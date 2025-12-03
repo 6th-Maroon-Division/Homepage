@@ -9,7 +9,9 @@
 * 🟢 You can import this file directly.
 */
 
+export const AuthProvider = {
+  discord: 'discord',
+  steam: 'steam'
+} as const
 
-
-// This file is empty because there are no enums in the schema.
-export {}
+export type AuthProvider = (typeof AuthProvider)[keyof typeof AuthProvider]

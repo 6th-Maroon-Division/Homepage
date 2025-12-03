@@ -39,14 +39,14 @@ export type AuthAccountSumAggregateOutputType = {
 export type AuthAccountMinAggregateOutputType = {
   id: number | null
   userId: number | null
-  provider: string | null
+  provider: $Enums.AuthProvider | null
   providerUserId: string | null
 }
 
 export type AuthAccountMaxAggregateOutputType = {
   id: number | null
   userId: number | null
-  provider: string | null
+  provider: $Enums.AuthProvider | null
   providerUserId: string | null
 }
 
@@ -180,7 +180,7 @@ export type AuthAccountGroupByArgs<ExtArgs extends runtime.Types.Extensions.Inte
 export type AuthAccountGroupByOutputType = {
   id: number
   userId: number
-  provider: string
+  provider: $Enums.AuthProvider
   providerUserId: string
   _count: AuthAccountCountAggregateOutputType | null
   _avg: AuthAccountAvgAggregateOutputType | null
@@ -210,7 +210,7 @@ export type AuthAccountWhereInput = {
   NOT?: Prisma.AuthAccountWhereInput | Prisma.AuthAccountWhereInput[]
   id?: Prisma.IntFilter<"AuthAccount"> | number
   userId?: Prisma.IntFilter<"AuthAccount"> | number
-  provider?: Prisma.StringFilter<"AuthAccount"> | string
+  provider?: Prisma.EnumAuthProviderFilter<"AuthAccount"> | $Enums.AuthProvider
   providerUserId?: Prisma.StringFilter<"AuthAccount"> | string
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
 }
@@ -230,7 +230,7 @@ export type AuthAccountWhereUniqueInput = Prisma.AtLeast<{
   OR?: Prisma.AuthAccountWhereInput[]
   NOT?: Prisma.AuthAccountWhereInput | Prisma.AuthAccountWhereInput[]
   userId?: Prisma.IntFilter<"AuthAccount"> | number
-  provider?: Prisma.StringFilter<"AuthAccount"> | string
+  provider?: Prisma.EnumAuthProviderFilter<"AuthAccount"> | $Enums.AuthProvider
   providerUserId?: Prisma.StringFilter<"AuthAccount"> | string
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
 }, "id" | "provider_providerUserId">
@@ -253,12 +253,12 @@ export type AuthAccountScalarWhereWithAggregatesInput = {
   NOT?: Prisma.AuthAccountScalarWhereWithAggregatesInput | Prisma.AuthAccountScalarWhereWithAggregatesInput[]
   id?: Prisma.IntWithAggregatesFilter<"AuthAccount"> | number
   userId?: Prisma.IntWithAggregatesFilter<"AuthAccount"> | number
-  provider?: Prisma.StringWithAggregatesFilter<"AuthAccount"> | string
+  provider?: Prisma.EnumAuthProviderWithAggregatesFilter<"AuthAccount"> | $Enums.AuthProvider
   providerUserId?: Prisma.StringWithAggregatesFilter<"AuthAccount"> | string
 }
 
 export type AuthAccountCreateInput = {
-  provider: string
+  provider: $Enums.AuthProvider
   providerUserId: string
   user: Prisma.UserCreateNestedOneWithoutAccountsInput
 }
@@ -266,12 +266,12 @@ export type AuthAccountCreateInput = {
 export type AuthAccountUncheckedCreateInput = {
   id?: number
   userId: number
-  provider: string
+  provider: $Enums.AuthProvider
   providerUserId: string
 }
 
 export type AuthAccountUpdateInput = {
-  provider?: Prisma.StringFieldUpdateOperationsInput | string
+  provider?: Prisma.EnumAuthProviderFieldUpdateOperationsInput | $Enums.AuthProvider
   providerUserId?: Prisma.StringFieldUpdateOperationsInput | string
   user?: Prisma.UserUpdateOneRequiredWithoutAccountsNestedInput
 }
@@ -279,26 +279,26 @@ export type AuthAccountUpdateInput = {
 export type AuthAccountUncheckedUpdateInput = {
   id?: Prisma.IntFieldUpdateOperationsInput | number
   userId?: Prisma.IntFieldUpdateOperationsInput | number
-  provider?: Prisma.StringFieldUpdateOperationsInput | string
+  provider?: Prisma.EnumAuthProviderFieldUpdateOperationsInput | $Enums.AuthProvider
   providerUserId?: Prisma.StringFieldUpdateOperationsInput | string
 }
 
 export type AuthAccountCreateManyInput = {
   id?: number
   userId: number
-  provider: string
+  provider: $Enums.AuthProvider
   providerUserId: string
 }
 
 export type AuthAccountUpdateManyMutationInput = {
-  provider?: Prisma.StringFieldUpdateOperationsInput | string
+  provider?: Prisma.EnumAuthProviderFieldUpdateOperationsInput | $Enums.AuthProvider
   providerUserId?: Prisma.StringFieldUpdateOperationsInput | string
 }
 
 export type AuthAccountUncheckedUpdateManyInput = {
   id?: Prisma.IntFieldUpdateOperationsInput | number
   userId?: Prisma.IntFieldUpdateOperationsInput | number
-  provider?: Prisma.StringFieldUpdateOperationsInput | string
+  provider?: Prisma.EnumAuthProviderFieldUpdateOperationsInput | $Enums.AuthProvider
   providerUserId?: Prisma.StringFieldUpdateOperationsInput | string
 }
 
@@ -313,7 +313,7 @@ export type AuthAccountOrderByRelationAggregateInput = {
 }
 
 export type AuthAccountProviderProviderUserIdCompoundUniqueInput = {
-  provider: string
+  provider: $Enums.AuthProvider
   providerUserId: string
 }
 
@@ -390,18 +390,22 @@ export type AuthAccountUncheckedUpdateManyWithoutUserNestedInput = {
   deleteMany?: Prisma.AuthAccountScalarWhereInput | Prisma.AuthAccountScalarWhereInput[]
 }
 
+export type EnumAuthProviderFieldUpdateOperationsInput = {
+  set?: $Enums.AuthProvider
+}
+
 export type StringFieldUpdateOperationsInput = {
   set?: string
 }
 
 export type AuthAccountCreateWithoutUserInput = {
-  provider: string
+  provider: $Enums.AuthProvider
   providerUserId: string
 }
 
 export type AuthAccountUncheckedCreateWithoutUserInput = {
   id?: number
-  provider: string
+  provider: $Enums.AuthProvider
   providerUserId: string
 }
 
@@ -437,30 +441,30 @@ export type AuthAccountScalarWhereInput = {
   NOT?: Prisma.AuthAccountScalarWhereInput | Prisma.AuthAccountScalarWhereInput[]
   id?: Prisma.IntFilter<"AuthAccount"> | number
   userId?: Prisma.IntFilter<"AuthAccount"> | number
-  provider?: Prisma.StringFilter<"AuthAccount"> | string
+  provider?: Prisma.EnumAuthProviderFilter<"AuthAccount"> | $Enums.AuthProvider
   providerUserId?: Prisma.StringFilter<"AuthAccount"> | string
 }
 
 export type AuthAccountCreateManyUserInput = {
   id?: number
-  provider: string
+  provider: $Enums.AuthProvider
   providerUserId: string
 }
 
 export type AuthAccountUpdateWithoutUserInput = {
-  provider?: Prisma.StringFieldUpdateOperationsInput | string
+  provider?: Prisma.EnumAuthProviderFieldUpdateOperationsInput | $Enums.AuthProvider
   providerUserId?: Prisma.StringFieldUpdateOperationsInput | string
 }
 
 export type AuthAccountUncheckedUpdateWithoutUserInput = {
   id?: Prisma.IntFieldUpdateOperationsInput | number
-  provider?: Prisma.StringFieldUpdateOperationsInput | string
+  provider?: Prisma.EnumAuthProviderFieldUpdateOperationsInput | $Enums.AuthProvider
   providerUserId?: Prisma.StringFieldUpdateOperationsInput | string
 }
 
 export type AuthAccountUncheckedUpdateManyWithoutUserInput = {
   id?: Prisma.IntFieldUpdateOperationsInput | number
-  provider?: Prisma.StringFieldUpdateOperationsInput | string
+  provider?: Prisma.EnumAuthProviderFieldUpdateOperationsInput | $Enums.AuthProvider
   providerUserId?: Prisma.StringFieldUpdateOperationsInput | string
 }
 
@@ -516,7 +520,7 @@ export type $AuthAccountPayload<ExtArgs extends runtime.Types.Extensions.Interna
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: number
     userId: number
-    provider: string
+    provider: $Enums.AuthProvider
     providerUserId: string
   }, ExtArgs["result"]["authAccount"]>
   composites: {}
@@ -944,7 +948,7 @@ export interface Prisma__AuthAccountClient<T, Null = never, ExtArgs extends runt
 export interface AuthAccountFieldRefs {
   readonly id: Prisma.FieldRef<"AuthAccount", 'Int'>
   readonly userId: Prisma.FieldRef<"AuthAccount", 'Int'>
-  readonly provider: Prisma.FieldRef<"AuthAccount", 'String'>
+  readonly provider: Prisma.FieldRef<"AuthAccount", 'AuthProvider'>
   readonly providerUserId: Prisma.FieldRef<"AuthAccount", 'String'>
 }
     

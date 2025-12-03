@@ -1,16 +1,21 @@
 generator client {
   provider = "prisma-client"
   output   = "../generated/prisma/"
-  // moduleFormat = "commonjs" // optional; default TS is fine for Next
 }
 
 datasource db {
   provider = "postgresql"
 }
 
+enum AuthProvider {
+  discord
+  steam
+}
+
 model User {
   id          Int           @id @default(autoincrement())
   username    String?
+  email       String?
   avatarUrl   String?
   isAdmin     Boolean       @default(false)
   createdAt   DateTime      @default(now())
@@ -20,10 +25,10 @@ model User {
 }
 
 model AuthAccount {
-  id             Int    @id @default(autoincrement())
-  user           User   @relation(fields: [userId], references: [id])
+  id             Int          @id @default(autoincrement())
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId         Int
-  provider       String // 'discord' | 'steam'
+  provider       AuthProvider // Using enum here for clarity
   providerUserId String
 
   @@unique([provider, providerUserId])
@@ -68,5 +73,5 @@ model Signup {
   createdAt DateTime @default(now())
 
   @@unique([subslotId, userId])
+  @@index([userId])  // Indexing for fast lookup
 }
-
