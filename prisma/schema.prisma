@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma/"
+  // moduleFormat = "commonjs" // optional; default TS is fine for Next
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id          Int           @id @default(autoincrement())
+  username    String?
+  avatarUrl   String?
+  isAdmin     Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  accounts    AuthAccount[]
+  orbats      Orbat[]       @relation("OrbatCreator")
+  signups     Signup[]
+}
+
+model AuthAccount {
+  id             Int    @id @default(autoincrement())
+  user           User   @relation(fields: [userId], references: [id])
+  userId         Int
+  provider       String // 'discord' | 'steam'
+  providerUserId String
+
+  @@unique([provider, providerUserId])
+}
+
+model Orbat {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String?
+  eventDate   DateTime?
+  createdBy   User      @relation("OrbatCreator", fields: [createdById], references: [id])
+  createdById Int
+  createdAt   DateTime  @default(now())
+  slots       Slot[]
+}
+
+model Slot {
+  id         Int       @id @default(autoincrement())
+  orbat      Orbat     @relation(fields: [orbatId], references: [id])
+  orbatId    Int
+  name       String
+  orderIndex Int
+  subslots   Subslot[]
+}
+
+model Subslot {
+  id          Int       @id @default(autoincrement())
+  slot        Slot      @relation(fields: [slotId], references: [id])
+  slotId      Int
+  name        String
+  orderIndex  Int
+  maxSignups  Int       @default(1)
+  signups     Signup[]
+}
+
+model Signup {
+  id        Int      @id @default(autoincrement())
+  subslot   Subslot  @relation(fields: [subslotId], references: [id])
+  subslotId Int
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  createdAt DateTime @default(now())
+
+  @@unique([subslotId, userId])
+}
+
