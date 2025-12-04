@@ -3,6 +3,7 @@
 import { useSession, signOut } from 'next-auth/react';
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function UserMenu() {
   const { data: session } = useSession();
@@ -36,9 +37,11 @@ export default function UserMenu() {
         className="flex items-center space-x-2 bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded-md transition-colors"
       >
         {session.user?.avatarUrl && (
-          <img
+          <Image
             src={session.user.avatarUrl}
             alt="User avatar"
+            width={32}
+            height={32}
             className="w-8 h-8 rounded-full"
           />
         )}

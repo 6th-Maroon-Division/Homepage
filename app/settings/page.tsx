@@ -3,6 +3,7 @@
 import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
 import { useState } from 'react';
+import Image from 'next/image';
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
@@ -95,10 +96,12 @@ export default function SettingsPage() {
                 Avatar
               </label>
               {session?.user?.avatarUrl && (
-                <img
+                <Image
                   src={session.user.avatarUrl}
                   alt="User avatar"
-                  className="w-20 h-20 rounded-full"
+                  width={80}
+                  height={80}
+                  className="rounded-full"
                 />
               )}
               <p className="mt-2 text-sm text-gray-500">
