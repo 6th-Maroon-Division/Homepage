@@ -232,7 +232,7 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                      {new Date(user.createdAt).toLocaleDateString()}
+                      {new Date(user.createdAt).toLocaleDateString('en-GB')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {user.isAdmin ? (

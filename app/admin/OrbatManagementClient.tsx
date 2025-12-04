@@ -180,7 +180,7 @@ export default function OrbatManagementClient({ orbats: initialOrbats }: OrbatMa
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
                         {orbat.eventDate ? (
                           <div>
-                            <div>{new Date(orbat.eventDate).toLocaleDateString()}</div>
+                            <div>{new Date(orbat.eventDate).toLocaleDateString('en-GB')}</div>
                             <div className="text-xs text-gray-500">
                               {new Date(orbat.eventDate).toLocaleTimeString([], {
                                 hour: '2-digit',

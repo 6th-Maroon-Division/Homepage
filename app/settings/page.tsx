@@ -141,7 +141,7 @@ export default function SettingsPage() {
             </div>
             <div className="flex justify-between">
               <span className="font-medium">Account Created:</span>
-              <span>{session?.user?.createdAt ? new Date(session.user.createdAt).toLocaleDateString() : 'N/A'}</span>
+              <span>{session?.user?.createdAt ? new Date(session.user.createdAt).toLocaleDateString('en-GB') : 'N/A'}</span>
             </div>
             <div className="flex justify-between">
               <span className="font-medium">Admin Status:</span>

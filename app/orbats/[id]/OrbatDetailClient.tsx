@@ -197,7 +197,7 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
         {eventDate && (
           <p className="text-xs text-gray-400">
             Event date:{' '}
-            {eventDate.toLocaleString(undefined, {
+            {eventDate.toLocaleString('en-GB', {
               dateStyle: 'medium',
               timeStyle: 'short',
             })}

@@ -51,7 +51,7 @@ function getMonthCalendar(year: number, month: number) {
 }
 
 function formatHumanDate(date: Date) {
-  return date.toLocaleString(undefined, {
+  return date.toLocaleString('en-GB', {
     dateStyle: 'medium',
     timeStyle: 'short',
   });
@@ -82,7 +82,7 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
 
   const monthLabel = useMemo(
     () =>
-      new Date(currentYear, currentMonth, 1).toLocaleString(undefined, {
+      new Date(currentYear, currentMonth, 1).toLocaleString('en-GB', {
         month: 'long',
         year: 'numeric',
       }),
@@ -109,12 +109,15 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
       return;
     }
 
-    if (dayOps.length === 1) {
-      // Navigate to admin view if admin, otherwise public view
-      const route = isAdmin ? `/admin/orbats/${dayOps[0].id}` : `/orbats/${dayOps[0].id}`;
-      router.push(route);
+    if (isAdmin) {
+      // Admin always shows modal for days with operations
+      setSelectedDateKey(dateKey);
+      setShowDayModal(true);
+    } else if (dayOps.length === 1) {
+      // Public view: single op navigates directly
+      router.push(`/orbats/${dayOps[0].id}`);
     } else {
-      // Multiple ops - show modal
+      // Public view: multiple ops show modal
       setSelectedDateKey(dateKey);
       setShowDayModal(true);
     }
@@ -255,20 +258,20 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
           {isAdmin && ' As an admin, you can click any empty day to create a new operation.'}
         </p>
 
-        {showDayModal && selectedDateKey && selectedOps.length > 1 && (
+        {showDayModal && selectedDateKey && selectedOps.length > 0 && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowDayModal(false)}>
             <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
               <h3 className="text-xl font-bold mb-4">
-                {new Date(selectedOps[0].eventDate).toLocaleDateString('en-US', { 
+                {new Date(selectedOps[0].eventDate).toLocaleDateString('en-GB', { 
                   weekday: 'long', 
-                  month: 'long', 
                   day: 'numeric', 
+                  month: 'long', 
                   year: 'numeric' 
                 })}
               </h3>
               
               <div className="space-y-3 mb-4">
-                <p className="text-sm text-gray-400">Operations on this day:</p>
+                <p className="text-sm text-gray-400">{selectedOps.length === 1 ? 'Operation on this day:' : 'Operations on this day:'}</p>
                 {selectedOps.map((op) => (
                   <button
                     key={op.id}

@@ -165,7 +165,7 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
             {eventDate && (
               <p className="text-xs text-gray-400 mt-1">
                 Event date:{' '}
-                {eventDate.toLocaleString(undefined, {
+                {eventDate.toLocaleString('en-GB', {
                   dateStyle: 'medium',
                   timeStyle: 'short',
                 })}

@@ -129,7 +129,7 @@ export default function OrbatCalendar({ orbats }: OrbatCalendarProps) {
         {/* Calendar Header */}
         <div className="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
           <h2 className="text-xl font-semibold">
-            {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            {currentMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
           </h2>
           <div className="flex gap-2">
             <button
@@ -176,7 +176,7 @@ export default function OrbatCalendar({ orbats }: OrbatCalendarProps) {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowDayModal(false)}>
           <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-xl font-bold mb-4">
-              {selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+              {selectedDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </h3>
             
             <div className="space-y-3 mb-4">
