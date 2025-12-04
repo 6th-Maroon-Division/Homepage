@@ -43,11 +43,11 @@ export default async function UsersManagementPage() {
 
   return (
     <main className="min-h-screen">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         <header className="space-y-2">
           <h1 className="text-2xl sm:text-3xl font-bold">User Management</h1>
           <p className="text-sm sm:text-base text-gray-300">
-            View and manage user accounts and permissions
+            Manage user accounts, roles, and permissions
           </p>
         </header>
 

@@ -64,13 +64,13 @@ export default async function EditOrbatPage({ params }: EditOrbatPageProps) {
 
   return (
     <main className="min-h-screen">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        <div>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <header className="space-y-2">
           <h1 className="text-2xl sm:text-3xl font-bold">Edit OrbAT</h1>
-          <p className="text-sm sm:text-base text-gray-300 mt-2">
+          <p className="text-sm sm:text-base text-gray-300">
             Modify operation details, slots, and subslots
           </p>
-        </div>
+        </header>
 
         <OrbatForm mode="edit" initialData={initialData} />
       </div>

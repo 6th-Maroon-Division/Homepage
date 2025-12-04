@@ -13,13 +13,13 @@ export default async function AdminPage() {
 
   return (
     <main className="min-h-screen">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        <div>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <header className="space-y-2">
           <h1 className="text-2xl sm:text-3xl font-bold">Admin Panel</h1>
-          <p className="text-sm sm:text-base text-gray-300 mt-2">
+          <p className="text-sm sm:text-base text-gray-300">
             Manage operations and system settings
           </p>
-        </div>
+        </header>
 
         {/* Category Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

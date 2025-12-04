@@ -13,13 +13,13 @@ export default async function NewOrbatPage() {
 
   return (
     <main className="min-h-screen">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        <div>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <header className="space-y-2">
           <h1 className="text-2xl sm:text-3xl font-bold">Create New OrbAT</h1>
-          <p className="text-sm sm:text-base text-gray-300 mt-2">
+          <p className="text-sm sm:text-base text-gray-300">
             Set up a new operation with slots and subslots
           </p>
-        </div>
+        </header>
 
         <OrbatForm mode="create" />
       </div>
