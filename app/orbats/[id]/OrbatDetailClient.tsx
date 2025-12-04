@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 type ClientSignup = {
   id: number;
@@ -55,9 +55,22 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
   const [orbat, setOrbat] = useState<ClientOrbat>(initialOrbat);
   const [loadingSubslotId, setLoadingSubslotId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
   const eventDate = orbat.eventDate ? new Date(orbat.eventDate) : null;
   const isPast = !!eventDate && eventDate < new Date();
+
+  // Fetch current user ID on mount
+  useEffect(() => {
+    fetch('/api/user/current')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.id) setCurrentUserId(data.id);
+      })
+      .catch(() => {
+        // Ignore error - user might not be logged in
+      });
+  }, []);
 
   async function handleSignup(subslotId: number) {
     setError(null);
@@ -114,6 +127,61 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
     }
   }
 
+  async function handleUnsign(subslotId: number) {
+    setError(null);
+    setLoadingSubslotId(subslotId);
+
+    try {
+      const res = await fetch(`/api/subslots/${subslotId}/signup`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        let message = 'Failed to remove signup.';
+        try {
+          const body: { error?: string } = await res.json();
+          if (body.error) message = body.error;
+        } catch {
+          // ignore JSON parse error
+        }
+        setError(message);
+        return;
+      }
+
+      const updated: ApiSubslot = await res.json();
+
+      const mappedSubslot: ClientSubslot = {
+        id: updated.id,
+        name: updated.name,
+        orderIndex: updated.orderIndex,
+        maxSignups: updated.maxSignups,
+        signups: updated.signups.map((s) => ({
+          id: s.id,
+          user: s.user
+            ? {
+                id: s.user.id,
+                username: s.user.username,
+              }
+            : null,
+        })),
+      };
+
+      setOrbat((prev) => ({
+        ...prev,
+        slots: prev.slots.map((slot) => ({
+          ...slot,
+          subslots: slot.subslots.map((sub) =>
+            sub.id === mappedSubslot.id ? mappedSubslot : sub,
+          ),
+        })),
+      }));
+    } catch {
+      setError('Network error while removing signup.');
+    } finally {
+      setLoadingSubslotId(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -163,8 +231,10 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
               {slot.subslots.map((sub) => {
                 const hasSignup = sub.signups.length > 0;
                 const isFull = sub.signups.length >= sub.maxSignups;
+                const userSignedUp = currentUserId !== null && sub.signups.some(s => s.user?.id === currentUserId);
 
-                const showButton = !isPast && !hasSignup && !isFull;
+                const showSignupButton = !isPast && !userSignedUp && !isFull;
+                const showUnsignButton = !isPast && userSignedUp;
 
                 return (
                   <li
@@ -184,7 +254,7 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
                       )}
                     </div>
 
-                    {showButton && (
+                    {showSignupButton && (
                       <button
                         type="button"
                         onClick={() => handleSignup(sub.id)}
@@ -192,6 +262,17 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
                         className="mt-1 sm:mt-0 inline-flex items-center justify-center rounded-md border border-slate-600 px-3 py-1 text-xs font-medium hover:bg-slate-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {loadingSubslotId === sub.id ? 'Signing…' : 'Sign up'}
+                      </button>
+                    )}
+
+                    {showUnsignButton && (
+                      <button
+                        type="button"
+                        onClick={() => handleUnsign(sub.id)}
+                        disabled={loadingSubslotId === sub.id}
+                        className="mt-1 sm:mt-0 inline-flex items-center justify-center rounded-md border border-red-600 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-950/50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loadingSubslotId === sub.id ? 'Removing…' : 'Remove'}
                       </button>
                     )}
                   </li>

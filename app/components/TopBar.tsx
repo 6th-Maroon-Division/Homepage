@@ -2,15 +2,16 @@
 
 'use client'; // Mark this as a Client Component
 
-import { useSession, signIn, signOut } from 'next-auth/react';
+import { useSession, signIn } from 'next-auth/react';
+import UserMenu from './UserMenu';
 
 export default function TopBar() {
   const { data: session } = useSession();
 
   return (
     <div className="bg-gray-800 text-white p-4 flex justify-between items-center">
-      <div className="text-xl font-semibold">Your App</div>
-      <div className="space-x-4">
+      <div className="text-xl font-semibold">6MD</div>
+      <div className="space-x-4 flex items-center">
         {!session ? (
           <button
             onClick={() => signIn('discord')}
@@ -19,15 +20,7 @@ export default function TopBar() {
             Sign in with Discord
           </button>
         ) : (
-          <>
-            <span>Welcome, {session.user?.username}</span>
-            <button
-              onClick={() => signOut()}
-              className="bg-red-600 text-white p-2 rounded-md hover:bg-red-700"
-            >
-              Sign out
-            </button>
-          </>
+          <UserMenu />
         )}
       </div>
     </div>

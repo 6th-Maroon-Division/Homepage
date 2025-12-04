@@ -164,3 +164,104 @@ export async function POST(_req: NextRequest, context: RouteParams) {
 
   return NextResponse.json(responseBody);
 }
+
+export async function DELETE(_req: NextRequest, context: RouteParams) {
+  const { id } = await context.params;
+  const subslotId = Number(id);
+
+  if (Number.isNaN(subslotId)) {
+    return NextResponse.json({ error: 'Invalid subslot id' }, { status: 400 });
+  }
+
+  // Get the current logged-in user from session
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return NextResponse.json(
+      { error: 'You must be logged in to remove a signup.' },
+      { status: 401 },
+    );
+  }
+
+  const currentUserId = Number(session.user.id);
+
+  // Load subslot to check if the operation is in the past
+  const subslot = await prisma.subslot.findUnique({
+    where: { id: subslotId },
+    include: {
+      slot: {
+        include: { orbat: true },
+      },
+    },
+  });
+
+  if (!subslot) {
+    return NextResponse.json({ error: 'Subslot not found' }, { status: 404 });
+  }
+
+  const orbat = subslot.slot.orbat;
+  const now = new Date();
+
+  // Past ops cannot be modified
+  if (orbat.eventDate && orbat.eventDate < now) {
+    return NextResponse.json(
+      { error: 'Operation is in the past. Signups cannot be modified.' },
+      { status: 400 },
+    );
+  }
+
+  // Find the user's signup for this subslot
+  const signup = await prisma.signup.findFirst({
+    where: {
+      subslotId,
+      userId: currentUserId,
+    },
+  });
+
+  if (!signup) {
+    return NextResponse.json(
+      { error: 'You are not signed up for this slot.' },
+      { status: 400 },
+    );
+  }
+
+  // Delete the signup
+  await prisma.signup.delete({
+    where: { id: signup.id },
+  });
+
+  // Return updated subslot with users included
+  const updatedSubslot = await prisma.subslot.findUnique({
+    where: { id: subslotId },
+    include: {
+      signups: {
+        include: { user: true },
+      },
+    },
+  });
+
+  if (!updatedSubslot) {
+    return NextResponse.json(
+      { error: 'Failed to load updated subslot.' },
+      { status: 500 },
+    );
+  }
+
+  const responseBody: SubslotWithSignupsAndUser = {
+    id: updatedSubslot.id,
+    name: updatedSubslot.name,
+    orderIndex: updatedSubslot.orderIndex,
+    maxSignups: updatedSubslot.maxSignups,
+    signups: updatedSubslot.signups.map((s) => ({
+      id: s.id,
+      user: s.user
+        ? {
+            id: s.user.id,
+            username: s.user.username,
+          }
+        : null,
+    })),
+  };
+
+  return NextResponse.json(responseBody);
+}

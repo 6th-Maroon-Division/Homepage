@@ -1,8 +1,27 @@
 import NextAuth from 'next-auth';
+import type { AuthOptions, Session } from 'next-auth';
+import type { JWT } from 'next-auth/jwt';
 import DiscordProvider from 'next-auth/providers/discord';
 import { prisma } from '@/lib/prisma';
 
-export const authOptions = {
+interface DiscordProfile {
+  id: string;
+  username: string;
+  global_name?: string;
+  email?: string;
+  image_url?: string;
+}
+
+interface ExtendedJWT extends JWT {
+  id?: number;
+  username?: string | null;
+  email?: string | null;
+  avatarUrl?: string | null;
+  isAdmin?: boolean;
+  createdAt?: Date;
+}
+
+export const authOptions: AuthOptions = {
   providers: [
     DiscordProvider({
       clientId: process.env.DISCORD_CLIENT_ID!,
@@ -10,15 +29,17 @@ export const authOptions = {
     }),
   ],
   callbacks: {
-    async signIn({ user, account, profile }: any) {
+    async signIn({ account, profile }) {
       if (!account || !profile) return false;
 
+      const discordProfile = profile as DiscordProfile;
+
       // Check if this Discord account already exists
-      let authAccount = await prisma.authAccount.findUnique({
+      const authAccount = await prisma.authAccount.findUnique({
         where: {
           provider_providerUserId: {
             provider: 'discord',
-            providerUserId: profile.id,
+            providerUserId: discordProfile.id,
           },
         },
         include: { user: true },
@@ -26,15 +47,16 @@ export const authOptions = {
 
       if (!authAccount) {
         // Create new user and link Discord account
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const newUser = await prisma.user.create({
           data: {
-            username: profile.username || profile.global_name || user.name,
-            email: user.email,
-            avatarUrl: user.image,
+            username: discordProfile.username || discordProfile.global_name,
+            email: discordProfile.email,
+            avatarUrl: discordProfile.image_url,
             accounts: {
               create: {
                 provider: 'discord',
-                providerUserId: profile.id,
+                providerUserId: discordProfile.id,
               },
             },
           },
@@ -44,10 +66,11 @@ export const authOptions = {
       return true;
     },
 
-    async jwt({ token, profile, trigger }: any) {
+    async jwt({ token, profile, trigger }) {
       // On signin or profile update, fetch user from database
       if (profile || trigger === 'signIn' || trigger === 'update') {
-        const providerUserId = profile?.id || token.sub;
+        const discordProfile = profile as DiscordProfile | undefined;
+        const providerUserId = discordProfile?.id || token.sub;
         
         if (providerUserId) {
           const authAccount = await prisma.authAccount.findUnique({
@@ -61,20 +84,28 @@ export const authOptions = {
           });
 
           if (authAccount) {
-            token.id = authAccount.user.id;
-            token.username = authAccount.user.username;
-            token.email = authAccount.user.email;
+            const extendedToken = token as ExtendedJWT;
+            extendedToken.id = authAccount.user.id;
+            extendedToken.username = authAccount.user.username;
+            extendedToken.email = authAccount.user.email ?? null;
+            extendedToken.avatarUrl = authAccount.user.avatarUrl;
+            extendedToken.isAdmin = authAccount.user.isAdmin;
+            extendedToken.createdAt = authAccount.user.createdAt;
           }
         }
       }
       return token;
     },
 
-    async session({ session, token }: any) {
+    async session({ session, token }: { session: Session; token: JWT }) {
+      const extendedToken = token as ExtendedJWT;
       if (session.user) {
-        session.user.id = token.id;
-        session.user.username = token.username;
-        session.user.email = token.email;
+        session.user.id = extendedToken.id as number;
+        session.user.username = extendedToken.username ?? null;
+        session.user.email = extendedToken.email ?? null;
+        session.user.avatarUrl = extendedToken.avatarUrl ?? null;
+        session.user.isAdmin = extendedToken.isAdmin as boolean;
+        session.user.createdAt = extendedToken.createdAt as Date;
       }
       return session;
     },
