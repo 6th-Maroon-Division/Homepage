@@ -39,6 +39,8 @@ model Orbat {
   name        String
   description String?
   eventDate   DateTime?
+  startTime   String?
+  endTime     String?
   createdBy   User      @relation("OrbatCreator", fields: [createdById], references: [id])
   createdById Int
   createdAt   DateTime  @default(now())
@@ -47,7 +49,7 @@ model Orbat {
 
 model Slot {
   id         Int       @id @default(autoincrement())
-  orbat      Orbat     @relation(fields: [orbatId], references: [id])
+  orbat      Orbat     @relation(fields: [orbatId], references: [id], onDelete: Cascade)
   orbatId    Int
   name       String
   orderIndex Int
@@ -56,7 +58,7 @@ model Slot {
 
 model Subslot {
   id          Int       @id @default(autoincrement())
-  slot        Slot      @relation(fields: [slotId], references: [id])
+  slot        Slot      @relation(fields: [slotId], references: [id], onDelete: Cascade)
   slotId      Int
   name        String
   orderIndex  Int
@@ -66,9 +68,9 @@ model Subslot {
 
 model Signup {
   id        Int      @id @default(autoincrement())
-  subslot   Subslot  @relation(fields: [subslotId], references: [id])
+  subslot   Subslot  @relation(fields: [subslotId], references: [id], onDelete: Cascade)
   subslotId Int
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    Int
   createdAt DateTime @default(now())
 

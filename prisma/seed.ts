@@ -16,11 +16,17 @@ async function main() {
   await prisma.authAccount.deleteMany();
   await prisma.user.deleteMany();
 
-  // --- Users ---
+  // --- Admin User (YOU) ---
   const admin = await prisma.user.create({
     data: {
-      username: 'Admin',
+      username: 'chilla55',
       isAdmin: true,
+      accounts: {
+        create: {
+          provider: 'discord',
+          providerUserId: '894924053276663810',
+        },
+      },
     },
   });
 
@@ -54,6 +60,8 @@ async function main() {
       description: 'A completed operation from last week.',
       createdById: admin.id,
       eventDate: pastDate,
+      startTime: '19:00',
+      endTime: '21:30',
     },
   });
 

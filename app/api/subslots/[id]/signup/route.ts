@@ -165,7 +165,7 @@ export async function POST(_req: NextRequest, context: RouteParams) {
   return NextResponse.json(responseBody);
 }
 
-export async function DELETE(_req: NextRequest, context: RouteParams) {
+export async function DELETE(req: NextRequest, context: RouteParams) {
   const { id } = await context.params;
   const subslotId = Number(id);
 
@@ -184,6 +184,7 @@ export async function DELETE(_req: NextRequest, context: RouteParams) {
   }
 
   const currentUserId = Number(session.user.id);
+  const isAdmin = session.user.isAdmin || false;
 
   // Load subslot to check if the operation is in the past
   const subslot = await prisma.subslot.findUnique({
@@ -202,25 +203,41 @@ export async function DELETE(_req: NextRequest, context: RouteParams) {
   const orbat = subslot.slot.orbat;
   const now = new Date();
 
-  // Past ops cannot be modified
-  if (orbat.eventDate && orbat.eventDate < now) {
+  // Past ops cannot be modified (unless admin)
+  if (!isAdmin && orbat.eventDate && orbat.eventDate < now) {
     return NextResponse.json(
       { error: 'Operation is in the past. Signups cannot be modified.' },
       { status: 400 },
     );
   }
 
-  // Find the user's signup for this subslot
-  const signup = await prisma.signup.findFirst({
-    where: {
-      subslotId,
-      userId: currentUserId,
-    },
-  });
+  // Admins can specify a signup ID to delete, otherwise delete current user's signup
+  const body = await req.json().catch(() => ({}));
+  const signupIdToDelete = body.signupId;
+
+  let signup;
+
+  if (isAdmin && signupIdToDelete) {
+    // Admin removing a specific signup
+    signup = await prisma.signup.findFirst({
+      where: {
+        id: Number(signupIdToDelete),
+        subslotId,
+      },
+    });
+  } else {
+    // User removing their own signup
+    signup = await prisma.signup.findFirst({
+      where: {
+        subslotId,
+        userId: currentUserId,
+      },
+    });
+  }
 
   if (!signup) {
     return NextResponse.json(
-      { error: 'You are not signed up for this slot.' },
+      { error: 'Signup not found.' },
       { status: 400 },
     );
   }

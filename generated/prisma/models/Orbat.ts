@@ -41,6 +41,8 @@ export type OrbatMinAggregateOutputType = {
   name: string | null
   description: string | null
   eventDate: Date | null
+  startTime: string | null
+  endTime: string | null
   createdById: number | null
   createdAt: Date | null
 }
@@ -50,6 +52,8 @@ export type OrbatMaxAggregateOutputType = {
   name: string | null
   description: string | null
   eventDate: Date | null
+  startTime: string | null
+  endTime: string | null
   createdById: number | null
   createdAt: Date | null
 }
@@ -59,6 +63,8 @@ export type OrbatCountAggregateOutputType = {
   name: number
   description: number
   eventDate: number
+  startTime: number
+  endTime: number
   createdById: number
   createdAt: number
   _all: number
@@ -80,6 +86,8 @@ export type OrbatMinAggregateInputType = {
   name?: true
   description?: true
   eventDate?: true
+  startTime?: true
+  endTime?: true
   createdById?: true
   createdAt?: true
 }
@@ -89,6 +97,8 @@ export type OrbatMaxAggregateInputType = {
   name?: true
   description?: true
   eventDate?: true
+  startTime?: true
+  endTime?: true
   createdById?: true
   createdAt?: true
 }
@@ -98,6 +108,8 @@ export type OrbatCountAggregateInputType = {
   name?: true
   description?: true
   eventDate?: true
+  startTime?: true
+  endTime?: true
   createdById?: true
   createdAt?: true
   _all?: true
@@ -194,6 +206,8 @@ export type OrbatGroupByOutputType = {
   name: string
   description: string | null
   eventDate: Date | null
+  startTime: string | null
+  endTime: string | null
   createdById: number
   createdAt: Date
   _count: OrbatCountAggregateOutputType | null
@@ -226,6 +240,8 @@ export type OrbatWhereInput = {
   name?: Prisma.StringFilter<"Orbat"> | string
   description?: Prisma.StringNullableFilter<"Orbat"> | string | null
   eventDate?: Prisma.DateTimeNullableFilter<"Orbat"> | Date | string | null
+  startTime?: Prisma.StringNullableFilter<"Orbat"> | string | null
+  endTime?: Prisma.StringNullableFilter<"Orbat"> | string | null
   createdById?: Prisma.IntFilter<"Orbat"> | number
   createdAt?: Prisma.DateTimeFilter<"Orbat"> | Date | string
   createdBy?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
@@ -237,6 +253,8 @@ export type OrbatOrderByWithRelationInput = {
   name?: Prisma.SortOrder
   description?: Prisma.SortOrderInput | Prisma.SortOrder
   eventDate?: Prisma.SortOrderInput | Prisma.SortOrder
+  startTime?: Prisma.SortOrderInput | Prisma.SortOrder
+  endTime?: Prisma.SortOrderInput | Prisma.SortOrder
   createdById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   createdBy?: Prisma.UserOrderByWithRelationInput
@@ -251,6 +269,8 @@ export type OrbatWhereUniqueInput = Prisma.AtLeast<{
   name?: Prisma.StringFilter<"Orbat"> | string
   description?: Prisma.StringNullableFilter<"Orbat"> | string | null
   eventDate?: Prisma.DateTimeNullableFilter<"Orbat"> | Date | string | null
+  startTime?: Prisma.StringNullableFilter<"Orbat"> | string | null
+  endTime?: Prisma.StringNullableFilter<"Orbat"> | string | null
   createdById?: Prisma.IntFilter<"Orbat"> | number
   createdAt?: Prisma.DateTimeFilter<"Orbat"> | Date | string
   createdBy?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
@@ -262,6 +282,8 @@ export type OrbatOrderByWithAggregationInput = {
   name?: Prisma.SortOrder
   description?: Prisma.SortOrderInput | Prisma.SortOrder
   eventDate?: Prisma.SortOrderInput | Prisma.SortOrder
+  startTime?: Prisma.SortOrderInput | Prisma.SortOrder
+  endTime?: Prisma.SortOrderInput | Prisma.SortOrder
   createdById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.OrbatCountOrderByAggregateInput
@@ -279,6 +301,8 @@ export type OrbatScalarWhereWithAggregatesInput = {
   name?: Prisma.StringWithAggregatesFilter<"Orbat"> | string
   description?: Prisma.StringNullableWithAggregatesFilter<"Orbat"> | string | null
   eventDate?: Prisma.DateTimeNullableWithAggregatesFilter<"Orbat"> | Date | string | null
+  startTime?: Prisma.StringNullableWithAggregatesFilter<"Orbat"> | string | null
+  endTime?: Prisma.StringNullableWithAggregatesFilter<"Orbat"> | string | null
   createdById?: Prisma.IntWithAggregatesFilter<"Orbat"> | number
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Orbat"> | Date | string
 }
@@ -287,6 +311,8 @@ export type OrbatCreateInput = {
   name: string
   description?: string | null
   eventDate?: Date | string | null
+  startTime?: string | null
+  endTime?: string | null
   createdAt?: Date | string
   createdBy: Prisma.UserCreateNestedOneWithoutOrbatsInput
   slots?: Prisma.SlotCreateNestedManyWithoutOrbatInput
@@ -297,6 +323,8 @@ export type OrbatUncheckedCreateInput = {
   name: string
   description?: string | null
   eventDate?: Date | string | null
+  startTime?: string | null
+  endTime?: string | null
   createdById: number
   createdAt?: Date | string
   slots?: Prisma.SlotUncheckedCreateNestedManyWithoutOrbatInput
@@ -306,6 +334,8 @@ export type OrbatUpdateInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  startTime?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  endTime?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdBy?: Prisma.UserUpdateOneRequiredWithoutOrbatsNestedInput
   slots?: Prisma.SlotUpdateManyWithoutOrbatNestedInput
@@ -316,6 +346,8 @@ export type OrbatUncheckedUpdateInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  startTime?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  endTime?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdById?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   slots?: Prisma.SlotUncheckedUpdateManyWithoutOrbatNestedInput
@@ -326,6 +358,8 @@ export type OrbatCreateManyInput = {
   name: string
   description?: string | null
   eventDate?: Date | string | null
+  startTime?: string | null
+  endTime?: string | null
   createdById: number
   createdAt?: Date | string
 }
@@ -334,6 +368,8 @@ export type OrbatUpdateManyMutationInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  startTime?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  endTime?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -342,6 +378,8 @@ export type OrbatUncheckedUpdateManyInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  startTime?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  endTime?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdById?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -361,6 +399,8 @@ export type OrbatCountOrderByAggregateInput = {
   name?: Prisma.SortOrder
   description?: Prisma.SortOrder
   eventDate?: Prisma.SortOrder
+  startTime?: Prisma.SortOrder
+  endTime?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
@@ -375,6 +415,8 @@ export type OrbatMaxOrderByAggregateInput = {
   name?: Prisma.SortOrder
   description?: Prisma.SortOrder
   eventDate?: Prisma.SortOrder
+  startTime?: Prisma.SortOrder
+  endTime?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
@@ -384,6 +426,8 @@ export type OrbatMinOrderByAggregateInput = {
   name?: Prisma.SortOrder
   description?: Prisma.SortOrder
   eventDate?: Prisma.SortOrder
+  startTime?: Prisma.SortOrder
+  endTime?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
@@ -462,6 +506,8 @@ export type OrbatCreateWithoutCreatedByInput = {
   name: string
   description?: string | null
   eventDate?: Date | string | null
+  startTime?: string | null
+  endTime?: string | null
   createdAt?: Date | string
   slots?: Prisma.SlotCreateNestedManyWithoutOrbatInput
 }
@@ -471,6 +517,8 @@ export type OrbatUncheckedCreateWithoutCreatedByInput = {
   name: string
   description?: string | null
   eventDate?: Date | string | null
+  startTime?: string | null
+  endTime?: string | null
   createdAt?: Date | string
   slots?: Prisma.SlotUncheckedCreateNestedManyWithoutOrbatInput
 }
@@ -509,6 +557,8 @@ export type OrbatScalarWhereInput = {
   name?: Prisma.StringFilter<"Orbat"> | string
   description?: Prisma.StringNullableFilter<"Orbat"> | string | null
   eventDate?: Prisma.DateTimeNullableFilter<"Orbat"> | Date | string | null
+  startTime?: Prisma.StringNullableFilter<"Orbat"> | string | null
+  endTime?: Prisma.StringNullableFilter<"Orbat"> | string | null
   createdById?: Prisma.IntFilter<"Orbat"> | number
   createdAt?: Prisma.DateTimeFilter<"Orbat"> | Date | string
 }
@@ -517,6 +567,8 @@ export type OrbatCreateWithoutSlotsInput = {
   name: string
   description?: string | null
   eventDate?: Date | string | null
+  startTime?: string | null
+  endTime?: string | null
   createdAt?: Date | string
   createdBy: Prisma.UserCreateNestedOneWithoutOrbatsInput
 }
@@ -526,6 +578,8 @@ export type OrbatUncheckedCreateWithoutSlotsInput = {
   name: string
   description?: string | null
   eventDate?: Date | string | null
+  startTime?: string | null
+  endTime?: string | null
   createdById: number
   createdAt?: Date | string
 }
@@ -550,6 +604,8 @@ export type OrbatUpdateWithoutSlotsInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  startTime?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  endTime?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdBy?: Prisma.UserUpdateOneRequiredWithoutOrbatsNestedInput
 }
@@ -559,6 +615,8 @@ export type OrbatUncheckedUpdateWithoutSlotsInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  startTime?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  endTime?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdById?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -568,6 +626,8 @@ export type OrbatCreateManyCreatedByInput = {
   name: string
   description?: string | null
   eventDate?: Date | string | null
+  startTime?: string | null
+  endTime?: string | null
   createdAt?: Date | string
 }
 
@@ -575,6 +635,8 @@ export type OrbatUpdateWithoutCreatedByInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  startTime?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  endTime?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   slots?: Prisma.SlotUpdateManyWithoutOrbatNestedInput
 }
@@ -584,6 +646,8 @@ export type OrbatUncheckedUpdateWithoutCreatedByInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  startTime?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  endTime?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   slots?: Prisma.SlotUncheckedUpdateManyWithoutOrbatNestedInput
 }
@@ -593,6 +657,8 @@ export type OrbatUncheckedUpdateManyWithoutCreatedByInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  startTime?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  endTime?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -632,6 +698,8 @@ export type OrbatSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   name?: boolean
   description?: boolean
   eventDate?: boolean
+  startTime?: boolean
+  endTime?: boolean
   createdById?: boolean
   createdAt?: boolean
   createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -644,6 +712,8 @@ export type OrbatSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   name?: boolean
   description?: boolean
   eventDate?: boolean
+  startTime?: boolean
+  endTime?: boolean
   createdById?: boolean
   createdAt?: boolean
   createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -654,6 +724,8 @@ export type OrbatSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   name?: boolean
   description?: boolean
   eventDate?: boolean
+  startTime?: boolean
+  endTime?: boolean
   createdById?: boolean
   createdAt?: boolean
   createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -664,11 +736,13 @@ export type OrbatSelectScalar = {
   name?: boolean
   description?: boolean
   eventDate?: boolean
+  startTime?: boolean
+  endTime?: boolean
   createdById?: boolean
   createdAt?: boolean
 }
 
-export type OrbatOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "description" | "eventDate" | "createdById" | "createdAt", ExtArgs["result"]["orbat"]>
+export type OrbatOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "description" | "eventDate" | "startTime" | "endTime" | "createdById" | "createdAt", ExtArgs["result"]["orbat"]>
 export type OrbatInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   slots?: boolean | Prisma.Orbat$slotsArgs<ExtArgs>
@@ -692,6 +766,8 @@ export type $OrbatPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     name: string
     description: string | null
     eventDate: Date | null
+    startTime: string | null
+    endTime: string | null
     createdById: number
     createdAt: Date
   }, ExtArgs["result"]["orbat"]>
@@ -1123,6 +1199,8 @@ export interface OrbatFieldRefs {
   readonly name: Prisma.FieldRef<"Orbat", 'String'>
   readonly description: Prisma.FieldRef<"Orbat", 'String'>
   readonly eventDate: Prisma.FieldRef<"Orbat", 'DateTime'>
+  readonly startTime: Prisma.FieldRef<"Orbat", 'String'>
+  readonly endTime: Prisma.FieldRef<"Orbat", 'String'>
   readonly createdById: Prisma.FieldRef<"Orbat", 'Int'>
   readonly createdAt: Prisma.FieldRef<"Orbat", 'DateTime'>
 }

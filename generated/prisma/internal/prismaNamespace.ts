@@ -919,6 +919,8 @@ export const OrbatScalarFieldEnum = {
   name: 'name',
   description: 'description',
   eventDate: 'eventDate',
+  startTime: 'startTime',
+  endTime: 'endTime',
   createdById: 'createdById',
   createdAt: 'createdAt'
 } as const

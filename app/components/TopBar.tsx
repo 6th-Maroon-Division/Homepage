@@ -11,14 +11,24 @@ export default function TopBar() {
   const { data: session } = useSession();
   const pathname = usePathname();
 
-  const navLinks = [
+  const isAdminRoute = pathname?.startsWith('/admin');
+
+  const publicNavLinks = [
     { href: '/', label: 'Home' },
     { href: '/orbats', label: 'Operations' },
   ];
 
+  const adminNavLinks = [
+    { href: '/admin', label: 'Dashboard' },
+    { href: '/admin/orbats', label: 'OrbATs' },
+    { href: '/admin/users', label: 'Users' },
+  ];
+
+  const navLinks = isAdminRoute ? adminNavLinks : publicNavLinks;
+
   const isActive = (href: string) => {
-    if (href === '/') {
-      return pathname === '/';
+    if (href === '/' || href === '/admin') {
+      return pathname === href;
     }
     return pathname?.startsWith(href);
   };
@@ -27,7 +37,7 @@ export default function TopBar() {
     <div className="bg-gray-800 text-white p-4 flex justify-between items-center">
       <div className="flex items-center space-x-8">
         <Link href="/" className="text-xl font-semibold hover:text-gray-300 transition-colors">
-          6MD
+          6MD {isAdminRoute && <span className="text-sm text-blue-400 ml-2">Admin</span>}
         </Link>
         <nav className="flex space-x-4">
           {navLinks.map((link) => (
@@ -46,6 +56,14 @@ export default function TopBar() {
         </nav>
       </div>
       <div className="space-x-4 flex items-center">
+        {isAdminRoute && (
+          <Link
+            href="/orbats"
+            className="px-3 py-2 bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 transition-colors"
+          >
+            Exit Admin
+          </Link>
+        )}
         {!session ? (
           <button
             onClick={() => signIn('discord')}

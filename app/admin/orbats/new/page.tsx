@@ -1,0 +1,28 @@
+// app/admin/orbats/new/page.tsx
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { redirect } from 'next/navigation';
+import OrbatForm from '@/app/components/OrbatForm';
+
+export default async function NewOrbatPage() {
+  const session = await getServerSession(authOptions);
+
+  if (!session || !session.user?.isAdmin) {
+    redirect('/');
+  }
+
+  return (
+    <main className="min-h-screen">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold">Create New OrbAT</h1>
+          <p className="text-sm sm:text-base text-gray-300 mt-2">
+            Set up a new operation with slots and subslots
+          </p>
+        </div>
+
+        <OrbatForm mode="create" />
+      </div>
+    </main>
+  );
+}
