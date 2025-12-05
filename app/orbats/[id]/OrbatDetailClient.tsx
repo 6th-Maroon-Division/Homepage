@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useToast } from '@/app/components/ToastContainer';
+import LoadingSpinner from '@/app/components/LoadingSpinner';
 
 type ClientSignup = {
   id: number;
@@ -54,8 +56,8 @@ type ApiSubslot = {
 export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailClientProps) {
   const [orbat, setOrbat] = useState<ClientOrbat>(initialOrbat);
   const [loadingSubslotId, setLoadingSubslotId] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const { showSuccess, showError } = useToast();
 
   const eventDate = orbat.eventDate ? new Date(orbat.eventDate) : null;
   const isPast = !!eventDate && eventDate < new Date();
@@ -73,7 +75,6 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
   }, []);
 
   async function handleSignup(subslotId: number) {
-    setError(null);
     setLoadingSubslotId(subslotId);
 
     try {
@@ -89,7 +90,7 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
         } catch {
           // ignore JSON parse error
         }
-        setError(message);
+        showError(message);
         return;
       }
 
@@ -120,15 +121,15 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
           ),
         })),
       }));
+      
+      showSuccess('Successfully signed up!');
     } catch {
-      setError('Network error while signing up.');
+      showError('Network error while signing up.');
     } finally {
       setLoadingSubslotId(null);
     }
   }
-
   async function handleUnsign(subslotId: number) {
-    setError(null);
     setLoadingSubslotId(subslotId);
 
     try {
@@ -144,7 +145,7 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
         } catch {
           // ignore JSON parse error
         }
-        setError(message);
+        showError(message);
         return;
       }
 
@@ -175,8 +176,10 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
           ),
         })),
       }));
+      
+      showSuccess('Signup removed successfully');
     } catch {
-      setError('Network error while removing signup.');
+      showError('Network error while removing signup.');
     } finally {
       setLoadingSubslotId(null);
     }
@@ -209,10 +212,6 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
             This operation is in the past. Signups are closed, existing
             participants are shown below.
           </p>
-        )}
-
-        {error && (
-          <p className="text-xs font-semibold text-red-400">{error}</p>
         )}
       </header>
 
@@ -261,7 +260,14 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
                         disabled={loadingSubslotId === sub.id}
                         className="mt-1 sm:mt-0 inline-flex items-center justify-center rounded-md border border-slate-600 px-3 py-1 text-xs font-medium hover:bg-slate-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {loadingSubslotId === sub.id ? 'Signing…' : 'Sign up'}
+                        {loadingSubslotId === sub.id ? (
+                          <span className="flex items-center gap-2">
+                            <LoadingSpinner size="sm" />
+                            Signing…
+                          </span>
+                        ) : (
+                          'Sign up'
+                        )}
                       </button>
                     )}
 
@@ -272,7 +278,14 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
                         disabled={loadingSubslotId === sub.id}
                         className="mt-1 sm:mt-0 inline-flex items-center justify-center rounded-md border border-red-600 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-950/50 transition disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {loadingSubslotId === sub.id ? 'Removing…' : 'Remove'}
+                        {loadingSubslotId === sub.id ? (
+                          <span className="flex items-center gap-2">
+                            <LoadingSpinner size="sm" />
+                            Removing…
+                          </span>
+                        ) : (
+                          'Remove'
+                        )}
                       </button>
                     )}
                   </li>

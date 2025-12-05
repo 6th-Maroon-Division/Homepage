@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useToast } from './ToastContainer';
+import LoadingSpinner from './LoadingSpinner';
 
 type Subslot = {
   id?: number;
@@ -37,6 +39,7 @@ type OrbatFormProps = {
 export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { showSuccess, showError } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -201,11 +204,14 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
       }
 
       const result = await response.json();
+      showSuccess(`OrbAT ${mode === 'create' ? 'created' : 'updated'} successfully!`);
       router.push(`/orbats/${result.id}`);
       router.refresh();
     } catch (err) {
       console.error('Error saving OrbAT:', err);
-      setError('Network error occurred');
+      const errorMsg = 'Network error occurred';
+      setError(errorMsg);
+      showError(errorMsg);
       setIsSaving(false);
     }
   };
@@ -418,8 +424,9 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         <button
           type="submit"
           disabled={isSaving}
-          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white rounded-md transition-colors font-medium"
+          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white rounded-md transition-colors font-medium flex items-center gap-2"
         >
+          {isSaving && <LoadingSpinner size="sm" />}
           {isSaving ? 'Saving...' : mode === 'create' ? 'Create OrbAT' : 'Save Changes'}
         </button>
       </div>
