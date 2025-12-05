@@ -60,11 +60,11 @@ export default function Toast({ id, message, type, duration = 5000, onClose }: T
       className={`${styles[type]} text-white px-4 py-3 rounded-lg shadow-lg border-l-4 flex items-center gap-3 min-w-[300px] max-w-md animate-slide-in`}
       role="alert"
     >
-      <div className="flex-shrink-0">{icons[type]}</div>
+      <div className="shrink-0">{icons[type]}</div>
       <div className="flex-1 text-sm font-medium">{message}</div>
       <button
         onClick={() => onClose(id)}
-        className="flex-shrink-0 hover:bg-white/20 rounded p-1 transition-colors"
+        className="shrink-0 hover:bg-white/20 rounded p-1 transition-colors"
         aria-label="Close notification"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
