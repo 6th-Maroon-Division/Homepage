@@ -28,10 +28,12 @@ export type AggregateUser = {
 
 export type UserAvgAggregateOutputType = {
   id: number | null
+  selectedThemeId: number | null
 }
 
 export type UserSumAggregateOutputType = {
   id: number | null
+  selectedThemeId: number | null
 }
 
 export type UserMinAggregateOutputType = {
@@ -40,6 +42,7 @@ export type UserMinAggregateOutputType = {
   email: string | null
   avatarUrl: string | null
   isAdmin: boolean | null
+  selectedThemeId: number | null
   createdAt: Date | null
 }
 
@@ -49,6 +52,7 @@ export type UserMaxAggregateOutputType = {
   email: string | null
   avatarUrl: string | null
   isAdmin: boolean | null
+  selectedThemeId: number | null
   createdAt: Date | null
 }
 
@@ -58,6 +62,7 @@ export type UserCountAggregateOutputType = {
   email: number
   avatarUrl: number
   isAdmin: number
+  selectedThemeId: number
   createdAt: number
   _all: number
 }
@@ -65,10 +70,12 @@ export type UserCountAggregateOutputType = {
 
 export type UserAvgAggregateInputType = {
   id?: true
+  selectedThemeId?: true
 }
 
 export type UserSumAggregateInputType = {
   id?: true
+  selectedThemeId?: true
 }
 
 export type UserMinAggregateInputType = {
@@ -77,6 +84,7 @@ export type UserMinAggregateInputType = {
   email?: true
   avatarUrl?: true
   isAdmin?: true
+  selectedThemeId?: true
   createdAt?: true
 }
 
@@ -86,6 +94,7 @@ export type UserMaxAggregateInputType = {
   email?: true
   avatarUrl?: true
   isAdmin?: true
+  selectedThemeId?: true
   createdAt?: true
 }
 
@@ -95,6 +104,7 @@ export type UserCountAggregateInputType = {
   email?: true
   avatarUrl?: true
   isAdmin?: true
+  selectedThemeId?: true
   createdAt?: true
   _all?: true
 }
@@ -191,6 +201,7 @@ export type UserGroupByOutputType = {
   email: string | null
   avatarUrl: string | null
   isAdmin: boolean
+  selectedThemeId: number | null
   createdAt: Date
   _count: UserCountAggregateOutputType | null
   _avg: UserAvgAggregateOutputType | null
@@ -223,10 +234,14 @@ export type UserWhereInput = {
   email?: Prisma.StringNullableFilter<"User"> | string | null
   avatarUrl?: Prisma.StringNullableFilter<"User"> | string | null
   isAdmin?: Prisma.BoolFilter<"User"> | boolean
+  selectedThemeId?: Prisma.IntNullableFilter<"User"> | number | null
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   accounts?: Prisma.AuthAccountListRelationFilter
   orbats?: Prisma.OrbatListRelationFilter
   signups?: Prisma.SignupListRelationFilter
+  selectedTheme?: Prisma.XOR<Prisma.ThemeNullableScalarRelationFilter, Prisma.ThemeWhereInput> | null
+  customTheme?: Prisma.XOR<Prisma.ThemeNullableScalarRelationFilter, Prisma.ThemeWhereInput> | null
+  themeSubmissions?: Prisma.ThemeSubmissionListRelationFilter
 }
 
 export type UserOrderByWithRelationInput = {
@@ -235,10 +250,14 @@ export type UserOrderByWithRelationInput = {
   email?: Prisma.SortOrderInput | Prisma.SortOrder
   avatarUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   isAdmin?: Prisma.SortOrder
+  selectedThemeId?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   accounts?: Prisma.AuthAccountOrderByRelationAggregateInput
   orbats?: Prisma.OrbatOrderByRelationAggregateInput
   signups?: Prisma.SignupOrderByRelationAggregateInput
+  selectedTheme?: Prisma.ThemeOrderByWithRelationInput
+  customTheme?: Prisma.ThemeOrderByWithRelationInput
+  themeSubmissions?: Prisma.ThemeSubmissionOrderByRelationAggregateInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -250,10 +269,14 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   email?: Prisma.StringNullableFilter<"User"> | string | null
   avatarUrl?: Prisma.StringNullableFilter<"User"> | string | null
   isAdmin?: Prisma.BoolFilter<"User"> | boolean
+  selectedThemeId?: Prisma.IntNullableFilter<"User"> | number | null
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   accounts?: Prisma.AuthAccountListRelationFilter
   orbats?: Prisma.OrbatListRelationFilter
   signups?: Prisma.SignupListRelationFilter
+  selectedTheme?: Prisma.XOR<Prisma.ThemeNullableScalarRelationFilter, Prisma.ThemeWhereInput> | null
+  customTheme?: Prisma.XOR<Prisma.ThemeNullableScalarRelationFilter, Prisma.ThemeWhereInput> | null
+  themeSubmissions?: Prisma.ThemeSubmissionListRelationFilter
 }, "id">
 
 export type UserOrderByWithAggregationInput = {
@@ -262,6 +285,7 @@ export type UserOrderByWithAggregationInput = {
   email?: Prisma.SortOrderInput | Prisma.SortOrder
   avatarUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   isAdmin?: Prisma.SortOrder
+  selectedThemeId?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.UserCountOrderByAggregateInput
   _avg?: Prisma.UserAvgOrderByAggregateInput
@@ -279,6 +303,7 @@ export type UserScalarWhereWithAggregatesInput = {
   email?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
   avatarUrl?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
   isAdmin?: Prisma.BoolWithAggregatesFilter<"User"> | boolean
+  selectedThemeId?: Prisma.IntNullableWithAggregatesFilter<"User"> | number | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"User"> | Date | string
 }
 
@@ -291,6 +316,9 @@ export type UserCreateInput = {
   accounts?: Prisma.AuthAccountCreateNestedManyWithoutUserInput
   orbats?: Prisma.OrbatCreateNestedManyWithoutCreatedByInput
   signups?: Prisma.SignupCreateNestedManyWithoutUserInput
+  selectedTheme?: Prisma.ThemeCreateNestedOneWithoutUsersWithThemeInput
+  customTheme?: Prisma.ThemeCreateNestedOneWithoutCreatedByInput
+  themeSubmissions?: Prisma.ThemeSubmissionCreateNestedManyWithoutSubmittedByInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -299,10 +327,13 @@ export type UserUncheckedCreateInput = {
   email?: string | null
   avatarUrl?: string | null
   isAdmin?: boolean
+  selectedThemeId?: number | null
   createdAt?: Date | string
   accounts?: Prisma.AuthAccountUncheckedCreateNestedManyWithoutUserInput
   orbats?: Prisma.OrbatUncheckedCreateNestedManyWithoutCreatedByInput
   signups?: Prisma.SignupUncheckedCreateNestedManyWithoutUserInput
+  customTheme?: Prisma.ThemeUncheckedCreateNestedOneWithoutCreatedByInput
+  themeSubmissions?: Prisma.ThemeSubmissionUncheckedCreateNestedManyWithoutSubmittedByInput
 }
 
 export type UserUpdateInput = {
@@ -314,6 +345,9 @@ export type UserUpdateInput = {
   accounts?: Prisma.AuthAccountUpdateManyWithoutUserNestedInput
   orbats?: Prisma.OrbatUpdateManyWithoutCreatedByNestedInput
   signups?: Prisma.SignupUpdateManyWithoutUserNestedInput
+  selectedTheme?: Prisma.ThemeUpdateOneWithoutUsersWithThemeNestedInput
+  customTheme?: Prisma.ThemeUpdateOneWithoutCreatedByNestedInput
+  themeSubmissions?: Prisma.ThemeSubmissionUpdateManyWithoutSubmittedByNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -322,10 +356,13 @@ export type UserUncheckedUpdateInput = {
   email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isAdmin?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  selectedThemeId?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   accounts?: Prisma.AuthAccountUncheckedUpdateManyWithoutUserNestedInput
   orbats?: Prisma.OrbatUncheckedUpdateManyWithoutCreatedByNestedInput
   signups?: Prisma.SignupUncheckedUpdateManyWithoutUserNestedInput
+  customTheme?: Prisma.ThemeUncheckedUpdateOneWithoutCreatedByNestedInput
+  themeSubmissions?: Prisma.ThemeSubmissionUncheckedUpdateManyWithoutSubmittedByNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -334,6 +371,7 @@ export type UserCreateManyInput = {
   email?: string | null
   avatarUrl?: string | null
   isAdmin?: boolean
+  selectedThemeId?: number | null
   createdAt?: Date | string
 }
 
@@ -351,6 +389,7 @@ export type UserUncheckedUpdateManyInput = {
   email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isAdmin?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  selectedThemeId?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -360,11 +399,13 @@ export type UserCountOrderByAggregateInput = {
   email?: Prisma.SortOrder
   avatarUrl?: Prisma.SortOrder
   isAdmin?: Prisma.SortOrder
+  selectedThemeId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
 export type UserAvgOrderByAggregateInput = {
   id?: Prisma.SortOrder
+  selectedThemeId?: Prisma.SortOrder
 }
 
 export type UserMaxOrderByAggregateInput = {
@@ -373,6 +414,7 @@ export type UserMaxOrderByAggregateInput = {
   email?: Prisma.SortOrder
   avatarUrl?: Prisma.SortOrder
   isAdmin?: Prisma.SortOrder
+  selectedThemeId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -382,16 +424,33 @@ export type UserMinOrderByAggregateInput = {
   email?: Prisma.SortOrder
   avatarUrl?: Prisma.SortOrder
   isAdmin?: Prisma.SortOrder
+  selectedThemeId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
 export type UserSumOrderByAggregateInput = {
   id?: Prisma.SortOrder
+  selectedThemeId?: Prisma.SortOrder
 }
 
 export type UserScalarRelationFilter = {
   is?: Prisma.UserWhereInput
   isNot?: Prisma.UserWhereInput
+}
+
+export type UserNullableScalarRelationFilter = {
+  is?: Prisma.UserWhereInput | null
+  isNot?: Prisma.UserWhereInput | null
+}
+
+export type UserListRelationFilter = {
+  every?: Prisma.UserWhereInput
+  some?: Prisma.UserWhereInput
+  none?: Prisma.UserWhereInput
+}
+
+export type UserOrderByRelationAggregateInput = {
+  _count?: Prisma.SortOrder
 }
 
 export type NullableStringFieldUpdateOperationsInput = {
@@ -408,6 +467,14 @@ export type DateTimeFieldUpdateOperationsInput = {
 
 export type IntFieldUpdateOperationsInput = {
   set?: number
+  increment?: number
+  decrement?: number
+  multiply?: number
+  divide?: number
+}
+
+export type NullableIntFieldUpdateOperationsInput = {
+  set?: number | null
   increment?: number
   decrement?: number
   multiply?: number
@@ -456,6 +523,78 @@ export type UserUpdateOneRequiredWithoutSignupsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutSignupsInput, Prisma.UserUpdateWithoutSignupsInput>, Prisma.UserUncheckedUpdateWithoutSignupsInput>
 }
 
+export type UserCreateNestedOneWithoutCustomThemeInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCustomThemeInput, Prisma.UserUncheckedCreateWithoutCustomThemeInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCustomThemeInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserCreateNestedManyWithoutSelectedThemeInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutSelectedThemeInput, Prisma.UserUncheckedCreateWithoutSelectedThemeInput> | Prisma.UserCreateWithoutSelectedThemeInput[] | Prisma.UserUncheckedCreateWithoutSelectedThemeInput[]
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutSelectedThemeInput | Prisma.UserCreateOrConnectWithoutSelectedThemeInput[]
+  createMany?: Prisma.UserCreateManySelectedThemeInputEnvelope
+  connect?: Prisma.UserWhereUniqueInput | Prisma.UserWhereUniqueInput[]
+}
+
+export type UserUncheckedCreateNestedManyWithoutSelectedThemeInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutSelectedThemeInput, Prisma.UserUncheckedCreateWithoutSelectedThemeInput> | Prisma.UserCreateWithoutSelectedThemeInput[] | Prisma.UserUncheckedCreateWithoutSelectedThemeInput[]
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutSelectedThemeInput | Prisma.UserCreateOrConnectWithoutSelectedThemeInput[]
+  createMany?: Prisma.UserCreateManySelectedThemeInputEnvelope
+  connect?: Prisma.UserWhereUniqueInput | Prisma.UserWhereUniqueInput[]
+}
+
+export type UserUpdateOneWithoutCustomThemeNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCustomThemeInput, Prisma.UserUncheckedCreateWithoutCustomThemeInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCustomThemeInput
+  upsert?: Prisma.UserUpsertWithoutCustomThemeInput
+  disconnect?: Prisma.UserWhereInput | boolean
+  delete?: Prisma.UserWhereInput | boolean
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutCustomThemeInput, Prisma.UserUpdateWithoutCustomThemeInput>, Prisma.UserUncheckedUpdateWithoutCustomThemeInput>
+}
+
+export type UserUpdateManyWithoutSelectedThemeNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutSelectedThemeInput, Prisma.UserUncheckedCreateWithoutSelectedThemeInput> | Prisma.UserCreateWithoutSelectedThemeInput[] | Prisma.UserUncheckedCreateWithoutSelectedThemeInput[]
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutSelectedThemeInput | Prisma.UserCreateOrConnectWithoutSelectedThemeInput[]
+  upsert?: Prisma.UserUpsertWithWhereUniqueWithoutSelectedThemeInput | Prisma.UserUpsertWithWhereUniqueWithoutSelectedThemeInput[]
+  createMany?: Prisma.UserCreateManySelectedThemeInputEnvelope
+  set?: Prisma.UserWhereUniqueInput | Prisma.UserWhereUniqueInput[]
+  disconnect?: Prisma.UserWhereUniqueInput | Prisma.UserWhereUniqueInput[]
+  delete?: Prisma.UserWhereUniqueInput | Prisma.UserWhereUniqueInput[]
+  connect?: Prisma.UserWhereUniqueInput | Prisma.UserWhereUniqueInput[]
+  update?: Prisma.UserUpdateWithWhereUniqueWithoutSelectedThemeInput | Prisma.UserUpdateWithWhereUniqueWithoutSelectedThemeInput[]
+  updateMany?: Prisma.UserUpdateManyWithWhereWithoutSelectedThemeInput | Prisma.UserUpdateManyWithWhereWithoutSelectedThemeInput[]
+  deleteMany?: Prisma.UserScalarWhereInput | Prisma.UserScalarWhereInput[]
+}
+
+export type UserUncheckedUpdateManyWithoutSelectedThemeNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutSelectedThemeInput, Prisma.UserUncheckedCreateWithoutSelectedThemeInput> | Prisma.UserCreateWithoutSelectedThemeInput[] | Prisma.UserUncheckedCreateWithoutSelectedThemeInput[]
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutSelectedThemeInput | Prisma.UserCreateOrConnectWithoutSelectedThemeInput[]
+  upsert?: Prisma.UserUpsertWithWhereUniqueWithoutSelectedThemeInput | Prisma.UserUpsertWithWhereUniqueWithoutSelectedThemeInput[]
+  createMany?: Prisma.UserCreateManySelectedThemeInputEnvelope
+  set?: Prisma.UserWhereUniqueInput | Prisma.UserWhereUniqueInput[]
+  disconnect?: Prisma.UserWhereUniqueInput | Prisma.UserWhereUniqueInput[]
+  delete?: Prisma.UserWhereUniqueInput | Prisma.UserWhereUniqueInput[]
+  connect?: Prisma.UserWhereUniqueInput | Prisma.UserWhereUniqueInput[]
+  update?: Prisma.UserUpdateWithWhereUniqueWithoutSelectedThemeInput | Prisma.UserUpdateWithWhereUniqueWithoutSelectedThemeInput[]
+  updateMany?: Prisma.UserUpdateManyWithWhereWithoutSelectedThemeInput | Prisma.UserUpdateManyWithWhereWithoutSelectedThemeInput[]
+  deleteMany?: Prisma.UserScalarWhereInput | Prisma.UserScalarWhereInput[]
+}
+
+export type UserCreateNestedOneWithoutThemeSubmissionsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutThemeSubmissionsInput, Prisma.UserUncheckedCreateWithoutThemeSubmissionsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutThemeSubmissionsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutThemeSubmissionsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutThemeSubmissionsInput, Prisma.UserUncheckedCreateWithoutThemeSubmissionsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutThemeSubmissionsInput
+  upsert?: Prisma.UserUpsertWithoutThemeSubmissionsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutThemeSubmissionsInput, Prisma.UserUpdateWithoutThemeSubmissionsInput>, Prisma.UserUncheckedUpdateWithoutThemeSubmissionsInput>
+}
+
 export type UserCreateWithoutAccountsInput = {
   username?: string | null
   email?: string | null
@@ -464,6 +603,9 @@ export type UserCreateWithoutAccountsInput = {
   createdAt?: Date | string
   orbats?: Prisma.OrbatCreateNestedManyWithoutCreatedByInput
   signups?: Prisma.SignupCreateNestedManyWithoutUserInput
+  selectedTheme?: Prisma.ThemeCreateNestedOneWithoutUsersWithThemeInput
+  customTheme?: Prisma.ThemeCreateNestedOneWithoutCreatedByInput
+  themeSubmissions?: Prisma.ThemeSubmissionCreateNestedManyWithoutSubmittedByInput
 }
 
 export type UserUncheckedCreateWithoutAccountsInput = {
@@ -472,9 +614,12 @@ export type UserUncheckedCreateWithoutAccountsInput = {
   email?: string | null
   avatarUrl?: string | null
   isAdmin?: boolean
+  selectedThemeId?: number | null
   createdAt?: Date | string
   orbats?: Prisma.OrbatUncheckedCreateNestedManyWithoutCreatedByInput
   signups?: Prisma.SignupUncheckedCreateNestedManyWithoutUserInput
+  customTheme?: Prisma.ThemeUncheckedCreateNestedOneWithoutCreatedByInput
+  themeSubmissions?: Prisma.ThemeSubmissionUncheckedCreateNestedManyWithoutSubmittedByInput
 }
 
 export type UserCreateOrConnectWithoutAccountsInput = {
@@ -501,6 +646,9 @@ export type UserUpdateWithoutAccountsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orbats?: Prisma.OrbatUpdateManyWithoutCreatedByNestedInput
   signups?: Prisma.SignupUpdateManyWithoutUserNestedInput
+  selectedTheme?: Prisma.ThemeUpdateOneWithoutUsersWithThemeNestedInput
+  customTheme?: Prisma.ThemeUpdateOneWithoutCreatedByNestedInput
+  themeSubmissions?: Prisma.ThemeSubmissionUpdateManyWithoutSubmittedByNestedInput
 }
 
 export type UserUncheckedUpdateWithoutAccountsInput = {
@@ -509,9 +657,12 @@ export type UserUncheckedUpdateWithoutAccountsInput = {
   email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isAdmin?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  selectedThemeId?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orbats?: Prisma.OrbatUncheckedUpdateManyWithoutCreatedByNestedInput
   signups?: Prisma.SignupUncheckedUpdateManyWithoutUserNestedInput
+  customTheme?: Prisma.ThemeUncheckedUpdateOneWithoutCreatedByNestedInput
+  themeSubmissions?: Prisma.ThemeSubmissionUncheckedUpdateManyWithoutSubmittedByNestedInput
 }
 
 export type UserCreateWithoutOrbatsInput = {
@@ -522,6 +673,9 @@ export type UserCreateWithoutOrbatsInput = {
   createdAt?: Date | string
   accounts?: Prisma.AuthAccountCreateNestedManyWithoutUserInput
   signups?: Prisma.SignupCreateNestedManyWithoutUserInput
+  selectedTheme?: Prisma.ThemeCreateNestedOneWithoutUsersWithThemeInput
+  customTheme?: Prisma.ThemeCreateNestedOneWithoutCreatedByInput
+  themeSubmissions?: Prisma.ThemeSubmissionCreateNestedManyWithoutSubmittedByInput
 }
 
 export type UserUncheckedCreateWithoutOrbatsInput = {
@@ -530,9 +684,12 @@ export type UserUncheckedCreateWithoutOrbatsInput = {
   email?: string | null
   avatarUrl?: string | null
   isAdmin?: boolean
+  selectedThemeId?: number | null
   createdAt?: Date | string
   accounts?: Prisma.AuthAccountUncheckedCreateNestedManyWithoutUserInput
   signups?: Prisma.SignupUncheckedCreateNestedManyWithoutUserInput
+  customTheme?: Prisma.ThemeUncheckedCreateNestedOneWithoutCreatedByInput
+  themeSubmissions?: Prisma.ThemeSubmissionUncheckedCreateNestedManyWithoutSubmittedByInput
 }
 
 export type UserCreateOrConnectWithoutOrbatsInput = {
@@ -559,6 +716,9 @@ export type UserUpdateWithoutOrbatsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   accounts?: Prisma.AuthAccountUpdateManyWithoutUserNestedInput
   signups?: Prisma.SignupUpdateManyWithoutUserNestedInput
+  selectedTheme?: Prisma.ThemeUpdateOneWithoutUsersWithThemeNestedInput
+  customTheme?: Prisma.ThemeUpdateOneWithoutCreatedByNestedInput
+  themeSubmissions?: Prisma.ThemeSubmissionUpdateManyWithoutSubmittedByNestedInput
 }
 
 export type UserUncheckedUpdateWithoutOrbatsInput = {
@@ -567,9 +727,12 @@ export type UserUncheckedUpdateWithoutOrbatsInput = {
   email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isAdmin?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  selectedThemeId?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   accounts?: Prisma.AuthAccountUncheckedUpdateManyWithoutUserNestedInput
   signups?: Prisma.SignupUncheckedUpdateManyWithoutUserNestedInput
+  customTheme?: Prisma.ThemeUncheckedUpdateOneWithoutCreatedByNestedInput
+  themeSubmissions?: Prisma.ThemeSubmissionUncheckedUpdateManyWithoutSubmittedByNestedInput
 }
 
 export type UserCreateWithoutSignupsInput = {
@@ -580,6 +743,9 @@ export type UserCreateWithoutSignupsInput = {
   createdAt?: Date | string
   accounts?: Prisma.AuthAccountCreateNestedManyWithoutUserInput
   orbats?: Prisma.OrbatCreateNestedManyWithoutCreatedByInput
+  selectedTheme?: Prisma.ThemeCreateNestedOneWithoutUsersWithThemeInput
+  customTheme?: Prisma.ThemeCreateNestedOneWithoutCreatedByInput
+  themeSubmissions?: Prisma.ThemeSubmissionCreateNestedManyWithoutSubmittedByInput
 }
 
 export type UserUncheckedCreateWithoutSignupsInput = {
@@ -588,9 +754,12 @@ export type UserUncheckedCreateWithoutSignupsInput = {
   email?: string | null
   avatarUrl?: string | null
   isAdmin?: boolean
+  selectedThemeId?: number | null
   createdAt?: Date | string
   accounts?: Prisma.AuthAccountUncheckedCreateNestedManyWithoutUserInput
   orbats?: Prisma.OrbatUncheckedCreateNestedManyWithoutCreatedByInput
+  customTheme?: Prisma.ThemeUncheckedCreateNestedOneWithoutCreatedByInput
+  themeSubmissions?: Prisma.ThemeSubmissionUncheckedCreateNestedManyWithoutSubmittedByInput
 }
 
 export type UserCreateOrConnectWithoutSignupsInput = {
@@ -617,6 +786,9 @@ export type UserUpdateWithoutSignupsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   accounts?: Prisma.AuthAccountUpdateManyWithoutUserNestedInput
   orbats?: Prisma.OrbatUpdateManyWithoutCreatedByNestedInput
+  selectedTheme?: Prisma.ThemeUpdateOneWithoutUsersWithThemeNestedInput
+  customTheme?: Prisma.ThemeUpdateOneWithoutCreatedByNestedInput
+  themeSubmissions?: Prisma.ThemeSubmissionUpdateManyWithoutSubmittedByNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSignupsInput = {
@@ -625,9 +797,263 @@ export type UserUncheckedUpdateWithoutSignupsInput = {
   email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isAdmin?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  selectedThemeId?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   accounts?: Prisma.AuthAccountUncheckedUpdateManyWithoutUserNestedInput
   orbats?: Prisma.OrbatUncheckedUpdateManyWithoutCreatedByNestedInput
+  customTheme?: Prisma.ThemeUncheckedUpdateOneWithoutCreatedByNestedInput
+  themeSubmissions?: Prisma.ThemeSubmissionUncheckedUpdateManyWithoutSubmittedByNestedInput
+}
+
+export type UserCreateWithoutCustomThemeInput = {
+  username?: string | null
+  email?: string | null
+  avatarUrl?: string | null
+  isAdmin?: boolean
+  createdAt?: Date | string
+  accounts?: Prisma.AuthAccountCreateNestedManyWithoutUserInput
+  orbats?: Prisma.OrbatCreateNestedManyWithoutCreatedByInput
+  signups?: Prisma.SignupCreateNestedManyWithoutUserInput
+  selectedTheme?: Prisma.ThemeCreateNestedOneWithoutUsersWithThemeInput
+  themeSubmissions?: Prisma.ThemeSubmissionCreateNestedManyWithoutSubmittedByInput
+}
+
+export type UserUncheckedCreateWithoutCustomThemeInput = {
+  id?: number
+  username?: string | null
+  email?: string | null
+  avatarUrl?: string | null
+  isAdmin?: boolean
+  selectedThemeId?: number | null
+  createdAt?: Date | string
+  accounts?: Prisma.AuthAccountUncheckedCreateNestedManyWithoutUserInput
+  orbats?: Prisma.OrbatUncheckedCreateNestedManyWithoutCreatedByInput
+  signups?: Prisma.SignupUncheckedCreateNestedManyWithoutUserInput
+  themeSubmissions?: Prisma.ThemeSubmissionUncheckedCreateNestedManyWithoutSubmittedByInput
+}
+
+export type UserCreateOrConnectWithoutCustomThemeInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutCustomThemeInput, Prisma.UserUncheckedCreateWithoutCustomThemeInput>
+}
+
+export type UserCreateWithoutSelectedThemeInput = {
+  username?: string | null
+  email?: string | null
+  avatarUrl?: string | null
+  isAdmin?: boolean
+  createdAt?: Date | string
+  accounts?: Prisma.AuthAccountCreateNestedManyWithoutUserInput
+  orbats?: Prisma.OrbatCreateNestedManyWithoutCreatedByInput
+  signups?: Prisma.SignupCreateNestedManyWithoutUserInput
+  customTheme?: Prisma.ThemeCreateNestedOneWithoutCreatedByInput
+  themeSubmissions?: Prisma.ThemeSubmissionCreateNestedManyWithoutSubmittedByInput
+}
+
+export type UserUncheckedCreateWithoutSelectedThemeInput = {
+  id?: number
+  username?: string | null
+  email?: string | null
+  avatarUrl?: string | null
+  isAdmin?: boolean
+  createdAt?: Date | string
+  accounts?: Prisma.AuthAccountUncheckedCreateNestedManyWithoutUserInput
+  orbats?: Prisma.OrbatUncheckedCreateNestedManyWithoutCreatedByInput
+  signups?: Prisma.SignupUncheckedCreateNestedManyWithoutUserInput
+  customTheme?: Prisma.ThemeUncheckedCreateNestedOneWithoutCreatedByInput
+  themeSubmissions?: Prisma.ThemeSubmissionUncheckedCreateNestedManyWithoutSubmittedByInput
+}
+
+export type UserCreateOrConnectWithoutSelectedThemeInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutSelectedThemeInput, Prisma.UserUncheckedCreateWithoutSelectedThemeInput>
+}
+
+export type UserCreateManySelectedThemeInputEnvelope = {
+  data: Prisma.UserCreateManySelectedThemeInput | Prisma.UserCreateManySelectedThemeInput[]
+  skipDuplicates?: boolean
+}
+
+export type UserUpsertWithoutCustomThemeInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutCustomThemeInput, Prisma.UserUncheckedUpdateWithoutCustomThemeInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutCustomThemeInput, Prisma.UserUncheckedCreateWithoutCustomThemeInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutCustomThemeInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutCustomThemeInput, Prisma.UserUncheckedUpdateWithoutCustomThemeInput>
+}
+
+export type UserUpdateWithoutCustomThemeInput = {
+  username?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isAdmin?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  accounts?: Prisma.AuthAccountUpdateManyWithoutUserNestedInput
+  orbats?: Prisma.OrbatUpdateManyWithoutCreatedByNestedInput
+  signups?: Prisma.SignupUpdateManyWithoutUserNestedInput
+  selectedTheme?: Prisma.ThemeUpdateOneWithoutUsersWithThemeNestedInput
+  themeSubmissions?: Prisma.ThemeSubmissionUpdateManyWithoutSubmittedByNestedInput
+}
+
+export type UserUncheckedUpdateWithoutCustomThemeInput = {
+  id?: Prisma.IntFieldUpdateOperationsInput | number
+  username?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isAdmin?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  selectedThemeId?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  accounts?: Prisma.AuthAccountUncheckedUpdateManyWithoutUserNestedInput
+  orbats?: Prisma.OrbatUncheckedUpdateManyWithoutCreatedByNestedInput
+  signups?: Prisma.SignupUncheckedUpdateManyWithoutUserNestedInput
+  themeSubmissions?: Prisma.ThemeSubmissionUncheckedUpdateManyWithoutSubmittedByNestedInput
+}
+
+export type UserUpsertWithWhereUniqueWithoutSelectedThemeInput = {
+  where: Prisma.UserWhereUniqueInput
+  update: Prisma.XOR<Prisma.UserUpdateWithoutSelectedThemeInput, Prisma.UserUncheckedUpdateWithoutSelectedThemeInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutSelectedThemeInput, Prisma.UserUncheckedCreateWithoutSelectedThemeInput>
+}
+
+export type UserUpdateWithWhereUniqueWithoutSelectedThemeInput = {
+  where: Prisma.UserWhereUniqueInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutSelectedThemeInput, Prisma.UserUncheckedUpdateWithoutSelectedThemeInput>
+}
+
+export type UserUpdateManyWithWhereWithoutSelectedThemeInput = {
+  where: Prisma.UserScalarWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateManyMutationInput, Prisma.UserUncheckedUpdateManyWithoutSelectedThemeInput>
+}
+
+export type UserScalarWhereInput = {
+  AND?: Prisma.UserScalarWhereInput | Prisma.UserScalarWhereInput[]
+  OR?: Prisma.UserScalarWhereInput[]
+  NOT?: Prisma.UserScalarWhereInput | Prisma.UserScalarWhereInput[]
+  id?: Prisma.IntFilter<"User"> | number
+  username?: Prisma.StringNullableFilter<"User"> | string | null
+  email?: Prisma.StringNullableFilter<"User"> | string | null
+  avatarUrl?: Prisma.StringNullableFilter<"User"> | string | null
+  isAdmin?: Prisma.BoolFilter<"User"> | boolean
+  selectedThemeId?: Prisma.IntNullableFilter<"User"> | number | null
+  createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
+}
+
+export type UserCreateWithoutThemeSubmissionsInput = {
+  username?: string | null
+  email?: string | null
+  avatarUrl?: string | null
+  isAdmin?: boolean
+  createdAt?: Date | string
+  accounts?: Prisma.AuthAccountCreateNestedManyWithoutUserInput
+  orbats?: Prisma.OrbatCreateNestedManyWithoutCreatedByInput
+  signups?: Prisma.SignupCreateNestedManyWithoutUserInput
+  selectedTheme?: Prisma.ThemeCreateNestedOneWithoutUsersWithThemeInput
+  customTheme?: Prisma.ThemeCreateNestedOneWithoutCreatedByInput
+}
+
+export type UserUncheckedCreateWithoutThemeSubmissionsInput = {
+  id?: number
+  username?: string | null
+  email?: string | null
+  avatarUrl?: string | null
+  isAdmin?: boolean
+  selectedThemeId?: number | null
+  createdAt?: Date | string
+  accounts?: Prisma.AuthAccountUncheckedCreateNestedManyWithoutUserInput
+  orbats?: Prisma.OrbatUncheckedCreateNestedManyWithoutCreatedByInput
+  signups?: Prisma.SignupUncheckedCreateNestedManyWithoutUserInput
+  customTheme?: Prisma.ThemeUncheckedCreateNestedOneWithoutCreatedByInput
+}
+
+export type UserCreateOrConnectWithoutThemeSubmissionsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutThemeSubmissionsInput, Prisma.UserUncheckedCreateWithoutThemeSubmissionsInput>
+}
+
+export type UserUpsertWithoutThemeSubmissionsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutThemeSubmissionsInput, Prisma.UserUncheckedUpdateWithoutThemeSubmissionsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutThemeSubmissionsInput, Prisma.UserUncheckedCreateWithoutThemeSubmissionsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutThemeSubmissionsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutThemeSubmissionsInput, Prisma.UserUncheckedUpdateWithoutThemeSubmissionsInput>
+}
+
+export type UserUpdateWithoutThemeSubmissionsInput = {
+  username?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isAdmin?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  accounts?: Prisma.AuthAccountUpdateManyWithoutUserNestedInput
+  orbats?: Prisma.OrbatUpdateManyWithoutCreatedByNestedInput
+  signups?: Prisma.SignupUpdateManyWithoutUserNestedInput
+  selectedTheme?: Prisma.ThemeUpdateOneWithoutUsersWithThemeNestedInput
+  customTheme?: Prisma.ThemeUpdateOneWithoutCreatedByNestedInput
+}
+
+export type UserUncheckedUpdateWithoutThemeSubmissionsInput = {
+  id?: Prisma.IntFieldUpdateOperationsInput | number
+  username?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isAdmin?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  selectedThemeId?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  accounts?: Prisma.AuthAccountUncheckedUpdateManyWithoutUserNestedInput
+  orbats?: Prisma.OrbatUncheckedUpdateManyWithoutCreatedByNestedInput
+  signups?: Prisma.SignupUncheckedUpdateManyWithoutUserNestedInput
+  customTheme?: Prisma.ThemeUncheckedUpdateOneWithoutCreatedByNestedInput
+}
+
+export type UserCreateManySelectedThemeInput = {
+  id?: number
+  username?: string | null
+  email?: string | null
+  avatarUrl?: string | null
+  isAdmin?: boolean
+  createdAt?: Date | string
+}
+
+export type UserUpdateWithoutSelectedThemeInput = {
+  username?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isAdmin?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  accounts?: Prisma.AuthAccountUpdateManyWithoutUserNestedInput
+  orbats?: Prisma.OrbatUpdateManyWithoutCreatedByNestedInput
+  signups?: Prisma.SignupUpdateManyWithoutUserNestedInput
+  customTheme?: Prisma.ThemeUpdateOneWithoutCreatedByNestedInput
+  themeSubmissions?: Prisma.ThemeSubmissionUpdateManyWithoutSubmittedByNestedInput
+}
+
+export type UserUncheckedUpdateWithoutSelectedThemeInput = {
+  id?: Prisma.IntFieldUpdateOperationsInput | number
+  username?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isAdmin?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  accounts?: Prisma.AuthAccountUncheckedUpdateManyWithoutUserNestedInput
+  orbats?: Prisma.OrbatUncheckedUpdateManyWithoutCreatedByNestedInput
+  signups?: Prisma.SignupUncheckedUpdateManyWithoutUserNestedInput
+  customTheme?: Prisma.ThemeUncheckedUpdateOneWithoutCreatedByNestedInput
+  themeSubmissions?: Prisma.ThemeSubmissionUncheckedUpdateManyWithoutSubmittedByNestedInput
+}
+
+export type UserUncheckedUpdateManyWithoutSelectedThemeInput = {
+  id?: Prisma.IntFieldUpdateOperationsInput | number
+  username?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isAdmin?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 
@@ -639,12 +1065,14 @@ export type UserCountOutputType = {
   accounts: number
   orbats: number
   signups: number
+  themeSubmissions: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   accounts?: boolean | UserCountOutputTypeCountAccountsArgs
   orbats?: boolean | UserCountOutputTypeCountOrbatsArgs
   signups?: boolean | UserCountOutputTypeCountSignupsArgs
+  themeSubmissions?: boolean | UserCountOutputTypeCountThemeSubmissionsArgs
 }
 
 /**
@@ -678,6 +1106,13 @@ export type UserCountOutputTypeCountSignupsArgs<ExtArgs extends runtime.Types.Ex
   where?: Prisma.SignupWhereInput
 }
 
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountThemeSubmissionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ThemeSubmissionWhereInput
+}
+
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -685,10 +1120,14 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   email?: boolean
   avatarUrl?: boolean
   isAdmin?: boolean
+  selectedThemeId?: boolean
   createdAt?: boolean
   accounts?: boolean | Prisma.User$accountsArgs<ExtArgs>
   orbats?: boolean | Prisma.User$orbatsArgs<ExtArgs>
   signups?: boolean | Prisma.User$signupsArgs<ExtArgs>
+  selectedTheme?: boolean | Prisma.User$selectedThemeArgs<ExtArgs>
+  customTheme?: boolean | Prisma.User$customThemeArgs<ExtArgs>
+  themeSubmissions?: boolean | Prisma.User$themeSubmissionsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -698,7 +1137,9 @@ export type UserSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   email?: boolean
   avatarUrl?: boolean
   isAdmin?: boolean
+  selectedThemeId?: boolean
   createdAt?: boolean
+  selectedTheme?: boolean | Prisma.User$selectedThemeArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
 export type UserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -707,7 +1148,9 @@ export type UserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   email?: boolean
   avatarUrl?: boolean
   isAdmin?: boolean
+  selectedThemeId?: boolean
   createdAt?: boolean
+  selectedTheme?: boolean | Prisma.User$selectedThemeArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
 export type UserSelectScalar = {
@@ -716,18 +1159,26 @@ export type UserSelectScalar = {
   email?: boolean
   avatarUrl?: boolean
   isAdmin?: boolean
+  selectedThemeId?: boolean
   createdAt?: boolean
 }
 
-export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "username" | "email" | "avatarUrl" | "isAdmin" | "createdAt", ExtArgs["result"]["user"]>
+export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "username" | "email" | "avatarUrl" | "isAdmin" | "selectedThemeId" | "createdAt", ExtArgs["result"]["user"]>
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   accounts?: boolean | Prisma.User$accountsArgs<ExtArgs>
   orbats?: boolean | Prisma.User$orbatsArgs<ExtArgs>
   signups?: boolean | Prisma.User$signupsArgs<ExtArgs>
+  selectedTheme?: boolean | Prisma.User$selectedThemeArgs<ExtArgs>
+  customTheme?: boolean | Prisma.User$customThemeArgs<ExtArgs>
+  themeSubmissions?: boolean | Prisma.User$themeSubmissionsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
-export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
-export type UserIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
+export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  selectedTheme?: boolean | Prisma.User$selectedThemeArgs<ExtArgs>
+}
+export type UserIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  selectedTheme?: boolean | Prisma.User$selectedThemeArgs<ExtArgs>
+}
 
 export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "User"
@@ -735,6 +1186,9 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     accounts: Prisma.$AuthAccountPayload<ExtArgs>[]
     orbats: Prisma.$OrbatPayload<ExtArgs>[]
     signups: Prisma.$SignupPayload<ExtArgs>[]
+    selectedTheme: Prisma.$ThemePayload<ExtArgs> | null
+    customTheme: Prisma.$ThemePayload<ExtArgs> | null
+    themeSubmissions: Prisma.$ThemeSubmissionPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: number
@@ -742,6 +1196,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     email: string | null
     avatarUrl: string | null
     isAdmin: boolean
+    selectedThemeId: number | null
     createdAt: Date
   }, ExtArgs["result"]["user"]>
   composites: {}
@@ -1140,6 +1595,9 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   accounts<T extends Prisma.User$accountsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$accountsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AuthAccountPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   orbats<T extends Prisma.User$orbatsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$orbatsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrbatPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   signups<T extends Prisma.User$signupsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$signupsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SignupPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  selectedTheme<T extends Prisma.User$selectedThemeArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$selectedThemeArgs<ExtArgs>>): Prisma.Prisma__ThemeClient<runtime.Types.Result.GetResult<Prisma.$ThemePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  customTheme<T extends Prisma.User$customThemeArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$customThemeArgs<ExtArgs>>): Prisma.Prisma__ThemeClient<runtime.Types.Result.GetResult<Prisma.$ThemePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  themeSubmissions<T extends Prisma.User$themeSubmissionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$themeSubmissionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ThemeSubmissionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1174,6 +1632,7 @@ export interface UserFieldRefs {
   readonly email: Prisma.FieldRef<"User", 'String'>
   readonly avatarUrl: Prisma.FieldRef<"User", 'String'>
   readonly isAdmin: Prisma.FieldRef<"User", 'Boolean'>
+  readonly selectedThemeId: Prisma.FieldRef<"User", 'Int'>
   readonly createdAt: Prisma.FieldRef<"User", 'DateTime'>
 }
     
@@ -1424,6 +1883,10 @@ export type UserCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions
    */
   data: Prisma.UserCreateManyInput | Prisma.UserCreateManyInput[]
   skipDuplicates?: boolean
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.UserIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1494,6 +1957,10 @@ export type UserUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions
    * Limit how many Users to update.
    */
   limit?: number
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.UserIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1632,6 +2099,68 @@ export type User$signupsArgs<ExtArgs extends runtime.Types.Extensions.InternalAr
   take?: number
   skip?: number
   distinct?: Prisma.SignupScalarFieldEnum | Prisma.SignupScalarFieldEnum[]
+}
+
+/**
+ * User.selectedTheme
+ */
+export type User$selectedThemeArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Theme
+   */
+  select?: Prisma.ThemeSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Theme
+   */
+  omit?: Prisma.ThemeOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ThemeInclude<ExtArgs> | null
+  where?: Prisma.ThemeWhereInput
+}
+
+/**
+ * User.customTheme
+ */
+export type User$customThemeArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Theme
+   */
+  select?: Prisma.ThemeSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Theme
+   */
+  omit?: Prisma.ThemeOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ThemeInclude<ExtArgs> | null
+  where?: Prisma.ThemeWhereInput
+}
+
+/**
+ * User.themeSubmissions
+ */
+export type User$themeSubmissionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ThemeSubmission
+   */
+  select?: Prisma.ThemeSubmissionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ThemeSubmission
+   */
+  omit?: Prisma.ThemeSubmissionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ThemeSubmissionInclude<ExtArgs> | null
+  where?: Prisma.ThemeSubmissionWhereInput
+  orderBy?: Prisma.ThemeSubmissionOrderByWithRelationInput | Prisma.ThemeSubmissionOrderByWithRelationInput[]
+  cursor?: Prisma.ThemeSubmissionWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ThemeSubmissionScalarFieldEnum | Prisma.ThemeSubmissionScalarFieldEnum[]
 }
 
 /**

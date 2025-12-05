@@ -13,15 +13,19 @@ enum AuthProvider {
 }
 
 model User {
-  id          Int           @id @default(autoincrement())
-  username    String?
-  email       String?
-  avatarUrl   String?
-  isAdmin     Boolean       @default(false)
-  createdAt   DateTime      @default(now())
-  accounts    AuthAccount[]
-  orbats      Orbat[]       @relation("OrbatCreator")
-  signups     Signup[]
+  id                Int                @id @default(autoincrement())
+  username          String?
+  email             String?
+  avatarUrl         String?
+  isAdmin           Boolean            @default(false)
+  selectedThemeId   Int?
+  createdAt         DateTime           @default(now())
+  accounts          AuthAccount[]
+  orbats            Orbat[]            @relation("OrbatCreator")
+  signups           Signup[]
+  selectedTheme     Theme?             @relation("UserSelectedTheme", fields: [selectedThemeId], references: [id])
+  customTheme       Theme?             @relation("UserCustomTheme")
+  themeSubmissions  ThemeSubmission[]
 }
 
 model AuthAccount {
@@ -76,4 +80,54 @@ model Signup {
 
   @@unique([subslotId, userId])
   @@index([userId])  // Indexing for fast lookup
+}
+
+model Theme {
+  id                Int                @id @default(autoincrement())
+  name              String             @unique
+  isPublic          Boolean            @default(false)
+  isDefaultLight    Boolean            @default(false)
+  isDefaultDark     Boolean            @default(false)
+  isEnabled         Boolean            @default(true)
+  customCss         String?            @db.Text
+  createdBy         User?              @relation("UserCustomTheme", fields: [createdById], references: [id], onDelete: Cascade)
+  createdById       Int?               @unique
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  
+  // Color scheme
+  background        String
+  foreground        String
+  primary           String
+  primaryForeground String
+  secondary         String
+  secondaryForeground String
+  accent            String
+  accentForeground  String
+  muted             String
+  mutedForeground   String
+  border            String
+  
+  usersWithTheme    User[]             @relation("UserSelectedTheme")
+  submissions       ThemeSubmission[]
+}
+
+model ThemeSubmission {
+  id          Int       @id @default(autoincrement())
+  theme       Theme     @relation(fields: [themeId], references: [id], onDelete: Cascade)
+  themeId     Int
+  submittedBy User      @relation(fields: [submittedById], references: [id], onDelete: Cascade)
+  submittedById Int
+  status      SubmissionStatus @default(pending)
+  message     String?
+  createdAt   DateTime  @default(now())
+  reviewedAt  DateTime?
+  
+  @@unique([themeId])
+}
+
+enum SubmissionStatus {
+  pending
+  approved
+  rejected
 }

@@ -4,6 +4,7 @@ import "./globals.css";
 import TopBar from "./components/TopBar";
 import AuthSessionProvider from "./components/SessionProvider";
 import { ToastProvider } from "./components/ToastContainer";
+import { ThemeProvider } from "./components/ThemeProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -26,15 +27,53 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  const theme = localStorage.getItem('theme');
+                  if (theme) {
+                    const parsed = JSON.parse(theme);
+                    const root = document.documentElement;
+                    root.style.setProperty('--background', parsed.background);
+                    root.style.setProperty('--foreground', parsed.foreground);
+                    root.style.setProperty('--primary', parsed.primary);
+                    root.style.setProperty('--primary-foreground', parsed.primaryForeground);
+                    root.style.setProperty('--secondary', parsed.secondary);
+                    root.style.setProperty('--secondary-foreground', parsed.secondaryForeground);
+                    root.style.setProperty('--accent', parsed.accent);
+                    root.style.setProperty('--accent-foreground', parsed.accentForeground);
+                    root.style.setProperty('--muted', parsed.muted);
+                    root.style.setProperty('--muted-foreground', parsed.mutedForeground);
+                    root.style.setProperty('--border', parsed.border);
+                    
+                    if (parsed.customCss) {
+                      const style = document.createElement('style');
+                      style.id = 'custom-theme-css';
+                      style.textContent = parsed.customCss;
+                      document.head.appendChild(style);
+                    }
+                  }
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning
       >
         <AuthSessionProvider>
-          <ToastProvider>
-            <TopBar />
-            {children}
-          </ToastProvider>
+          <ThemeProvider>
+            <ToastProvider>
+              <TopBar />
+              {children}
+            </ToastProvider>
+          </ThemeProvider>
         </AuthSessionProvider>
       </body>
     </html>

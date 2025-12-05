@@ -17,10 +17,10 @@ import type * as Prisma from "./prismaNamespace"
 
 const config: runtime.GetPrismaClientConfig = {
   "previewFeatures": [],
-  "clientVersion": "7.0.1",
-  "engineVersion": "f09f2815f091dbba658cdcd2264306d88bb5bda6",
+  "clientVersion": "7.1.0",
+  "engineVersion": "ab635e6b9d606fa5c8fb8b1a7f909c3c3c1c98ba",
   "activeProvider": "postgresql",
-  "inlineSchema": "generator client {\n  provider = \"prisma-client\"\n  output   = \"../generated/prisma/\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n}\n\nenum AuthProvider {\n  discord\n  steam\n}\n\nmodel User {\n  id        Int           @id @default(autoincrement())\n  username  String?\n  email     String?\n  avatarUrl String?\n  isAdmin   Boolean       @default(false)\n  createdAt DateTime      @default(now())\n  accounts  AuthAccount[]\n  orbats    Orbat[]       @relation(\"OrbatCreator\")\n  signups   Signup[]\n}\n\nmodel AuthAccount {\n  id             Int          @id @default(autoincrement())\n  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)\n  userId         Int\n  provider       AuthProvider // Using enum here for clarity\n  providerUserId String\n\n  @@unique([provider, providerUserId])\n}\n\nmodel Orbat {\n  id          Int       @id @default(autoincrement())\n  name        String\n  description String?\n  eventDate   DateTime?\n  startTime   String?\n  endTime     String?\n  createdBy   User      @relation(\"OrbatCreator\", fields: [createdById], references: [id])\n  createdById Int\n  createdAt   DateTime  @default(now())\n  slots       Slot[]\n}\n\nmodel Slot {\n  id         Int       @id @default(autoincrement())\n  orbat      Orbat     @relation(fields: [orbatId], references: [id], onDelete: Cascade)\n  orbatId    Int\n  name       String\n  orderIndex Int\n  subslots   Subslot[]\n}\n\nmodel Subslot {\n  id         Int      @id @default(autoincrement())\n  slot       Slot     @relation(fields: [slotId], references: [id], onDelete: Cascade)\n  slotId     Int\n  name       String\n  orderIndex Int\n  maxSignups Int      @default(1)\n  signups    Signup[]\n}\n\nmodel Signup {\n  id        Int      @id @default(autoincrement())\n  subslot   Subslot  @relation(fields: [subslotId], references: [id], onDelete: Cascade)\n  subslotId Int\n  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)\n  userId    Int\n  createdAt DateTime @default(now())\n\n  @@unique([subslotId, userId])\n  @@index([userId]) // Indexing for fast lookup\n}\n",
+  "inlineSchema": "generator client {\n  provider = \"prisma-client\"\n  output   = \"../generated/prisma/\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n}\n\nenum AuthProvider {\n  discord\n  steam\n}\n\nmodel User {\n  id               Int               @id @default(autoincrement())\n  username         String?\n  email            String?\n  avatarUrl        String?\n  isAdmin          Boolean           @default(false)\n  selectedThemeId  Int?\n  createdAt        DateTime          @default(now())\n  accounts         AuthAccount[]\n  orbats           Orbat[]           @relation(\"OrbatCreator\")\n  signups          Signup[]\n  selectedTheme    Theme?            @relation(\"UserSelectedTheme\", fields: [selectedThemeId], references: [id])\n  customTheme      Theme?            @relation(\"UserCustomTheme\")\n  themeSubmissions ThemeSubmission[]\n}\n\nmodel AuthAccount {\n  id             Int          @id @default(autoincrement())\n  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)\n  userId         Int\n  provider       AuthProvider // Using enum here for clarity\n  providerUserId String\n\n  @@unique([provider, providerUserId])\n}\n\nmodel Orbat {\n  id          Int       @id @default(autoincrement())\n  name        String\n  description String?\n  eventDate   DateTime?\n  startTime   String?\n  endTime     String?\n  createdBy   User      @relation(\"OrbatCreator\", fields: [createdById], references: [id])\n  createdById Int\n  createdAt   DateTime  @default(now())\n  slots       Slot[]\n}\n\nmodel Slot {\n  id         Int       @id @default(autoincrement())\n  orbat      Orbat     @relation(fields: [orbatId], references: [id], onDelete: Cascade)\n  orbatId    Int\n  name       String\n  orderIndex Int\n  subslots   Subslot[]\n}\n\nmodel Subslot {\n  id         Int      @id @default(autoincrement())\n  slot       Slot     @relation(fields: [slotId], references: [id], onDelete: Cascade)\n  slotId     Int\n  name       String\n  orderIndex Int\n  maxSignups Int      @default(1)\n  signups    Signup[]\n}\n\nmodel Signup {\n  id        Int      @id @default(autoincrement())\n  subslot   Subslot  @relation(fields: [subslotId], references: [id], onDelete: Cascade)\n  subslotId Int\n  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)\n  userId    Int\n  createdAt DateTime @default(now())\n\n  @@unique([subslotId, userId])\n  @@index([userId]) // Indexing for fast lookup\n}\n\nmodel Theme {\n  id             Int      @id @default(autoincrement())\n  name           String   @unique\n  isPublic       Boolean  @default(false)\n  isDefaultLight Boolean  @default(false)\n  isDefaultDark  Boolean  @default(false)\n  isEnabled      Boolean  @default(true)\n  customCss      String?  @db.Text\n  createdBy      User?    @relation(\"UserCustomTheme\", fields: [createdById], references: [id], onDelete: Cascade)\n  createdById    Int?     @unique\n  createdAt      DateTime @default(now())\n  updatedAt      DateTime @updatedAt\n\n  // Color scheme\n  background          String\n  foreground          String\n  primary             String\n  primaryForeground   String\n  secondary           String\n  secondaryForeground String\n  accent              String\n  accentForeground    String\n  muted               String\n  mutedForeground     String\n  border              String\n\n  usersWithTheme User[]            @relation(\"UserSelectedTheme\")\n  submissions    ThemeSubmission[]\n}\n\nmodel ThemeSubmission {\n  id            Int              @id @default(autoincrement())\n  theme         Theme            @relation(fields: [themeId], references: [id], onDelete: Cascade)\n  themeId       Int\n  submittedBy   User             @relation(fields: [submittedById], references: [id], onDelete: Cascade)\n  submittedById Int\n  status        SubmissionStatus @default(pending)\n  message       String?\n  createdAt     DateTime         @default(now())\n  reviewedAt    DateTime?\n\n  @@unique([themeId])\n}\n\nenum SubmissionStatus {\n  pending\n  approved\n  rejected\n}\n",
   "runtimeDataModel": {
     "models": {},
     "enums": {},
@@ -28,7 +28,7 @@ const config: runtime.GetPrismaClientConfig = {
   }
 }
 
-config.runtimeDataModel = JSON.parse("{\"models\":{\"User\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"username\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"email\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"avatarUrl\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"isAdmin\",\"kind\":\"scalar\",\"type\":\"Boolean\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"accounts\",\"kind\":\"object\",\"type\":\"AuthAccount\",\"relationName\":\"AuthAccountToUser\"},{\"name\":\"orbats\",\"kind\":\"object\",\"type\":\"Orbat\",\"relationName\":\"OrbatCreator\"},{\"name\":\"signups\",\"kind\":\"object\",\"type\":\"Signup\",\"relationName\":\"SignupToUser\"}],\"dbName\":null},\"AuthAccount\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"user\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"AuthAccountToUser\"},{\"name\":\"userId\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"provider\",\"kind\":\"enum\",\"type\":\"AuthProvider\"},{\"name\":\"providerUserId\",\"kind\":\"scalar\",\"type\":\"String\"}],\"dbName\":null},\"Orbat\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"description\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"eventDate\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"startTime\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"endTime\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"createdBy\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"OrbatCreator\"},{\"name\":\"createdById\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"slots\",\"kind\":\"object\",\"type\":\"Slot\",\"relationName\":\"OrbatToSlot\"}],\"dbName\":null},\"Slot\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"orbat\",\"kind\":\"object\",\"type\":\"Orbat\",\"relationName\":\"OrbatToSlot\"},{\"name\":\"orbatId\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"orderIndex\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"subslots\",\"kind\":\"object\",\"type\":\"Subslot\",\"relationName\":\"SlotToSubslot\"}],\"dbName\":null},\"Subslot\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"slot\",\"kind\":\"object\",\"type\":\"Slot\",\"relationName\":\"SlotToSubslot\"},{\"name\":\"slotId\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"orderIndex\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"maxSignups\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"signups\",\"kind\":\"object\",\"type\":\"Signup\",\"relationName\":\"SignupToSubslot\"}],\"dbName\":null},\"Signup\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"subslot\",\"kind\":\"object\",\"type\":\"Subslot\",\"relationName\":\"SignupToSubslot\"},{\"name\":\"subslotId\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"user\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"SignupToUser\"},{\"name\":\"userId\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"}],\"dbName\":null}},\"enums\":{},\"types\":{}}")
+config.runtimeDataModel = JSON.parse("{\"models\":{\"User\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"username\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"email\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"avatarUrl\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"isAdmin\",\"kind\":\"scalar\",\"type\":\"Boolean\"},{\"name\":\"selectedThemeId\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"accounts\",\"kind\":\"object\",\"type\":\"AuthAccount\",\"relationName\":\"AuthAccountToUser\"},{\"name\":\"orbats\",\"kind\":\"object\",\"type\":\"Orbat\",\"relationName\":\"OrbatCreator\"},{\"name\":\"signups\",\"kind\":\"object\",\"type\":\"Signup\",\"relationName\":\"SignupToUser\"},{\"name\":\"selectedTheme\",\"kind\":\"object\",\"type\":\"Theme\",\"relationName\":\"UserSelectedTheme\"},{\"name\":\"customTheme\",\"kind\":\"object\",\"type\":\"Theme\",\"relationName\":\"UserCustomTheme\"},{\"name\":\"themeSubmissions\",\"kind\":\"object\",\"type\":\"ThemeSubmission\",\"relationName\":\"ThemeSubmissionToUser\"}],\"dbName\":null},\"AuthAccount\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"user\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"AuthAccountToUser\"},{\"name\":\"userId\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"provider\",\"kind\":\"enum\",\"type\":\"AuthProvider\"},{\"name\":\"providerUserId\",\"kind\":\"scalar\",\"type\":\"String\"}],\"dbName\":null},\"Orbat\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"description\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"eventDate\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"startTime\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"endTime\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"createdBy\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"OrbatCreator\"},{\"name\":\"createdById\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"slots\",\"kind\":\"object\",\"type\":\"Slot\",\"relationName\":\"OrbatToSlot\"}],\"dbName\":null},\"Slot\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"orbat\",\"kind\":\"object\",\"type\":\"Orbat\",\"relationName\":\"OrbatToSlot\"},{\"name\":\"orbatId\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"orderIndex\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"subslots\",\"kind\":\"object\",\"type\":\"Subslot\",\"relationName\":\"SlotToSubslot\"}],\"dbName\":null},\"Subslot\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"slot\",\"kind\":\"object\",\"type\":\"Slot\",\"relationName\":\"SlotToSubslot\"},{\"name\":\"slotId\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"orderIndex\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"maxSignups\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"signups\",\"kind\":\"object\",\"type\":\"Signup\",\"relationName\":\"SignupToSubslot\"}],\"dbName\":null},\"Signup\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"subslot\",\"kind\":\"object\",\"type\":\"Subslot\",\"relationName\":\"SignupToSubslot\"},{\"name\":\"subslotId\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"user\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"SignupToUser\"},{\"name\":\"userId\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"}],\"dbName\":null},\"Theme\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"isPublic\",\"kind\":\"scalar\",\"type\":\"Boolean\"},{\"name\":\"isDefaultLight\",\"kind\":\"scalar\",\"type\":\"Boolean\"},{\"name\":\"isDefaultDark\",\"kind\":\"scalar\",\"type\":\"Boolean\"},{\"name\":\"isEnabled\",\"kind\":\"scalar\",\"type\":\"Boolean\"},{\"name\":\"customCss\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"createdBy\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"UserCustomTheme\"},{\"name\":\"createdById\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"background\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"foreground\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"primary\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"primaryForeground\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"secondary\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"secondaryForeground\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"accent\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"accentForeground\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"muted\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"mutedForeground\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"border\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"usersWithTheme\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"UserSelectedTheme\"},{\"name\":\"submissions\",\"kind\":\"object\",\"type\":\"ThemeSubmission\",\"relationName\":\"ThemeToThemeSubmission\"}],\"dbName\":null},\"ThemeSubmission\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"theme\",\"kind\":\"object\",\"type\":\"Theme\",\"relationName\":\"ThemeToThemeSubmission\"},{\"name\":\"themeId\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"submittedBy\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"ThemeSubmissionToUser\"},{\"name\":\"submittedById\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"status\",\"kind\":\"enum\",\"type\":\"SubmissionStatus\"},{\"name\":\"message\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"reviewedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"}],\"dbName\":null}},\"enums\":{},\"types\":{}}")
 
 async function decodeBase64AsWasm(wasmBase64: string): Promise<WebAssembly.Module> {
   const { Buffer } = await import('node:buffer')
@@ -62,7 +62,7 @@ export interface PrismaClientConstructor {
    * const users = await prisma.user.findMany()
    * ```
    * 
-   * Read more in our [docs](https://www.prisma.io/docs/reference/tools-and-interfaces/prisma-client).
+   * Read more in our [docs](https://pris.ly/d/client).
    */
 
   new <
@@ -84,7 +84,7 @@ export interface PrismaClientConstructor {
  * const users = await prisma.user.findMany()
  * ```
  * 
- * Read more in our [docs](https://www.prisma.io/docs/reference/tools-and-interfaces/prisma-client).
+ * Read more in our [docs](https://pris.ly/d/client).
  */
 
 export interface PrismaClient<
@@ -113,7 +113,7 @@ export interface PrismaClient<
    * const result = await prisma.$executeRaw`UPDATE User SET cool = ${true} WHERE email = ${'user@email.com'};`
    * ```
    *
-   * Read more in our [docs](https://www.prisma.io/docs/reference/tools-and-interfaces/prisma-client/raw-database-access).
+   * Read more in our [docs](https://pris.ly/d/raw-queries).
    */
   $executeRaw<T = unknown>(query: TemplateStringsArray | Prisma.Sql, ...values: any[]): Prisma.PrismaPromise<number>;
 
@@ -125,7 +125,7 @@ export interface PrismaClient<
    * const result = await prisma.$executeRawUnsafe('UPDATE User SET cool = $1 WHERE email = $2 ;', true, 'user@email.com')
    * ```
    *
-   * Read more in our [docs](https://www.prisma.io/docs/reference/tools-and-interfaces/prisma-client/raw-database-access).
+   * Read more in our [docs](https://pris.ly/d/raw-queries).
    */
   $executeRawUnsafe<T = unknown>(query: string, ...values: any[]): Prisma.PrismaPromise<number>;
 
@@ -136,7 +136,7 @@ export interface PrismaClient<
    * const result = await prisma.$queryRaw`SELECT * FROM User WHERE id = ${1} OR email = ${'user@email.com'};`
    * ```
    *
-   * Read more in our [docs](https://www.prisma.io/docs/reference/tools-and-interfaces/prisma-client/raw-database-access).
+   * Read more in our [docs](https://pris.ly/d/raw-queries).
    */
   $queryRaw<T = unknown>(query: TemplateStringsArray | Prisma.Sql, ...values: any[]): Prisma.PrismaPromise<T>;
 
@@ -148,7 +148,7 @@ export interface PrismaClient<
    * const result = await prisma.$queryRawUnsafe('SELECT * FROM User WHERE id = $1 OR email = $2;', 1, 'user@email.com')
    * ```
    *
-   * Read more in our [docs](https://www.prisma.io/docs/reference/tools-and-interfaces/prisma-client/raw-database-access).
+   * Read more in our [docs](https://pris.ly/d/raw-queries).
    */
   $queryRawUnsafe<T = unknown>(query: string, ...values: any[]): Prisma.PrismaPromise<T>;
 
@@ -233,6 +233,26 @@ export interface PrismaClient<
     * ```
     */
   get signup(): Prisma.SignupDelegate<ExtArgs, { omit: OmitOpts }>;
+
+  /**
+   * `prisma.theme`: Exposes CRUD operations for the **Theme** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Themes
+    * const themes = await prisma.theme.findMany()
+    * ```
+    */
+  get theme(): Prisma.ThemeDelegate<ExtArgs, { omit: OmitOpts }>;
+
+  /**
+   * `prisma.themeSubmission`: Exposes CRUD operations for the **ThemeSubmission** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more ThemeSubmissions
+    * const themeSubmissions = await prisma.themeSubmission.findMany()
+    * ```
+    */
+  get themeSubmission(): Prisma.ThemeSubmissionDelegate<ExtArgs, { omit: OmitOpts }>;
 }
 
 export function getPrismaClientClass(): PrismaClientConstructor {

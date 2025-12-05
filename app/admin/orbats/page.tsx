@@ -85,8 +85,8 @@ export default async function AdminOrbatsPage() {
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         <header className="space-y-2">
-          <h1 className="text-2xl sm:text-3xl font-bold">OrbAT Management</h1>
-          <p className="text-sm sm:text-base text-gray-300">
+          <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: 'var(--foreground)' }}>OrbAT Management</h1>
+          <p className="text-sm sm:text-base" style={{ color: 'var(--muted-foreground)' }}>
             Search, filter, and manage operations below. Use the calendar to quickly create new operations.
           </p>
         </header>
@@ -95,10 +95,10 @@ export default async function AdminOrbatsPage() {
         <OrbatManagementClient orbats={orbatsWithCounts} />
 
         {/* Calendar View */}
-        <div className="pt-6 border-t border-gray-700 space-y-4">
+        <div className="pt-6 space-y-4" style={{ borderTop: '1px solid var(--border)' }}>
           <div>
-            <h2 className="text-xl font-bold">Quick Create Calendar</h2>
-            <p className="text-sm text-gray-400 mt-1">
+            <h2 className="text-xl font-bold" style={{ color: 'var(--foreground)' }}>Quick Create Calendar</h2>
+            <p className="text-sm mt-1" style={{ color: 'var(--muted-foreground)' }}>
               Click any empty day to create a new operation for that date. Click days with operations to view or manage them.
             </p>
           </div>

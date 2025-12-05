@@ -13,8 +13,49 @@ async function main() {
   await prisma.subslot.deleteMany();
   await prisma.slot.deleteMany();
   await prisma.orbat.deleteMany();
+  await prisma.themeSubmission.deleteMany();
+  await prisma.theme.deleteMany();
   await prisma.authAccount.deleteMany();
   await prisma.user.deleteMany();
+
+  // --- Create Default Themes ---
+  const darkTheme = await prisma.theme.create({
+    data: {
+      name: 'Dark',
+      isPublic: true,
+      isDefaultDark: true,
+      background: '#0a0a0a',
+      foreground: '#ededed',
+      primary: '#3b82f6',
+      primaryForeground: '#ffffff',
+      secondary: '#1e293b',
+      secondaryForeground: '#f1f5f9',
+      accent: '#8b5cf6',
+      accentForeground: '#ffffff',
+      muted: '#1e293b',
+      mutedForeground: '#94a3b8',
+      border: '#334155',
+    },
+  });
+
+  const lightTheme = await prisma.theme.create({
+    data: {
+      name: 'Light',
+      isPublic: true,
+      isDefaultLight: true,
+      background: '#ffffff',
+      foreground: '#0f172a',
+      primary: '#1d4ed8',
+      primaryForeground: '#ffffff',
+      secondary: '#e2e8f0',
+      secondaryForeground: '#1e293b',
+      accent: '#6d28d9',
+      accentForeground: '#ffffff',
+      muted: '#f1f5f9',
+      mutedForeground: '#475569',
+      border: '#cbd5e1',
+    },
+  });
 
   // --- Admin User (YOU) ---
   const admin = await prisma.user.create({

@@ -16,7 +16,7 @@ export default async function NewOrbatPage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         <header className="space-y-2">
           <h1 className="text-2xl sm:text-3xl font-bold">Create New OrbAT</h1>
-          <p className="text-sm sm:text-base text-gray-300">
+          <p className="text-sm sm:text-base" style={{ color: 'var(--muted-foreground)' }}>
             Set up a new operation with slots and subslots
           </p>
         </header>

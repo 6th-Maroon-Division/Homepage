@@ -115,31 +115,31 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
         <div className="flex gap-2">
           <button
             onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              filter === 'all'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-            }`}
+            className="px-4 py-2 rounded-md font-medium transition-colors"
+            style={{
+              backgroundColor: filter === 'all' ? 'var(--primary)' : 'var(--secondary)',
+              color: filter === 'all' ? 'var(--primary-foreground)' : 'var(--foreground)'
+            }}
           >
             All Users ({users.length})
           </button>
           <button
             onClick={() => setFilter('admin')}
-            className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              filter === 'admin'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-            }`}
+            className="px-4 py-2 rounded-md font-medium transition-colors"
+            style={{
+              backgroundColor: filter === 'admin' ? 'var(--primary)' : 'var(--secondary)',
+              color: filter === 'admin' ? 'var(--primary-foreground)' : 'var(--foreground)'
+            }}
           >
             Admins ({users.filter(u => u.isAdmin).length})
           </button>
           <button
             onClick={() => setFilter('regular')}
-            className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              filter === 'regular'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-            }`}
+            className="px-4 py-2 rounded-md font-medium transition-colors"
+            style={{
+              backgroundColor: filter === 'regular' ? 'var(--primary)' : 'var(--secondary)',
+              color: filter === 'regular' ? 'var(--primary-foreground)' : 'var(--foreground)'
+            }}
           >
             Regular ({users.filter(u => !u.isAdmin).length})
           </button>
@@ -150,47 +150,52 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
           placeholder="Search users..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="flex-1 px-4 py-2 bg-gray-900/50 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 px-4 py-2 border rounded-md focus:outline-none focus:ring-2"
+          style={{ 
+            backgroundColor: 'var(--background)', 
+            borderColor: 'var(--border)', 
+            color: 'var(--foreground)'
+          }}
         />
       </div>
 
       {/* Users Table */}
-      <div className="bg-gray-800/50 border border-gray-700 rounded-lg overflow-hidden">
+      <div className="border rounded-lg overflow-hidden" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
         {filteredUsers.length === 0 ? (
-          <div className="px-6 py-12 text-center text-gray-400">
+          <div className="px-6 py-12 text-center" style={{ color: 'var(--muted-foreground)' }}>
             <p>No users found</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-700/50">
+              <thead style={{ backgroundColor: 'var(--muted)' }}>
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
                     User
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
                     Email
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
                     Providers
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
                     Activity
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
                     Joined
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
                     Role
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-700">
+              <tbody style={{ borderTopWidth: '1px', borderColor: 'var(--border)' }}>
                 {filteredUsers.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-700/30">
+                  <tr key={user.id} style={{ borderBottomWidth: '1px', borderColor: 'var(--border)' }}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
                         {user.avatarUrl && (
@@ -203,14 +208,14 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                           />
                         )}
                         <div>
-                          <div className="font-medium text-white">
+                          <div className="font-medium" style={{ color: 'var(--foreground)' }}>
                             {user.username || 'Unknown'}
                           </div>
-                          <div className="text-xs text-gray-400">ID: {user.id}</div>
+                          <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>ID: {user.id}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: 'var(--foreground)' }}>
                       {user.email || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -218,34 +223,35 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                         {user.providers.map((provider) => (
                           <span
                             key={provider}
-                            className="px-2 py-1 bg-gray-700 rounded text-xs capitalize"
+                            className="px-2 py-1 rounded text-xs capitalize"
+                            style={{ backgroundColor: 'var(--muted)', color: 'var(--foreground)' }}
                           >
                             {provider}
                           </span>
                         ))}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: 'var(--foreground)' }}>
                       <div className="text-xs space-y-1">
                         <div>{user.signupCount} signups</div>
                         <div>{user.orbatCount} OrbATs</div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: 'var(--foreground)' }}>
                       {new Date(user.createdAt).toLocaleDateString('en-GB')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {user.isAdmin ? (
-                        <span className="px-2 py-1 bg-purple-600 text-white rounded text-xs font-medium">
+                        <span className="px-2 py-1 rounded text-xs font-medium" style={{ backgroundColor: 'var(--accent)', color: 'var(--accent-foreground)' }}>
                           Admin
                         </span>
                       ) : (
-                        <span className="px-2 py-1 bg-gray-700 text-gray-300 rounded text-xs">
+                        <span className="px-2 py-1 rounded text-xs" style={{ backgroundColor: 'var(--muted)', color: 'var(--foreground)' }}>
                           User
                         </span>
                       )}
                       {user.id === currentUserId && (
-                        <span className="ml-2 text-xs text-blue-400">(You)</span>
+                        <span className="ml-2 text-xs" style={{ color: 'var(--primary)' }}>(You)</span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
@@ -261,7 +267,7 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                           >
                             {user.isAdmin ? 'Demote' : 'Promote'}
                           </button>
-                          <span className="text-gray-600">|</span>
+                          <span style={{ color: 'var(--border)' }}>|</span>
                           <button
                             onClick={() => handleDeleteUser(user.id, user.username)}
                             className="text-red-500 hover:text-red-400 font-medium"

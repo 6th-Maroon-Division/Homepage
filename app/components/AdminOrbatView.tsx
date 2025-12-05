@@ -156,14 +156,14 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
       <header className="space-y-2">
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold">{orbat.name}</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: 'var(--foreground)' }}>{orbat.name}</h1>
             {orbat.description && (
-              <p className="text-sm sm:text-base text-gray-300 mt-2">
+              <p className="text-sm sm:text-base mt-2" style={{ color: 'var(--muted-foreground)' }}>
                 {orbat.description}
               </p>
             )}
             {eventDate && (
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
                 Event date:{' '}
                 {eventDate.toLocaleString('en-GB', {
                   dateStyle: 'medium',
@@ -172,7 +172,7 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
               </p>
             )}
           </div>
-          <span className="px-3 py-1 bg-purple-600 text-white text-xs font-medium rounded-full">
+          <span className="px-3 py-1 text-xs font-medium rounded-full" style={{ backgroundColor: '#9333ea', color: '#ffffff' }}>
             Admin View
           </span>
         </div>
@@ -183,9 +183,10 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
         {orbat.slots.map((slot) => (
           <article
             key={slot.id}
-            className="rounded-lg border border-slate-700 bg-slate-900/60 p-4 flex flex-col gap-3"
+            className="rounded-lg border p-4 flex flex-col gap-3"
+            style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
           >
-            <h2 className="text-lg font-semibold border-b border-slate-700 pb-2">
+            <h2 className="text-lg font-semibold pb-2" style={{ color: 'var(--foreground)', borderBottom: '1px solid var(--border)' }}>
               {slot.name}
             </h2>
 
@@ -197,21 +198,22 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
                 return (
                   <li key={sub.id} className="flex flex-col gap-2">
                     <div className="flex justify-between items-start">
-                      <div className="font-medium">{sub.name}</div>
-                      <div className="text-xs text-gray-400">
+                      <div className="font-medium" style={{ color: 'var(--foreground)' }}>{sub.name}</div>
+                      <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
                         {sub.signups.length}/{sub.maxSignups}
-                        {isFull && <span className="ml-1 text-amber-400">(Full)</span>}
+                        {isFull && <span className="ml-1" style={{ color: '#f59e0b' }}>(Full)</span>}
                       </div>
                     </div>
 
                     {hasSignup ? (
-                      <div className="space-y-1 pl-2 border-l-2 border-blue-600">
+                      <div className="space-y-1 pl-2" style={{ borderLeft: '2px solid var(--primary)' }}>
                         {sub.signups.map((signup) => (
                           <div
                             key={signup.id}
-                            className="flex justify-between items-center text-sm bg-gray-800/50 rounded px-2 py-1"
+                            className="flex justify-between items-center text-sm rounded px-2 py-1"
+                            style={{ backgroundColor: 'var(--background)' }}
                           >
-                            <span className="text-gray-300">
+                            <span style={{ color: 'var(--foreground)' }}>
                               {signup.user?.username ?? 'Unknown'}
                             </span>
                             <div className="flex gap-1">
@@ -225,14 +227,16 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
                                     slot.name
                                   )
                                 }
-                                className="text-blue-400 hover:text-blue-300 px-2 py-0.5 text-xs"
+                                className="px-2 py-0.5 text-xs"
+                                style={{ color: 'var(--primary)' }}
                                 title="Move to another slot"
                               >
                                 Move
                               </button>
                               <button
                                 onClick={() => handleRemoveSignup(signup.id, sub.id)}
-                                className="text-red-400 hover:text-red-300 px-2 py-0.5 text-xs"
+                                className="px-2 py-0.5 text-xs"
+                                style={{ color: '#ef4444' }}
                                 title="Remove signup"
                               >
                                 Remove
@@ -242,7 +246,7 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
                         ))}
                       </div>
                     ) : (
-                      <div className="text-xs text-gray-500 italic pl-2">Empty</div>
+                      <div className="text-xs italic pl-2" style={{ color: 'var(--muted-foreground)' }}>Empty</div>
                     )}
                   </li>
                 );

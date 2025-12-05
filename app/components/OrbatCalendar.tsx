@@ -80,7 +80,7 @@ export default function OrbatCalendar({ orbats }: OrbatCalendarProps) {
   
   // Empty cells for days before month starts
   for (let i = 0; i < startingDayOfWeek; i++) {
-    calendarDays.push(<div key={`empty-${i}`} className="h-24 bg-gray-800/30" />);
+    calendarDays.push(<div key={`empty-${i}`} className="h-24" style={{ backgroundColor: 'var(--muted)', opacity: 0.3 }} />);
   }
   
   // Days of the month
@@ -94,25 +94,28 @@ export default function OrbatCalendar({ orbats }: OrbatCalendarProps) {
       <div
         key={day}
         onClick={() => handleDayClick(day)}
-        className={`h-24 border border-gray-700 p-2 cursor-pointer hover:bg-gray-700/50 transition-colors ${
-          isToday ? 'bg-blue-900/20 border-blue-600' : 'bg-gray-800/50'
-        }`}
+        className="h-24 border p-2 cursor-pointer transition-colors"
+        style={{
+          borderColor: isToday ? 'var(--primary)' : 'var(--border)',
+          backgroundColor: 'var(--background)',
+        }}
       >
-        <div className={`text-sm font-semibold mb-1 ${isToday ? 'text-blue-400' : 'text-gray-400'}`}>
+        <div className="text-sm font-semibold mb-1" style={{ color: isToday ? 'var(--primary)' : 'var(--foreground)' }}>
           {day}
         </div>
         <div className="space-y-1 overflow-hidden">
           {opsOnDay.slice(0, 2).map(op => (
             <div
               key={op.id}
-              className="text-xs bg-blue-600/80 text-white px-1 py-0.5 rounded truncate"
+              className="text-xs px-1 py-0.5 rounded truncate font-medium"
+              style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
               title={op.name}
             >
               {op.name}
             </div>
           ))}
           {opsOnDay.length > 2 && (
-            <div className="text-xs text-gray-400">
+            <div className="text-xs font-medium" style={{ color: 'var(--muted-foreground)' }}>
               +{opsOnDay.length - 2} more
             </div>
           )}
@@ -125,28 +128,31 @@ export default function OrbatCalendar({ orbats }: OrbatCalendarProps) {
 
   return (
     <>
-      <div className="bg-gray-800/50 border border-gray-700 rounded-lg overflow-hidden">
+      <div className="border rounded-lg overflow-hidden" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
         {/* Calendar Header */}
-        <div className="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
-          <h2 className="text-xl font-semibold">
+        <div className="px-6 py-4 flex items-center justify-between" style={{ borderBottomWidth: '1px', borderColor: 'var(--border)' }}>
+          <h2 className="text-xl font-semibold" style={{ color: 'var(--foreground)' }}>
             {currentMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
           </h2>
           <div className="flex gap-2">
             <button
               onClick={handlePrevMonth}
-              className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors"
+              className="px-3 py-1 rounded-md transition-colors"
+              style={{ backgroundColor: 'var(--muted)', color: 'var(--foreground)' }}
             >
               ←
             </button>
             <button
               onClick={() => setCurrentMonth(new Date())}
-              className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors text-sm"
+              className="px-3 py-1 rounded-md transition-colors text-sm"
+              style={{ backgroundColor: 'var(--muted)', color: 'var(--foreground)' }}
             >
               Today
             </button>
             <button
               onClick={handleNextMonth}
-              className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors"
+              className="px-3 py-1 rounded-md transition-colors"
+              style={{ backgroundColor: 'var(--muted)', color: 'var(--foreground)' }}
             >
               →
             </button>
@@ -158,7 +164,7 @@ export default function OrbatCalendar({ orbats }: OrbatCalendarProps) {
           {/* Day headers */}
           <div className="grid grid-cols-7 gap-2 mb-2">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-              <div key={day} className="text-center text-sm font-semibold text-gray-400 pb-2">
+              <div key={day} className="text-center text-sm font-semibold pb-2" style={{ color: 'var(--muted-foreground)' }}>
                 {day}
               </div>
             ))}
@@ -173,23 +179,24 @@ export default function OrbatCalendar({ orbats }: OrbatCalendarProps) {
 
       {/* Day Modal */}
       {showDayModal && selectedDate && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowDayModal(false)}>
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-xl font-bold mb-4">
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={() => setShowDayModal(false)}>
+          <div className="border rounded-lg p-6 max-w-md w-full mx-4" style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }} onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-xl font-bold mb-4" style={{ color: 'var(--foreground)' }}>
               {selectedDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </h3>
             
             <div className="space-y-3 mb-4">
-              <p className="text-sm text-gray-400">Operations on this day:</p>
+              <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>Operations on this day:</p>
               {selectedOrbats.map(orbat => (
                 <button
                   key={orbat.id}
                   onClick={() => handleSelectOrbat(orbat.id)}
-                  className="w-full text-left p-3 bg-gray-700/50 hover:bg-gray-700 rounded-md transition-colors"
+                  className="w-full text-left p-3 rounded-md transition-colors"
+                  style={{ backgroundColor: 'var(--muted)', color: 'var(--foreground)' }}
                 >
                   <div className="font-semibold">{orbat.name}</div>
                   {orbat.description && (
-                    <div className="text-sm text-gray-400 mt-1 truncate">{orbat.description}</div>
+                    <div className="text-sm mt-1 truncate" style={{ color: 'var(--muted-foreground)' }}>{orbat.description}</div>
                   )}
                 </button>
               ))}
@@ -198,13 +205,15 @@ export default function OrbatCalendar({ orbats }: OrbatCalendarProps) {
             <div className="flex gap-3">
               <button
                 onClick={handleCreateNew}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors font-medium"
+                className="flex-1 px-4 py-2 rounded-md transition-colors font-medium"
+                style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
               >
                 Create New OrbAT
               </button>
               <button
                 onClick={() => setShowDayModal(false)}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors"
+                className="px-4 py-2 rounded-md transition-colors"
+                style={{ backgroundColor: 'var(--muted)', color: 'var(--foreground)' }}
               >
                 Cancel
               </button>

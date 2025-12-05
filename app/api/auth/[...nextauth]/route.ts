@@ -67,8 +67,11 @@ export const authOptions: AuthOptions = {
     },
 
     async jwt({ token, profile, trigger }) {
-      // On signin or profile update, fetch user from database
-      if (profile || trigger === 'signIn' || trigger === 'update') {
+      // Always refresh user data from database to ensure consistency
+      // This handles cases where the database was reset or user data changed
+      const shouldRefresh = profile || trigger === 'signIn' || trigger === 'update' || !token.id;
+      
+      if (shouldRefresh) {
         const discordProfile = profile as DiscordProfile | undefined;
         const providerUserId = discordProfile?.id || token.sub;
         

@@ -48,31 +48,33 @@ export default function ConfirmModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
       <div
-        className="bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6 space-y-4 border border-gray-700 animate-scale-in"
+        className="rounded-lg shadow-xl max-w-md w-full p-6 space-y-4 border animate-scale-in"
+        style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-xl font-semibold text-white">{title}</h3>
+        <h3 className="text-xl font-semibold" style={{ color: 'var(--foreground)' }}>{title}</h3>
         
-        <div className="text-gray-300 text-sm">{message}</div>
+        <div className="text-sm" style={{ color: 'var(--muted-foreground)' }}>{message}</div>
 
         <div className="flex justify-end gap-3 pt-2">
           <button
             onClick={onCancel}
             disabled={isLoading}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ backgroundColor: 'var(--secondary)', color: 'var(--foreground)' }}
           >
             {cancelLabel}
           </button>
           <button
             onClick={onConfirm}
             disabled={isLoading}
-            className={`px-4 py-2 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-              isDestructive
-                ? 'bg-red-600 hover:bg-red-700'
-                : 'bg-blue-600 hover:bg-blue-700'
-            }`}
+            className="px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              backgroundColor: isDestructive ? '#dc2626' : 'var(--primary)',
+              color: isDestructive ? '#ffffff' : 'var(--primary-foreground)'
+            }}
           >
             {isLoading ? 'Processing...' : confirmLabel}
           </button>

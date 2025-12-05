@@ -4,6 +4,7 @@ import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
 import { useState } from 'react';
 import Image from 'next/image';
+import ThemeSettings from '@/app/components/ThemeSettings';
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
@@ -58,18 +59,18 @@ export default function SettingsPage() {
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         <header className="space-y-2">
-          <h1 className="text-2xl sm:text-3xl font-bold">Settings</h1>
-          <p className="text-sm sm:text-base text-gray-300">
+          <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: 'var(--foreground)' }}>Settings</h1>
+          <p className="text-sm sm:text-base" style={{ color: 'var(--muted-foreground)' }}>
             Manage your profile information and account settings
           </p>
         </header>
 
-        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">Profile Information</h2>
+        <div className="border rounded-lg p-6" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+          <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--foreground)' }}>Profile Information</h2>
           
           <form onSubmit={handleSave} className="space-y-6">
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="username" className="block text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>
                 Username
               </label>
               <input
@@ -77,13 +78,14 @@ export default function SettingsPage() {
                 id="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-900/50 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white placeholder-gray-400"
+                className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2"
+                style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
                 placeholder="Enter your username"
               />
             </div>
 
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>
                 Email
               </label>
               <input
@@ -91,13 +93,14 @@ export default function SettingsPage() {
                 id="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-900/50 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white placeholder-gray-400"
+                className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2"
+                style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
                 placeholder="Enter your email"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>
                 Avatar
               </label>
               {session?.user?.avatarUrl && (
@@ -109,13 +112,17 @@ export default function SettingsPage() {
                   className="rounded-full"
                 />
               )}
-              <p className="mt-2 text-sm text-gray-400">
+              <p className="mt-2 text-sm" style={{ color: 'var(--muted-foreground)' }}>
                 Avatar is synced from your Discord account
               </p>
             </div>
 
             {message && (
-              <div className={`p-3 rounded-md ${message.includes('success') ? 'bg-green-900/30 text-green-400 border border-green-800' : 'bg-red-900/30 text-red-400 border border-red-800'}`}>
+              <div className={`p-3 rounded-md border`} style={{
+                backgroundColor: message.includes('success') ? 'var(--accent)' : 'var(--muted)',
+                color: message.includes('success') ? 'var(--accent-foreground)' : 'var(--foreground)',
+                borderColor: 'var(--border)'
+              }}>
                 {message}
               </div>
             )}
@@ -124,7 +131,8 @@ export default function SettingsPage() {
               <button
                 type="submit"
                 disabled={isSaving}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 rounded-md transition-colors disabled:cursor-not-allowed"
+                style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
               >
                 {isSaving ? 'Saving...' : 'Save Changes'}
               </button>
@@ -132,9 +140,9 @@ export default function SettingsPage() {
           </form>
         </div>
 
-        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">Account Information</h2>
-          <div className="space-y-3 text-sm text-gray-300">
+        <div className="border rounded-lg p-6" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+          <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--foreground)' }}>Account Information</h2>
+          <div className="space-y-3 text-sm" style={{ color: 'var(--foreground)' }}>
             <div className="flex justify-between">
               <span className="font-medium">User ID:</span>
               <span>{session?.user?.id}</span>
@@ -149,6 +157,8 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
+
+        <ThemeSettings />
       </div>
     </main>
   );

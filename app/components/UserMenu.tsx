@@ -34,7 +34,8 @@ export default function UserMenu() {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-2 bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded-md transition-colors"
+        className="flex items-center space-x-2 px-3 py-2 rounded-md transition-colors"
+        style={{ backgroundColor: 'var(--secondary)', color: 'var(--foreground)' }}
       >
         {session.user?.avatarUrl && (
           <Image
@@ -57,10 +58,11 @@ export default function UserMenu() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
+        <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 z-50" style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)' }}>
           <Link
             href="/settings"
-            className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+            className="block px-4 py-2 transition-colors"
+            style={{ color: 'var(--foreground)' }}
             onClick={() => setIsOpen(false)}
           >
             Settings
@@ -68,19 +70,21 @@ export default function UserMenu() {
           {session.user?.isAdmin && (
             <Link
               href="/admin"
-              className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+              className="block px-4 py-2 transition-colors"
+              style={{ color: 'var(--foreground)' }}
               onClick={() => setIsOpen(false)}
             >
               Admin Panel
             </Link>
           )}
-          <hr className="my-1" />
+          <hr style={{ borderColor: 'var(--border)' }} className="my-1" />
           <button
             onClick={() => {
               setIsOpen(false);
               signOut();
             }}
-            className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100 transition-colors"
+            className="block w-full text-left px-4 py-2 transition-colors"
+            style={{ color: '#dc2626' }}
           >
             Sign Out
           </button>

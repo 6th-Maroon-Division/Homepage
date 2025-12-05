@@ -16,7 +16,7 @@ export default async function AdminPage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         <header className="space-y-2">
           <h1 className="text-2xl sm:text-3xl font-bold">Admin Panel</h1>
-          <p className="text-sm sm:text-base text-gray-300">
+          <p className="text-sm sm:text-base" style={{ color: 'var(--muted-foreground)' }}>
             Manage operations and system settings
           </p>
         </header>
@@ -25,18 +25,29 @@ export default async function AdminPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Link
             href="/admin/orbats"
-            className="bg-gray-800/50 border border-gray-700 rounded-lg p-8 hover:border-blue-500 hover:bg-gray-800 transition-colors"
+            className="border rounded-lg p-8 transition-colors"
+            style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
           >
-            <h2 className="text-2xl font-bold mb-2">OrbATs</h2>
-            <p className="text-gray-400">Manage operations and battle tasks</p>
+            <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>OrbATs</h2>
+            <p style={{ color: 'var(--muted-foreground)' }}>Manage operations and battle tasks</p>
           </Link>
           
           <Link
             href="/admin/users"
-            className="bg-gray-800/50 border border-gray-700 rounded-lg p-8 hover:border-blue-500 hover:bg-gray-800 transition-colors"
+            className="border rounded-lg p-8 transition-colors"
+            style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
           >
-            <h2 className="text-2xl font-bold mb-2">Users</h2>
-            <p className="text-gray-400">Manage user accounts and permissions</p>
+            <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>Users</h2>
+            <p style={{ color: 'var(--muted-foreground)' }}>Manage user accounts and permissions</p>
+          </Link>
+
+          <Link
+            href="/admin/themes"
+            className="border rounded-lg p-8 transition-colors"
+            style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
+          >
+            <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>Themes</h2>
+            <p style={{ color: 'var(--muted-foreground)' }}>Manage themes and review user submissions</p>
           </Link>
         </div>
       </div>

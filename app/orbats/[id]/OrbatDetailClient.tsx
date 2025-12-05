@@ -189,16 +189,16 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
     <div className="space-y-6">
       {/* Header */}
       <header className="space-y-2">
-        <h1 className="text-2xl sm:text-3xl font-bold">{orbat.name}</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: 'var(--foreground)' }}>{orbat.name}</h1>
 
         {orbat.description && (
-          <p className="text-sm sm:text-base text-gray-300">
+          <p className="text-sm sm:text-base" style={{ color: 'var(--muted-foreground)' }}>
             {orbat.description}
           </p>
         )}
 
         {eventDate && (
-          <p className="text-xs text-gray-400">
+          <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
             Event date:{' '}
             {eventDate.toLocaleString('en-GB', {
               dateStyle: 'medium',
@@ -208,7 +208,7 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
         )}
 
         {isPast && (
-          <p className="text-xs font-semibold text-amber-400">
+          <p className="text-xs font-semibold" style={{ color: '#f59e0b' }}>
             This operation is in the past. Signups are closed, existing
             participants are shown below.
           </p>
@@ -220,9 +220,10 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
         {orbat.slots.map((slot) => (
           <article
             key={slot.id}
-            className="rounded-lg border border-slate-700 bg-slate-900/60 p-4 flex flex-col gap-3"
+            className="rounded-lg border p-4 flex flex-col gap-3"
+            style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
           >
-            <h2 className="text-lg font-semibold border-b border-slate-700 pb-2">
+            <h2 className="text-lg font-semibold pb-2" style={{ color: 'var(--foreground)', borderBottom: '1px solid var(--border)' }}>
               {slot.name}
             </h2>
 
@@ -241,11 +242,11 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
                     className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1"
                   >
                     <div>
-                      <div className="font-medium">{sub.name}</div>
+                      <div className="font-medium" style={{ color: 'var(--foreground)' }}>{sub.name}</div>
 
                       {/* Show participant names only if there are any */}
                       {hasSignup && (
-                        <div className="text-xs text-gray-300">
+                        <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
                           {sub.signups
                             .map((s) => s.user?.username ?? 'Unknown')
                             .join(', ')}
@@ -258,7 +259,8 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
                         type="button"
                         onClick={() => handleSignup(sub.id)}
                         disabled={loadingSubslotId === sub.id}
-                        className="mt-1 sm:mt-0 inline-flex items-center justify-center rounded-md border border-slate-600 px-3 py-1 text-xs font-medium hover:bg-slate-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="mt-1 sm:mt-0 inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{ borderColor: 'var(--border)', color: 'var(--foreground)' }}
                       >
                         {loadingSubslotId === sub.id ? (
                           <span className="flex items-center gap-2">
@@ -276,7 +278,8 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
                         type="button"
                         onClick={() => handleUnsign(sub.id)}
                         disabled={loadingSubslotId === sub.id}
-                        className="mt-1 sm:mt-0 inline-flex items-center justify-center rounded-md border border-red-600 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-950/50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="mt-1 sm:mt-0 inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{ borderColor: '#dc2626', color: '#ef4444' }}
                       >
                         {loadingSubslotId === sub.id ? (
                           <span className="flex items-center gap-2">

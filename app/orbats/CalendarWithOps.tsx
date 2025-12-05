@@ -155,21 +155,23 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
   return (
     <div className={isAdmin ? '' : 'grid grid-cols-1 lg:grid-cols-[2fr,3fr] gap-6'}>
       {/* Calendar */}
-      <section className="rounded-lg border border-slate-700 bg-slate-900/60 p-4 space-y-4">
+      <section className="rounded-lg border p-4 space-y-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
         {/* Month navigation */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={goToPreviousMonth}
-              className="text-xs sm:text-sm px-2 py-1 rounded-md border border-slate-600 bg-slate-900 hover:bg-slate-800"
+              className="text-xs sm:text-sm px-2 py-1 rounded-md border"
+              style={{ backgroundColor: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
             >
               ← Prev
             </button>
             <button
               type="button"
               onClick={goToNextMonth}
-              className="text-xs sm:text-sm px-2 py-1 rounded-md border border-slate-600 bg-slate-900 hover:bg-slate-800"
+              className="text-xs sm:text-sm px-2 py-1 rounded-md border"
+              style={{ backgroundColor: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
             >
               Next →
             </button>
@@ -177,15 +179,16 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
           <button
             type="button"
             onClick={goToCurrentMonth}
-            className="text-[10px] sm:text-xs px-2 py-1 rounded-md border border-slate-600 bg-slate-900 hover:bg-slate-800"
+            className="text-[10px] sm:text-xs px-2 py-1 rounded-md border"
+            style={{ backgroundColor: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
           >
             Today
           </button>
         </div>
 
-        <h2 className="text-lg font-semibold text-center">{monthLabel}</h2>
+        <h2 className="text-lg font-semibold text-center" style={{ color: 'var(--foreground)' }}>{monthLabel}</h2>
 
-        <div className="grid grid-cols-7 text-center text-xs sm:text-sm text-gray-400 mb-1">
+        <div className="grid grid-cols-7 text-center text-xs sm:text-sm mb-1" style={{ color: 'var(--muted-foreground)' }}>
           <div>Sun</div>
           <div>Mon</div>
           <div>Tue</div>
@@ -232,19 +235,25 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
                   type="button"
                   onClick={() => handleDayClick(dateKey)}
                   disabled={!isClickable}
-                  className={[
-                    'h-10 sm:h-12 rounded-md flex flex-col items-center justify-center border transition',
-                    hasOps
-                      ? 'border-emerald-500 bg-emerald-500/10 hover:bg-blue-900/20 hover:border-blue-600 cursor-pointer'
-                      : isAdmin && !isPast
-                      ? 'border-slate-700 bg-slate-900 hover:bg-blue-900/20 hover:border-blue-600 cursor-pointer'
-                      : 'border-slate-700 bg-slate-900',
-                    isSelected ? 'ring-2 ring-emerald-400' : '',
-                  ].join(' ')}
+                  className="h-10 sm:h-12 rounded-md flex flex-col items-center justify-center border transition"
+                  style={{
+                    backgroundColor: hasOps 
+                      ? 'var(--secondary)' 
+                      : 'var(--background)',
+                    borderColor: hasOps
+                      ? 'var(--primary)'
+                      : 'var(--border)',
+                    borderWidth: hasOps ? '2px' : '1px',
+                    color: 'var(--foreground)',
+                    cursor: isClickable ? 'pointer' : 'default',
+                    ...(isSelected && {
+                      boxShadow: '0 0 0 2px var(--primary)',
+                    }),
+                  }}
                 >
-                  <span className="text-sm">{day}</span>
+                  <span className="text-sm font-semibold">{day}</span>
                   {hasOps && (
-                    <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    <span className="mt-0.5 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--primary)' }} />
                   )}
                 </button>
               );
@@ -252,16 +261,16 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
           )}
         </div>
 
-        <p className="text-xs text-gray-400 mt-3">
+        <p className="text-xs mt-3" style={{ color: 'var(--muted-foreground)' }}>
           Click a day with a green dot to view its operations. If only one exists, you&apos;ll
           go straight to it. If multiple exist, you can pick one below.
           {isAdmin && ' As an admin, you can click any empty day to create a new operation.'}
         </p>
 
         {showDayModal && selectedDateKey && selectedOps.length > 0 && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowDayModal(false)}>
-            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
-              <h3 className="text-xl font-bold mb-4">
+          <div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={() => setShowDayModal(false)}>
+            <div className="border rounded-lg p-6 max-w-md w-full mx-4" style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }} onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-xl font-bold mb-4" style={{ color: 'var(--foreground)' }}>
                 {new Date(selectedOps[0].eventDate).toLocaleDateString('en-GB', { 
                   weekday: 'long', 
                   day: 'numeric', 
@@ -271,7 +280,7 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
               </h3>
               
               <div className="space-y-3 mb-4">
-                <p className="text-sm text-gray-400">{selectedOps.length === 1 ? 'Operation on this day:' : 'Operations on this day:'}</p>
+                <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>{selectedOps.length === 1 ? 'Operation on this day:' : 'Operations on this day:'}</p>
                 {selectedOps.map((op) => (
                   <button
                     key={op.id}
@@ -280,11 +289,12 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
                       router.push(route);
                       setShowDayModal(false);
                     }}
-                    className="w-full text-left p-3 bg-gray-700/50 hover:bg-gray-700 rounded-md transition-colors"
+                    className="w-full text-left p-3 rounded-md transition-colors"
+                    style={{ backgroundColor: 'var(--muted)', color: 'var(--foreground)' }}
                   >
                     <div className="font-semibold">{op.name}</div>
                     {op.description && (
-                      <div className="text-sm text-gray-400 mt-1 line-clamp-2">{op.description}</div>
+                      <div className="text-sm mt-1 line-clamp-2" style={{ color: 'var(--muted-foreground)' }}>{op.description}</div>
                     )}
                   </button>
                 ))}
@@ -304,7 +314,8 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
                         router.push(`/admin/orbats/new?date=${selectedDateKey}`);
                         setShowDayModal(false);
                       }}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors font-medium"
+                      className="flex-1 px-4 py-2 rounded-md transition-colors font-medium"
+                      style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
                     >
                       Create New OrbAT
                     </button>
@@ -312,7 +323,8 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
                 })()}
                 <button
                   onClick={() => setShowDayModal(false)}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors"
+                  className="px-4 py-2 rounded-md transition-colors"
+                  style={{ backgroundColor: 'var(--muted)', color: 'var(--foreground)' }}
                 >
                   Cancel
                 </button>
@@ -322,15 +334,16 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
         )}
 
         {selectedDateKey && selectedOps.length > 1 && !showDayModal && (
-          <div className="mt-4 border-t border-slate-700 pt-3 space-y-2">
+          <div className="mt-4 pt-3 space-y-2" style={{ borderTopWidth: '1px', borderColor: 'var(--border)' }}>
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold">
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
                 Operations on{' '}
                 {formatHumanDate(new Date(selectedOps[0].eventDate))}
               </h3>
               <button
                 type="button"
-                className="text-xs text-gray-400 hover:text-gray-200"
+                className="text-xs hover:underline"
+                style={{ color: 'var(--muted-foreground)' }}
                 onClick={() => setSelectedDateKey(null)}
               >
                 Clear
@@ -342,12 +355,13 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
                 <li key={op.id}>
                   <button
                     type="button"
-                    className="w-full text-left text-xs sm:text-sm rounded-md px-2 py-1 border border-slate-700 bg-slate-900/80 hover:bg-slate-800"
+                    className="w-full text-left text-xs sm:text-sm rounded-md px-2 py-1 border"
+                    style={{ backgroundColor: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
                     onClick={() => router.push(`/orbats/${op.id}`)}
                   >
                     <span className="font-medium">{op.name}</span>
                     {op.description && (
-                      <span className="ml-1 text-gray-400">
+                      <span className="ml-1" style={{ color: 'var(--muted-foreground)' }}>
                         – {op.description}
                       </span>
                     )}
@@ -361,36 +375,38 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
 
       {/* List of all ops - only show for public view */}
       {!isAdmin && (
-        <section className="rounded-lg border border-slate-700 bg-slate-900/60 p-4 space-y-4">
-          <h2 className="text-lg font-semibold">All operations</h2>
+        <section className="rounded-lg border p-4 space-y-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+          <h2 className="text-lg font-semibold" style={{ color: 'var(--foreground)' }}>All operations</h2>
 
           {ops.length === 0 && (
-            <p className="text-sm text-gray-400">No operations yet.</p>
+            <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>No operations yet.</p>
           )}
 
           <ul className="space-y-3">
             {ops.map((op) => (
               <li
                 key={op.id}
-                className="rounded-md border border-slate-700 bg-slate-900/80 px-3 py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+                className="rounded-md border px-3 py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+                style={{ backgroundColor: 'var(--muted)', borderColor: 'var(--border)' }}
               >
                 <div>
                   <button
                     type="button"
                     onClick={() => router.push(`/orbats/${op.id}`)}
                     className="text-sm sm:text-base font-medium hover:underline"
+                    style={{ color: 'var(--foreground)' }}
                   >
                     {op.name}
                   </button>
                   {op.description && (
-                    <p className="text-xs text-gray-400 line-clamp-2">
+                    <p className="text-xs line-clamp-2" style={{ color: 'var(--muted-foreground)' }}>
                       {op.description}
                     </p>
                   )}
                 </div>
-                <div className="text-right text-xs text-gray-300">
+                <div className="text-right text-xs" style={{ color: 'var(--foreground)' }}>
                   {formatHumanDate(new Date(op.eventDate))}
-                  <div className="text-[10px] text-gray-500">
+                  <div className="text-[10px]" style={{ color: 'var(--muted-foreground)', opacity: 0.7 }}>
                     {op.dateKey}
                   </div>
                 </div>

@@ -68,11 +68,12 @@ export default function OrbatManagementClient({ orbats: initialOrbats }: OrbatMa
       {/* Header with Create Button */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-xl font-semibold">Operations List</h2>
+          <h2 className="text-xl font-semibold" style={{ color: 'var(--foreground)' }}>Operations List</h2>
         </div>
         <Link
           href="/admin/orbats/new"
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors font-medium"
+          className="px-4 py-2 rounded-md transition-colors font-medium"
+          style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
         >
           Create New OrbAT
         </Link>
@@ -83,31 +84,31 @@ export default function OrbatManagementClient({ orbats: initialOrbats }: OrbatMa
         <div className="flex gap-2">
           <button
             onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              filter === 'all'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-            }`}
+            className="px-4 py-2 rounded-md font-medium transition-colors"
+            style={{
+              backgroundColor: filter === 'all' ? 'var(--primary)' : 'var(--secondary)',
+              color: filter === 'all' ? 'var(--primary-foreground)' : 'var(--foreground)'
+            }}
           >
             All ({orbats.length})
           </button>
           <button
             onClick={() => setFilter('upcoming')}
-            className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              filter === 'upcoming'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-            }`}
+            className="px-4 py-2 rounded-md font-medium transition-colors"
+            style={{
+              backgroundColor: filter === 'upcoming' ? 'var(--primary)' : 'var(--secondary)',
+              color: filter === 'upcoming' ? 'var(--primary-foreground)' : 'var(--foreground)'
+            }}
           >
             Upcoming ({upcomingOrbats.length})
           </button>
           <button
             onClick={() => setFilter('past')}
-            className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              filter === 'past'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-            }`}
+            className="px-4 py-2 rounded-md font-medium transition-colors"
+            style={{
+              backgroundColor: filter === 'past' ? 'var(--primary)' : 'var(--secondary)',
+              color: filter === 'past' ? 'var(--primary-foreground)' : 'var(--foreground)'
+            }}
           >
             Past ({pastOrbats.length})
           </button>
@@ -118,70 +119,76 @@ export default function OrbatManagementClient({ orbats: initialOrbats }: OrbatMa
           placeholder="Search operations..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="flex-1 px-4 py-2 bg-gray-900/50 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 px-4 py-2 border rounded-md focus:outline-none focus:ring-2"
+          style={{ 
+            backgroundColor: 'var(--background)', 
+            borderColor: 'var(--border)', 
+            color: 'var(--foreground)'
+          }}
         />
       </div>
 
       {/* OrbATs Table */}
-      <div className="bg-gray-800/50 border border-gray-700 rounded-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-700">
-          <h2 className="text-xl font-semibold">
+      <div className="border rounded-lg overflow-hidden" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+        <div className="px-6 py-4" style={{ borderBottomWidth: '1px', borderColor: 'var(--border)' }}>
+          <h2 className="text-xl font-semibold" style={{ color: 'var(--foreground)' }}>
             {filter === 'all' ? 'All OrbATs' : filter === 'upcoming' ? 'Upcoming Operations' : 'Past Operations'}
           </h2>
         </div>
 
         {filteredOrbats.length === 0 ? (
-          <div className="px-6 py-12 text-center text-gray-400">
+          <div className="px-6 py-12 text-center" style={{ color: 'var(--muted-foreground)' }}>
             <p>No operations found</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-700/50">
+              <thead style={{ backgroundColor: 'var(--muted)' }}>
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
                     Name
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
                     Event Date
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
                     Created By
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
                     Details
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-700">
+              <tbody style={{ borderTopWidth: '1px', borderColor: 'var(--border)' }}>
                 {filteredOrbats.map((orbat) => {
                   const isPast = orbat.eventDate && new Date(orbat.eventDate) < now;
                   return (
-                    <tr key={orbat.id} className="hover:bg-gray-700/30">
+                    <tr key={orbat.id} style={{ borderBottomWidth: '1px', borderColor: 'var(--border)' }}>
                       <td className="px-6 py-4">
                         <Link
                           href={`/admin/orbats/${orbat.id}`}
-                          className="text-blue-400 hover:text-blue-300 font-medium"
+                          className="font-medium hover:underline"
+                          style={{ color: 'var(--primary)' }}
                         >
                           {orbat.name}
                         </Link>
                         {orbat.description && (
-                          <div className="text-xs text-gray-400 mt-1 max-w-xs truncate">
+                          <div className="text-xs mt-1 max-w-xs truncate" style={{ color: 'var(--muted-foreground)' }}>
                             {orbat.description}
                           </div>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: 'var(--foreground)' }}>
                         {orbat.eventDate ? (
                           <div>
                             <div>{new Date(orbat.eventDate).toLocaleDateString('en-GB')}</div>
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
                               {new Date(orbat.eventDate).toLocaleTimeString([], {
                                 hour: '2-digit',
                                 minute: '2-digit',
@@ -189,26 +196,26 @@ export default function OrbatManagementClient({ orbats: initialOrbats }: OrbatMa
                             </div>
                           </div>
                         ) : (
-                          <span className="text-gray-500">Not set</span>
+                          <span style={{ color: 'var(--muted-foreground)' }}>Not set</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: 'var(--foreground)' }}>
                         {orbat.createdBy.username}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: 'var(--foreground)' }}>
                         <div className="text-xs space-y-1">
                           <div>{orbat.slotCount} slots</div>
                           <div>{orbat.totalSubslots} positions</div>
-                          <div className="text-blue-400">{orbat.totalSignups} signups</div>
+                          <div style={{ color: 'var(--primary)' }}>{orbat.totalSignups} signups</div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {isPast ? (
-                          <span className="px-2 py-1 bg-gray-700 text-gray-400 rounded text-xs">
+                          <span className="px-2 py-1 rounded text-xs" style={{ backgroundColor: 'var(--muted)', color: 'var(--muted-foreground)' }}>
                             Completed
                           </span>
                         ) : (
-                          <span className="px-2 py-1 bg-green-600 text-white rounded text-xs font-medium">
+                          <span className="px-2 py-1 rounded text-xs font-medium" style={{ backgroundColor: 'var(--accent)', color: 'var(--accent-foreground)' }}>
                             Active
                           </span>
                         )}
@@ -216,11 +223,12 @@ export default function OrbatManagementClient({ orbats: initialOrbats }: OrbatMa
                       <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
                         <Link
                           href={`/admin/orbats/${orbat.id}/edit`}
-                          className="text-blue-400 hover:text-blue-300 font-medium"
+                          className="font-medium hover:underline"
+                          style={{ color: 'var(--primary)' }}
                         >
                           Edit
                         </Link>
-                        <span className="text-gray-600">|</span>
+                        <span style={{ color: 'var(--border)' }}>|</span>
                         <DeleteOrbatButton orbatId={orbat.id} />
                       </td>
                     </tr>

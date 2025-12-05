@@ -56,7 +56,9 @@ export const ModelName = {
   Orbat: 'Orbat',
   Slot: 'Slot',
   Subslot: 'Subslot',
-  Signup: 'Signup'
+  Signup: 'Signup',
+  Theme: 'Theme',
+  ThemeSubmission: 'ThemeSubmission'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -81,6 +83,7 @@ export const UserScalarFieldEnum = {
   email: 'email',
   avatarUrl: 'avatarUrl',
   isAdmin: 'isAdmin',
+  selectedThemeId: 'selectedThemeId',
   createdAt: 'createdAt'
 } as const
 
@@ -140,6 +143,46 @@ export const SignupScalarFieldEnum = {
 } as const
 
 export type SignupScalarFieldEnum = (typeof SignupScalarFieldEnum)[keyof typeof SignupScalarFieldEnum]
+
+
+export const ThemeScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  isPublic: 'isPublic',
+  isDefaultLight: 'isDefaultLight',
+  isDefaultDark: 'isDefaultDark',
+  isEnabled: 'isEnabled',
+  customCss: 'customCss',
+  createdById: 'createdById',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  background: 'background',
+  foreground: 'foreground',
+  primary: 'primary',
+  primaryForeground: 'primaryForeground',
+  secondary: 'secondary',
+  secondaryForeground: 'secondaryForeground',
+  accent: 'accent',
+  accentForeground: 'accentForeground',
+  muted: 'muted',
+  mutedForeground: 'mutedForeground',
+  border: 'border'
+} as const
+
+export type ThemeScalarFieldEnum = (typeof ThemeScalarFieldEnum)[keyof typeof ThemeScalarFieldEnum]
+
+
+export const ThemeSubmissionScalarFieldEnum = {
+  id: 'id',
+  themeId: 'themeId',
+  submittedById: 'submittedById',
+  status: 'status',
+  message: 'message',
+  createdAt: 'createdAt',
+  reviewedAt: 'reviewedAt'
+} as const
+
+export type ThemeSubmissionScalarFieldEnum = (typeof ThemeSubmissionScalarFieldEnum)[keyof typeof ThemeSubmissionScalarFieldEnum]
 
 
 export const SortOrder = {
