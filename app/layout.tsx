@@ -5,6 +5,7 @@ import TopBar from "./components/TopBar";
 import AuthSessionProvider from "./components/SessionProvider";
 import { ToastProvider } from "./components/ToastContainer";
 import { ThemeProvider } from "./components/ThemeProvider";
+import LinkAccountPrompt from "./components/LinkAccountPrompt";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -72,6 +73,7 @@ export default function RootLayout({
             <ToastProvider>
               <TopBar />
               {children}
+              <LinkAccountPrompt />
             </ToastProvider>
           </ThemeProvider>
         </AuthSessionProvider>

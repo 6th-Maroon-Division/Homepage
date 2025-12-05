@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 // types/next-auth.d.ts
-import NextAuth from "next-auth";
+import NextAuth, { DefaultSession } from "next-auth";
 
 declare module "next-auth" {
   interface Session {
@@ -11,15 +11,17 @@ declare module "next-auth" {
       avatarUrl: string | null;
       isAdmin: boolean;
       createdAt: Date;
-    };
+    } & DefaultSession["user"];
   }
+}
 
-  interface User {
-    id: number;
-    username: string | null;
-    email: string | null;
-    avatarUrl: string | null;
-    isAdmin: boolean;
-    createdAt: Date;
+declare module "next-auth/jwt" {
+  interface JWT {
+    id?: number;
+    username?: string | null;
+    email?: string | null;
+    avatarUrl?: string | null;
+    isAdmin?: boolean;
+    createdAt?: Date;
   }
 }

@@ -27,40 +27,80 @@ export const authOptions: AuthOptions = {
       clientId: process.env.DISCORD_CLIENT_ID!,
       clientSecret: process.env.DISCORD_CLIENT_SECRET!,
     }),
+    // Steam uses OpenID 2.0 which doesn't work well with NextAuth's OAuth flow
+    // We'll handle it with a custom page that redirects to Steam
   ],
   callbacks: {
-    async signIn({ account, profile }) {
+    async signIn({ account, profile, user }) {
       if (!account || !profile) return false;
 
-      const discordProfile = profile as DiscordProfile;
+      const provider = account.provider as 'discord' | 'steam';
+      let providerUserId: string;
+      let username: string;
+      let email: string | null = null;
+      let avatarUrl: string | null = null;
+
+      if (provider === 'discord') {
+        const discordProfile = profile as DiscordProfile;
+        providerUserId = discordProfile.id;
+        username = discordProfile.username || discordProfile.global_name || 'Unknown';
+        email = discordProfile.email || null;
+        avatarUrl = discordProfile.image_url || null;
+      } else {
+        return false;
+      }
 
       // Check if this Discord account already exists
       const authAccount = await prisma.authAccount.findUnique({
         where: {
           provider_providerUserId: {
-            provider: 'discord',
-            providerUserId: discordProfile.id,
+            provider,
+            providerUserId,
           },
         },
         include: { user: true },
       });
 
+      // Check if we have an existing session (for account linking)
+      // We'll use the user object passed by NextAuth if available
+      const existingUserId = user?.id ? parseInt(user.id as string) : null;
+
       if (!authAccount) {
-        // Create new user and link Discord account
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const newUser = await prisma.user.create({
-          data: {
-            username: discordProfile.username || discordProfile.global_name,
-            email: discordProfile.email,
-            avatarUrl: discordProfile.image_url,
-            accounts: {
-              create: {
-                provider: 'discord',
-                providerUserId: discordProfile.id,
+        if (existingUserId) {
+          // User is already logged in - link Discord account to existing user
+          await prisma.authAccount.create({
+            data: {
+              provider,
+              providerUserId,
+              userId: existingUserId,
+            },
+          });
+
+          // Update user's avatar if they don't have one
+          const existingUser = await prisma.user.findUnique({ where: { id: existingUserId } });
+          if (!existingUser?.avatarUrl && avatarUrl) {
+            await prisma.user.update({
+              where: { id: existingUserId },
+              data: { avatarUrl },
+            });
+          }
+        } else {
+          // Create new user and link the account
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const newUser = await prisma.user.create({
+            data: {
+              username,
+              email,
+              avatarUrl,
+              accounts: {
+                create: {
+                  provider,
+                  providerUserId,
+                },
               },
             },
-          },
-        });
+          });
+        }
       }
 
       return true;
@@ -71,30 +111,38 @@ export const authOptions: AuthOptions = {
       // This handles cases where the database was reset or user data changed
       const shouldRefresh = profile || trigger === 'signIn' || trigger === 'update' || !token.id;
       
-      if (shouldRefresh) {
-        const discordProfile = profile as DiscordProfile | undefined;
-        const providerUserId = discordProfile?.id || token.sub;
-        
-        if (providerUserId) {
-          const authAccount = await prisma.authAccount.findUnique({
-            where: {
-              provider_providerUserId: {
-                provider: 'discord',
-                providerUserId: providerUserId,
-              },
+      if (shouldRefresh && token.sub) {
+        // Try to find the user by checking both Discord and Steam accounts
+        const steamAccount = await prisma.authAccount.findUnique({
+          where: {
+            provider_providerUserId: {
+              provider: 'steam',
+              providerUserId: token.sub,
             },
-            include: { user: true },
-          });
+          },
+          include: { user: true },
+        });
 
-          if (authAccount) {
-            const extendedToken = token as ExtendedJWT;
-            extendedToken.id = authAccount.user.id;
-            extendedToken.username = authAccount.user.username;
-            extendedToken.email = authAccount.user.email ?? null;
-            extendedToken.avatarUrl = authAccount.user.avatarUrl;
-            extendedToken.isAdmin = authAccount.user.isAdmin;
-            extendedToken.createdAt = authAccount.user.createdAt;
-          }
+        const discordAccount = await prisma.authAccount.findUnique({
+          where: {
+            provider_providerUserId: {
+              provider: 'discord',
+              providerUserId: token.sub,
+            },
+          },
+          include: { user: true },
+        });
+
+        const authAccount = steamAccount || discordAccount;
+
+        if (authAccount) {
+          const extendedToken = token as ExtendedJWT;
+          extendedToken.id = authAccount.user.id;
+          extendedToken.username = authAccount.user.username;
+          extendedToken.email = authAccount.user.email ?? null;
+          extendedToken.avatarUrl = authAccount.user.avatarUrl;
+          extendedToken.isAdmin = authAccount.user.isAdmin;
+          extendedToken.createdAt = authAccount.user.createdAt;
         }
       }
       return token;
