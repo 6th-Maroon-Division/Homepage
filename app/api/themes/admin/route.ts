@@ -30,6 +30,24 @@ export async function GET() {
           },
           orderBy: { createdAt: 'desc' },
         },
+        parentTheme: {
+          select: {
+            id: true,
+            name: true,
+            background: true,
+            foreground: true,
+            primary: true,
+            primaryForeground: true,
+            secondary: true,
+            secondaryForeground: true,
+            accent: true,
+            accentForeground: true,
+            muted: true,
+            mutedForeground: true,
+            border: true,
+            customCss: true,
+          },
+        },
       },
       orderBy: [{ isPublic: 'desc' }, { name: 'asc' }],
     });
@@ -76,8 +94,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if theme with this name already exists
-    const existingTheme = await prisma.theme.findUnique({
-      where: { name },
+    const existingTheme = await prisma.theme.findFirst({
+      where: { name, isPublic: true },
     });
 
     if (existingTheme) {

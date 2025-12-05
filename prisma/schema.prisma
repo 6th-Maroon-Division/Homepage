@@ -24,7 +24,7 @@ model User {
   orbats            Orbat[]            @relation("OrbatCreator")
   signups           Signup[]
   selectedTheme     Theme?             @relation("UserSelectedTheme", fields: [selectedThemeId], references: [id])
-  customTheme       Theme?             @relation("UserCustomTheme")
+  customThemes      Theme[]            @relation("UserThemes")
   themeSubmissions  ThemeSubmission[]
 }
 
@@ -84,14 +84,21 @@ model Signup {
 
 model Theme {
   id                Int                @id @default(autoincrement())
-  name              String             @unique
+  name              String
   isPublic          Boolean            @default(false)
   isDefaultLight    Boolean            @default(false)
   isDefaultDark     Boolean            @default(false)
   isEnabled         Boolean            @default(true)
   customCss         String?            @db.Text
-  createdBy         User?              @relation("UserCustomTheme", fields: [createdById], references: [id], onDelete: Cascade)
-  createdById       Int?               @unique
+  type              ThemeType          @default(original)
+  
+  // For derived themes - links to parent public theme
+  parentTheme       Theme?             @relation("ThemeHierarchy", fields: [parentThemeId], references: [id], onDelete: Cascade)
+  parentThemeId     Int?
+  childThemes       Theme[]            @relation("ThemeHierarchy")
+  
+  createdBy         User?              @relation("UserThemes", fields: [createdById], references: [id], onDelete: Cascade)
+  createdById       Int?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   
@@ -110,6 +117,9 @@ model Theme {
   
   usersWithTheme    User[]             @relation("UserSelectedTheme")
   submissions       ThemeSubmission[]
+  
+  @@index([createdById])
+  @@index([parentThemeId])
 }
 
 model ThemeSubmission {
@@ -119,15 +129,39 @@ model ThemeSubmission {
   submittedBy User      @relation(fields: [submittedById], references: [id], onDelete: Cascade)
   submittedById Int
   status      SubmissionStatus @default(pending)
-  message     String?
+  message     String?   @db.Text
+  adminMessage String?  @db.Text  // Admin feedback/rejection reason
+  submissionType String @default("new")  // "new" = new theme, "update" = update parent theme
+  
+  // Snapshot of theme data at submission time
+  snapshotName              String
+  snapshotBackground        String
+  snapshotForeground        String
+  snapshotPrimary           String
+  snapshotPrimaryForeground String
+  snapshotSecondary         String
+  snapshotSecondaryForeground String
+  snapshotAccent            String
+  snapshotAccentForeground  String
+  snapshotMuted             String
+  snapshotMutedForeground   String
+  snapshotBorder            String
+  snapshotCustomCss         String?            @db.Text
+  
   createdAt   DateTime  @default(now())
   reviewedAt  DateTime?
   
-  @@unique([themeId])
+  @@index([themeId])
+  @@index([submittedById])
 }
 
 enum SubmissionStatus {
   pending
   approved
   rejected
+}
+
+enum ThemeType {
+  original  // User-created theme that becomes public
+  derived   // Theme based on a public theme with modifications
 }

@@ -219,6 +219,23 @@ export type DateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedDateTimeNullableFilter<$PrismaModel>
 }
 
+export type EnumThemeTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.ThemeType | Prisma.EnumThemeTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.ThemeType[] | Prisma.ListEnumThemeTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ThemeType[] | Prisma.ListEnumThemeTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumThemeTypeFilter<$PrismaModel> | $Enums.ThemeType
+}
+
+export type EnumThemeTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ThemeType | Prisma.EnumThemeTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.ThemeType[] | Prisma.ListEnumThemeTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ThemeType[] | Prisma.ListEnumThemeTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumThemeTypeWithAggregatesFilter<$PrismaModel> | $Enums.ThemeType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumThemeTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumThemeTypeFilter<$PrismaModel>
+}
+
 export type EnumSubmissionStatusFilter<$PrismaModel = never> = {
   equals?: $Enums.SubmissionStatus | Prisma.EnumSubmissionStatusFieldRefInput<$PrismaModel>
   in?: $Enums.SubmissionStatus[] | Prisma.ListEnumSubmissionStatusFieldRefInput<$PrismaModel>
@@ -452,6 +469,23 @@ export type NestedDateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
   _min?: Prisma.NestedDateTimeNullableFilter<$PrismaModel>
   _max?: Prisma.NestedDateTimeNullableFilter<$PrismaModel>
+}
+
+export type NestedEnumThemeTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.ThemeType | Prisma.EnumThemeTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.ThemeType[] | Prisma.ListEnumThemeTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ThemeType[] | Prisma.ListEnumThemeTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumThemeTypeFilter<$PrismaModel> | $Enums.ThemeType
+}
+
+export type NestedEnumThemeTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ThemeType | Prisma.EnumThemeTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.ThemeType[] | Prisma.ListEnumThemeTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ThemeType[] | Prisma.ListEnumThemeTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumThemeTypeWithAggregatesFilter<$PrismaModel> | $Enums.ThemeType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumThemeTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumThemeTypeFilter<$PrismaModel>
 }
 
 export type NestedEnumSubmissionStatusFilter<$PrismaModel = never> = {

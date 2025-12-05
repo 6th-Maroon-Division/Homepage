@@ -15,6 +15,9 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    const body = await request.json();
+    const { adminMessage } = body;
+
     const submissionId = parseInt(params.id);
 
     const submission = await prisma.themeSubmission.update({
@@ -22,6 +25,7 @@ export async function POST(
       data: {
         status: 'rejected',
         reviewedAt: new Date(),
+        adminMessage: adminMessage || null,
       },
     });
 

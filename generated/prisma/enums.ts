@@ -24,3 +24,11 @@ export const SubmissionStatus = {
 } as const
 
 export type SubmissionStatus = (typeof SubmissionStatus)[keyof typeof SubmissionStatus]
+
+
+export const ThemeType = {
+  original: 'original',
+  derived: 'derived'
+} as const
+
+export type ThemeType = (typeof ThemeType)[keyof typeof ThemeType]

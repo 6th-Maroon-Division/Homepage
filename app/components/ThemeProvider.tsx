@@ -6,6 +6,9 @@ import { useSession } from 'next-auth/react';
 interface Theme {
   id: number;
   name: string;
+  type?: 'original' | 'derived';
+  parentThemeId?: number | null;
+  isPublic?: boolean;
   background: string;
   foreground: string;
   primary: string;
@@ -18,12 +21,48 @@ interface Theme {
   mutedForeground: string;
   border: string;
   customCss?: string | null;
+  submissions?: Array<{
+    id: number;
+    status: string;
+    message: string | null;
+    adminMessage: string | null;
+    createdAt: string;
+    snapshotName: string;
+    snapshotBackground: string;
+    snapshotForeground: string;
+    snapshotPrimary: string;
+    snapshotPrimaryForeground: string;
+    snapshotSecondary: string;
+    snapshotSecondaryForeground: string;
+    snapshotAccent: string;
+    snapshotAccentForeground: string;
+    snapshotMuted: string;
+    snapshotMutedForeground: string;
+    snapshotBorder: string;
+    snapshotCustomCss: string | null;
+  }>;
+  parentTheme?: {
+    id: number;
+    name: string;
+    background: string;
+    foreground: string;
+    primary: string;
+    primaryForeground: string;
+    secondary: string;
+    secondaryForeground: string;
+    accent: string;
+    accentForeground: string;
+    muted: string;
+    mutedForeground: string;
+    border: string;
+    customCss: string | null;
+  } | null;
 }
 
 interface ThemeContextType {
   theme: Theme | null;
   availableThemes: Theme[];
-  customTheme: Theme | null;
+  customThemes: Theme[];
   isLoading: boolean;
   setTheme: (themeId: number | null) => Promise<void>;
   refreshThemes: () => Promise<void>;
@@ -95,7 +134,7 @@ function applyTheme(theme: Theme) {
   // Save to localStorage to prevent flash on reload
   try {
     localStorage.setItem('theme', JSON.stringify(theme));
-  } catch (e) {
+  } catch {
     // localStorage might not be available
   }
 
@@ -114,7 +153,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const { data: session, status } = useSession();
   const [theme, setThemeState] = useState<Theme | null>(null);
   const [availableThemes, setAvailableThemes] = useState<Theme[]>([]);
-  const [customTheme, setCustomTheme] = useState<Theme | null>(null);
+  const [customThemes, setCustomThemes] = useState<Theme[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Fetch available themes
@@ -124,7 +163,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       if (response.ok) {
         const data = await response.json();
         setAvailableThemes(data.publicThemes || []);
-        setCustomTheme(data.customTheme || null);
+        setCustomThemes(data.customThemes || []);
       }
     } catch (error) {
       console.error('Error fetching themes:', error);
@@ -158,9 +197,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
       if (response.ok) {
         const data = await response.json();
-        const newTheme = data.theme || getSystemTheme();
+        // If themeId is null, user selected system default
+        const newTheme = themeId === null ? null : (data.theme || getSystemTheme());
         setThemeState(newTheme);
-        applyTheme(newTheme);
+        applyTheme(newTheme || getSystemTheme());
       } else {
         const error = await response.json();
         if (error.error?.includes('log out and log back in')) {
@@ -189,13 +229,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       if (status === 'authenticated' && session?.user) {
         // User is logged in - fetch their selected theme
         const userTheme = await fetchUserTheme();
-        const selectedTheme = userTheme || getSystemTheme();
-        setThemeState(selectedTheme);
-        applyTheme(selectedTheme);
+        // If userTheme is null, keep theme state as null (system default)
+        setThemeState(userTheme);
+        applyTheme(userTheme || getSystemTheme());
       } else if (status === 'unauthenticated') {
         // User is not logged in - use system preference
         const systemTheme = getSystemTheme();
-        setThemeState(systemTheme);
+        setThemeState(null);
         applyTheme(systemTheme);
       }
 
@@ -225,7 +265,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       value={{
         theme,
         availableThemes,
-        customTheme,
+        customThemes,
         isLoading,
         setTheme,
         refreshThemes,

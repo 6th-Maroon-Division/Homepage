@@ -4,9 +4,37 @@ import { useState, useEffect } from 'react';
 import CssEditor from '@/app/components/CssEditor';
 import CssLegend from '@/app/components/CssLegend';
 
+interface ThemeSubmission {
+  id: number;
+  status: string;
+  message: string | null;
+  adminMessage: string | null;
+  submissionType: string;
+  createdAt: string;
+  submittedBy: {
+    id: number;
+    username: string | null;
+  };
+  snapshotName: string;
+  snapshotBackground: string;
+  snapshotForeground: string;
+  snapshotPrimary: string;
+  snapshotPrimaryForeground: string;
+  snapshotSecondary: string;
+  snapshotSecondaryForeground: string;
+  snapshotAccent: string;
+  snapshotAccentForeground: string;
+  snapshotMuted: string;
+  snapshotMutedForeground: string;
+  snapshotBorder: string;
+  snapshotCustomCss: string | null;
+}
+
 interface Theme {
   id: number;
   name: string;
+  type?: string;
+  parentThemeId?: number | null;
   isPublic: boolean;
   isDefaultLight: boolean;
   isDefaultDark: boolean;
@@ -28,16 +56,23 @@ interface Theme {
     id: number;
     username: string | null;
   } | null;
-  submissions?: Array<{
+  submissions?: ThemeSubmission[];
+  parentTheme?: {
     id: number;
-    status: string;
-    message: string | null;
-    createdAt: string;
-    submittedBy: {
-      id: number;
-      username: string | null;
-    };
-  }>;
+    name: string;
+    background: string;
+    foreground: string;
+    primary: string;
+    primaryForeground: string;
+    secondary: string;
+    secondaryForeground: string;
+    accent: string;
+    accentForeground: string;
+    muted: string;
+    mutedForeground: string;
+    border: string;
+    customCss: string | null;
+  } | null;
 }
 
 export default function ThemeManagementClient() {
@@ -45,6 +80,9 @@ export default function ThemeManagementClient() {
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingTheme, setEditingTheme] = useState<Theme | null>(null);
+  const [rejectingSubmissionId, setRejectingSubmissionId] = useState<number | null>(null);
+  const [reviewingSubmission, setReviewingSubmission] = useState<{ theme: Theme; submission: ThemeSubmission; parentTheme: Theme | null } | null>(null);
+  const [adminMessage, setAdminMessage] = useState('');
   const [newTheme, setNewTheme] = useState({
     name: '',
     background: '#0a0a0a',
@@ -226,14 +264,20 @@ export default function ThemeManagementClient() {
     }
   };
 
-  const handleRejectSubmission = async (submissionId: number) => {
+  const handleRejectSubmission = async (submissionId: number, message: string) => {
     try {
       const response = await fetch(
         `/api/themes/admin/submissions/${submissionId}/reject`,
-        { method: 'POST' }
+        { 
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ adminMessage: message }),
+        }
       );
 
       if (response.ok) {
+        setRejectingSubmissionId(null);
+        setAdminMessage('');
         fetchThemes();
       } else {
         alert('Failed to reject submission');
@@ -363,6 +407,90 @@ export default function ThemeManagementClient() {
                 </div>
               )}
             </div>
+
+            {/* Submission History */}
+            {editingTheme.submissions && editingTheme.submissions.length > 0 && (
+              <div className="border rounded-lg p-4 bg-background">
+                <h4 className="font-semibold mb-3">Submission History (All Messages)</h4>
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {editingTheme.submissions.map((submission, index) => {
+                    // Determine what to compare against
+                    const nextSubmission = editingTheme.submissions?.[index + 1];
+                    const baseForComparison = nextSubmission || editingTheme.parentTheme;
+                    
+                    // Calculate changes
+                    const colorChanges = baseForComparison ? (['background', 'foreground', 'primary', 'primaryForeground', 'secondary', 'secondaryForeground', 'accent', 'accentForeground', 'muted', 'mutedForeground', 'border'] as const)
+                      .map(key => {
+                        const snapshotKey = `snapshot${key.charAt(0).toUpperCase()}${key.slice(1)}` as keyof typeof submission;
+                        const newValue = submission[snapshotKey] as string;
+                        const oldValue = nextSubmission 
+                          ? (nextSubmission[snapshotKey] as string)
+                          : String(baseForComparison[key as keyof typeof baseForComparison] || '');
+                        return { key, changed: newValue !== oldValue, newValue, oldValue };
+                      })
+                      .filter(change => change.changed) : [];
+
+                    const cssChanged = baseForComparison && 
+                      (submission.snapshotCustomCss || '') !== (nextSubmission?.snapshotCustomCss || (('customCss' in baseForComparison) ? baseForComparison.customCss : '') || '');
+
+                    return (
+                    <div 
+                      key={submission.id}
+                      className="border-l-4 pl-3 py-2"
+                      style={{ 
+                        borderLeftColor: submission.status === 'approved' ? '#22c55e' : submission.status === 'rejected' ? '#ef4444' : '#eab308'
+                      }}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-semibold">
+                          {submission.status === 'approved' ? '✅ Approved' : submission.status === 'rejected' ? '❌ Rejected' : '⏳ Pending'}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(submission.createdAt).toLocaleDateString()} {new Date(submission.createdAt).toLocaleTimeString()}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          by {submission.submittedBy?.username || 'Unknown'}
+                        </span>
+                      </div>
+                      
+                      {/* Show changes */}
+                      {colorChanges.length > 0 && (
+                        <div className="text-xs mb-2 p-2 rounded bg-secondary">
+                          <span className="font-semibold text-muted-foreground">Colors changed: </span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {colorChanges.map(change => (
+                              <div key={change.key} className="flex items-center gap-1 px-1 py-0.5 rounded bg-background">
+                                <div className="w-3 h-3 rounded border border-border" style={{ backgroundColor: change.newValue }} />
+                                <span className="text-foreground">{change.key.replace(/([A-Z])/g, ' $1').trim()}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {cssChanged && (
+                        <div className="text-xs mb-2 p-2 rounded bg-secondary text-muted-foreground">
+                          🎨 Custom CSS modified
+                        </div>
+                      )}
+                      
+                      {submission.message && (
+                        <div className="text-sm mb-2 p-2 rounded bg-secondary">
+                          <span className="font-semibold text-muted-foreground">User: </span>
+                          <span>{submission.message}</span>
+                        </div>
+                      )}
+                      {submission.adminMessage && (
+                        <div className="text-sm p-2 rounded bg-secondary">
+                          <span className="font-semibold text-muted-foreground">Admin: </span>
+                          <span>{submission.adminMessage}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="flex gap-2">
               <button
@@ -505,8 +633,19 @@ export default function ThemeManagementClient() {
                   className="p-4 border rounded-lg bg-yellow-900/20 border-yellow-600"
                 >
                   <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="text-lg font-bold">{theme.name}</h3>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="text-lg font-bold">{theme.name}</h3>
+                        <span className={`text-xs px-2 py-1 rounded ${
+                          pendingSub.submissionType === 'update' 
+                            ? 'bg-purple-600 text-white' 
+                            : 'bg-green-600 text-white'
+                        }`}>
+                          {pendingSub.submissionType === 'update' 
+                            ? `📝 Update "${theme.parentTheme?.name || 'Parent'}"` 
+                            : '✨ New Theme'}
+                        </span>
+                      </div>
                       <p className="text-sm text-muted-foreground">
                         Submitted by: {pendingSub.submittedBy.username || 'Unknown'}
                       </p>
@@ -539,22 +678,389 @@ export default function ThemeManagementClient() {
                     </div>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => handleApproveSubmission(pendingSub.id)}
-                        className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
+                        onClick={async () => {
+                          let parentTheme = null;
+                          if (theme.parentThemeId) {
+                            // Fetch parent theme if it's a derived theme
+                            const parent = themes.find(t => t.id === theme.parentThemeId);
+                            parentTheme = parent || null;
+                          }
+                          setReviewingSubmission({ theme, submission: pendingSub, parentTheme });
+                        }}
+                        className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
                       >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => handleRejectSubmission(pendingSub.id)}
-                        className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
-                      >
-                        Reject
+                        Review
                       </button>
                     </div>
                   </div>
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Rejection Modal */}
+      {rejectingSubmissionId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background border border-border rounded-lg max-w-md w-full p-6">
+            <h3 className="text-xl font-bold mb-4">Reject Submission</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Provide feedback to help the user improve their submission:
+            </p>
+            <textarea
+              value={adminMessage}
+              onChange={(e) => setAdminMessage(e.target.value)}
+              placeholder="e.g., Please increase contrast on the primary color for better readability..."
+              className="w-full p-2 bg-secondary border border-border rounded mb-4 min-h-[100px]"
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => {
+                  setRejectingSubmissionId(null);
+                  setAdminMessage('');
+                }}
+                className="px-4 py-2 bg-secondary text-secondary-foreground rounded"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleRejectSubmission(rejectingSubmissionId, adminMessage)}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+              >
+                Reject & Send Feedback
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Review Modal */}
+      {reviewingSubmission && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background border border-border rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto p-6">
+            <h3 className="text-2xl font-bold mb-4">Review Submission: {reviewingSubmission.submission.snapshotName}</h3>
+            <div className="flex items-center gap-4 mb-4">
+              <p className="text-sm text-muted-foreground">
+                Submitted by: {reviewingSubmission.submission.submittedBy.username || 'Unknown'}
+              </p>
+              <span className={`text-xs px-3 py-1 rounded ${
+                reviewingSubmission.submission.submissionType === 'update' 
+                  ? 'bg-purple-600 text-white' 
+                  : 'bg-green-600 text-white'
+              }`}>
+                {reviewingSubmission.submission.submissionType === 'update' 
+                  ? `📝 Update "${reviewingSubmission.theme.parentTheme?.name || 'Parent Theme'}"` 
+                  : '✨ New Public Theme'}
+              </span>
+            </div>
+            {reviewingSubmission.submission.message && (
+              <div className="mb-4 p-3 bg-blue-900/20 border border-blue-600 rounded">
+                <p className="text-sm font-semibold">User Message:</p>
+                <p className="text-sm mt-1">{reviewingSubmission.submission.message}</p>
+              </div>
+            )}
+
+            {/* Color Comparisons */}
+            <div className="mb-6">
+              {(() => {
+                // Find last rejected submission from the same user
+                const lastRejectedSubmission = reviewingSubmission.theme.submissions
+                  ?.filter(sub => 
+                    sub.id !== reviewingSubmission.submission.id && 
+                    sub.status === 'rejected' &&
+                    sub.submittedBy.id === reviewingSubmission.submission.submittedBy.id
+                  )
+                  .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+
+                const hasRejectedVersion = !!lastRejectedSubmission;
+
+                return (
+                  <>
+                    <h4 className="text-lg font-bold mb-3">
+                      Color Changes
+                      {reviewingSubmission.parentTheme && (
+                        <span className="text-sm font-normal text-muted-foreground ml-2">
+                          (comparing to parent: {reviewingSubmission.parentTheme.name})
+                        </span>
+                      )}
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {(['background', 'foreground', 'primary', 'primaryForeground', 'secondary', 'secondaryForeground', 'accent', 'accentForeground', 'muted', 'mutedForeground', 'border'] as const).map((key) => {
+                        // Use parent theme for comparison if it exists, otherwise use current theme
+                        const baseTheme = reviewingSubmission.parentTheme || reviewingSubmission.theme;
+                        const parentColor = baseTheme[key];
+                        const snapshotKey = `snapshot${key.charAt(0).toUpperCase()}${key.slice(1)}` as keyof typeof reviewingSubmission.submission;
+                        const proposedColor = reviewingSubmission.submission[snapshotKey] as string;
+                        const rejectedColor = lastRejectedSubmission ? (lastRejectedSubmission[snapshotKey] as string) : null;
+                        
+                        const hasChanged = parentColor !== proposedColor;
+                        const changedFromRejected = rejectedColor && rejectedColor !== proposedColor;
+
+                        return (
+                          <div
+                            key={key}
+                            className={`p-3 border rounded ${
+                              hasChanged ? 'bg-yellow-900/20 border-yellow-600' : 'bg-secondary border-border'
+                            }`}
+                          >
+                            <p className="text-sm font-semibold mb-2 capitalize flex items-center gap-2">
+                              {key.replace(/([A-Z])/g, ' $1')}
+                              {hasChanged && <span className="text-xs bg-yellow-600 px-2 py-0.5 rounded">Changed</span>}
+                            </p>
+                            <div className={`flex ${hasRejectedVersion ? 'flex-col gap-2' : 'gap-4 items-center'}`}>
+                              <div className={`flex ${hasRejectedVersion ? 'items-center justify-between' : 'flex-1 items-center gap-4'}`}>
+                                <div className={hasRejectedVersion ? 'flex-1' : ''}>
+                                  <p className="text-xs text-muted-foreground mb-1">{reviewingSubmission.parentTheme ? 'Parent' : 'Current'}</p>
+                                  <div className="flex items-center gap-2">
+                                    <div
+                                      className="w-12 h-12 border-2 rounded"
+                                      style={{ backgroundColor: parentColor }}
+                                    />
+                                    <span className="text-xs font-mono">{parentColor}</span>
+                                  </div>
+                                </div>
+                                {!hasRejectedVersion && (
+                                  <>
+                                    <div className="text-2xl">→</div>
+                                    <div className="flex-1">
+                                      <p className="text-xs text-muted-foreground mb-1">Proposed</p>
+                                      <div className="flex items-center gap-2">
+                                        <div
+                                          className={`w-12 h-12 border-2 rounded ${hasChanged ? 'border-yellow-600' : ''}`}
+                                          style={{ backgroundColor: proposedColor }}
+                                        />
+                                        <span className="text-xs font-mono">{proposedColor}</span>
+                                      </div>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                              {hasRejectedVersion && (
+                                <>
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex-1">
+                                      <p className="text-xs text-red-400 mb-1">Last Rejected</p>
+                                      <div className="flex items-center gap-2">
+                                        <div
+                                          className="w-12 h-12 border-2 border-red-600 rounded"
+                                          style={{ backgroundColor: rejectedColor || parentColor }}
+                                        />
+                                        <span className="text-xs font-mono">{rejectedColor}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex-1">
+                                      <p className="text-xs text-muted-foreground mb-1">Proposed</p>
+                                      <div className="flex items-center gap-2">
+                                        <div
+                                          className={`w-12 h-12 border-2 rounded ${changedFromRejected ? 'border-yellow-600' : ''}`}
+                                          style={{ backgroundColor: proposedColor }}
+                                        />
+                                        <span className="text-xs font-mono">{proposedColor}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* CSS Comparison */}
+            <div className="mb-6">
+              {(() => {
+                // Find last rejected submission from the same user
+                const lastRejectedSubmission = reviewingSubmission.theme.submissions
+                  ?.filter(sub => 
+                    sub.id !== reviewingSubmission.submission.id && 
+                    sub.status === 'rejected' &&
+                    sub.submittedBy.id === reviewingSubmission.submission.submittedBy.id
+                  )
+                  .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+
+                const hasRejectedVersion = !!lastRejectedSubmission;
+                
+                return (
+                  <>
+                    <h4 className="text-lg font-bold mb-3 flex items-center gap-2">
+                      Custom CSS Changes
+                      {((reviewingSubmission.parentTheme || reviewingSubmission.theme).customCss || '') !== (reviewingSubmission.submission.snapshotCustomCss || '') && (
+                        <span className="text-xs bg-yellow-600 px-2 py-1 rounded">Modified</span>
+                      )}
+                    </h4>
+                    <CssLegend />
+                    <div className={`grid grid-cols-1 ${hasRejectedVersion ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4 mt-4`}>
+                      <div>
+                        <p className="text-sm font-semibold mb-2">{reviewingSubmission.parentTheme ? 'Parent' : 'Current'} CSS</p>
+                        <CssEditor
+                          value={(reviewingSubmission.parentTheme || reviewingSubmission.theme).customCss || ''}
+                          onChange={() => {}} // Read-only
+                          height="300px"
+                        />
+                      </div>
+                      {hasRejectedVersion && (
+                        <div>
+                          <p className="text-sm font-semibold mb-2 text-red-400">Last Rejected CSS</p>
+                          <CssEditor
+                            value={lastRejectedSubmission.snapshotCustomCss || ''}
+                            onChange={() => {}} // Read-only
+                            height="300px"
+                          />
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-sm font-semibold mb-2">Proposed CSS</p>
+                        <CssEditor
+                          value={reviewingSubmission.submission.snapshotCustomCss || ''}
+                          onChange={() => {}} // Read-only
+                          height="300px"
+                        />
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Submission History */}
+            {reviewingSubmission.theme.submissions && reviewingSubmission.theme.submissions.length > 1 && (
+              <div className="mb-6">
+                <h4 className="text-lg font-bold mb-3">Previous Submissions</h4>
+                <div className="space-y-3 max-h-60 overflow-y-auto">
+                  {reviewingSubmission.theme.submissions
+                    .filter(sub => sub.id !== reviewingSubmission.submission.id)
+                    .map((submission, index, filteredArray) => {
+                      // Determine what to compare against
+                      const nextSubmission = filteredArray[index + 1];
+                      const baseForComparison = nextSubmission || reviewingSubmission.theme.parentTheme;
+                      
+                      // Calculate changes
+                      const colorChanges = baseForComparison ? (['background', 'foreground', 'primary', 'primaryForeground', 'secondary', 'secondaryForeground', 'accent', 'accentForeground', 'muted', 'mutedForeground', 'border'] as const)
+                        .map(key => {
+                          const snapshotKey = `snapshot${key.charAt(0).toUpperCase()}${key.slice(1)}` as keyof typeof submission;
+                          const newValue = submission[snapshotKey] as string;
+                          const oldValue = nextSubmission 
+                            ? (nextSubmission[snapshotKey] as string)
+                            : (baseForComparison[key as keyof typeof baseForComparison] as string);
+                          return { key, changed: newValue !== oldValue, newValue };
+                        })
+                        .filter(change => change.changed) : [];
+
+                      const cssChanged = baseForComparison && 
+                        (submission.snapshotCustomCss || '') !== (nextSubmission?.snapshotCustomCss || (('customCss' in baseForComparison) ? baseForComparison.customCss : '') || '');
+
+                      return (
+                      <div 
+                        key={submission.id}
+                        className="border-l-4 pl-3 py-2 bg-secondary/50 rounded"
+                        style={{ 
+                          borderLeftColor: submission.status === 'approved' ? '#22c55e' : submission.status === 'rejected' ? '#ef4444' : '#eab308'
+                        }}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-semibold">
+                            {submission.status === 'approved' ? '✅ Approved' : submission.status === 'rejected' ? '❌ Rejected' : '⏳ Pending'}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(submission.createdAt).toLocaleDateString()} {new Date(submission.createdAt).toLocaleTimeString()}
+                          </span>
+                        </div>
+                        
+                        {/* Show changes */}
+                        {colorChanges.length > 0 && (
+                          <div className="text-xs mb-2 p-2 rounded bg-background">
+                            <span className="font-semibold text-muted-foreground">Colors changed: </span>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {colorChanges.map(change => (
+                                <div key={change.key} className="flex items-center gap-1 px-1 py-0.5 rounded bg-secondary">
+                                  <div className="w-3 h-3 rounded border border-border" style={{ backgroundColor: change.newValue }} />
+                                  <span>{change.key.replace(/([A-Z])/g, ' $1').trim()}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {cssChanged && (
+                          <div className="text-xs mb-2 p-2 rounded bg-background text-muted-foreground">
+                            🎨 Custom CSS modified
+                          </div>
+                        )}
+                        
+                        {submission.message && (
+                          <div className="text-sm mb-2 p-2 rounded bg-background">
+                            <span className="font-semibold text-muted-foreground">User: </span>
+                            <span>{submission.message}</span>
+                          </div>
+                        )}
+                        {submission.adminMessage && (
+                          <div className="text-sm p-2 rounded bg-background">
+                            <span className="font-semibold text-muted-foreground">Admin: </span>
+                            <span>{submission.adminMessage}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                    })}
+                </div>
+              </div>
+            )}
+
+            {/* Admin Actions */}
+            <div className="border-t border-border pt-4">
+              <h4 className="text-lg font-bold mb-3">Admin Actions</h4>
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2">
+                  Rejection Message (optional - only needed if rejecting)
+                </label>
+                <textarea
+                  value={adminMessage}
+                  onChange={(e) => setAdminMessage(e.target.value)}
+                  placeholder="Provide feedback if rejecting..."
+                  className="w-full p-2 bg-secondary border border-border rounded min-h-[100px]"
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => {
+                    setReviewingSubmission(null);
+                    setAdminMessage('');
+                  }}
+                  className="px-4 py-2 bg-secondary text-secondary-foreground rounded hover:bg-secondary/80"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    if (reviewingSubmission.submission.id) {
+                      handleRejectSubmission(reviewingSubmission.submission.id, adminMessage);
+                      setReviewingSubmission(null);
+                    }
+                  }}
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                >
+                  Reject & Send Feedback
+                </button>
+                <button
+                  onClick={() => {
+                    if (reviewingSubmission.submission.id) {
+                      handleApproveSubmission(reviewingSubmission.submission.id);
+                      setReviewingSubmission(null);
+                    }
+                  }}
+                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                >
+                  Approve Changes
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

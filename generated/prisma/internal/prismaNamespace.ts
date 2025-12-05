@@ -1118,6 +1118,8 @@ export const ThemeScalarFieldEnum = {
   isDefaultDark: 'isDefaultDark',
   isEnabled: 'isEnabled',
   customCss: 'customCss',
+  type: 'type',
+  parentThemeId: 'parentThemeId',
   createdById: 'createdById',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
@@ -1143,6 +1145,21 @@ export const ThemeSubmissionScalarFieldEnum = {
   submittedById: 'submittedById',
   status: 'status',
   message: 'message',
+  adminMessage: 'adminMessage',
+  submissionType: 'submissionType',
+  snapshotName: 'snapshotName',
+  snapshotBackground: 'snapshotBackground',
+  snapshotForeground: 'snapshotForeground',
+  snapshotPrimary: 'snapshotPrimary',
+  snapshotPrimaryForeground: 'snapshotPrimaryForeground',
+  snapshotSecondary: 'snapshotSecondary',
+  snapshotSecondaryForeground: 'snapshotSecondaryForeground',
+  snapshotAccent: 'snapshotAccent',
+  snapshotAccentForeground: 'snapshotAccentForeground',
+  snapshotMuted: 'snapshotMuted',
+  snapshotMutedForeground: 'snapshotMutedForeground',
+  snapshotBorder: 'snapshotBorder',
+  snapshotCustomCss: 'snapshotCustomCss',
   createdAt: 'createdAt',
   reviewedAt: 'reviewedAt'
 } as const
@@ -1240,6 +1257,20 @@ export type EnumAuthProviderFieldRefInput<$PrismaModel> = FieldRefInputType<$Pri
  * Reference to a field of type 'AuthProvider[]'
  */
 export type ListEnumAuthProviderFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AuthProvider[]'>
+    
+
+
+/**
+ * Reference to a field of type 'ThemeType'
+ */
+export type EnumThemeTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ThemeType'>
+    
+
+
+/**
+ * Reference to a field of type 'ThemeType[]'
+ */
+export type ListEnumThemeTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ThemeType[]'>
     
 
 

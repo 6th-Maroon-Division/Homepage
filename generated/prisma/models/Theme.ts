@@ -28,11 +28,13 @@ export type AggregateTheme = {
 
 export type ThemeAvgAggregateOutputType = {
   id: number | null
+  parentThemeId: number | null
   createdById: number | null
 }
 
 export type ThemeSumAggregateOutputType = {
   id: number | null
+  parentThemeId: number | null
   createdById: number | null
 }
 
@@ -44,6 +46,8 @@ export type ThemeMinAggregateOutputType = {
   isDefaultDark: boolean | null
   isEnabled: boolean | null
   customCss: string | null
+  type: $Enums.ThemeType | null
+  parentThemeId: number | null
   createdById: number | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -68,6 +72,8 @@ export type ThemeMaxAggregateOutputType = {
   isDefaultDark: boolean | null
   isEnabled: boolean | null
   customCss: string | null
+  type: $Enums.ThemeType | null
+  parentThemeId: number | null
   createdById: number | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -92,6 +98,8 @@ export type ThemeCountAggregateOutputType = {
   isDefaultDark: number
   isEnabled: number
   customCss: number
+  type: number
+  parentThemeId: number
   createdById: number
   createdAt: number
   updatedAt: number
@@ -112,11 +120,13 @@ export type ThemeCountAggregateOutputType = {
 
 export type ThemeAvgAggregateInputType = {
   id?: true
+  parentThemeId?: true
   createdById?: true
 }
 
 export type ThemeSumAggregateInputType = {
   id?: true
+  parentThemeId?: true
   createdById?: true
 }
 
@@ -128,6 +138,8 @@ export type ThemeMinAggregateInputType = {
   isDefaultDark?: true
   isEnabled?: true
   customCss?: true
+  type?: true
+  parentThemeId?: true
   createdById?: true
   createdAt?: true
   updatedAt?: true
@@ -152,6 +164,8 @@ export type ThemeMaxAggregateInputType = {
   isDefaultDark?: true
   isEnabled?: true
   customCss?: true
+  type?: true
+  parentThemeId?: true
   createdById?: true
   createdAt?: true
   updatedAt?: true
@@ -176,6 +190,8 @@ export type ThemeCountAggregateInputType = {
   isDefaultDark?: true
   isEnabled?: true
   customCss?: true
+  type?: true
+  parentThemeId?: true
   createdById?: true
   createdAt?: true
   updatedAt?: true
@@ -287,6 +303,8 @@ export type ThemeGroupByOutputType = {
   isDefaultDark: boolean
   isEnabled: boolean
   customCss: string | null
+  type: $Enums.ThemeType
+  parentThemeId: number | null
   createdById: number | null
   createdAt: Date
   updatedAt: Date
@@ -334,6 +352,8 @@ export type ThemeWhereInput = {
   isDefaultDark?: Prisma.BoolFilter<"Theme"> | boolean
   isEnabled?: Prisma.BoolFilter<"Theme"> | boolean
   customCss?: Prisma.StringNullableFilter<"Theme"> | string | null
+  type?: Prisma.EnumThemeTypeFilter<"Theme"> | $Enums.ThemeType
+  parentThemeId?: Prisma.IntNullableFilter<"Theme"> | number | null
   createdById?: Prisma.IntNullableFilter<"Theme"> | number | null
   createdAt?: Prisma.DateTimeFilter<"Theme"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Theme"> | Date | string
@@ -348,6 +368,8 @@ export type ThemeWhereInput = {
   muted?: Prisma.StringFilter<"Theme"> | string
   mutedForeground?: Prisma.StringFilter<"Theme"> | string
   border?: Prisma.StringFilter<"Theme"> | string
+  parentTheme?: Prisma.XOR<Prisma.ThemeNullableScalarRelationFilter, Prisma.ThemeWhereInput> | null
+  childThemes?: Prisma.ThemeListRelationFilter
   createdBy?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
   usersWithTheme?: Prisma.UserListRelationFilter
   submissions?: Prisma.ThemeSubmissionListRelationFilter
@@ -361,6 +383,8 @@ export type ThemeOrderByWithRelationInput = {
   isDefaultDark?: Prisma.SortOrder
   isEnabled?: Prisma.SortOrder
   customCss?: Prisma.SortOrderInput | Prisma.SortOrder
+  type?: Prisma.SortOrder
+  parentThemeId?: Prisma.SortOrderInput | Prisma.SortOrder
   createdById?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -375,6 +399,8 @@ export type ThemeOrderByWithRelationInput = {
   muted?: Prisma.SortOrder
   mutedForeground?: Prisma.SortOrder
   border?: Prisma.SortOrder
+  parentTheme?: Prisma.ThemeOrderByWithRelationInput
+  childThemes?: Prisma.ThemeOrderByRelationAggregateInput
   createdBy?: Prisma.UserOrderByWithRelationInput
   usersWithTheme?: Prisma.UserOrderByRelationAggregateInput
   submissions?: Prisma.ThemeSubmissionOrderByRelationAggregateInput
@@ -382,16 +408,18 @@ export type ThemeOrderByWithRelationInput = {
 
 export type ThemeWhereUniqueInput = Prisma.AtLeast<{
   id?: number
-  name?: string
-  createdById?: number
   AND?: Prisma.ThemeWhereInput | Prisma.ThemeWhereInput[]
   OR?: Prisma.ThemeWhereInput[]
   NOT?: Prisma.ThemeWhereInput | Prisma.ThemeWhereInput[]
+  name?: Prisma.StringFilter<"Theme"> | string
   isPublic?: Prisma.BoolFilter<"Theme"> | boolean
   isDefaultLight?: Prisma.BoolFilter<"Theme"> | boolean
   isDefaultDark?: Prisma.BoolFilter<"Theme"> | boolean
   isEnabled?: Prisma.BoolFilter<"Theme"> | boolean
   customCss?: Prisma.StringNullableFilter<"Theme"> | string | null
+  type?: Prisma.EnumThemeTypeFilter<"Theme"> | $Enums.ThemeType
+  parentThemeId?: Prisma.IntNullableFilter<"Theme"> | number | null
+  createdById?: Prisma.IntNullableFilter<"Theme"> | number | null
   createdAt?: Prisma.DateTimeFilter<"Theme"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Theme"> | Date | string
   background?: Prisma.StringFilter<"Theme"> | string
@@ -405,10 +433,12 @@ export type ThemeWhereUniqueInput = Prisma.AtLeast<{
   muted?: Prisma.StringFilter<"Theme"> | string
   mutedForeground?: Prisma.StringFilter<"Theme"> | string
   border?: Prisma.StringFilter<"Theme"> | string
+  parentTheme?: Prisma.XOR<Prisma.ThemeNullableScalarRelationFilter, Prisma.ThemeWhereInput> | null
+  childThemes?: Prisma.ThemeListRelationFilter
   createdBy?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
   usersWithTheme?: Prisma.UserListRelationFilter
   submissions?: Prisma.ThemeSubmissionListRelationFilter
-}, "id" | "name" | "createdById">
+}, "id">
 
 export type ThemeOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -418,6 +448,8 @@ export type ThemeOrderByWithAggregationInput = {
   isDefaultDark?: Prisma.SortOrder
   isEnabled?: Prisma.SortOrder
   customCss?: Prisma.SortOrderInput | Prisma.SortOrder
+  type?: Prisma.SortOrder
+  parentThemeId?: Prisma.SortOrderInput | Prisma.SortOrder
   createdById?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -450,6 +482,8 @@ export type ThemeScalarWhereWithAggregatesInput = {
   isDefaultDark?: Prisma.BoolWithAggregatesFilter<"Theme"> | boolean
   isEnabled?: Prisma.BoolWithAggregatesFilter<"Theme"> | boolean
   customCss?: Prisma.StringNullableWithAggregatesFilter<"Theme"> | string | null
+  type?: Prisma.EnumThemeTypeWithAggregatesFilter<"Theme"> | $Enums.ThemeType
+  parentThemeId?: Prisma.IntNullableWithAggregatesFilter<"Theme"> | number | null
   createdById?: Prisma.IntNullableWithAggregatesFilter<"Theme"> | number | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Theme"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Theme"> | Date | string
@@ -473,6 +507,7 @@ export type ThemeCreateInput = {
   isDefaultDark?: boolean
   isEnabled?: boolean
   customCss?: string | null
+  type?: $Enums.ThemeType
   createdAt?: Date | string
   updatedAt?: Date | string
   background: string
@@ -486,7 +521,9 @@ export type ThemeCreateInput = {
   muted: string
   mutedForeground: string
   border: string
-  createdBy?: Prisma.UserCreateNestedOneWithoutCustomThemeInput
+  parentTheme?: Prisma.ThemeCreateNestedOneWithoutChildThemesInput
+  childThemes?: Prisma.ThemeCreateNestedManyWithoutParentThemeInput
+  createdBy?: Prisma.UserCreateNestedOneWithoutCustomThemesInput
   usersWithTheme?: Prisma.UserCreateNestedManyWithoutSelectedThemeInput
   submissions?: Prisma.ThemeSubmissionCreateNestedManyWithoutThemeInput
 }
@@ -499,6 +536,8 @@ export type ThemeUncheckedCreateInput = {
   isDefaultDark?: boolean
   isEnabled?: boolean
   customCss?: string | null
+  type?: $Enums.ThemeType
+  parentThemeId?: number | null
   createdById?: number | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -513,6 +552,7 @@ export type ThemeUncheckedCreateInput = {
   muted: string
   mutedForeground: string
   border: string
+  childThemes?: Prisma.ThemeUncheckedCreateNestedManyWithoutParentThemeInput
   usersWithTheme?: Prisma.UserUncheckedCreateNestedManyWithoutSelectedThemeInput
   submissions?: Prisma.ThemeSubmissionUncheckedCreateNestedManyWithoutThemeInput
 }
@@ -524,6 +564,7 @@ export type ThemeUpdateInput = {
   isDefaultDark?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   customCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  type?: Prisma.EnumThemeTypeFieldUpdateOperationsInput | $Enums.ThemeType
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   background?: Prisma.StringFieldUpdateOperationsInput | string
@@ -537,7 +578,9 @@ export type ThemeUpdateInput = {
   muted?: Prisma.StringFieldUpdateOperationsInput | string
   mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   border?: Prisma.StringFieldUpdateOperationsInput | string
-  createdBy?: Prisma.UserUpdateOneWithoutCustomThemeNestedInput
+  parentTheme?: Prisma.ThemeUpdateOneWithoutChildThemesNestedInput
+  childThemes?: Prisma.ThemeUpdateManyWithoutParentThemeNestedInput
+  createdBy?: Prisma.UserUpdateOneWithoutCustomThemesNestedInput
   usersWithTheme?: Prisma.UserUpdateManyWithoutSelectedThemeNestedInput
   submissions?: Prisma.ThemeSubmissionUpdateManyWithoutThemeNestedInput
 }
@@ -550,6 +593,8 @@ export type ThemeUncheckedUpdateInput = {
   isDefaultDark?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   customCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  type?: Prisma.EnumThemeTypeFieldUpdateOperationsInput | $Enums.ThemeType
+  parentThemeId?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdById?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -564,6 +609,7 @@ export type ThemeUncheckedUpdateInput = {
   muted?: Prisma.StringFieldUpdateOperationsInput | string
   mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   border?: Prisma.StringFieldUpdateOperationsInput | string
+  childThemes?: Prisma.ThemeUncheckedUpdateManyWithoutParentThemeNestedInput
   usersWithTheme?: Prisma.UserUncheckedUpdateManyWithoutSelectedThemeNestedInput
   submissions?: Prisma.ThemeSubmissionUncheckedUpdateManyWithoutThemeNestedInput
 }
@@ -576,6 +622,8 @@ export type ThemeCreateManyInput = {
   isDefaultDark?: boolean
   isEnabled?: boolean
   customCss?: string | null
+  type?: $Enums.ThemeType
+  parentThemeId?: number | null
   createdById?: number | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -599,6 +647,7 @@ export type ThemeUpdateManyMutationInput = {
   isDefaultDark?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   customCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  type?: Prisma.EnumThemeTypeFieldUpdateOperationsInput | $Enums.ThemeType
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   background?: Prisma.StringFieldUpdateOperationsInput | string
@@ -622,6 +671,8 @@ export type ThemeUncheckedUpdateManyInput = {
   isDefaultDark?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   customCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  type?: Prisma.EnumThemeTypeFieldUpdateOperationsInput | $Enums.ThemeType
+  parentThemeId?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdById?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -643,6 +694,16 @@ export type ThemeNullableScalarRelationFilter = {
   isNot?: Prisma.ThemeWhereInput | null
 }
 
+export type ThemeListRelationFilter = {
+  every?: Prisma.ThemeWhereInput
+  some?: Prisma.ThemeWhereInput
+  none?: Prisma.ThemeWhereInput
+}
+
+export type ThemeOrderByRelationAggregateInput = {
+  _count?: Prisma.SortOrder
+}
+
 export type ThemeCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
@@ -651,6 +712,8 @@ export type ThemeCountOrderByAggregateInput = {
   isDefaultDark?: Prisma.SortOrder
   isEnabled?: Prisma.SortOrder
   customCss?: Prisma.SortOrder
+  type?: Prisma.SortOrder
+  parentThemeId?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -669,6 +732,7 @@ export type ThemeCountOrderByAggregateInput = {
 
 export type ThemeAvgOrderByAggregateInput = {
   id?: Prisma.SortOrder
+  parentThemeId?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
 }
 
@@ -680,6 +744,8 @@ export type ThemeMaxOrderByAggregateInput = {
   isDefaultDark?: Prisma.SortOrder
   isEnabled?: Prisma.SortOrder
   customCss?: Prisma.SortOrder
+  type?: Prisma.SortOrder
+  parentThemeId?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -704,6 +770,8 @@ export type ThemeMinOrderByAggregateInput = {
   isDefaultDark?: Prisma.SortOrder
   isEnabled?: Prisma.SortOrder
   customCss?: Prisma.SortOrder
+  type?: Prisma.SortOrder
+  parentThemeId?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -722,6 +790,7 @@ export type ThemeMinOrderByAggregateInput = {
 
 export type ThemeSumOrderByAggregateInput = {
   id?: Prisma.SortOrder
+  parentThemeId?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
 }
 
@@ -736,16 +805,18 @@ export type ThemeCreateNestedOneWithoutUsersWithThemeInput = {
   connect?: Prisma.ThemeWhereUniqueInput
 }
 
-export type ThemeCreateNestedOneWithoutCreatedByInput = {
-  create?: Prisma.XOR<Prisma.ThemeCreateWithoutCreatedByInput, Prisma.ThemeUncheckedCreateWithoutCreatedByInput>
-  connectOrCreate?: Prisma.ThemeCreateOrConnectWithoutCreatedByInput
-  connect?: Prisma.ThemeWhereUniqueInput
+export type ThemeCreateNestedManyWithoutCreatedByInput = {
+  create?: Prisma.XOR<Prisma.ThemeCreateWithoutCreatedByInput, Prisma.ThemeUncheckedCreateWithoutCreatedByInput> | Prisma.ThemeCreateWithoutCreatedByInput[] | Prisma.ThemeUncheckedCreateWithoutCreatedByInput[]
+  connectOrCreate?: Prisma.ThemeCreateOrConnectWithoutCreatedByInput | Prisma.ThemeCreateOrConnectWithoutCreatedByInput[]
+  createMany?: Prisma.ThemeCreateManyCreatedByInputEnvelope
+  connect?: Prisma.ThemeWhereUniqueInput | Prisma.ThemeWhereUniqueInput[]
 }
 
-export type ThemeUncheckedCreateNestedOneWithoutCreatedByInput = {
-  create?: Prisma.XOR<Prisma.ThemeCreateWithoutCreatedByInput, Prisma.ThemeUncheckedCreateWithoutCreatedByInput>
-  connectOrCreate?: Prisma.ThemeCreateOrConnectWithoutCreatedByInput
-  connect?: Prisma.ThemeWhereUniqueInput
+export type ThemeUncheckedCreateNestedManyWithoutCreatedByInput = {
+  create?: Prisma.XOR<Prisma.ThemeCreateWithoutCreatedByInput, Prisma.ThemeUncheckedCreateWithoutCreatedByInput> | Prisma.ThemeCreateWithoutCreatedByInput[] | Prisma.ThemeUncheckedCreateWithoutCreatedByInput[]
+  connectOrCreate?: Prisma.ThemeCreateOrConnectWithoutCreatedByInput | Prisma.ThemeCreateOrConnectWithoutCreatedByInput[]
+  createMany?: Prisma.ThemeCreateManyCreatedByInputEnvelope
+  connect?: Prisma.ThemeWhereUniqueInput | Prisma.ThemeWhereUniqueInput[]
 }
 
 export type ThemeUpdateOneWithoutUsersWithThemeNestedInput = {
@@ -758,24 +829,94 @@ export type ThemeUpdateOneWithoutUsersWithThemeNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.ThemeUpdateToOneWithWhereWithoutUsersWithThemeInput, Prisma.ThemeUpdateWithoutUsersWithThemeInput>, Prisma.ThemeUncheckedUpdateWithoutUsersWithThemeInput>
 }
 
-export type ThemeUpdateOneWithoutCreatedByNestedInput = {
-  create?: Prisma.XOR<Prisma.ThemeCreateWithoutCreatedByInput, Prisma.ThemeUncheckedCreateWithoutCreatedByInput>
-  connectOrCreate?: Prisma.ThemeCreateOrConnectWithoutCreatedByInput
-  upsert?: Prisma.ThemeUpsertWithoutCreatedByInput
-  disconnect?: Prisma.ThemeWhereInput | boolean
-  delete?: Prisma.ThemeWhereInput | boolean
-  connect?: Prisma.ThemeWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.ThemeUpdateToOneWithWhereWithoutCreatedByInput, Prisma.ThemeUpdateWithoutCreatedByInput>, Prisma.ThemeUncheckedUpdateWithoutCreatedByInput>
+export type ThemeUpdateManyWithoutCreatedByNestedInput = {
+  create?: Prisma.XOR<Prisma.ThemeCreateWithoutCreatedByInput, Prisma.ThemeUncheckedCreateWithoutCreatedByInput> | Prisma.ThemeCreateWithoutCreatedByInput[] | Prisma.ThemeUncheckedCreateWithoutCreatedByInput[]
+  connectOrCreate?: Prisma.ThemeCreateOrConnectWithoutCreatedByInput | Prisma.ThemeCreateOrConnectWithoutCreatedByInput[]
+  upsert?: Prisma.ThemeUpsertWithWhereUniqueWithoutCreatedByInput | Prisma.ThemeUpsertWithWhereUniqueWithoutCreatedByInput[]
+  createMany?: Prisma.ThemeCreateManyCreatedByInputEnvelope
+  set?: Prisma.ThemeWhereUniqueInput | Prisma.ThemeWhereUniqueInput[]
+  disconnect?: Prisma.ThemeWhereUniqueInput | Prisma.ThemeWhereUniqueInput[]
+  delete?: Prisma.ThemeWhereUniqueInput | Prisma.ThemeWhereUniqueInput[]
+  connect?: Prisma.ThemeWhereUniqueInput | Prisma.ThemeWhereUniqueInput[]
+  update?: Prisma.ThemeUpdateWithWhereUniqueWithoutCreatedByInput | Prisma.ThemeUpdateWithWhereUniqueWithoutCreatedByInput[]
+  updateMany?: Prisma.ThemeUpdateManyWithWhereWithoutCreatedByInput | Prisma.ThemeUpdateManyWithWhereWithoutCreatedByInput[]
+  deleteMany?: Prisma.ThemeScalarWhereInput | Prisma.ThemeScalarWhereInput[]
 }
 
-export type ThemeUncheckedUpdateOneWithoutCreatedByNestedInput = {
-  create?: Prisma.XOR<Prisma.ThemeCreateWithoutCreatedByInput, Prisma.ThemeUncheckedCreateWithoutCreatedByInput>
-  connectOrCreate?: Prisma.ThemeCreateOrConnectWithoutCreatedByInput
-  upsert?: Prisma.ThemeUpsertWithoutCreatedByInput
+export type ThemeUncheckedUpdateManyWithoutCreatedByNestedInput = {
+  create?: Prisma.XOR<Prisma.ThemeCreateWithoutCreatedByInput, Prisma.ThemeUncheckedCreateWithoutCreatedByInput> | Prisma.ThemeCreateWithoutCreatedByInput[] | Prisma.ThemeUncheckedCreateWithoutCreatedByInput[]
+  connectOrCreate?: Prisma.ThemeCreateOrConnectWithoutCreatedByInput | Prisma.ThemeCreateOrConnectWithoutCreatedByInput[]
+  upsert?: Prisma.ThemeUpsertWithWhereUniqueWithoutCreatedByInput | Prisma.ThemeUpsertWithWhereUniqueWithoutCreatedByInput[]
+  createMany?: Prisma.ThemeCreateManyCreatedByInputEnvelope
+  set?: Prisma.ThemeWhereUniqueInput | Prisma.ThemeWhereUniqueInput[]
+  disconnect?: Prisma.ThemeWhereUniqueInput | Prisma.ThemeWhereUniqueInput[]
+  delete?: Prisma.ThemeWhereUniqueInput | Prisma.ThemeWhereUniqueInput[]
+  connect?: Prisma.ThemeWhereUniqueInput | Prisma.ThemeWhereUniqueInput[]
+  update?: Prisma.ThemeUpdateWithWhereUniqueWithoutCreatedByInput | Prisma.ThemeUpdateWithWhereUniqueWithoutCreatedByInput[]
+  updateMany?: Prisma.ThemeUpdateManyWithWhereWithoutCreatedByInput | Prisma.ThemeUpdateManyWithWhereWithoutCreatedByInput[]
+  deleteMany?: Prisma.ThemeScalarWhereInput | Prisma.ThemeScalarWhereInput[]
+}
+
+export type ThemeCreateNestedOneWithoutChildThemesInput = {
+  create?: Prisma.XOR<Prisma.ThemeCreateWithoutChildThemesInput, Prisma.ThemeUncheckedCreateWithoutChildThemesInput>
+  connectOrCreate?: Prisma.ThemeCreateOrConnectWithoutChildThemesInput
+  connect?: Prisma.ThemeWhereUniqueInput
+}
+
+export type ThemeCreateNestedManyWithoutParentThemeInput = {
+  create?: Prisma.XOR<Prisma.ThemeCreateWithoutParentThemeInput, Prisma.ThemeUncheckedCreateWithoutParentThemeInput> | Prisma.ThemeCreateWithoutParentThemeInput[] | Prisma.ThemeUncheckedCreateWithoutParentThemeInput[]
+  connectOrCreate?: Prisma.ThemeCreateOrConnectWithoutParentThemeInput | Prisma.ThemeCreateOrConnectWithoutParentThemeInput[]
+  createMany?: Prisma.ThemeCreateManyParentThemeInputEnvelope
+  connect?: Prisma.ThemeWhereUniqueInput | Prisma.ThemeWhereUniqueInput[]
+}
+
+export type ThemeUncheckedCreateNestedManyWithoutParentThemeInput = {
+  create?: Prisma.XOR<Prisma.ThemeCreateWithoutParentThemeInput, Prisma.ThemeUncheckedCreateWithoutParentThemeInput> | Prisma.ThemeCreateWithoutParentThemeInput[] | Prisma.ThemeUncheckedCreateWithoutParentThemeInput[]
+  connectOrCreate?: Prisma.ThemeCreateOrConnectWithoutParentThemeInput | Prisma.ThemeCreateOrConnectWithoutParentThemeInput[]
+  createMany?: Prisma.ThemeCreateManyParentThemeInputEnvelope
+  connect?: Prisma.ThemeWhereUniqueInput | Prisma.ThemeWhereUniqueInput[]
+}
+
+export type EnumThemeTypeFieldUpdateOperationsInput = {
+  set?: $Enums.ThemeType
+}
+
+export type ThemeUpdateOneWithoutChildThemesNestedInput = {
+  create?: Prisma.XOR<Prisma.ThemeCreateWithoutChildThemesInput, Prisma.ThemeUncheckedCreateWithoutChildThemesInput>
+  connectOrCreate?: Prisma.ThemeCreateOrConnectWithoutChildThemesInput
+  upsert?: Prisma.ThemeUpsertWithoutChildThemesInput
   disconnect?: Prisma.ThemeWhereInput | boolean
   delete?: Prisma.ThemeWhereInput | boolean
   connect?: Prisma.ThemeWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.ThemeUpdateToOneWithWhereWithoutCreatedByInput, Prisma.ThemeUpdateWithoutCreatedByInput>, Prisma.ThemeUncheckedUpdateWithoutCreatedByInput>
+  update?: Prisma.XOR<Prisma.XOR<Prisma.ThemeUpdateToOneWithWhereWithoutChildThemesInput, Prisma.ThemeUpdateWithoutChildThemesInput>, Prisma.ThemeUncheckedUpdateWithoutChildThemesInput>
+}
+
+export type ThemeUpdateManyWithoutParentThemeNestedInput = {
+  create?: Prisma.XOR<Prisma.ThemeCreateWithoutParentThemeInput, Prisma.ThemeUncheckedCreateWithoutParentThemeInput> | Prisma.ThemeCreateWithoutParentThemeInput[] | Prisma.ThemeUncheckedCreateWithoutParentThemeInput[]
+  connectOrCreate?: Prisma.ThemeCreateOrConnectWithoutParentThemeInput | Prisma.ThemeCreateOrConnectWithoutParentThemeInput[]
+  upsert?: Prisma.ThemeUpsertWithWhereUniqueWithoutParentThemeInput | Prisma.ThemeUpsertWithWhereUniqueWithoutParentThemeInput[]
+  createMany?: Prisma.ThemeCreateManyParentThemeInputEnvelope
+  set?: Prisma.ThemeWhereUniqueInput | Prisma.ThemeWhereUniqueInput[]
+  disconnect?: Prisma.ThemeWhereUniqueInput | Prisma.ThemeWhereUniqueInput[]
+  delete?: Prisma.ThemeWhereUniqueInput | Prisma.ThemeWhereUniqueInput[]
+  connect?: Prisma.ThemeWhereUniqueInput | Prisma.ThemeWhereUniqueInput[]
+  update?: Prisma.ThemeUpdateWithWhereUniqueWithoutParentThemeInput | Prisma.ThemeUpdateWithWhereUniqueWithoutParentThemeInput[]
+  updateMany?: Prisma.ThemeUpdateManyWithWhereWithoutParentThemeInput | Prisma.ThemeUpdateManyWithWhereWithoutParentThemeInput[]
+  deleteMany?: Prisma.ThemeScalarWhereInput | Prisma.ThemeScalarWhereInput[]
+}
+
+export type ThemeUncheckedUpdateManyWithoutParentThemeNestedInput = {
+  create?: Prisma.XOR<Prisma.ThemeCreateWithoutParentThemeInput, Prisma.ThemeUncheckedCreateWithoutParentThemeInput> | Prisma.ThemeCreateWithoutParentThemeInput[] | Prisma.ThemeUncheckedCreateWithoutParentThemeInput[]
+  connectOrCreate?: Prisma.ThemeCreateOrConnectWithoutParentThemeInput | Prisma.ThemeCreateOrConnectWithoutParentThemeInput[]
+  upsert?: Prisma.ThemeUpsertWithWhereUniqueWithoutParentThemeInput | Prisma.ThemeUpsertWithWhereUniqueWithoutParentThemeInput[]
+  createMany?: Prisma.ThemeCreateManyParentThemeInputEnvelope
+  set?: Prisma.ThemeWhereUniqueInput | Prisma.ThemeWhereUniqueInput[]
+  disconnect?: Prisma.ThemeWhereUniqueInput | Prisma.ThemeWhereUniqueInput[]
+  delete?: Prisma.ThemeWhereUniqueInput | Prisma.ThemeWhereUniqueInput[]
+  connect?: Prisma.ThemeWhereUniqueInput | Prisma.ThemeWhereUniqueInput[]
+  update?: Prisma.ThemeUpdateWithWhereUniqueWithoutParentThemeInput | Prisma.ThemeUpdateWithWhereUniqueWithoutParentThemeInput[]
+  updateMany?: Prisma.ThemeUpdateManyWithWhereWithoutParentThemeInput | Prisma.ThemeUpdateManyWithWhereWithoutParentThemeInput[]
+  deleteMany?: Prisma.ThemeScalarWhereInput | Prisma.ThemeScalarWhereInput[]
 }
 
 export type ThemeCreateNestedOneWithoutSubmissionsInput = {
@@ -799,6 +940,7 @@ export type ThemeCreateWithoutUsersWithThemeInput = {
   isDefaultDark?: boolean
   isEnabled?: boolean
   customCss?: string | null
+  type?: $Enums.ThemeType
   createdAt?: Date | string
   updatedAt?: Date | string
   background: string
@@ -812,7 +954,9 @@ export type ThemeCreateWithoutUsersWithThemeInput = {
   muted: string
   mutedForeground: string
   border: string
-  createdBy?: Prisma.UserCreateNestedOneWithoutCustomThemeInput
+  parentTheme?: Prisma.ThemeCreateNestedOneWithoutChildThemesInput
+  childThemes?: Prisma.ThemeCreateNestedManyWithoutParentThemeInput
+  createdBy?: Prisma.UserCreateNestedOneWithoutCustomThemesInput
   submissions?: Prisma.ThemeSubmissionCreateNestedManyWithoutThemeInput
 }
 
@@ -824,6 +968,8 @@ export type ThemeUncheckedCreateWithoutUsersWithThemeInput = {
   isDefaultDark?: boolean
   isEnabled?: boolean
   customCss?: string | null
+  type?: $Enums.ThemeType
+  parentThemeId?: number | null
   createdById?: number | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -838,6 +984,7 @@ export type ThemeUncheckedCreateWithoutUsersWithThemeInput = {
   muted: string
   mutedForeground: string
   border: string
+  childThemes?: Prisma.ThemeUncheckedCreateNestedManyWithoutParentThemeInput
   submissions?: Prisma.ThemeSubmissionUncheckedCreateNestedManyWithoutThemeInput
 }
 
@@ -853,6 +1000,7 @@ export type ThemeCreateWithoutCreatedByInput = {
   isDefaultDark?: boolean
   isEnabled?: boolean
   customCss?: string | null
+  type?: $Enums.ThemeType
   createdAt?: Date | string
   updatedAt?: Date | string
   background: string
@@ -866,6 +1014,8 @@ export type ThemeCreateWithoutCreatedByInput = {
   muted: string
   mutedForeground: string
   border: string
+  parentTheme?: Prisma.ThemeCreateNestedOneWithoutChildThemesInput
+  childThemes?: Prisma.ThemeCreateNestedManyWithoutParentThemeInput
   usersWithTheme?: Prisma.UserCreateNestedManyWithoutSelectedThemeInput
   submissions?: Prisma.ThemeSubmissionCreateNestedManyWithoutThemeInput
 }
@@ -878,6 +1028,8 @@ export type ThemeUncheckedCreateWithoutCreatedByInput = {
   isDefaultDark?: boolean
   isEnabled?: boolean
   customCss?: string | null
+  type?: $Enums.ThemeType
+  parentThemeId?: number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   background: string
@@ -891,6 +1043,7 @@ export type ThemeUncheckedCreateWithoutCreatedByInput = {
   muted: string
   mutedForeground: string
   border: string
+  childThemes?: Prisma.ThemeUncheckedCreateNestedManyWithoutParentThemeInput
   usersWithTheme?: Prisma.UserUncheckedCreateNestedManyWithoutSelectedThemeInput
   submissions?: Prisma.ThemeSubmissionUncheckedCreateNestedManyWithoutThemeInput
 }
@@ -898,6 +1051,11 @@ export type ThemeUncheckedCreateWithoutCreatedByInput = {
 export type ThemeCreateOrConnectWithoutCreatedByInput = {
   where: Prisma.ThemeWhereUniqueInput
   create: Prisma.XOR<Prisma.ThemeCreateWithoutCreatedByInput, Prisma.ThemeUncheckedCreateWithoutCreatedByInput>
+}
+
+export type ThemeCreateManyCreatedByInputEnvelope = {
+  data: Prisma.ThemeCreateManyCreatedByInput | Prisma.ThemeCreateManyCreatedByInput[]
+  skipDuplicates?: boolean
 }
 
 export type ThemeUpsertWithoutUsersWithThemeInput = {
@@ -918,6 +1076,7 @@ export type ThemeUpdateWithoutUsersWithThemeInput = {
   isDefaultDark?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   customCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  type?: Prisma.EnumThemeTypeFieldUpdateOperationsInput | $Enums.ThemeType
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   background?: Prisma.StringFieldUpdateOperationsInput | string
@@ -931,7 +1090,9 @@ export type ThemeUpdateWithoutUsersWithThemeInput = {
   muted?: Prisma.StringFieldUpdateOperationsInput | string
   mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   border?: Prisma.StringFieldUpdateOperationsInput | string
-  createdBy?: Prisma.UserUpdateOneWithoutCustomThemeNestedInput
+  parentTheme?: Prisma.ThemeUpdateOneWithoutChildThemesNestedInput
+  childThemes?: Prisma.ThemeUpdateManyWithoutParentThemeNestedInput
+  createdBy?: Prisma.UserUpdateOneWithoutCustomThemesNestedInput
   submissions?: Prisma.ThemeSubmissionUpdateManyWithoutThemeNestedInput
 }
 
@@ -943,6 +1104,8 @@ export type ThemeUncheckedUpdateWithoutUsersWithThemeInput = {
   isDefaultDark?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   customCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  type?: Prisma.EnumThemeTypeFieldUpdateOperationsInput | $Enums.ThemeType
+  parentThemeId?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdById?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -957,27 +1120,199 @@ export type ThemeUncheckedUpdateWithoutUsersWithThemeInput = {
   muted?: Prisma.StringFieldUpdateOperationsInput | string
   mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   border?: Prisma.StringFieldUpdateOperationsInput | string
+  childThemes?: Prisma.ThemeUncheckedUpdateManyWithoutParentThemeNestedInput
   submissions?: Prisma.ThemeSubmissionUncheckedUpdateManyWithoutThemeNestedInput
 }
 
-export type ThemeUpsertWithoutCreatedByInput = {
+export type ThemeUpsertWithWhereUniqueWithoutCreatedByInput = {
+  where: Prisma.ThemeWhereUniqueInput
   update: Prisma.XOR<Prisma.ThemeUpdateWithoutCreatedByInput, Prisma.ThemeUncheckedUpdateWithoutCreatedByInput>
   create: Prisma.XOR<Prisma.ThemeCreateWithoutCreatedByInput, Prisma.ThemeUncheckedCreateWithoutCreatedByInput>
-  where?: Prisma.ThemeWhereInput
 }
 
-export type ThemeUpdateToOneWithWhereWithoutCreatedByInput = {
-  where?: Prisma.ThemeWhereInput
+export type ThemeUpdateWithWhereUniqueWithoutCreatedByInput = {
+  where: Prisma.ThemeWhereUniqueInput
   data: Prisma.XOR<Prisma.ThemeUpdateWithoutCreatedByInput, Prisma.ThemeUncheckedUpdateWithoutCreatedByInput>
 }
 
-export type ThemeUpdateWithoutCreatedByInput = {
+export type ThemeUpdateManyWithWhereWithoutCreatedByInput = {
+  where: Prisma.ThemeScalarWhereInput
+  data: Prisma.XOR<Prisma.ThemeUpdateManyMutationInput, Prisma.ThemeUncheckedUpdateManyWithoutCreatedByInput>
+}
+
+export type ThemeScalarWhereInput = {
+  AND?: Prisma.ThemeScalarWhereInput | Prisma.ThemeScalarWhereInput[]
+  OR?: Prisma.ThemeScalarWhereInput[]
+  NOT?: Prisma.ThemeScalarWhereInput | Prisma.ThemeScalarWhereInput[]
+  id?: Prisma.IntFilter<"Theme"> | number
+  name?: Prisma.StringFilter<"Theme"> | string
+  isPublic?: Prisma.BoolFilter<"Theme"> | boolean
+  isDefaultLight?: Prisma.BoolFilter<"Theme"> | boolean
+  isDefaultDark?: Prisma.BoolFilter<"Theme"> | boolean
+  isEnabled?: Prisma.BoolFilter<"Theme"> | boolean
+  customCss?: Prisma.StringNullableFilter<"Theme"> | string | null
+  type?: Prisma.EnumThemeTypeFilter<"Theme"> | $Enums.ThemeType
+  parentThemeId?: Prisma.IntNullableFilter<"Theme"> | number | null
+  createdById?: Prisma.IntNullableFilter<"Theme"> | number | null
+  createdAt?: Prisma.DateTimeFilter<"Theme"> | Date | string
+  updatedAt?: Prisma.DateTimeFilter<"Theme"> | Date | string
+  background?: Prisma.StringFilter<"Theme"> | string
+  foreground?: Prisma.StringFilter<"Theme"> | string
+  primary?: Prisma.StringFilter<"Theme"> | string
+  primaryForeground?: Prisma.StringFilter<"Theme"> | string
+  secondary?: Prisma.StringFilter<"Theme"> | string
+  secondaryForeground?: Prisma.StringFilter<"Theme"> | string
+  accent?: Prisma.StringFilter<"Theme"> | string
+  accentForeground?: Prisma.StringFilter<"Theme"> | string
+  muted?: Prisma.StringFilter<"Theme"> | string
+  mutedForeground?: Prisma.StringFilter<"Theme"> | string
+  border?: Prisma.StringFilter<"Theme"> | string
+}
+
+export type ThemeCreateWithoutChildThemesInput = {
+  name: string
+  isPublic?: boolean
+  isDefaultLight?: boolean
+  isDefaultDark?: boolean
+  isEnabled?: boolean
+  customCss?: string | null
+  type?: $Enums.ThemeType
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  background: string
+  foreground: string
+  primary: string
+  primaryForeground: string
+  secondary: string
+  secondaryForeground: string
+  accent: string
+  accentForeground: string
+  muted: string
+  mutedForeground: string
+  border: string
+  parentTheme?: Prisma.ThemeCreateNestedOneWithoutChildThemesInput
+  createdBy?: Prisma.UserCreateNestedOneWithoutCustomThemesInput
+  usersWithTheme?: Prisma.UserCreateNestedManyWithoutSelectedThemeInput
+  submissions?: Prisma.ThemeSubmissionCreateNestedManyWithoutThemeInput
+}
+
+export type ThemeUncheckedCreateWithoutChildThemesInput = {
+  id?: number
+  name: string
+  isPublic?: boolean
+  isDefaultLight?: boolean
+  isDefaultDark?: boolean
+  isEnabled?: boolean
+  customCss?: string | null
+  type?: $Enums.ThemeType
+  parentThemeId?: number | null
+  createdById?: number | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  background: string
+  foreground: string
+  primary: string
+  primaryForeground: string
+  secondary: string
+  secondaryForeground: string
+  accent: string
+  accentForeground: string
+  muted: string
+  mutedForeground: string
+  border: string
+  usersWithTheme?: Prisma.UserUncheckedCreateNestedManyWithoutSelectedThemeInput
+  submissions?: Prisma.ThemeSubmissionUncheckedCreateNestedManyWithoutThemeInput
+}
+
+export type ThemeCreateOrConnectWithoutChildThemesInput = {
+  where: Prisma.ThemeWhereUniqueInput
+  create: Prisma.XOR<Prisma.ThemeCreateWithoutChildThemesInput, Prisma.ThemeUncheckedCreateWithoutChildThemesInput>
+}
+
+export type ThemeCreateWithoutParentThemeInput = {
+  name: string
+  isPublic?: boolean
+  isDefaultLight?: boolean
+  isDefaultDark?: boolean
+  isEnabled?: boolean
+  customCss?: string | null
+  type?: $Enums.ThemeType
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  background: string
+  foreground: string
+  primary: string
+  primaryForeground: string
+  secondary: string
+  secondaryForeground: string
+  accent: string
+  accentForeground: string
+  muted: string
+  mutedForeground: string
+  border: string
+  childThemes?: Prisma.ThemeCreateNestedManyWithoutParentThemeInput
+  createdBy?: Prisma.UserCreateNestedOneWithoutCustomThemesInput
+  usersWithTheme?: Prisma.UserCreateNestedManyWithoutSelectedThemeInput
+  submissions?: Prisma.ThemeSubmissionCreateNestedManyWithoutThemeInput
+}
+
+export type ThemeUncheckedCreateWithoutParentThemeInput = {
+  id?: number
+  name: string
+  isPublic?: boolean
+  isDefaultLight?: boolean
+  isDefaultDark?: boolean
+  isEnabled?: boolean
+  customCss?: string | null
+  type?: $Enums.ThemeType
+  createdById?: number | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  background: string
+  foreground: string
+  primary: string
+  primaryForeground: string
+  secondary: string
+  secondaryForeground: string
+  accent: string
+  accentForeground: string
+  muted: string
+  mutedForeground: string
+  border: string
+  childThemes?: Prisma.ThemeUncheckedCreateNestedManyWithoutParentThemeInput
+  usersWithTheme?: Prisma.UserUncheckedCreateNestedManyWithoutSelectedThemeInput
+  submissions?: Prisma.ThemeSubmissionUncheckedCreateNestedManyWithoutThemeInput
+}
+
+export type ThemeCreateOrConnectWithoutParentThemeInput = {
+  where: Prisma.ThemeWhereUniqueInput
+  create: Prisma.XOR<Prisma.ThemeCreateWithoutParentThemeInput, Prisma.ThemeUncheckedCreateWithoutParentThemeInput>
+}
+
+export type ThemeCreateManyParentThemeInputEnvelope = {
+  data: Prisma.ThemeCreateManyParentThemeInput | Prisma.ThemeCreateManyParentThemeInput[]
+  skipDuplicates?: boolean
+}
+
+export type ThemeUpsertWithoutChildThemesInput = {
+  update: Prisma.XOR<Prisma.ThemeUpdateWithoutChildThemesInput, Prisma.ThemeUncheckedUpdateWithoutChildThemesInput>
+  create: Prisma.XOR<Prisma.ThemeCreateWithoutChildThemesInput, Prisma.ThemeUncheckedCreateWithoutChildThemesInput>
+  where?: Prisma.ThemeWhereInput
+}
+
+export type ThemeUpdateToOneWithWhereWithoutChildThemesInput = {
+  where?: Prisma.ThemeWhereInput
+  data: Prisma.XOR<Prisma.ThemeUpdateWithoutChildThemesInput, Prisma.ThemeUncheckedUpdateWithoutChildThemesInput>
+}
+
+export type ThemeUpdateWithoutChildThemesInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   isPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isDefaultLight?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isDefaultDark?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   customCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  type?: Prisma.EnumThemeTypeFieldUpdateOperationsInput | $Enums.ThemeType
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   background?: Prisma.StringFieldUpdateOperationsInput | string
@@ -991,11 +1326,13 @@ export type ThemeUpdateWithoutCreatedByInput = {
   muted?: Prisma.StringFieldUpdateOperationsInput | string
   mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   border?: Prisma.StringFieldUpdateOperationsInput | string
+  parentTheme?: Prisma.ThemeUpdateOneWithoutChildThemesNestedInput
+  createdBy?: Prisma.UserUpdateOneWithoutCustomThemesNestedInput
   usersWithTheme?: Prisma.UserUpdateManyWithoutSelectedThemeNestedInput
   submissions?: Prisma.ThemeSubmissionUpdateManyWithoutThemeNestedInput
 }
 
-export type ThemeUncheckedUpdateWithoutCreatedByInput = {
+export type ThemeUncheckedUpdateWithoutChildThemesInput = {
   id?: Prisma.IntFieldUpdateOperationsInput | number
   name?: Prisma.StringFieldUpdateOperationsInput | string
   isPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -1003,6 +1340,9 @@ export type ThemeUncheckedUpdateWithoutCreatedByInput = {
   isDefaultDark?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   customCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  type?: Prisma.EnumThemeTypeFieldUpdateOperationsInput | $Enums.ThemeType
+  parentThemeId?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  createdById?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   background?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1020,6 +1360,22 @@ export type ThemeUncheckedUpdateWithoutCreatedByInput = {
   submissions?: Prisma.ThemeSubmissionUncheckedUpdateManyWithoutThemeNestedInput
 }
 
+export type ThemeUpsertWithWhereUniqueWithoutParentThemeInput = {
+  where: Prisma.ThemeWhereUniqueInput
+  update: Prisma.XOR<Prisma.ThemeUpdateWithoutParentThemeInput, Prisma.ThemeUncheckedUpdateWithoutParentThemeInput>
+  create: Prisma.XOR<Prisma.ThemeCreateWithoutParentThemeInput, Prisma.ThemeUncheckedCreateWithoutParentThemeInput>
+}
+
+export type ThemeUpdateWithWhereUniqueWithoutParentThemeInput = {
+  where: Prisma.ThemeWhereUniqueInput
+  data: Prisma.XOR<Prisma.ThemeUpdateWithoutParentThemeInput, Prisma.ThemeUncheckedUpdateWithoutParentThemeInput>
+}
+
+export type ThemeUpdateManyWithWhereWithoutParentThemeInput = {
+  where: Prisma.ThemeScalarWhereInput
+  data: Prisma.XOR<Prisma.ThemeUpdateManyMutationInput, Prisma.ThemeUncheckedUpdateManyWithoutParentThemeInput>
+}
+
 export type ThemeCreateWithoutSubmissionsInput = {
   name: string
   isPublic?: boolean
@@ -1027,6 +1383,7 @@ export type ThemeCreateWithoutSubmissionsInput = {
   isDefaultDark?: boolean
   isEnabled?: boolean
   customCss?: string | null
+  type?: $Enums.ThemeType
   createdAt?: Date | string
   updatedAt?: Date | string
   background: string
@@ -1040,7 +1397,9 @@ export type ThemeCreateWithoutSubmissionsInput = {
   muted: string
   mutedForeground: string
   border: string
-  createdBy?: Prisma.UserCreateNestedOneWithoutCustomThemeInput
+  parentTheme?: Prisma.ThemeCreateNestedOneWithoutChildThemesInput
+  childThemes?: Prisma.ThemeCreateNestedManyWithoutParentThemeInput
+  createdBy?: Prisma.UserCreateNestedOneWithoutCustomThemesInput
   usersWithTheme?: Prisma.UserCreateNestedManyWithoutSelectedThemeInput
 }
 
@@ -1052,6 +1411,8 @@ export type ThemeUncheckedCreateWithoutSubmissionsInput = {
   isDefaultDark?: boolean
   isEnabled?: boolean
   customCss?: string | null
+  type?: $Enums.ThemeType
+  parentThemeId?: number | null
   createdById?: number | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1066,6 +1427,7 @@ export type ThemeUncheckedCreateWithoutSubmissionsInput = {
   muted: string
   mutedForeground: string
   border: string
+  childThemes?: Prisma.ThemeUncheckedCreateNestedManyWithoutParentThemeInput
   usersWithTheme?: Prisma.UserUncheckedCreateNestedManyWithoutSelectedThemeInput
 }
 
@@ -1092,6 +1454,7 @@ export type ThemeUpdateWithoutSubmissionsInput = {
   isDefaultDark?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   customCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  type?: Prisma.EnumThemeTypeFieldUpdateOperationsInput | $Enums.ThemeType
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   background?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1105,7 +1468,9 @@ export type ThemeUpdateWithoutSubmissionsInput = {
   muted?: Prisma.StringFieldUpdateOperationsInput | string
   mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   border?: Prisma.StringFieldUpdateOperationsInput | string
-  createdBy?: Prisma.UserUpdateOneWithoutCustomThemeNestedInput
+  parentTheme?: Prisma.ThemeUpdateOneWithoutChildThemesNestedInput
+  childThemes?: Prisma.ThemeUpdateManyWithoutParentThemeNestedInput
+  createdBy?: Prisma.UserUpdateOneWithoutCustomThemesNestedInput
   usersWithTheme?: Prisma.UserUpdateManyWithoutSelectedThemeNestedInput
 }
 
@@ -1117,6 +1482,8 @@ export type ThemeUncheckedUpdateWithoutSubmissionsInput = {
   isDefaultDark?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   customCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  type?: Prisma.EnumThemeTypeFieldUpdateOperationsInput | $Enums.ThemeType
+  parentThemeId?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdById?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1131,7 +1498,218 @@ export type ThemeUncheckedUpdateWithoutSubmissionsInput = {
   muted?: Prisma.StringFieldUpdateOperationsInput | string
   mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   border?: Prisma.StringFieldUpdateOperationsInput | string
+  childThemes?: Prisma.ThemeUncheckedUpdateManyWithoutParentThemeNestedInput
   usersWithTheme?: Prisma.UserUncheckedUpdateManyWithoutSelectedThemeNestedInput
+}
+
+export type ThemeCreateManyCreatedByInput = {
+  id?: number
+  name: string
+  isPublic?: boolean
+  isDefaultLight?: boolean
+  isDefaultDark?: boolean
+  isEnabled?: boolean
+  customCss?: string | null
+  type?: $Enums.ThemeType
+  parentThemeId?: number | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  background: string
+  foreground: string
+  primary: string
+  primaryForeground: string
+  secondary: string
+  secondaryForeground: string
+  accent: string
+  accentForeground: string
+  muted: string
+  mutedForeground: string
+  border: string
+}
+
+export type ThemeUpdateWithoutCreatedByInput = {
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  isPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isDefaultLight?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isDefaultDark?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  customCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  type?: Prisma.EnumThemeTypeFieldUpdateOperationsInput | $Enums.ThemeType
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  background?: Prisma.StringFieldUpdateOperationsInput | string
+  foreground?: Prisma.StringFieldUpdateOperationsInput | string
+  primary?: Prisma.StringFieldUpdateOperationsInput | string
+  primaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  secondary?: Prisma.StringFieldUpdateOperationsInput | string
+  secondaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  accent?: Prisma.StringFieldUpdateOperationsInput | string
+  accentForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  muted?: Prisma.StringFieldUpdateOperationsInput | string
+  mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  border?: Prisma.StringFieldUpdateOperationsInput | string
+  parentTheme?: Prisma.ThemeUpdateOneWithoutChildThemesNestedInput
+  childThemes?: Prisma.ThemeUpdateManyWithoutParentThemeNestedInput
+  usersWithTheme?: Prisma.UserUpdateManyWithoutSelectedThemeNestedInput
+  submissions?: Prisma.ThemeSubmissionUpdateManyWithoutThemeNestedInput
+}
+
+export type ThemeUncheckedUpdateWithoutCreatedByInput = {
+  id?: Prisma.IntFieldUpdateOperationsInput | number
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  isPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isDefaultLight?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isDefaultDark?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  customCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  type?: Prisma.EnumThemeTypeFieldUpdateOperationsInput | $Enums.ThemeType
+  parentThemeId?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  background?: Prisma.StringFieldUpdateOperationsInput | string
+  foreground?: Prisma.StringFieldUpdateOperationsInput | string
+  primary?: Prisma.StringFieldUpdateOperationsInput | string
+  primaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  secondary?: Prisma.StringFieldUpdateOperationsInput | string
+  secondaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  accent?: Prisma.StringFieldUpdateOperationsInput | string
+  accentForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  muted?: Prisma.StringFieldUpdateOperationsInput | string
+  mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  border?: Prisma.StringFieldUpdateOperationsInput | string
+  childThemes?: Prisma.ThemeUncheckedUpdateManyWithoutParentThemeNestedInput
+  usersWithTheme?: Prisma.UserUncheckedUpdateManyWithoutSelectedThemeNestedInput
+  submissions?: Prisma.ThemeSubmissionUncheckedUpdateManyWithoutThemeNestedInput
+}
+
+export type ThemeUncheckedUpdateManyWithoutCreatedByInput = {
+  id?: Prisma.IntFieldUpdateOperationsInput | number
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  isPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isDefaultLight?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isDefaultDark?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  customCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  type?: Prisma.EnumThemeTypeFieldUpdateOperationsInput | $Enums.ThemeType
+  parentThemeId?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  background?: Prisma.StringFieldUpdateOperationsInput | string
+  foreground?: Prisma.StringFieldUpdateOperationsInput | string
+  primary?: Prisma.StringFieldUpdateOperationsInput | string
+  primaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  secondary?: Prisma.StringFieldUpdateOperationsInput | string
+  secondaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  accent?: Prisma.StringFieldUpdateOperationsInput | string
+  accentForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  muted?: Prisma.StringFieldUpdateOperationsInput | string
+  mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  border?: Prisma.StringFieldUpdateOperationsInput | string
+}
+
+export type ThemeCreateManyParentThemeInput = {
+  id?: number
+  name: string
+  isPublic?: boolean
+  isDefaultLight?: boolean
+  isDefaultDark?: boolean
+  isEnabled?: boolean
+  customCss?: string | null
+  type?: $Enums.ThemeType
+  createdById?: number | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  background: string
+  foreground: string
+  primary: string
+  primaryForeground: string
+  secondary: string
+  secondaryForeground: string
+  accent: string
+  accentForeground: string
+  muted: string
+  mutedForeground: string
+  border: string
+}
+
+export type ThemeUpdateWithoutParentThemeInput = {
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  isPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isDefaultLight?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isDefaultDark?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  customCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  type?: Prisma.EnumThemeTypeFieldUpdateOperationsInput | $Enums.ThemeType
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  background?: Prisma.StringFieldUpdateOperationsInput | string
+  foreground?: Prisma.StringFieldUpdateOperationsInput | string
+  primary?: Prisma.StringFieldUpdateOperationsInput | string
+  primaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  secondary?: Prisma.StringFieldUpdateOperationsInput | string
+  secondaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  accent?: Prisma.StringFieldUpdateOperationsInput | string
+  accentForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  muted?: Prisma.StringFieldUpdateOperationsInput | string
+  mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  border?: Prisma.StringFieldUpdateOperationsInput | string
+  childThemes?: Prisma.ThemeUpdateManyWithoutParentThemeNestedInput
+  createdBy?: Prisma.UserUpdateOneWithoutCustomThemesNestedInput
+  usersWithTheme?: Prisma.UserUpdateManyWithoutSelectedThemeNestedInput
+  submissions?: Prisma.ThemeSubmissionUpdateManyWithoutThemeNestedInput
+}
+
+export type ThemeUncheckedUpdateWithoutParentThemeInput = {
+  id?: Prisma.IntFieldUpdateOperationsInput | number
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  isPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isDefaultLight?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isDefaultDark?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  customCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  type?: Prisma.EnumThemeTypeFieldUpdateOperationsInput | $Enums.ThemeType
+  createdById?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  background?: Prisma.StringFieldUpdateOperationsInput | string
+  foreground?: Prisma.StringFieldUpdateOperationsInput | string
+  primary?: Prisma.StringFieldUpdateOperationsInput | string
+  primaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  secondary?: Prisma.StringFieldUpdateOperationsInput | string
+  secondaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  accent?: Prisma.StringFieldUpdateOperationsInput | string
+  accentForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  muted?: Prisma.StringFieldUpdateOperationsInput | string
+  mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  border?: Prisma.StringFieldUpdateOperationsInput | string
+  childThemes?: Prisma.ThemeUncheckedUpdateManyWithoutParentThemeNestedInput
+  usersWithTheme?: Prisma.UserUncheckedUpdateManyWithoutSelectedThemeNestedInput
+  submissions?: Prisma.ThemeSubmissionUncheckedUpdateManyWithoutThemeNestedInput
+}
+
+export type ThemeUncheckedUpdateManyWithoutParentThemeInput = {
+  id?: Prisma.IntFieldUpdateOperationsInput | number
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  isPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isDefaultLight?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isDefaultDark?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  customCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  type?: Prisma.EnumThemeTypeFieldUpdateOperationsInput | $Enums.ThemeType
+  createdById?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  background?: Prisma.StringFieldUpdateOperationsInput | string
+  foreground?: Prisma.StringFieldUpdateOperationsInput | string
+  primary?: Prisma.StringFieldUpdateOperationsInput | string
+  primaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  secondary?: Prisma.StringFieldUpdateOperationsInput | string
+  secondaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  accent?: Prisma.StringFieldUpdateOperationsInput | string
+  accentForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  muted?: Prisma.StringFieldUpdateOperationsInput | string
+  mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  border?: Prisma.StringFieldUpdateOperationsInput | string
 }
 
 
@@ -1140,11 +1718,13 @@ export type ThemeUncheckedUpdateWithoutSubmissionsInput = {
  */
 
 export type ThemeCountOutputType = {
+  childThemes: number
   usersWithTheme: number
   submissions: number
 }
 
 export type ThemeCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  childThemes?: boolean | ThemeCountOutputTypeCountChildThemesArgs
   usersWithTheme?: boolean | ThemeCountOutputTypeCountUsersWithThemeArgs
   submissions?: boolean | ThemeCountOutputTypeCountSubmissionsArgs
 }
@@ -1157,6 +1737,13 @@ export type ThemeCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extens
    * Select specific fields to fetch from the ThemeCountOutputType
    */
   select?: Prisma.ThemeCountOutputTypeSelect<ExtArgs> | null
+}
+
+/**
+ * ThemeCountOutputType without action
+ */
+export type ThemeCountOutputTypeCountChildThemesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ThemeWhereInput
 }
 
 /**
@@ -1182,6 +1769,8 @@ export type ThemeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   isDefaultDark?: boolean
   isEnabled?: boolean
   customCss?: boolean
+  type?: boolean
+  parentThemeId?: boolean
   createdById?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -1196,6 +1785,8 @@ export type ThemeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   muted?: boolean
   mutedForeground?: boolean
   border?: boolean
+  parentTheme?: boolean | Prisma.Theme$parentThemeArgs<ExtArgs>
+  childThemes?: boolean | Prisma.Theme$childThemesArgs<ExtArgs>
   createdBy?: boolean | Prisma.Theme$createdByArgs<ExtArgs>
   usersWithTheme?: boolean | Prisma.Theme$usersWithThemeArgs<ExtArgs>
   submissions?: boolean | Prisma.Theme$submissionsArgs<ExtArgs>
@@ -1210,6 +1801,8 @@ export type ThemeSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   isDefaultDark?: boolean
   isEnabled?: boolean
   customCss?: boolean
+  type?: boolean
+  parentThemeId?: boolean
   createdById?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -1224,6 +1817,7 @@ export type ThemeSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   muted?: boolean
   mutedForeground?: boolean
   border?: boolean
+  parentTheme?: boolean | Prisma.Theme$parentThemeArgs<ExtArgs>
   createdBy?: boolean | Prisma.Theme$createdByArgs<ExtArgs>
 }, ExtArgs["result"]["theme"]>
 
@@ -1235,6 +1829,8 @@ export type ThemeSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   isDefaultDark?: boolean
   isEnabled?: boolean
   customCss?: boolean
+  type?: boolean
+  parentThemeId?: boolean
   createdById?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -1249,6 +1845,7 @@ export type ThemeSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   muted?: boolean
   mutedForeground?: boolean
   border?: boolean
+  parentTheme?: boolean | Prisma.Theme$parentThemeArgs<ExtArgs>
   createdBy?: boolean | Prisma.Theme$createdByArgs<ExtArgs>
 }, ExtArgs["result"]["theme"]>
 
@@ -1260,6 +1857,8 @@ export type ThemeSelectScalar = {
   isDefaultDark?: boolean
   isEnabled?: boolean
   customCss?: boolean
+  type?: boolean
+  parentThemeId?: boolean
   createdById?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -1276,23 +1875,29 @@ export type ThemeSelectScalar = {
   border?: boolean
 }
 
-export type ThemeOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "isPublic" | "isDefaultLight" | "isDefaultDark" | "isEnabled" | "customCss" | "createdById" | "createdAt" | "updatedAt" | "background" | "foreground" | "primary" | "primaryForeground" | "secondary" | "secondaryForeground" | "accent" | "accentForeground" | "muted" | "mutedForeground" | "border", ExtArgs["result"]["theme"]>
+export type ThemeOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "isPublic" | "isDefaultLight" | "isDefaultDark" | "isEnabled" | "customCss" | "type" | "parentThemeId" | "createdById" | "createdAt" | "updatedAt" | "background" | "foreground" | "primary" | "primaryForeground" | "secondary" | "secondaryForeground" | "accent" | "accentForeground" | "muted" | "mutedForeground" | "border", ExtArgs["result"]["theme"]>
 export type ThemeInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  parentTheme?: boolean | Prisma.Theme$parentThemeArgs<ExtArgs>
+  childThemes?: boolean | Prisma.Theme$childThemesArgs<ExtArgs>
   createdBy?: boolean | Prisma.Theme$createdByArgs<ExtArgs>
   usersWithTheme?: boolean | Prisma.Theme$usersWithThemeArgs<ExtArgs>
   submissions?: boolean | Prisma.Theme$submissionsArgs<ExtArgs>
   _count?: boolean | Prisma.ThemeCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type ThemeIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  parentTheme?: boolean | Prisma.Theme$parentThemeArgs<ExtArgs>
   createdBy?: boolean | Prisma.Theme$createdByArgs<ExtArgs>
 }
 export type ThemeIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  parentTheme?: boolean | Prisma.Theme$parentThemeArgs<ExtArgs>
   createdBy?: boolean | Prisma.Theme$createdByArgs<ExtArgs>
 }
 
 export type $ThemePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "Theme"
   objects: {
+    parentTheme: Prisma.$ThemePayload<ExtArgs> | null
+    childThemes: Prisma.$ThemePayload<ExtArgs>[]
     createdBy: Prisma.$UserPayload<ExtArgs> | null
     usersWithTheme: Prisma.$UserPayload<ExtArgs>[]
     submissions: Prisma.$ThemeSubmissionPayload<ExtArgs>[]
@@ -1305,6 +1910,8 @@ export type $ThemePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     isDefaultDark: boolean
     isEnabled: boolean
     customCss: string | null
+    type: $Enums.ThemeType
+    parentThemeId: number | null
     createdById: number | null
     createdAt: Date
     updatedAt: Date
@@ -1713,6 +2320,8 @@ readonly fields: ThemeFieldRefs;
  */
 export interface Prisma__ThemeClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
+  parentTheme<T extends Prisma.Theme$parentThemeArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Theme$parentThemeArgs<ExtArgs>>): Prisma.Prisma__ThemeClient<runtime.Types.Result.GetResult<Prisma.$ThemePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  childThemes<T extends Prisma.Theme$childThemesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Theme$childThemesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ThemePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   createdBy<T extends Prisma.Theme$createdByArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Theme$createdByArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   usersWithTheme<T extends Prisma.Theme$usersWithThemeArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Theme$usersWithThemeArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   submissions<T extends Prisma.Theme$submissionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Theme$submissionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ThemeSubmissionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -1752,6 +2361,8 @@ export interface ThemeFieldRefs {
   readonly isDefaultDark: Prisma.FieldRef<"Theme", 'Boolean'>
   readonly isEnabled: Prisma.FieldRef<"Theme", 'Boolean'>
   readonly customCss: Prisma.FieldRef<"Theme", 'String'>
+  readonly type: Prisma.FieldRef<"Theme", 'ThemeType'>
+  readonly parentThemeId: Prisma.FieldRef<"Theme", 'Int'>
   readonly createdById: Prisma.FieldRef<"Theme", 'Int'>
   readonly createdAt: Prisma.FieldRef<"Theme", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Theme", 'DateTime'>
@@ -2159,6 +2770,49 @@ export type ThemeDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Interna
    * Limit how many Themes to delete.
    */
   limit?: number
+}
+
+/**
+ * Theme.parentTheme
+ */
+export type Theme$parentThemeArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Theme
+   */
+  select?: Prisma.ThemeSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Theme
+   */
+  omit?: Prisma.ThemeOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ThemeInclude<ExtArgs> | null
+  where?: Prisma.ThemeWhereInput
+}
+
+/**
+ * Theme.childThemes
+ */
+export type Theme$childThemesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Theme
+   */
+  select?: Prisma.ThemeSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Theme
+   */
+  omit?: Prisma.ThemeOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ThemeInclude<ExtArgs> | null
+  where?: Prisma.ThemeWhereInput
+  orderBy?: Prisma.ThemeOrderByWithRelationInput | Prisma.ThemeOrderByWithRelationInput[]
+  cursor?: Prisma.ThemeWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ThemeScalarFieldEnum | Prisma.ThemeScalarFieldEnum[]
 }
 
 /**

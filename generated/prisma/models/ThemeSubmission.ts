@@ -44,6 +44,21 @@ export type ThemeSubmissionMinAggregateOutputType = {
   submittedById: number | null
   status: $Enums.SubmissionStatus | null
   message: string | null
+  adminMessage: string | null
+  submissionType: string | null
+  snapshotName: string | null
+  snapshotBackground: string | null
+  snapshotForeground: string | null
+  snapshotPrimary: string | null
+  snapshotPrimaryForeground: string | null
+  snapshotSecondary: string | null
+  snapshotSecondaryForeground: string | null
+  snapshotAccent: string | null
+  snapshotAccentForeground: string | null
+  snapshotMuted: string | null
+  snapshotMutedForeground: string | null
+  snapshotBorder: string | null
+  snapshotCustomCss: string | null
   createdAt: Date | null
   reviewedAt: Date | null
 }
@@ -54,6 +69,21 @@ export type ThemeSubmissionMaxAggregateOutputType = {
   submittedById: number | null
   status: $Enums.SubmissionStatus | null
   message: string | null
+  adminMessage: string | null
+  submissionType: string | null
+  snapshotName: string | null
+  snapshotBackground: string | null
+  snapshotForeground: string | null
+  snapshotPrimary: string | null
+  snapshotPrimaryForeground: string | null
+  snapshotSecondary: string | null
+  snapshotSecondaryForeground: string | null
+  snapshotAccent: string | null
+  snapshotAccentForeground: string | null
+  snapshotMuted: string | null
+  snapshotMutedForeground: string | null
+  snapshotBorder: string | null
+  snapshotCustomCss: string | null
   createdAt: Date | null
   reviewedAt: Date | null
 }
@@ -64,6 +94,21 @@ export type ThemeSubmissionCountAggregateOutputType = {
   submittedById: number
   status: number
   message: number
+  adminMessage: number
+  submissionType: number
+  snapshotName: number
+  snapshotBackground: number
+  snapshotForeground: number
+  snapshotPrimary: number
+  snapshotPrimaryForeground: number
+  snapshotSecondary: number
+  snapshotSecondaryForeground: number
+  snapshotAccent: number
+  snapshotAccentForeground: number
+  snapshotMuted: number
+  snapshotMutedForeground: number
+  snapshotBorder: number
+  snapshotCustomCss: number
   createdAt: number
   reviewedAt: number
   _all: number
@@ -88,6 +133,21 @@ export type ThemeSubmissionMinAggregateInputType = {
   submittedById?: true
   status?: true
   message?: true
+  adminMessage?: true
+  submissionType?: true
+  snapshotName?: true
+  snapshotBackground?: true
+  snapshotForeground?: true
+  snapshotPrimary?: true
+  snapshotPrimaryForeground?: true
+  snapshotSecondary?: true
+  snapshotSecondaryForeground?: true
+  snapshotAccent?: true
+  snapshotAccentForeground?: true
+  snapshotMuted?: true
+  snapshotMutedForeground?: true
+  snapshotBorder?: true
+  snapshotCustomCss?: true
   createdAt?: true
   reviewedAt?: true
 }
@@ -98,6 +158,21 @@ export type ThemeSubmissionMaxAggregateInputType = {
   submittedById?: true
   status?: true
   message?: true
+  adminMessage?: true
+  submissionType?: true
+  snapshotName?: true
+  snapshotBackground?: true
+  snapshotForeground?: true
+  snapshotPrimary?: true
+  snapshotPrimaryForeground?: true
+  snapshotSecondary?: true
+  snapshotSecondaryForeground?: true
+  snapshotAccent?: true
+  snapshotAccentForeground?: true
+  snapshotMuted?: true
+  snapshotMutedForeground?: true
+  snapshotBorder?: true
+  snapshotCustomCss?: true
   createdAt?: true
   reviewedAt?: true
 }
@@ -108,6 +183,21 @@ export type ThemeSubmissionCountAggregateInputType = {
   submittedById?: true
   status?: true
   message?: true
+  adminMessage?: true
+  submissionType?: true
+  snapshotName?: true
+  snapshotBackground?: true
+  snapshotForeground?: true
+  snapshotPrimary?: true
+  snapshotPrimaryForeground?: true
+  snapshotSecondary?: true
+  snapshotSecondaryForeground?: true
+  snapshotAccent?: true
+  snapshotAccentForeground?: true
+  snapshotMuted?: true
+  snapshotMutedForeground?: true
+  snapshotBorder?: true
+  snapshotCustomCss?: true
   createdAt?: true
   reviewedAt?: true
   _all?: true
@@ -205,6 +295,21 @@ export type ThemeSubmissionGroupByOutputType = {
   submittedById: number
   status: $Enums.SubmissionStatus
   message: string | null
+  adminMessage: string | null
+  submissionType: string
+  snapshotName: string
+  snapshotBackground: string
+  snapshotForeground: string
+  snapshotPrimary: string
+  snapshotPrimaryForeground: string
+  snapshotSecondary: string
+  snapshotSecondaryForeground: string
+  snapshotAccent: string
+  snapshotAccentForeground: string
+  snapshotMuted: string
+  snapshotMutedForeground: string
+  snapshotBorder: string
+  snapshotCustomCss: string | null
   createdAt: Date
   reviewedAt: Date | null
   _count: ThemeSubmissionCountAggregateOutputType | null
@@ -238,6 +343,21 @@ export type ThemeSubmissionWhereInput = {
   submittedById?: Prisma.IntFilter<"ThemeSubmission"> | number
   status?: Prisma.EnumSubmissionStatusFilter<"ThemeSubmission"> | $Enums.SubmissionStatus
   message?: Prisma.StringNullableFilter<"ThemeSubmission"> | string | null
+  adminMessage?: Prisma.StringNullableFilter<"ThemeSubmission"> | string | null
+  submissionType?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotName?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotBackground?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotForeground?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotPrimary?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotPrimaryForeground?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotSecondary?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotSecondaryForeground?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotAccent?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotAccentForeground?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotMuted?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotMutedForeground?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotBorder?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotCustomCss?: Prisma.StringNullableFilter<"ThemeSubmission"> | string | null
   createdAt?: Prisma.DateTimeFilter<"ThemeSubmission"> | Date | string
   reviewedAt?: Prisma.DateTimeNullableFilter<"ThemeSubmission"> | Date | string | null
   theme?: Prisma.XOR<Prisma.ThemeScalarRelationFilter, Prisma.ThemeWhereInput>
@@ -250,6 +370,21 @@ export type ThemeSubmissionOrderByWithRelationInput = {
   submittedById?: Prisma.SortOrder
   status?: Prisma.SortOrder
   message?: Prisma.SortOrderInput | Prisma.SortOrder
+  adminMessage?: Prisma.SortOrderInput | Prisma.SortOrder
+  submissionType?: Prisma.SortOrder
+  snapshotName?: Prisma.SortOrder
+  snapshotBackground?: Prisma.SortOrder
+  snapshotForeground?: Prisma.SortOrder
+  snapshotPrimary?: Prisma.SortOrder
+  snapshotPrimaryForeground?: Prisma.SortOrder
+  snapshotSecondary?: Prisma.SortOrder
+  snapshotSecondaryForeground?: Prisma.SortOrder
+  snapshotAccent?: Prisma.SortOrder
+  snapshotAccentForeground?: Prisma.SortOrder
+  snapshotMuted?: Prisma.SortOrder
+  snapshotMutedForeground?: Prisma.SortOrder
+  snapshotBorder?: Prisma.SortOrder
+  snapshotCustomCss?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   reviewedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   theme?: Prisma.ThemeOrderByWithRelationInput
@@ -258,18 +393,33 @@ export type ThemeSubmissionOrderByWithRelationInput = {
 
 export type ThemeSubmissionWhereUniqueInput = Prisma.AtLeast<{
   id?: number
-  themeId?: number
   AND?: Prisma.ThemeSubmissionWhereInput | Prisma.ThemeSubmissionWhereInput[]
   OR?: Prisma.ThemeSubmissionWhereInput[]
   NOT?: Prisma.ThemeSubmissionWhereInput | Prisma.ThemeSubmissionWhereInput[]
+  themeId?: Prisma.IntFilter<"ThemeSubmission"> | number
   submittedById?: Prisma.IntFilter<"ThemeSubmission"> | number
   status?: Prisma.EnumSubmissionStatusFilter<"ThemeSubmission"> | $Enums.SubmissionStatus
   message?: Prisma.StringNullableFilter<"ThemeSubmission"> | string | null
+  adminMessage?: Prisma.StringNullableFilter<"ThemeSubmission"> | string | null
+  submissionType?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotName?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotBackground?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotForeground?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotPrimary?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotPrimaryForeground?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotSecondary?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotSecondaryForeground?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotAccent?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotAccentForeground?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotMuted?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotMutedForeground?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotBorder?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotCustomCss?: Prisma.StringNullableFilter<"ThemeSubmission"> | string | null
   createdAt?: Prisma.DateTimeFilter<"ThemeSubmission"> | Date | string
   reviewedAt?: Prisma.DateTimeNullableFilter<"ThemeSubmission"> | Date | string | null
   theme?: Prisma.XOR<Prisma.ThemeScalarRelationFilter, Prisma.ThemeWhereInput>
   submittedBy?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
-}, "id" | "themeId">
+}, "id">
 
 export type ThemeSubmissionOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -277,6 +427,21 @@ export type ThemeSubmissionOrderByWithAggregationInput = {
   submittedById?: Prisma.SortOrder
   status?: Prisma.SortOrder
   message?: Prisma.SortOrderInput | Prisma.SortOrder
+  adminMessage?: Prisma.SortOrderInput | Prisma.SortOrder
+  submissionType?: Prisma.SortOrder
+  snapshotName?: Prisma.SortOrder
+  snapshotBackground?: Prisma.SortOrder
+  snapshotForeground?: Prisma.SortOrder
+  snapshotPrimary?: Prisma.SortOrder
+  snapshotPrimaryForeground?: Prisma.SortOrder
+  snapshotSecondary?: Prisma.SortOrder
+  snapshotSecondaryForeground?: Prisma.SortOrder
+  snapshotAccent?: Prisma.SortOrder
+  snapshotAccentForeground?: Prisma.SortOrder
+  snapshotMuted?: Prisma.SortOrder
+  snapshotMutedForeground?: Prisma.SortOrder
+  snapshotBorder?: Prisma.SortOrder
+  snapshotCustomCss?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   reviewedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.ThemeSubmissionCountOrderByAggregateInput
@@ -295,6 +460,21 @@ export type ThemeSubmissionScalarWhereWithAggregatesInput = {
   submittedById?: Prisma.IntWithAggregatesFilter<"ThemeSubmission"> | number
   status?: Prisma.EnumSubmissionStatusWithAggregatesFilter<"ThemeSubmission"> | $Enums.SubmissionStatus
   message?: Prisma.StringNullableWithAggregatesFilter<"ThemeSubmission"> | string | null
+  adminMessage?: Prisma.StringNullableWithAggregatesFilter<"ThemeSubmission"> | string | null
+  submissionType?: Prisma.StringWithAggregatesFilter<"ThemeSubmission"> | string
+  snapshotName?: Prisma.StringWithAggregatesFilter<"ThemeSubmission"> | string
+  snapshotBackground?: Prisma.StringWithAggregatesFilter<"ThemeSubmission"> | string
+  snapshotForeground?: Prisma.StringWithAggregatesFilter<"ThemeSubmission"> | string
+  snapshotPrimary?: Prisma.StringWithAggregatesFilter<"ThemeSubmission"> | string
+  snapshotPrimaryForeground?: Prisma.StringWithAggregatesFilter<"ThemeSubmission"> | string
+  snapshotSecondary?: Prisma.StringWithAggregatesFilter<"ThemeSubmission"> | string
+  snapshotSecondaryForeground?: Prisma.StringWithAggregatesFilter<"ThemeSubmission"> | string
+  snapshotAccent?: Prisma.StringWithAggregatesFilter<"ThemeSubmission"> | string
+  snapshotAccentForeground?: Prisma.StringWithAggregatesFilter<"ThemeSubmission"> | string
+  snapshotMuted?: Prisma.StringWithAggregatesFilter<"ThemeSubmission"> | string
+  snapshotMutedForeground?: Prisma.StringWithAggregatesFilter<"ThemeSubmission"> | string
+  snapshotBorder?: Prisma.StringWithAggregatesFilter<"ThemeSubmission"> | string
+  snapshotCustomCss?: Prisma.StringNullableWithAggregatesFilter<"ThemeSubmission"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"ThemeSubmission"> | Date | string
   reviewedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ThemeSubmission"> | Date | string | null
 }
@@ -302,6 +482,21 @@ export type ThemeSubmissionScalarWhereWithAggregatesInput = {
 export type ThemeSubmissionCreateInput = {
   status?: $Enums.SubmissionStatus
   message?: string | null
+  adminMessage?: string | null
+  submissionType?: string
+  snapshotName: string
+  snapshotBackground: string
+  snapshotForeground: string
+  snapshotPrimary: string
+  snapshotPrimaryForeground: string
+  snapshotSecondary: string
+  snapshotSecondaryForeground: string
+  snapshotAccent: string
+  snapshotAccentForeground: string
+  snapshotMuted: string
+  snapshotMutedForeground: string
+  snapshotBorder: string
+  snapshotCustomCss?: string | null
   createdAt?: Date | string
   reviewedAt?: Date | string | null
   theme: Prisma.ThemeCreateNestedOneWithoutSubmissionsInput
@@ -314,6 +509,21 @@ export type ThemeSubmissionUncheckedCreateInput = {
   submittedById: number
   status?: $Enums.SubmissionStatus
   message?: string | null
+  adminMessage?: string | null
+  submissionType?: string
+  snapshotName: string
+  snapshotBackground: string
+  snapshotForeground: string
+  snapshotPrimary: string
+  snapshotPrimaryForeground: string
+  snapshotSecondary: string
+  snapshotSecondaryForeground: string
+  snapshotAccent: string
+  snapshotAccentForeground: string
+  snapshotMuted: string
+  snapshotMutedForeground: string
+  snapshotBorder: string
+  snapshotCustomCss?: string | null
   createdAt?: Date | string
   reviewedAt?: Date | string | null
 }
@@ -321,6 +531,21 @@ export type ThemeSubmissionUncheckedCreateInput = {
 export type ThemeSubmissionUpdateInput = {
   status?: Prisma.EnumSubmissionStatusFieldUpdateOperationsInput | $Enums.SubmissionStatus
   message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  adminMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  submissionType?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotName?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotBackground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotPrimary?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotPrimaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotSecondary?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotSecondaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotAccent?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotAccentForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotMuted?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotMutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotBorder?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotCustomCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   theme?: Prisma.ThemeUpdateOneRequiredWithoutSubmissionsNestedInput
@@ -333,6 +558,21 @@ export type ThemeSubmissionUncheckedUpdateInput = {
   submittedById?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumSubmissionStatusFieldUpdateOperationsInput | $Enums.SubmissionStatus
   message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  adminMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  submissionType?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotName?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotBackground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotPrimary?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotPrimaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotSecondary?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotSecondaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotAccent?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotAccentForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotMuted?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotMutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotBorder?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotCustomCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
@@ -343,6 +583,21 @@ export type ThemeSubmissionCreateManyInput = {
   submittedById: number
   status?: $Enums.SubmissionStatus
   message?: string | null
+  adminMessage?: string | null
+  submissionType?: string
+  snapshotName: string
+  snapshotBackground: string
+  snapshotForeground: string
+  snapshotPrimary: string
+  snapshotPrimaryForeground: string
+  snapshotSecondary: string
+  snapshotSecondaryForeground: string
+  snapshotAccent: string
+  snapshotAccentForeground: string
+  snapshotMuted: string
+  snapshotMutedForeground: string
+  snapshotBorder: string
+  snapshotCustomCss?: string | null
   createdAt?: Date | string
   reviewedAt?: Date | string | null
 }
@@ -350,6 +605,21 @@ export type ThemeSubmissionCreateManyInput = {
 export type ThemeSubmissionUpdateManyMutationInput = {
   status?: Prisma.EnumSubmissionStatusFieldUpdateOperationsInput | $Enums.SubmissionStatus
   message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  adminMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  submissionType?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotName?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotBackground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotPrimary?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotPrimaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotSecondary?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotSecondaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotAccent?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotAccentForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotMuted?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotMutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotBorder?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotCustomCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
@@ -360,6 +630,21 @@ export type ThemeSubmissionUncheckedUpdateManyInput = {
   submittedById?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumSubmissionStatusFieldUpdateOperationsInput | $Enums.SubmissionStatus
   message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  adminMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  submissionType?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotName?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotBackground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotPrimary?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotPrimaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotSecondary?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotSecondaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotAccent?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotAccentForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotMuted?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotMutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotBorder?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotCustomCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
@@ -380,6 +665,21 @@ export type ThemeSubmissionCountOrderByAggregateInput = {
   submittedById?: Prisma.SortOrder
   status?: Prisma.SortOrder
   message?: Prisma.SortOrder
+  adminMessage?: Prisma.SortOrder
+  submissionType?: Prisma.SortOrder
+  snapshotName?: Prisma.SortOrder
+  snapshotBackground?: Prisma.SortOrder
+  snapshotForeground?: Prisma.SortOrder
+  snapshotPrimary?: Prisma.SortOrder
+  snapshotPrimaryForeground?: Prisma.SortOrder
+  snapshotSecondary?: Prisma.SortOrder
+  snapshotSecondaryForeground?: Prisma.SortOrder
+  snapshotAccent?: Prisma.SortOrder
+  snapshotAccentForeground?: Prisma.SortOrder
+  snapshotMuted?: Prisma.SortOrder
+  snapshotMutedForeground?: Prisma.SortOrder
+  snapshotBorder?: Prisma.SortOrder
+  snapshotCustomCss?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   reviewedAt?: Prisma.SortOrder
 }
@@ -396,6 +696,21 @@ export type ThemeSubmissionMaxOrderByAggregateInput = {
   submittedById?: Prisma.SortOrder
   status?: Prisma.SortOrder
   message?: Prisma.SortOrder
+  adminMessage?: Prisma.SortOrder
+  submissionType?: Prisma.SortOrder
+  snapshotName?: Prisma.SortOrder
+  snapshotBackground?: Prisma.SortOrder
+  snapshotForeground?: Prisma.SortOrder
+  snapshotPrimary?: Prisma.SortOrder
+  snapshotPrimaryForeground?: Prisma.SortOrder
+  snapshotSecondary?: Prisma.SortOrder
+  snapshotSecondaryForeground?: Prisma.SortOrder
+  snapshotAccent?: Prisma.SortOrder
+  snapshotAccentForeground?: Prisma.SortOrder
+  snapshotMuted?: Prisma.SortOrder
+  snapshotMutedForeground?: Prisma.SortOrder
+  snapshotBorder?: Prisma.SortOrder
+  snapshotCustomCss?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   reviewedAt?: Prisma.SortOrder
 }
@@ -406,6 +721,21 @@ export type ThemeSubmissionMinOrderByAggregateInput = {
   submittedById?: Prisma.SortOrder
   status?: Prisma.SortOrder
   message?: Prisma.SortOrder
+  adminMessage?: Prisma.SortOrder
+  submissionType?: Prisma.SortOrder
+  snapshotName?: Prisma.SortOrder
+  snapshotBackground?: Prisma.SortOrder
+  snapshotForeground?: Prisma.SortOrder
+  snapshotPrimary?: Prisma.SortOrder
+  snapshotPrimaryForeground?: Prisma.SortOrder
+  snapshotSecondary?: Prisma.SortOrder
+  snapshotSecondaryForeground?: Prisma.SortOrder
+  snapshotAccent?: Prisma.SortOrder
+  snapshotAccentForeground?: Prisma.SortOrder
+  snapshotMuted?: Prisma.SortOrder
+  snapshotMutedForeground?: Prisma.SortOrder
+  snapshotBorder?: Prisma.SortOrder
+  snapshotCustomCss?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   reviewedAt?: Prisma.SortOrder
 }
@@ -507,6 +837,21 @@ export type EnumSubmissionStatusFieldUpdateOperationsInput = {
 export type ThemeSubmissionCreateWithoutSubmittedByInput = {
   status?: $Enums.SubmissionStatus
   message?: string | null
+  adminMessage?: string | null
+  submissionType?: string
+  snapshotName: string
+  snapshotBackground: string
+  snapshotForeground: string
+  snapshotPrimary: string
+  snapshotPrimaryForeground: string
+  snapshotSecondary: string
+  snapshotSecondaryForeground: string
+  snapshotAccent: string
+  snapshotAccentForeground: string
+  snapshotMuted: string
+  snapshotMutedForeground: string
+  snapshotBorder: string
+  snapshotCustomCss?: string | null
   createdAt?: Date | string
   reviewedAt?: Date | string | null
   theme: Prisma.ThemeCreateNestedOneWithoutSubmissionsInput
@@ -517,6 +862,21 @@ export type ThemeSubmissionUncheckedCreateWithoutSubmittedByInput = {
   themeId: number
   status?: $Enums.SubmissionStatus
   message?: string | null
+  adminMessage?: string | null
+  submissionType?: string
+  snapshotName: string
+  snapshotBackground: string
+  snapshotForeground: string
+  snapshotPrimary: string
+  snapshotPrimaryForeground: string
+  snapshotSecondary: string
+  snapshotSecondaryForeground: string
+  snapshotAccent: string
+  snapshotAccentForeground: string
+  snapshotMuted: string
+  snapshotMutedForeground: string
+  snapshotBorder: string
+  snapshotCustomCss?: string | null
   createdAt?: Date | string
   reviewedAt?: Date | string | null
 }
@@ -556,6 +916,21 @@ export type ThemeSubmissionScalarWhereInput = {
   submittedById?: Prisma.IntFilter<"ThemeSubmission"> | number
   status?: Prisma.EnumSubmissionStatusFilter<"ThemeSubmission"> | $Enums.SubmissionStatus
   message?: Prisma.StringNullableFilter<"ThemeSubmission"> | string | null
+  adminMessage?: Prisma.StringNullableFilter<"ThemeSubmission"> | string | null
+  submissionType?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotName?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotBackground?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotForeground?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotPrimary?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotPrimaryForeground?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotSecondary?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotSecondaryForeground?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotAccent?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotAccentForeground?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotMuted?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotMutedForeground?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotBorder?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotCustomCss?: Prisma.StringNullableFilter<"ThemeSubmission"> | string | null
   createdAt?: Prisma.DateTimeFilter<"ThemeSubmission"> | Date | string
   reviewedAt?: Prisma.DateTimeNullableFilter<"ThemeSubmission"> | Date | string | null
 }
@@ -563,6 +938,21 @@ export type ThemeSubmissionScalarWhereInput = {
 export type ThemeSubmissionCreateWithoutThemeInput = {
   status?: $Enums.SubmissionStatus
   message?: string | null
+  adminMessage?: string | null
+  submissionType?: string
+  snapshotName: string
+  snapshotBackground: string
+  snapshotForeground: string
+  snapshotPrimary: string
+  snapshotPrimaryForeground: string
+  snapshotSecondary: string
+  snapshotSecondaryForeground: string
+  snapshotAccent: string
+  snapshotAccentForeground: string
+  snapshotMuted: string
+  snapshotMutedForeground: string
+  snapshotBorder: string
+  snapshotCustomCss?: string | null
   createdAt?: Date | string
   reviewedAt?: Date | string | null
   submittedBy: Prisma.UserCreateNestedOneWithoutThemeSubmissionsInput
@@ -573,6 +963,21 @@ export type ThemeSubmissionUncheckedCreateWithoutThemeInput = {
   submittedById: number
   status?: $Enums.SubmissionStatus
   message?: string | null
+  adminMessage?: string | null
+  submissionType?: string
+  snapshotName: string
+  snapshotBackground: string
+  snapshotForeground: string
+  snapshotPrimary: string
+  snapshotPrimaryForeground: string
+  snapshotSecondary: string
+  snapshotSecondaryForeground: string
+  snapshotAccent: string
+  snapshotAccentForeground: string
+  snapshotMuted: string
+  snapshotMutedForeground: string
+  snapshotBorder: string
+  snapshotCustomCss?: string | null
   createdAt?: Date | string
   reviewedAt?: Date | string | null
 }
@@ -608,6 +1013,21 @@ export type ThemeSubmissionCreateManySubmittedByInput = {
   themeId: number
   status?: $Enums.SubmissionStatus
   message?: string | null
+  adminMessage?: string | null
+  submissionType?: string
+  snapshotName: string
+  snapshotBackground: string
+  snapshotForeground: string
+  snapshotPrimary: string
+  snapshotPrimaryForeground: string
+  snapshotSecondary: string
+  snapshotSecondaryForeground: string
+  snapshotAccent: string
+  snapshotAccentForeground: string
+  snapshotMuted: string
+  snapshotMutedForeground: string
+  snapshotBorder: string
+  snapshotCustomCss?: string | null
   createdAt?: Date | string
   reviewedAt?: Date | string | null
 }
@@ -615,6 +1035,21 @@ export type ThemeSubmissionCreateManySubmittedByInput = {
 export type ThemeSubmissionUpdateWithoutSubmittedByInput = {
   status?: Prisma.EnumSubmissionStatusFieldUpdateOperationsInput | $Enums.SubmissionStatus
   message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  adminMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  submissionType?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotName?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotBackground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotPrimary?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotPrimaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotSecondary?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotSecondaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotAccent?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotAccentForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotMuted?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotMutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotBorder?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotCustomCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   theme?: Prisma.ThemeUpdateOneRequiredWithoutSubmissionsNestedInput
@@ -625,6 +1060,21 @@ export type ThemeSubmissionUncheckedUpdateWithoutSubmittedByInput = {
   themeId?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumSubmissionStatusFieldUpdateOperationsInput | $Enums.SubmissionStatus
   message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  adminMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  submissionType?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotName?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotBackground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotPrimary?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotPrimaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotSecondary?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotSecondaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotAccent?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotAccentForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotMuted?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotMutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotBorder?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotCustomCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
@@ -634,6 +1084,21 @@ export type ThemeSubmissionUncheckedUpdateManyWithoutSubmittedByInput = {
   themeId?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumSubmissionStatusFieldUpdateOperationsInput | $Enums.SubmissionStatus
   message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  adminMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  submissionType?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotName?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotBackground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotPrimary?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotPrimaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotSecondary?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotSecondaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotAccent?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotAccentForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotMuted?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotMutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotBorder?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotCustomCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
@@ -643,6 +1108,21 @@ export type ThemeSubmissionCreateManyThemeInput = {
   submittedById: number
   status?: $Enums.SubmissionStatus
   message?: string | null
+  adminMessage?: string | null
+  submissionType?: string
+  snapshotName: string
+  snapshotBackground: string
+  snapshotForeground: string
+  snapshotPrimary: string
+  snapshotPrimaryForeground: string
+  snapshotSecondary: string
+  snapshotSecondaryForeground: string
+  snapshotAccent: string
+  snapshotAccentForeground: string
+  snapshotMuted: string
+  snapshotMutedForeground: string
+  snapshotBorder: string
+  snapshotCustomCss?: string | null
   createdAt?: Date | string
   reviewedAt?: Date | string | null
 }
@@ -650,6 +1130,21 @@ export type ThemeSubmissionCreateManyThemeInput = {
 export type ThemeSubmissionUpdateWithoutThemeInput = {
   status?: Prisma.EnumSubmissionStatusFieldUpdateOperationsInput | $Enums.SubmissionStatus
   message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  adminMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  submissionType?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotName?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotBackground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotPrimary?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotPrimaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotSecondary?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotSecondaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotAccent?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotAccentForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotMuted?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotMutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotBorder?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotCustomCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   submittedBy?: Prisma.UserUpdateOneRequiredWithoutThemeSubmissionsNestedInput
@@ -660,6 +1155,21 @@ export type ThemeSubmissionUncheckedUpdateWithoutThemeInput = {
   submittedById?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumSubmissionStatusFieldUpdateOperationsInput | $Enums.SubmissionStatus
   message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  adminMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  submissionType?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotName?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotBackground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotPrimary?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotPrimaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotSecondary?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotSecondaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotAccent?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotAccentForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotMuted?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotMutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotBorder?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotCustomCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
@@ -669,6 +1179,21 @@ export type ThemeSubmissionUncheckedUpdateManyWithoutThemeInput = {
   submittedById?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumSubmissionStatusFieldUpdateOperationsInput | $Enums.SubmissionStatus
   message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  adminMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  submissionType?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotName?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotBackground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotPrimary?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotPrimaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotSecondary?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotSecondaryForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotAccent?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotAccentForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotMuted?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotMutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotBorder?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotCustomCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
@@ -681,6 +1206,21 @@ export type ThemeSubmissionSelect<ExtArgs extends runtime.Types.Extensions.Inter
   submittedById?: boolean
   status?: boolean
   message?: boolean
+  adminMessage?: boolean
+  submissionType?: boolean
+  snapshotName?: boolean
+  snapshotBackground?: boolean
+  snapshotForeground?: boolean
+  snapshotPrimary?: boolean
+  snapshotPrimaryForeground?: boolean
+  snapshotSecondary?: boolean
+  snapshotSecondaryForeground?: boolean
+  snapshotAccent?: boolean
+  snapshotAccentForeground?: boolean
+  snapshotMuted?: boolean
+  snapshotMutedForeground?: boolean
+  snapshotBorder?: boolean
+  snapshotCustomCss?: boolean
   createdAt?: boolean
   reviewedAt?: boolean
   theme?: boolean | Prisma.ThemeDefaultArgs<ExtArgs>
@@ -693,6 +1233,21 @@ export type ThemeSubmissionSelectCreateManyAndReturn<ExtArgs extends runtime.Typ
   submittedById?: boolean
   status?: boolean
   message?: boolean
+  adminMessage?: boolean
+  submissionType?: boolean
+  snapshotName?: boolean
+  snapshotBackground?: boolean
+  snapshotForeground?: boolean
+  snapshotPrimary?: boolean
+  snapshotPrimaryForeground?: boolean
+  snapshotSecondary?: boolean
+  snapshotSecondaryForeground?: boolean
+  snapshotAccent?: boolean
+  snapshotAccentForeground?: boolean
+  snapshotMuted?: boolean
+  snapshotMutedForeground?: boolean
+  snapshotBorder?: boolean
+  snapshotCustomCss?: boolean
   createdAt?: boolean
   reviewedAt?: boolean
   theme?: boolean | Prisma.ThemeDefaultArgs<ExtArgs>
@@ -705,6 +1260,21 @@ export type ThemeSubmissionSelectUpdateManyAndReturn<ExtArgs extends runtime.Typ
   submittedById?: boolean
   status?: boolean
   message?: boolean
+  adminMessage?: boolean
+  submissionType?: boolean
+  snapshotName?: boolean
+  snapshotBackground?: boolean
+  snapshotForeground?: boolean
+  snapshotPrimary?: boolean
+  snapshotPrimaryForeground?: boolean
+  snapshotSecondary?: boolean
+  snapshotSecondaryForeground?: boolean
+  snapshotAccent?: boolean
+  snapshotAccentForeground?: boolean
+  snapshotMuted?: boolean
+  snapshotMutedForeground?: boolean
+  snapshotBorder?: boolean
+  snapshotCustomCss?: boolean
   createdAt?: boolean
   reviewedAt?: boolean
   theme?: boolean | Prisma.ThemeDefaultArgs<ExtArgs>
@@ -717,11 +1287,26 @@ export type ThemeSubmissionSelectScalar = {
   submittedById?: boolean
   status?: boolean
   message?: boolean
+  adminMessage?: boolean
+  submissionType?: boolean
+  snapshotName?: boolean
+  snapshotBackground?: boolean
+  snapshotForeground?: boolean
+  snapshotPrimary?: boolean
+  snapshotPrimaryForeground?: boolean
+  snapshotSecondary?: boolean
+  snapshotSecondaryForeground?: boolean
+  snapshotAccent?: boolean
+  snapshotAccentForeground?: boolean
+  snapshotMuted?: boolean
+  snapshotMutedForeground?: boolean
+  snapshotBorder?: boolean
+  snapshotCustomCss?: boolean
   createdAt?: boolean
   reviewedAt?: boolean
 }
 
-export type ThemeSubmissionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "themeId" | "submittedById" | "status" | "message" | "createdAt" | "reviewedAt", ExtArgs["result"]["themeSubmission"]>
+export type ThemeSubmissionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "themeId" | "submittedById" | "status" | "message" | "adminMessage" | "submissionType" | "snapshotName" | "snapshotBackground" | "snapshotForeground" | "snapshotPrimary" | "snapshotPrimaryForeground" | "snapshotSecondary" | "snapshotSecondaryForeground" | "snapshotAccent" | "snapshotAccentForeground" | "snapshotMuted" | "snapshotMutedForeground" | "snapshotBorder" | "snapshotCustomCss" | "createdAt" | "reviewedAt", ExtArgs["result"]["themeSubmission"]>
 export type ThemeSubmissionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   theme?: boolean | Prisma.ThemeDefaultArgs<ExtArgs>
   submittedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -747,6 +1332,21 @@ export type $ThemeSubmissionPayload<ExtArgs extends runtime.Types.Extensions.Int
     submittedById: number
     status: $Enums.SubmissionStatus
     message: string | null
+    adminMessage: string | null
+    submissionType: string
+    snapshotName: string
+    snapshotBackground: string
+    snapshotForeground: string
+    snapshotPrimary: string
+    snapshotPrimaryForeground: string
+    snapshotSecondary: string
+    snapshotSecondaryForeground: string
+    snapshotAccent: string
+    snapshotAccentForeground: string
+    snapshotMuted: string
+    snapshotMutedForeground: string
+    snapshotBorder: string
+    snapshotCustomCss: string | null
     createdAt: Date
     reviewedAt: Date | null
   }, ExtArgs["result"]["themeSubmission"]>
@@ -1179,6 +1779,21 @@ export interface ThemeSubmissionFieldRefs {
   readonly submittedById: Prisma.FieldRef<"ThemeSubmission", 'Int'>
   readonly status: Prisma.FieldRef<"ThemeSubmission", 'SubmissionStatus'>
   readonly message: Prisma.FieldRef<"ThemeSubmission", 'String'>
+  readonly adminMessage: Prisma.FieldRef<"ThemeSubmission", 'String'>
+  readonly submissionType: Prisma.FieldRef<"ThemeSubmission", 'String'>
+  readonly snapshotName: Prisma.FieldRef<"ThemeSubmission", 'String'>
+  readonly snapshotBackground: Prisma.FieldRef<"ThemeSubmission", 'String'>
+  readonly snapshotForeground: Prisma.FieldRef<"ThemeSubmission", 'String'>
+  readonly snapshotPrimary: Prisma.FieldRef<"ThemeSubmission", 'String'>
+  readonly snapshotPrimaryForeground: Prisma.FieldRef<"ThemeSubmission", 'String'>
+  readonly snapshotSecondary: Prisma.FieldRef<"ThemeSubmission", 'String'>
+  readonly snapshotSecondaryForeground: Prisma.FieldRef<"ThemeSubmission", 'String'>
+  readonly snapshotAccent: Prisma.FieldRef<"ThemeSubmission", 'String'>
+  readonly snapshotAccentForeground: Prisma.FieldRef<"ThemeSubmission", 'String'>
+  readonly snapshotMuted: Prisma.FieldRef<"ThemeSubmission", 'String'>
+  readonly snapshotMutedForeground: Prisma.FieldRef<"ThemeSubmission", 'String'>
+  readonly snapshotBorder: Prisma.FieldRef<"ThemeSubmission", 'String'>
+  readonly snapshotCustomCss: Prisma.FieldRef<"ThemeSubmission", 'String'>
   readonly createdAt: Prisma.FieldRef<"ThemeSubmission", 'DateTime'>
   readonly reviewedAt: Prisma.FieldRef<"ThemeSubmission", 'DateTime'>
 }
