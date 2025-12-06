@@ -6,7 +6,7 @@ import { useSession, signIn } from 'next-auth/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
-import UserMenu from './UserMenu';
+import UserMenu from '../auth/UserMenu';
 
 export default function TopBar() {
   const { data: session } = useSession();

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import DeleteOrbatButton from '../components/DeleteOrbatButton';
+import DeleteOrbatButton from '../components/orbat/DeleteOrbatButton';
 
 type Orbat = {
   id: number;

@@ -1,7 +1,7 @@
 // app/orbats/[id]/page.tsx
 import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
-import OrbatDetailClient from './OrbatDetailClient';
+import OrbatDetailClient from '../components/OrbatDetailClient';
 
 interface OrbatPageProps {
   params: Promise<{ id: string }>;

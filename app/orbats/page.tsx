@@ -1,6 +1,6 @@
 // app/orbats/page.tsx
 import { prisma } from '@/lib/prisma';
-import CalendarWithOps from './CalendarWithOps';
+import CalendarWithOps from './components/CalendarWithOps';
 
 type OrbatWithDates = {
   id: number;

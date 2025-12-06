@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useToast } from './ToastContainer';
-import ConfirmModal from './ConfirmModal';
+import { useToast } from '../ui/ToastContainer';
+import ConfirmModal from '../ui/ConfirmModal';
 
 type DeleteOrbatButtonProps = {
   orbatId: number;

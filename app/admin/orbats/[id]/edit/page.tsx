@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { redirect, notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import OrbatForm from '@/app/components/OrbatForm';
+import OrbatForm from '@/app/components/orbat/OrbatForm';
 
 interface EditOrbatPageProps {
   params: Promise<{ id: string }>;

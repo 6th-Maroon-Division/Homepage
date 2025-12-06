@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import CssEditor from '@/app/components/CssEditor';
-import CssLegend from '@/app/components/CssLegend';
+import CssEditor from '@/app/components/theme/CssEditor';
+import CssLegend from '@/app/components/theme/CssLegend';
 
 interface ThemeSubmission {
   id: number;

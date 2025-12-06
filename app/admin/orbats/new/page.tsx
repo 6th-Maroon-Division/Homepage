@@ -2,7 +2,7 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { redirect } from 'next/navigation';
-import OrbatForm from '@/app/components/OrbatForm';
+import OrbatForm from '@/app/components/orbat/OrbatForm';
 
 export default async function NewOrbatPage() {
   const session = await getServerSession(authOptions);

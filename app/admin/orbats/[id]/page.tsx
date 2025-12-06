@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import AdminOrbatView from '@/app/components/AdminOrbatView';
+import AdminOrbatView from '@/app/components/orbat/AdminOrbatView';
 
 interface AdminOrbatPageProps {
   params: Promise<{ id: string }>;

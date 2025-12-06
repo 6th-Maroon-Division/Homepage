@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useToast } from './ToastContainer';
-import LoadingSpinner from './LoadingSpinner';
+import { useToast } from '../ui/ToastContainer';
+import LoadingSpinner from '../ui/LoadingSpinner';
 
 type Subslot = {
   id?: number;

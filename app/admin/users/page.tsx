@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import UserManagementClient from './UserManagementClient';
+import UserManagementClient from '../components/user/UserManagementClient';
 
 export default async function UsersManagementPage() {
   const session = await getServerSession(authOptions);

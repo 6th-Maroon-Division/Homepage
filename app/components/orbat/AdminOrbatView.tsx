@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import MoveSignupModal from '@/app/components/MoveSignupModal';
+import MoveSignupModal from '@/app/components/orbat/MoveSignupModal';
 
 type ClientSignup = {
   id: number;

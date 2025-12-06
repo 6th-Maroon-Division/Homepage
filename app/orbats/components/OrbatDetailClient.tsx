@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useToast } from '@/app/components/ToastContainer';
-import LoadingSpinner from '@/app/components/LoadingSpinner';
+import { useToast } from '@/app/components/ui/ToastContainer';
+import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 
 type ClientSignup = {
   id: number;

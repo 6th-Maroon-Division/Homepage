@@ -2,8 +2,8 @@ import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
-import CalendarWithOps from '@/app/orbats/CalendarWithOps';
-import OrbatManagementClient from '@/app/admin/OrbatManagementClient';
+import CalendarWithOps from '@/app/orbats/components/CalendarWithOps';
+import OrbatManagementClient from '@/app/admin/components/orbat/OrbatManagementClient';
 
 export default async function AdminOrbatsPage() {
   const session = await getServerSession(authOptions);

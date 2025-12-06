@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import TopBar from "./components/TopBar";
-import AuthSessionProvider from "./components/SessionProvider";
-import { ToastProvider } from "./components/ToastContainer";
-import { ThemeProvider } from "./components/ThemeProvider";
-import LinkAccountPrompt from "./components/LinkAccountPrompt";
+import TopBar from "./components/layout/TopBar";
+import AuthSessionProvider from "./components/layout/SessionProvider";
+import { ToastProvider } from "./components/ui/ToastContainer";
+import { ThemeProvider } from "./components/theme/ThemeProvider";
+import LinkAccountPrompt from "./components/auth/LinkAccountPrompt";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

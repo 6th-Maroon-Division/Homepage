@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useTheme } from '@/app/components/ThemeProvider';
-import CssEditor from '@/app/components/CssEditor';
-import CssLegend from '@/app/components/CssLegend';
+import { useTheme } from '@/app/components/theme/ThemeProvider';
+import CssEditor from '@/app/components/theme/CssEditor';
+import CssLegend from '@/app/components/theme/CssLegend';
 
 interface Theme {
   id: number;

@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react';
 import { redirect, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import ThemeSettings from '@/app/components/ThemeSettings';
+import ThemeSettings from '@/app/components/theme/ThemeSettings';
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
