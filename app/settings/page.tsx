@@ -2,11 +2,11 @@
 
 import { useSession } from 'next-auth/react';
 import { redirect, useSearchParams } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Image from 'next/image';
 import ThemeSettings from '@/app/components/theme/ThemeSettings';
 
-export default function SettingsPage() {
+function SettingsContent() {
   const { data: session, status } = useSession();
   const searchParams = useSearchParams();
   const [username, setUsername] = useState(session?.user?.username || '');
@@ -263,5 +263,17 @@ export default function SettingsPage() {
         <ThemeSettings />
       </div>
     </main>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg">Loading...</div>
+      </div>
+    }>
+      <SettingsContent />
+    </Suspense>
   );
 }
