@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
+import ConfirmModal from '@/app/components/ui/ConfirmModal';
+import { useToast } from '@/app/components/ui/ToastContainer';
 
 type User = {
   id: number;
@@ -24,17 +26,26 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
   const [users, setUsers] = useState<User[]>(initialUsers);
   const [filter, setFilter] = useState<'all' | 'admin' | 'regular'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [confirmAdmin, setConfirmAdmin] = useState<{ userId: number; currentIsAdmin: boolean; username: string | null } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ userId: number; username: string | null } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const { showSuccess, showError } = useToast();
 
   const handleToggleAdmin = async (userId: number, currentIsAdmin: boolean) => {
     if (userId === currentUserId) {
-      alert("You cannot modify your own admin status");
+      showError("You cannot modify your own admin status");
       return;
     }
 
-    const action = currentIsAdmin ? 'demote' : 'promote';
-    if (!confirm(`Are you sure you want to ${action} this user ${currentIsAdmin ? 'from' : 'to'} admin?`)) {
-      return;
-    }
+    const user = users.find(u => u.id === userId);
+    setConfirmAdmin({ userId, currentIsAdmin, username: user?.username || null });
+  };
+
+  const confirmToggleAdmin = async () => {
+    if (!confirmAdmin) return;
+    
+    setIsLoading(true);
+    const { userId, currentIsAdmin } = confirmAdmin;
 
     try {
       const res = await fetch(`/api/users/${userId}/admin`, {
@@ -47,7 +58,7 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
 
       if (!res.ok) {
         const data = await res.json();
-        alert(data.error || 'Failed to update user');
+        showError(data.error || 'Failed to update user');
         return;
       }
 
@@ -55,21 +66,30 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
       setUsers(users.map(u => 
         u.id === userId ? { ...u, isAdmin: !currentIsAdmin } : u
       ));
+      showSuccess(`User ${currentIsAdmin ? 'demoted from' : 'promoted to'} admin`);
     } catch (error) {
       console.error('Error updating user:', error);
-      alert('Error updating user');
+      showError('Error updating user');
+    } finally {
+      setIsLoading(false);
+      setConfirmAdmin(null);
     }
   };
 
   const handleDeleteUser = async (userId: number, username: string | null) => {
     if (userId === currentUserId) {
-      alert("You cannot delete your own account");
+      showError("You cannot delete your own account");
       return;
     }
 
-    if (!confirm(`Are you sure you want to delete the account for "${username || 'Unknown'}"? This will remove all their signups but keep their created OrbATs.`)) {
-      return;
-    }
+    setConfirmDelete({ userId, username });
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!confirmDelete) return;
+    
+    setIsLoading(true);
+    const { userId } = confirmDelete;
 
     try {
       const res = await fetch(`/api/users/${userId}`, {
@@ -78,15 +98,19 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
 
       if (!res.ok) {
         const data = await res.json();
-        alert(data.error || 'Failed to delete user');
+        showError(data.error || 'Failed to delete user');
         return;
       }
 
       // Update local state
       setUsers(users.filter(u => u.id !== userId));
+      showSuccess('User deleted successfully');
     } catch (error) {
       console.error('Error deleting user:', error);
-      alert('Error deleting user');
+      showError('Error deleting user');
+    } finally {
+      setIsLoading(false);
+      setConfirmDelete(null);
     }
   };
 
@@ -282,8 +306,31 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        )}      </div>
+
+      {/* Confirm Modals */}
+      <ConfirmModal
+        isOpen={confirmAdmin !== null}
+        title={confirmAdmin?.currentIsAdmin ? 'Demote Admin' : 'Promote to Admin'}
+        message={`Are you sure you want to ${confirmAdmin?.currentIsAdmin ? 'demote' : 'promote'} ${confirmAdmin?.username || 'this user'} ${confirmAdmin?.currentIsAdmin ? 'from' : 'to'} admin?`}
+        confirmLabel={confirmAdmin?.currentIsAdmin ? 'Demote' : 'Promote'}
+        cancelLabel="Cancel"
+        onConfirm={confirmToggleAdmin}
+        onCancel={() => setConfirmAdmin(null)}
+        isDestructive={confirmAdmin?.currentIsAdmin}
+        isLoading={isLoading}
+      />
+      <ConfirmModal
+        isOpen={confirmDelete !== null}
+        title="Delete User"
+        message={`Are you sure you want to delete the account for "${confirmDelete?.username || 'Unknown'}"? This will remove all their signups but keep their created OrbATs.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={confirmDeleteUser}
+        onCancel={() => setConfirmDelete(null)}
+        isDestructive={true}
+        isLoading={isLoading}
+      />
     </div>
   );
 }

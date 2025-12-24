@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import CssEditor from '@/app/components/theme/CssEditor';
 import CssLegend from '@/app/components/theme/CssLegend';
+import ConfirmModal from '@/app/components/ui/ConfirmModal';
+import { useToast } from '@/app/components/ui/ToastContainer';
 
 interface ThemeSubmission {
   id: number;
@@ -83,6 +85,9 @@ export default function ThemeManagementClient() {
   const [rejectingSubmissionId, setRejectingSubmissionId] = useState<number | null>(null);
   const [reviewingSubmission, setReviewingSubmission] = useState<{ theme: Theme; submission: ThemeSubmission; parentTheme: Theme | null } | null>(null);
   const [adminMessage, setAdminMessage] = useState('');
+  const [confirmDeleteTheme, setConfirmDeleteTheme] = useState<{ id: number; name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const { showSuccess, showError } = useToast();
   const [newTheme, setNewTheme] = useState({
     name: '',
     background: '#0a0a0a',
@@ -153,31 +158,40 @@ export default function ThemeManagementClient() {
         fetchThemes();
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to create theme');
+        showError(error.error || 'Failed to create theme');
       }
     } catch (error) {
       console.error('Error creating theme:', error);
-      alert('Failed to create theme');
+      showError('Failed to create theme');
     }
   };
 
-  const handleDeleteTheme = async (themeId: number) => {
-    if (!confirm('Are you sure you want to delete this theme?')) return;
+  const handleDeleteTheme = async (themeId: number, themeName: string) => {
+    setConfirmDeleteTheme({ id: themeId, name: themeName });
+  };
 
+  const confirmDelete = async () => {
+    if (!confirmDeleteTheme) return;
+    
+    setIsDeleting(true);
     try {
-      const response = await fetch(`/api/themes/admin/${themeId}`, {
+      const response = await fetch(`/api/themes/admin/${confirmDeleteTheme.id}`, {
         method: 'DELETE',
       });
 
       if (response.ok) {
         fetchThemes();
+        showSuccess('Theme deleted successfully');
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to delete theme');
+        showError(error.error || 'Failed to delete theme');
       }
     } catch (error) {
       console.error('Error deleting theme:', error);
-      alert('Failed to delete theme');
+      showError('Failed to delete theme');
+    } finally {
+      setIsDeleting(false);
+      setConfirmDeleteTheme(null);
     }
   };
 
@@ -1150,7 +1164,7 @@ export default function ThemeManagementClient() {
                 )}
                 {!theme.isDefaultLight && !theme.isDefaultDark && !theme.isEnabled && (
                   <button
-                    onClick={() => handleDeleteTheme(theme.id)}
+                    onClick={() => handleDeleteTheme(theme.id, theme.name)}
                     className="flex-1 px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
                   >
                     Delete
@@ -1225,7 +1239,7 @@ export default function ThemeManagementClient() {
                     Edit
                   </button>
                   <button
-                    onClick={() => handleDeleteTheme(theme.id)}
+                    onClick={() => handleDeleteTheme(theme.id, theme.name)}
                     className="flex-1 px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
                   >
                     Delete
@@ -1236,6 +1250,19 @@ export default function ThemeManagementClient() {
           </div>
         </div>
       )}
+
+      {/* Confirm Delete Modal */}
+      <ConfirmModal
+        isOpen={confirmDeleteTheme !== null}
+        title="Delete Theme"
+        message={`Are you sure you want to delete the theme "${confirmDeleteTheme?.name}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={confirmDelete}
+        onCancel={() => setConfirmDeleteTheme(null)}
+        isDestructive={true}
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

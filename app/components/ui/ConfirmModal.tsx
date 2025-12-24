@@ -1,6 +1,7 @@
 'use client';
 
 import { ReactNode, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 type ConfirmModalProps = {
   isOpen: boolean;
@@ -47,16 +48,16 @@ export default function ConfirmModal({
 
   if (!isOpen) return null;
 
-  return (
+  const modalContent = (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
       <div
         className="rounded-lg shadow-xl max-w-md w-full p-6 space-y-4 border animate-scale-in"
         style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-xl font-semibold" style={{ color: 'var(--foreground)' }}>{title}</h3>
+        <h3 className="text-xl font-semibold wrap-break-word" style={{ color: 'var(--foreground)' }}>{title}</h3>
         
-        <div className="text-sm" style={{ color: 'var(--muted-foreground)' }}>{message}</div>
+        <div className="text-sm wrap-break-word" style={{ color: 'var(--muted-foreground)' }}>{message}</div>
 
         <div className="flex justify-end gap-3 pt-2">
           <button
@@ -82,4 +83,6 @@ export default function ConfirmModal({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }

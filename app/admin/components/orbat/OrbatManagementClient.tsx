@@ -189,9 +189,10 @@ export default function OrbatManagementClient({ orbats: initialOrbats }: OrbatMa
                           <div>
                             <div>{new Date(orbat.eventDate).toLocaleDateString('en-GB')}</div>
                             <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-                              {new Date(orbat.eventDate).toLocaleTimeString([], {
+                              {new Date(orbat.eventDate).toLocaleTimeString('en-GB', {
                                 hour: '2-digit',
                                 minute: '2-digit',
+                                hour12: false,
                               })}
                             </div>
                           </div>

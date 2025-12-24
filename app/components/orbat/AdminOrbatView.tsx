@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import MoveSignupModal from '@/app/components/orbat/MoveSignupModal';
+import ConfirmModal from '@/app/components/ui/ConfirmModal';
+import { useToast } from '@/app/components/ui/ToastContainer';
 
 type ClientSignup = {
   id: number;
@@ -48,6 +50,9 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
     currentSubslotName: string;
     currentSlotName: string;
   } | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<{ signupId: number; subslotId: number; userName: string } | null>(null);
+  const [isRemoving, setIsRemoving] = useState(false);
+  const { showSuccess, showError } = useToast();
 
   const eventDate = orbat.eventDate ? new Date(orbat.eventDate) : null;
 
@@ -90,10 +95,15 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
     }
   };
 
-  const handleRemoveSignup = async (signupId: number, subslotId: number) => {
-    if (!confirm('Are you sure you want to remove this signup?')) {
-      return;
-    }
+  const handleRemoveSignup = async (signupId: number, subslotId: number, userName: string) => {
+    setConfirmRemove({ signupId, subslotId, userName });
+  };
+
+  const confirmRemoveSignup = async () => {
+    if (!confirmRemove) return;
+    
+    setIsRemoving(true);
+    const { signupId, subslotId } = confirmRemove;
 
     try {
       const res = await fetch(`/api/subslots/${subslotId}/signup`, {
@@ -105,7 +115,7 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
       });
 
       if (!res.ok) {
-        alert('Failed to remove signup');
+        showError('Failed to remove signup');
         return;
       }
 
@@ -114,10 +124,14 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
       if (refreshRes.ok) {
         const updatedOrbat = await refreshRes.json();
         setOrbat(updatedOrbat);
+        showSuccess('Signup removed successfully');
       }
     } catch (error) {
       console.error('Error removing signup:', error);
-      alert('Error removing signup');
+      showError('Error removing signup');
+    } finally {
+      setIsRemoving(false);
+      setConfirmRemove(null);
     }
   };
 
@@ -234,7 +248,7 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
                                 Move
                               </button>
                               <button
-                                onClick={() => handleRemoveSignup(signup.id, sub.id)}
+                                onClick={() => handleRemoveSignup(signup.id, sub.id, signup.user?.username || 'Unknown')}
                                 className="px-2 py-0.5 text-xs"
                                 style={{ color: '#ef4444' }}
                                 title="Remove signup"
@@ -271,6 +285,19 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
           onMove={handleMove}
         />
       )}
+
+      {/* Confirm Remove Signup Modal */}
+      <ConfirmModal
+        isOpen={confirmRemove !== null}
+        title="Remove Signup"
+        message={`Are you sure you want to remove ${confirmRemove?.userName || 'this user'} from this position?`}
+        confirmLabel="Remove"
+        cancelLabel="Cancel"
+        onConfirm={confirmRemoveSignup}
+        onCancel={() => setConfirmRemove(null)}
+        isDestructive={true}
+        isLoading={isRemoving}
+      />
     </div>
   );
 }
