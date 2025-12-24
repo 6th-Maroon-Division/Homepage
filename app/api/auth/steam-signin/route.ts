@@ -4,10 +4,11 @@ import { encode } from 'next-auth/jwt';
 import { cookies } from 'next/headers';
 
 export async function GET(request: NextRequest) {
+  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
   const userId = request.nextUrl.searchParams.get('userId');
   
   if (!userId) {
-    return NextResponse.redirect(new URL('/?error=NoUserId', request.url));
+    return NextResponse.redirect(new URL('/?error=NoUserId', baseUrl));
   }
   
   try {
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
     });
     
     if (!user || !user.accounts[0]) {
-      return NextResponse.redirect(new URL('/?error=UserNotFound', request.url));
+      return NextResponse.redirect(new URL('/?error=UserNotFound', baseUrl));
     }
     
     // Create a NextAuth-compatible session token
@@ -55,10 +56,10 @@ export async function GET(request: NextRequest) {
     });
     
     // Redirect to orbats page
-    return NextResponse.redirect(new URL('/orbats', request.url));
+    return NextResponse.redirect(new URL('/orbats', baseUrl));
     
   } catch (error) {
     console.error('Steam signin error:', error);
-    return NextResponse.redirect(new URL('/?error=SigninError', request.url));
+    return NextResponse.redirect(new URL('/?error=SigninError', baseUrl));
   }
 }

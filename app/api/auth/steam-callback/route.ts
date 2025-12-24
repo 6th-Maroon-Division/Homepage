@@ -4,19 +4,20 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 
 export async function GET(request: NextRequest) {
+  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
   const searchParams = request.nextUrl.searchParams;
   const claimedId = searchParams.get('openid.claimed_id');
   const mode = searchParams.get('openid.mode');
   
   // Verify it's a valid OpenID response
   if (mode !== 'id_res' || !claimedId) {
-    return NextResponse.redirect(new URL('/?error=InvalidSteamResponse', request.url));
+    return NextResponse.redirect(new URL('/?error=InvalidSteamResponse', baseUrl));
   }
   
   const steamId = claimedId.split('/').pop();
   
   if (!steamId) {
-    return NextResponse.redirect(new URL('/?error=InvalidSteamID', request.url));
+    return NextResponse.redirect(new URL('/?error=InvalidSteamID', baseUrl));
   }
   
   try {
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
     const player = data.response?.players?.[0];
     
     if (!player) {
-      return NextResponse.redirect(new URL('/?error=SteamAPIError', request.url));
+      return NextResponse.redirect(new URL('/?error=SteamAPIError', baseUrl));
     }
     
     // Check if this Steam account already exists
@@ -56,10 +57,10 @@ export async function GET(request: NextRequest) {
       if (authAccount) {
         if (authAccount.userId === session.user.id) {
           // Already linked to this user
-          return NextResponse.redirect(new URL('/settings?success=AlreadyLinked', request.url));
+          return NextResponse.redirect(new URL('/settings?success=AlreadyLinked', baseUrl));
         } else {
           // Steam account already linked to another user
-          return NextResponse.redirect(new URL('/settings?error=SteamAlreadyLinked', request.url));
+          return NextResponse.redirect(new URL('/settings?error=SteamAlreadyLinked', baseUrl));
         }
       }
       
@@ -81,7 +82,7 @@ export async function GET(request: NextRequest) {
         });
       }
       
-      return NextResponse.redirect(new URL('/settings?success=SteamLinked', request.url));
+      return NextResponse.redirect(new URL('/settings?success=SteamLinked', baseUrl));
     }
     
     // User is not logged in - proceed with normal Steam login
@@ -113,18 +114,18 @@ export async function GET(request: NextRequest) {
     }
     
     if (!authAccount) {
-      return NextResponse.redirect(new URL('/?error=DatabaseError', request.url));
+      return NextResponse.redirect(new URL('/?error=DatabaseError', baseUrl));
     }
     
     // Store the Steam user info in a temporary session/cookie
     // Then redirect to a page that will use NextAuth's signIn with credentials
-    const successUrl = new URL('/api/auth/steam-signin', request.url);
+    const successUrl = new URL('/api/auth/steam-signin', baseUrl);
     successUrl.searchParams.set('userId', authAccount.user.id.toString());
     
     return NextResponse.redirect(successUrl);
     
   } catch (error) {
     console.error('Steam auth error:', error);
-    return NextResponse.redirect(new URL('/?error=SteamAuthError', request.url));
+    return NextResponse.redirect(new URL('/?error=SteamAuthError', baseUrl));
   }
 }
