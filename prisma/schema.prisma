@@ -114,6 +114,8 @@ model Theme {
   muted             String
   mutedForeground   String
   border            String
+  button            String?
+  buttonHover       String?
   
   usersWithTheme    User[]             @relation("UserSelectedTheme")
   submissions       ThemeSubmission[]
@@ -146,6 +148,8 @@ model ThemeSubmission {
   snapshotMuted             String
   snapshotMutedForeground   String
   snapshotBorder            String
+  snapshotButton            String?
+  snapshotButtonHover       String?
   snapshotCustomCss         String?            @db.Text
   
   createdAt   DateTime  @default(now())

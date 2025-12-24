@@ -20,6 +20,8 @@ interface Theme {
   muted: string;
   mutedForeground: string;
   border: string;
+  button?: string;
+  buttonHover?: string;
   customCss?: string | null;
   submissions?: Array<{
     id: number;
@@ -84,6 +86,8 @@ const defaultDarkTheme: Theme = {
   muted: '#1e293b',
   mutedForeground: '#94a3b8',
   border: '#334155',
+  button: '#3b82f6',
+  buttonHover: '#60a5fa',
 };
 
 const defaultLightTheme: Theme = {
@@ -100,6 +104,8 @@ const defaultLightTheme: Theme = {
   muted: '#f1f5f9',
   mutedForeground: '#475569',
   border: '#cbd5e1',
+  button: '#2563eb',
+  buttonHover: '#3b82f6',
 };
 
 function applyTheme(theme: Theme) {
@@ -115,6 +121,8 @@ function applyTheme(theme: Theme) {
   root.style.setProperty('--muted', theme.muted);
   root.style.setProperty('--muted-foreground', theme.mutedForeground);
   root.style.setProperty('--border', theme.border);
+  root.style.setProperty('--button', theme.button || theme.primary);
+  root.style.setProperty('--button-hover', theme.buttonHover || theme.primary);
 
   // Handle custom CSS
   let styleElement = document.getElementById('custom-theme-css') as HTMLStyleElement;

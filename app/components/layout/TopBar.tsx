@@ -52,6 +52,19 @@ export default function TopBar() {
                 style={{
                   backgroundColor: isActive(link.href) ? 'var(--secondary)' : 'transparent',
                   color: isActive(link.href) ? 'var(--foreground)' : 'var(--muted-foreground)',
+                  border: '1px solid var(--border)',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive(link.href)) {
+                    e.currentTarget.style.backgroundColor = 'var(--button-hover)';
+                    e.currentTarget.style.borderColor = 'var(--button-hover)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive(link.href)) {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.borderColor = 'var(--border)';
+                  }
                 }}
               >
                 {link.label}
@@ -69,6 +82,15 @@ export default function TopBar() {
               style={{
                 backgroundColor: 'var(--secondary)',
                 color: 'var(--muted-foreground)',
+                border: '1px solid var(--border)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--button-hover)';
+                e.currentTarget.style.borderColor = 'var(--button-hover)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--secondary)';
+                e.currentTarget.style.borderColor = 'var(--border)';
               }}
             >
               Exit Admin
@@ -153,6 +175,7 @@ export default function TopBar() {
               style={{
                 backgroundColor: isActive(link.href) ? 'var(--secondary)' : 'transparent',
                 color: isActive(link.href) ? 'var(--foreground)' : 'var(--muted-foreground)',
+                border: '1px solid var(--border)',
               }}
             >
               {link.label}
@@ -167,6 +190,7 @@ export default function TopBar() {
               style={{
                 backgroundColor: 'var(--secondary)',
                 color: 'var(--muted-foreground)',
+                border: '1px solid var(--border)',
               }}
             >
               Exit Admin
@@ -217,7 +241,7 @@ export default function TopBar() {
                   href="/settings"
                   onClick={() => setMobileMenuOpen(false)}
                   className="block px-3 py-2 rounded-md transition-colors"
-                  style={{ color: 'var(--muted-foreground)' }}
+                  style={{ color: 'var(--muted-foreground)', border: '1px solid var(--border)' }}
                 >
                   Settings
                 </Link>
@@ -226,7 +250,7 @@ export default function TopBar() {
                     href="/admin"
                     onClick={() => setMobileMenuOpen(false)}
                     className="block px-3 py-2 rounded-md transition-colors"
-                    style={{ color: 'var(--muted-foreground)' }}
+                    style={{ color: 'var(--muted-foreground)', border: '1px solid var(--border)' }}
                   >
                     Admin Panel
                   </Link>

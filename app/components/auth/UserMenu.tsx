@@ -35,7 +35,7 @@ export default function UserMenu() {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center space-x-2 px-3 py-2 rounded-md transition-colors"
-        style={{ backgroundColor: 'var(--secondary)', color: 'var(--foreground)' }}
+        style={{ backgroundColor: 'var(--secondary)', color: 'var(--foreground)', border: '1px solid var(--border)' }}
       >
         {session.user?.avatarUrl && (
           <Image
@@ -64,6 +64,12 @@ export default function UserMenu() {
             className="block px-4 py-2 transition-colors"
             style={{ color: 'var(--foreground)' }}
             onClick={() => setIsOpen(false)}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--button-hover)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
           >
             Settings
           </Link>
@@ -73,6 +79,12 @@ export default function UserMenu() {
               className="block px-4 py-2 transition-colors"
               style={{ color: 'var(--foreground)' }}
               onClick={() => setIsOpen(false)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--button-hover)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
             >
               Admin Panel
             </Link>
@@ -84,7 +96,13 @@ export default function UserMenu() {
               signOut();
             }}
             className="block w-full text-left px-4 py-2 transition-colors"
-            style={{ color: '#dc2626' }}
+            style={{ color: '#dc2626', border: 'none' }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--button-hover)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
           >
             Sign Out
           </button>
