@@ -5,6 +5,10 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 
 export async function GET(request: NextRequest) {
   const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+  console.log('[steam-callback] NEXTAUTH_URL:', process.env.NEXTAUTH_URL);
+  console.log('[steam-callback] request.url:', request.url);
+  console.log('[steam-callback] request.nextUrl.origin:', request.nextUrl.origin);
+  console.log('[steam-callback] baseUrl:', baseUrl);
   const searchParams = request.nextUrl.searchParams;
   const claimedId = searchParams.get('openid.claimed_id');
   const mode = searchParams.get('openid.mode');
