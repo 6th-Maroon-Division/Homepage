@@ -168,7 +168,10 @@ export const ThemeScalarFieldEnum = {
   accentForeground: 'accentForeground',
   muted: 'muted',
   mutedForeground: 'mutedForeground',
-  border: 'border'
+  border: 'border',
+  button: 'button',
+  buttonHover: 'buttonHover',
+  buttonHoverForeground: 'buttonHoverForeground'
 } as const
 
 export type ThemeScalarFieldEnum = (typeof ThemeScalarFieldEnum)[keyof typeof ThemeScalarFieldEnum]
@@ -194,6 +197,8 @@ export const ThemeSubmissionScalarFieldEnum = {
   snapshotMuted: 'snapshotMuted',
   snapshotMutedForeground: 'snapshotMutedForeground',
   snapshotBorder: 'snapshotBorder',
+  snapshotButton: 'snapshotButton',
+  snapshotButtonHover: 'snapshotButtonHover',
   snapshotCustomCss: 'snapshotCustomCss',
   createdAt: 'createdAt',
   reviewedAt: 'reviewedAt'

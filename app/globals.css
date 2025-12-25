@@ -15,6 +15,7 @@
   --border: #334155;
   --button: #3b82f6;
   --button-hover: #60a5fa;
+  --button-hover-foreground: #ffffff;
 }
 
 @theme inline {
@@ -31,6 +32,7 @@
   --color-border: var(--border);
   --color-button: var(--button);
   --color-button-hover: var(--button-hover);
+  --color-button-hover-foreground: var(--button-hover-foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -50,6 +52,7 @@
     --border: #cbd5e1;
     --button: #2563eb;
     --button-hover: #3b82f6;
+    --button-hover-foreground: #ffffff;
   }
 }
 
@@ -129,13 +132,14 @@ select:focus-visible {
 
 /* Button hover effects */
 button:not(:disabled) {
-  transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, transform 0.2s ease-in-out;
+  transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, color 0.2s ease-in-out, transform 0.2s ease-in-out;
   border: 1px solid var(--border);
 }
 
 button:not(:disabled):hover {
   background-color: var(--button-hover) !important;
   border-color: var(--button-hover);
+  color: var(--button-hover-foreground) !important;
   transform: translateY(-1px);
 }
 

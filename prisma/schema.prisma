@@ -116,6 +116,7 @@ model Theme {
   border            String
   button            String?
   buttonHover       String?
+  buttonHoverForeground String?
   
   usersWithTheme    User[]             @relation("UserSelectedTheme")
   submissions       ThemeSubmission[]

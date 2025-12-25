@@ -22,6 +22,7 @@ interface Theme {
   border: string;
   button?: string;
   buttonHover?: string;
+  buttonHoverForeground?: string;
   customCss?: string | null;
   submissions?: Array<{
     id: number;
@@ -88,6 +89,7 @@ const defaultDarkTheme: Theme = {
   border: '#334155',
   button: '#3b82f6',
   buttonHover: '#60a5fa',
+  buttonHoverForeground: '#ffffff',
 };
 
 const defaultLightTheme: Theme = {
@@ -106,6 +108,7 @@ const defaultLightTheme: Theme = {
   border: '#cbd5e1',
   button: '#2563eb',
   buttonHover: '#3b82f6',
+  buttonHoverForeground: '#ffffff',
 };
 
 function applyTheme(theme: Theme) {
@@ -123,6 +126,7 @@ function applyTheme(theme: Theme) {
   root.style.setProperty('--border', theme.border);
   root.style.setProperty('--button', theme.button || theme.primary);
   root.style.setProperty('--button-hover', theme.buttonHover || theme.primary);
+  root.style.setProperty('--button-hover-foreground', theme.buttonHoverForeground || '#ffffff');
 
   // Handle custom CSS
   let styleElement = document.getElementById('custom-theme-css') as HTMLStyleElement;

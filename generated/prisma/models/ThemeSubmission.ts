@@ -58,6 +58,8 @@ export type ThemeSubmissionMinAggregateOutputType = {
   snapshotMuted: string | null
   snapshotMutedForeground: string | null
   snapshotBorder: string | null
+  snapshotButton: string | null
+  snapshotButtonHover: string | null
   snapshotCustomCss: string | null
   createdAt: Date | null
   reviewedAt: Date | null
@@ -83,6 +85,8 @@ export type ThemeSubmissionMaxAggregateOutputType = {
   snapshotMuted: string | null
   snapshotMutedForeground: string | null
   snapshotBorder: string | null
+  snapshotButton: string | null
+  snapshotButtonHover: string | null
   snapshotCustomCss: string | null
   createdAt: Date | null
   reviewedAt: Date | null
@@ -108,6 +112,8 @@ export type ThemeSubmissionCountAggregateOutputType = {
   snapshotMuted: number
   snapshotMutedForeground: number
   snapshotBorder: number
+  snapshotButton: number
+  snapshotButtonHover: number
   snapshotCustomCss: number
   createdAt: number
   reviewedAt: number
@@ -147,6 +153,8 @@ export type ThemeSubmissionMinAggregateInputType = {
   snapshotMuted?: true
   snapshotMutedForeground?: true
   snapshotBorder?: true
+  snapshotButton?: true
+  snapshotButtonHover?: true
   snapshotCustomCss?: true
   createdAt?: true
   reviewedAt?: true
@@ -172,6 +180,8 @@ export type ThemeSubmissionMaxAggregateInputType = {
   snapshotMuted?: true
   snapshotMutedForeground?: true
   snapshotBorder?: true
+  snapshotButton?: true
+  snapshotButtonHover?: true
   snapshotCustomCss?: true
   createdAt?: true
   reviewedAt?: true
@@ -197,6 +207,8 @@ export type ThemeSubmissionCountAggregateInputType = {
   snapshotMuted?: true
   snapshotMutedForeground?: true
   snapshotBorder?: true
+  snapshotButton?: true
+  snapshotButtonHover?: true
   snapshotCustomCss?: true
   createdAt?: true
   reviewedAt?: true
@@ -309,6 +321,8 @@ export type ThemeSubmissionGroupByOutputType = {
   snapshotMuted: string
   snapshotMutedForeground: string
   snapshotBorder: string
+  snapshotButton: string | null
+  snapshotButtonHover: string | null
   snapshotCustomCss: string | null
   createdAt: Date
   reviewedAt: Date | null
@@ -357,6 +371,8 @@ export type ThemeSubmissionWhereInput = {
   snapshotMuted?: Prisma.StringFilter<"ThemeSubmission"> | string
   snapshotMutedForeground?: Prisma.StringFilter<"ThemeSubmission"> | string
   snapshotBorder?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotButton?: Prisma.StringNullableFilter<"ThemeSubmission"> | string | null
+  snapshotButtonHover?: Prisma.StringNullableFilter<"ThemeSubmission"> | string | null
   snapshotCustomCss?: Prisma.StringNullableFilter<"ThemeSubmission"> | string | null
   createdAt?: Prisma.DateTimeFilter<"ThemeSubmission"> | Date | string
   reviewedAt?: Prisma.DateTimeNullableFilter<"ThemeSubmission"> | Date | string | null
@@ -384,6 +400,8 @@ export type ThemeSubmissionOrderByWithRelationInput = {
   snapshotMuted?: Prisma.SortOrder
   snapshotMutedForeground?: Prisma.SortOrder
   snapshotBorder?: Prisma.SortOrder
+  snapshotButton?: Prisma.SortOrderInput | Prisma.SortOrder
+  snapshotButtonHover?: Prisma.SortOrderInput | Prisma.SortOrder
   snapshotCustomCss?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   reviewedAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -414,6 +432,8 @@ export type ThemeSubmissionWhereUniqueInput = Prisma.AtLeast<{
   snapshotMuted?: Prisma.StringFilter<"ThemeSubmission"> | string
   snapshotMutedForeground?: Prisma.StringFilter<"ThemeSubmission"> | string
   snapshotBorder?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotButton?: Prisma.StringNullableFilter<"ThemeSubmission"> | string | null
+  snapshotButtonHover?: Prisma.StringNullableFilter<"ThemeSubmission"> | string | null
   snapshotCustomCss?: Prisma.StringNullableFilter<"ThemeSubmission"> | string | null
   createdAt?: Prisma.DateTimeFilter<"ThemeSubmission"> | Date | string
   reviewedAt?: Prisma.DateTimeNullableFilter<"ThemeSubmission"> | Date | string | null
@@ -441,6 +461,8 @@ export type ThemeSubmissionOrderByWithAggregationInput = {
   snapshotMuted?: Prisma.SortOrder
   snapshotMutedForeground?: Prisma.SortOrder
   snapshotBorder?: Prisma.SortOrder
+  snapshotButton?: Prisma.SortOrderInput | Prisma.SortOrder
+  snapshotButtonHover?: Prisma.SortOrderInput | Prisma.SortOrder
   snapshotCustomCss?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   reviewedAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -474,6 +496,8 @@ export type ThemeSubmissionScalarWhereWithAggregatesInput = {
   snapshotMuted?: Prisma.StringWithAggregatesFilter<"ThemeSubmission"> | string
   snapshotMutedForeground?: Prisma.StringWithAggregatesFilter<"ThemeSubmission"> | string
   snapshotBorder?: Prisma.StringWithAggregatesFilter<"ThemeSubmission"> | string
+  snapshotButton?: Prisma.StringNullableWithAggregatesFilter<"ThemeSubmission"> | string | null
+  snapshotButtonHover?: Prisma.StringNullableWithAggregatesFilter<"ThemeSubmission"> | string | null
   snapshotCustomCss?: Prisma.StringNullableWithAggregatesFilter<"ThemeSubmission"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"ThemeSubmission"> | Date | string
   reviewedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ThemeSubmission"> | Date | string | null
@@ -496,6 +520,8 @@ export type ThemeSubmissionCreateInput = {
   snapshotMuted: string
   snapshotMutedForeground: string
   snapshotBorder: string
+  snapshotButton?: string | null
+  snapshotButtonHover?: string | null
   snapshotCustomCss?: string | null
   createdAt?: Date | string
   reviewedAt?: Date | string | null
@@ -523,6 +549,8 @@ export type ThemeSubmissionUncheckedCreateInput = {
   snapshotMuted: string
   snapshotMutedForeground: string
   snapshotBorder: string
+  snapshotButton?: string | null
+  snapshotButtonHover?: string | null
   snapshotCustomCss?: string | null
   createdAt?: Date | string
   reviewedAt?: Date | string | null
@@ -545,6 +573,8 @@ export type ThemeSubmissionUpdateInput = {
   snapshotMuted?: Prisma.StringFieldUpdateOperationsInput | string
   snapshotMutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   snapshotBorder?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotButton?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  snapshotButtonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   snapshotCustomCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -572,6 +602,8 @@ export type ThemeSubmissionUncheckedUpdateInput = {
   snapshotMuted?: Prisma.StringFieldUpdateOperationsInput | string
   snapshotMutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   snapshotBorder?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotButton?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  snapshotButtonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   snapshotCustomCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -597,6 +629,8 @@ export type ThemeSubmissionCreateManyInput = {
   snapshotMuted: string
   snapshotMutedForeground: string
   snapshotBorder: string
+  snapshotButton?: string | null
+  snapshotButtonHover?: string | null
   snapshotCustomCss?: string | null
   createdAt?: Date | string
   reviewedAt?: Date | string | null
@@ -619,6 +653,8 @@ export type ThemeSubmissionUpdateManyMutationInput = {
   snapshotMuted?: Prisma.StringFieldUpdateOperationsInput | string
   snapshotMutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   snapshotBorder?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotButton?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  snapshotButtonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   snapshotCustomCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -644,6 +680,8 @@ export type ThemeSubmissionUncheckedUpdateManyInput = {
   snapshotMuted?: Prisma.StringFieldUpdateOperationsInput | string
   snapshotMutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   snapshotBorder?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotButton?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  snapshotButtonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   snapshotCustomCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -679,6 +717,8 @@ export type ThemeSubmissionCountOrderByAggregateInput = {
   snapshotMuted?: Prisma.SortOrder
   snapshotMutedForeground?: Prisma.SortOrder
   snapshotBorder?: Prisma.SortOrder
+  snapshotButton?: Prisma.SortOrder
+  snapshotButtonHover?: Prisma.SortOrder
   snapshotCustomCss?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   reviewedAt?: Prisma.SortOrder
@@ -710,6 +750,8 @@ export type ThemeSubmissionMaxOrderByAggregateInput = {
   snapshotMuted?: Prisma.SortOrder
   snapshotMutedForeground?: Prisma.SortOrder
   snapshotBorder?: Prisma.SortOrder
+  snapshotButton?: Prisma.SortOrder
+  snapshotButtonHover?: Prisma.SortOrder
   snapshotCustomCss?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   reviewedAt?: Prisma.SortOrder
@@ -735,6 +777,8 @@ export type ThemeSubmissionMinOrderByAggregateInput = {
   snapshotMuted?: Prisma.SortOrder
   snapshotMutedForeground?: Prisma.SortOrder
   snapshotBorder?: Prisma.SortOrder
+  snapshotButton?: Prisma.SortOrder
+  snapshotButtonHover?: Prisma.SortOrder
   snapshotCustomCss?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   reviewedAt?: Prisma.SortOrder
@@ -851,6 +895,8 @@ export type ThemeSubmissionCreateWithoutSubmittedByInput = {
   snapshotMuted: string
   snapshotMutedForeground: string
   snapshotBorder: string
+  snapshotButton?: string | null
+  snapshotButtonHover?: string | null
   snapshotCustomCss?: string | null
   createdAt?: Date | string
   reviewedAt?: Date | string | null
@@ -876,6 +922,8 @@ export type ThemeSubmissionUncheckedCreateWithoutSubmittedByInput = {
   snapshotMuted: string
   snapshotMutedForeground: string
   snapshotBorder: string
+  snapshotButton?: string | null
+  snapshotButtonHover?: string | null
   snapshotCustomCss?: string | null
   createdAt?: Date | string
   reviewedAt?: Date | string | null
@@ -930,6 +978,8 @@ export type ThemeSubmissionScalarWhereInput = {
   snapshotMuted?: Prisma.StringFilter<"ThemeSubmission"> | string
   snapshotMutedForeground?: Prisma.StringFilter<"ThemeSubmission"> | string
   snapshotBorder?: Prisma.StringFilter<"ThemeSubmission"> | string
+  snapshotButton?: Prisma.StringNullableFilter<"ThemeSubmission"> | string | null
+  snapshotButtonHover?: Prisma.StringNullableFilter<"ThemeSubmission"> | string | null
   snapshotCustomCss?: Prisma.StringNullableFilter<"ThemeSubmission"> | string | null
   createdAt?: Prisma.DateTimeFilter<"ThemeSubmission"> | Date | string
   reviewedAt?: Prisma.DateTimeNullableFilter<"ThemeSubmission"> | Date | string | null
@@ -952,6 +1002,8 @@ export type ThemeSubmissionCreateWithoutThemeInput = {
   snapshotMuted: string
   snapshotMutedForeground: string
   snapshotBorder: string
+  snapshotButton?: string | null
+  snapshotButtonHover?: string | null
   snapshotCustomCss?: string | null
   createdAt?: Date | string
   reviewedAt?: Date | string | null
@@ -977,6 +1029,8 @@ export type ThemeSubmissionUncheckedCreateWithoutThemeInput = {
   snapshotMuted: string
   snapshotMutedForeground: string
   snapshotBorder: string
+  snapshotButton?: string | null
+  snapshotButtonHover?: string | null
   snapshotCustomCss?: string | null
   createdAt?: Date | string
   reviewedAt?: Date | string | null
@@ -1027,6 +1081,8 @@ export type ThemeSubmissionCreateManySubmittedByInput = {
   snapshotMuted: string
   snapshotMutedForeground: string
   snapshotBorder: string
+  snapshotButton?: string | null
+  snapshotButtonHover?: string | null
   snapshotCustomCss?: string | null
   createdAt?: Date | string
   reviewedAt?: Date | string | null
@@ -1049,6 +1105,8 @@ export type ThemeSubmissionUpdateWithoutSubmittedByInput = {
   snapshotMuted?: Prisma.StringFieldUpdateOperationsInput | string
   snapshotMutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   snapshotBorder?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotButton?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  snapshotButtonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   snapshotCustomCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1074,6 +1132,8 @@ export type ThemeSubmissionUncheckedUpdateWithoutSubmittedByInput = {
   snapshotMuted?: Prisma.StringFieldUpdateOperationsInput | string
   snapshotMutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   snapshotBorder?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotButton?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  snapshotButtonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   snapshotCustomCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1098,6 +1158,8 @@ export type ThemeSubmissionUncheckedUpdateManyWithoutSubmittedByInput = {
   snapshotMuted?: Prisma.StringFieldUpdateOperationsInput | string
   snapshotMutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   snapshotBorder?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotButton?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  snapshotButtonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   snapshotCustomCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1122,6 +1184,8 @@ export type ThemeSubmissionCreateManyThemeInput = {
   snapshotMuted: string
   snapshotMutedForeground: string
   snapshotBorder: string
+  snapshotButton?: string | null
+  snapshotButtonHover?: string | null
   snapshotCustomCss?: string | null
   createdAt?: Date | string
   reviewedAt?: Date | string | null
@@ -1144,6 +1208,8 @@ export type ThemeSubmissionUpdateWithoutThemeInput = {
   snapshotMuted?: Prisma.StringFieldUpdateOperationsInput | string
   snapshotMutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   snapshotBorder?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotButton?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  snapshotButtonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   snapshotCustomCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1169,6 +1235,8 @@ export type ThemeSubmissionUncheckedUpdateWithoutThemeInput = {
   snapshotMuted?: Prisma.StringFieldUpdateOperationsInput | string
   snapshotMutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   snapshotBorder?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotButton?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  snapshotButtonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   snapshotCustomCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1193,6 +1261,8 @@ export type ThemeSubmissionUncheckedUpdateManyWithoutThemeInput = {
   snapshotMuted?: Prisma.StringFieldUpdateOperationsInput | string
   snapshotMutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   snapshotBorder?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotButton?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  snapshotButtonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   snapshotCustomCss?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1220,6 +1290,8 @@ export type ThemeSubmissionSelect<ExtArgs extends runtime.Types.Extensions.Inter
   snapshotMuted?: boolean
   snapshotMutedForeground?: boolean
   snapshotBorder?: boolean
+  snapshotButton?: boolean
+  snapshotButtonHover?: boolean
   snapshotCustomCss?: boolean
   createdAt?: boolean
   reviewedAt?: boolean
@@ -1247,6 +1319,8 @@ export type ThemeSubmissionSelectCreateManyAndReturn<ExtArgs extends runtime.Typ
   snapshotMuted?: boolean
   snapshotMutedForeground?: boolean
   snapshotBorder?: boolean
+  snapshotButton?: boolean
+  snapshotButtonHover?: boolean
   snapshotCustomCss?: boolean
   createdAt?: boolean
   reviewedAt?: boolean
@@ -1274,6 +1348,8 @@ export type ThemeSubmissionSelectUpdateManyAndReturn<ExtArgs extends runtime.Typ
   snapshotMuted?: boolean
   snapshotMutedForeground?: boolean
   snapshotBorder?: boolean
+  snapshotButton?: boolean
+  snapshotButtonHover?: boolean
   snapshotCustomCss?: boolean
   createdAt?: boolean
   reviewedAt?: boolean
@@ -1301,12 +1377,14 @@ export type ThemeSubmissionSelectScalar = {
   snapshotMuted?: boolean
   snapshotMutedForeground?: boolean
   snapshotBorder?: boolean
+  snapshotButton?: boolean
+  snapshotButtonHover?: boolean
   snapshotCustomCss?: boolean
   createdAt?: boolean
   reviewedAt?: boolean
 }
 
-export type ThemeSubmissionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "themeId" | "submittedById" | "status" | "message" | "adminMessage" | "submissionType" | "snapshotName" | "snapshotBackground" | "snapshotForeground" | "snapshotPrimary" | "snapshotPrimaryForeground" | "snapshotSecondary" | "snapshotSecondaryForeground" | "snapshotAccent" | "snapshotAccentForeground" | "snapshotMuted" | "snapshotMutedForeground" | "snapshotBorder" | "snapshotCustomCss" | "createdAt" | "reviewedAt", ExtArgs["result"]["themeSubmission"]>
+export type ThemeSubmissionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "themeId" | "submittedById" | "status" | "message" | "adminMessage" | "submissionType" | "snapshotName" | "snapshotBackground" | "snapshotForeground" | "snapshotPrimary" | "snapshotPrimaryForeground" | "snapshotSecondary" | "snapshotSecondaryForeground" | "snapshotAccent" | "snapshotAccentForeground" | "snapshotMuted" | "snapshotMutedForeground" | "snapshotBorder" | "snapshotButton" | "snapshotButtonHover" | "snapshotCustomCss" | "createdAt" | "reviewedAt", ExtArgs["result"]["themeSubmission"]>
 export type ThemeSubmissionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   theme?: boolean | Prisma.ThemeDefaultArgs<ExtArgs>
   submittedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -1346,6 +1424,8 @@ export type $ThemeSubmissionPayload<ExtArgs extends runtime.Types.Extensions.Int
     snapshotMuted: string
     snapshotMutedForeground: string
     snapshotBorder: string
+    snapshotButton: string | null
+    snapshotButtonHover: string | null
     snapshotCustomCss: string | null
     createdAt: Date
     reviewedAt: Date | null
@@ -1793,6 +1873,8 @@ export interface ThemeSubmissionFieldRefs {
   readonly snapshotMuted: Prisma.FieldRef<"ThemeSubmission", 'String'>
   readonly snapshotMutedForeground: Prisma.FieldRef<"ThemeSubmission", 'String'>
   readonly snapshotBorder: Prisma.FieldRef<"ThemeSubmission", 'String'>
+  readonly snapshotButton: Prisma.FieldRef<"ThemeSubmission", 'String'>
+  readonly snapshotButtonHover: Prisma.FieldRef<"ThemeSubmission", 'String'>
   readonly snapshotCustomCss: Prisma.FieldRef<"ThemeSubmission", 'String'>
   readonly createdAt: Prisma.FieldRef<"ThemeSubmission", 'DateTime'>
   readonly reviewedAt: Prisma.FieldRef<"ThemeSubmission", 'DateTime'>

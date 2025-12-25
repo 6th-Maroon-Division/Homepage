@@ -45,6 +45,9 @@ export async function GET() {
             muted: true,
             mutedForeground: true,
             border: true,
+            button: true,
+            buttonHover: true,
+            buttonHoverForeground: true,
             customCss: true,
           },
         },
@@ -81,6 +84,9 @@ export async function POST(request: NextRequest) {
       muted,
       mutedForeground,
       border,
+      button,
+      buttonHover,
+      buttonHoverForeground,
       isDefaultLight,
       isDefaultDark,
     } = body;
@@ -122,6 +128,9 @@ export async function POST(request: NextRequest) {
         muted,
         mutedForeground,
         border,
+        button,
+        buttonHover,
+        buttonHoverForeground,
       },
     });
 

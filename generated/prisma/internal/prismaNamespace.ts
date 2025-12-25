@@ -80,12 +80,12 @@ export type PrismaVersion = {
 }
 
 /**
- * Prisma Client JS version: 7.1.0
- * Query Engine version: ab635e6b9d606fa5c8fb8b1a7f909c3c3c1c98ba
+ * Prisma Client JS version: 7.2.0
+ * Query Engine version: 0c8ef2ce45c83248ab3df073180d5eda9e8be7a3
  */
 export const prismaVersion: PrismaVersion = {
-  client: "7.1.0",
-  engine: "ab635e6b9d606fa5c8fb8b1a7f909c3c3c1c98ba"
+  client: "7.2.0",
+  engine: "0c8ef2ce45c83248ab3df073180d5eda9e8be7a3"
 }
 
 /**
@@ -1133,7 +1133,10 @@ export const ThemeScalarFieldEnum = {
   accentForeground: 'accentForeground',
   muted: 'muted',
   mutedForeground: 'mutedForeground',
-  border: 'border'
+  border: 'border',
+  button: 'button',
+  buttonHover: 'buttonHover',
+  buttonHoverForeground: 'buttonHoverForeground'
 } as const
 
 export type ThemeScalarFieldEnum = (typeof ThemeScalarFieldEnum)[keyof typeof ThemeScalarFieldEnum]
@@ -1159,6 +1162,8 @@ export const ThemeSubmissionScalarFieldEnum = {
   snapshotMuted: 'snapshotMuted',
   snapshotMutedForeground: 'snapshotMutedForeground',
   snapshotBorder: 'snapshotBorder',
+  snapshotButton: 'snapshotButton',
+  snapshotButtonHover: 'snapshotButtonHover',
   snapshotCustomCss: 'snapshotCustomCss',
   createdAt: 'createdAt',
   reviewedAt: 'reviewedAt'

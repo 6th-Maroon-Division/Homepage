@@ -54,6 +54,9 @@ interface Theme {
   muted: string;
   mutedForeground: string;
   border: string;
+  button?: string;
+  buttonHover?: string;
+  buttonHoverForeground?: string;
   createdBy?: {
     id: number;
     username: string | null;
@@ -101,6 +104,9 @@ export default function ThemeManagementClient() {
     muted: '#1e293b',
     mutedForeground: '#94a3b8',
     border: '#334155',
+    button: '#3b82f6',
+    buttonHover: '#60a5fa',
+    buttonHoverForeground: '#ffffff',
     isDefaultLight: false,
     isDefaultDark: false,
     isEnabled: true,
@@ -150,6 +156,9 @@ export default function ThemeManagementClient() {
           muted: '#1e293b',
           mutedForeground: '#94a3b8',
           border: '#334155',
+          button: '#3b82f6',
+          buttonHover: '#60a5fa',
+          buttonHoverForeground: '#ffffff',
           isDefaultLight: false,
           isDefaultDark: false,
           isEnabled: true,
@@ -221,6 +230,9 @@ export default function ThemeManagementClient() {
           muted: editingTheme.muted,
           mutedForeground: editingTheme.mutedForeground,
           border: editingTheme.border,
+          button: editingTheme.button,
+          buttonHover: editingTheme.buttonHover,
+          buttonHoverForeground: editingTheme.buttonHoverForeground,
           isDefaultLight: editingTheme.isDefaultLight,
           isDefaultDark: editingTheme.isDefaultDark,
           customCss: editingTheme.customCss || null,
@@ -374,7 +386,7 @@ export default function ThemeManagementClient() {
             </div>
 
             <div className="grid grid-cols-3 gap-4">
-              {(['background', 'foreground', 'primary', 'primaryForeground', 'secondary', 'secondaryForeground', 'accent', 'accentForeground', 'muted', 'mutedForeground', 'border'] as const).map((key) => (
+              {(['background', 'foreground', 'primary', 'primaryForeground', 'secondary', 'secondaryForeground', 'accent', 'accentForeground', 'muted', 'mutedForeground', 'border', 'button', 'buttonHover', 'buttonHoverForeground'] as const).map((key) => (
                 <div key={key}>
                   <label className="block text-sm font-medium mb-1 capitalize">
                     {key.replace(/([A-Z])/g, ' $1').trim()}
@@ -433,7 +445,7 @@ export default function ThemeManagementClient() {
                     const baseForComparison = nextSubmission || editingTheme.parentTheme;
                     
                     // Calculate changes
-                    const colorChanges = baseForComparison ? (['background', 'foreground', 'primary', 'primaryForeground', 'secondary', 'secondaryForeground', 'accent', 'accentForeground', 'muted', 'mutedForeground', 'border'] as const)
+                    const colorChanges = baseForComparison ? (['background', 'foreground', 'primary', 'primaryForeground', 'secondary', 'secondaryForeground', 'accent', 'accentForeground', 'muted', 'mutedForeground', 'border', 'button', 'buttonHover', 'buttonHoverForeground'] as const)
                       .map(key => {
                         const snapshotKey = `snapshot${key.charAt(0).toUpperCase()}${key.slice(1)}` as keyof typeof submission;
                         const newValue = submission[snapshotKey] as string;
@@ -572,7 +584,7 @@ export default function ThemeManagementClient() {
 
             <div className="grid grid-cols-3 gap-4">
               {Object.entries(newTheme)
-                .filter(([key]) => !['name', 'isDefaultLight', 'isDefaultDark', 'isEnabled', 'customCss'].includes(key))
+                .filter(([key]) => !['name', 'isDefaultLight', 'isDefaultDark', 'isEnabled', 'customCss', 'button', 'buttonHover', 'buttonHoverForeground'].includes(key))
                 .map(([key, value]) => (
                   <div key={key}>
                     <label className="block text-sm font-medium mb-1 capitalize">
@@ -588,6 +600,39 @@ export default function ThemeManagementClient() {
                     />
                   </div>
                 ))}
+            </div>
+
+            <div className="border-t pt-4 mt-4">
+              <h3 className="text-sm font-semibold mb-3">Button Colors</h3>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Button</label>
+                  <input
+                    type="color"
+                    value={newTheme.button}
+                    onChange={(e) => setNewTheme({ ...newTheme, button: e.target.value })}
+                    className="w-full h-10 border rounded cursor-pointer"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Button Hover</label>
+                  <input
+                    type="color"
+                    value={newTheme.buttonHover}
+                    onChange={(e) => setNewTheme({ ...newTheme, buttonHover: e.target.value })}
+                    className="w-full h-10 border rounded cursor-pointer"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Button Hover Text</label>
+                  <input
+                    type="color"
+                    value={newTheme.buttonHoverForeground}
+                    onChange={(e) => setNewTheme({ ...newTheme, buttonHoverForeground: e.target.value })}
+                    className="w-full h-10 border rounded cursor-pointer"
+                  />
+                </div>
+              </div>
             </div>
 
             <div>

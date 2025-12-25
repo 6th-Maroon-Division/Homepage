@@ -22,6 +22,9 @@ interface Theme {
   muted: string;
   mutedForeground: string;
   border: string;
+  button?: string;
+  buttonHover?: string;
+  buttonHoverForeground?: string;
   customCss?: string | null;
   submissions?: Array<{
     id: number;
@@ -79,6 +82,9 @@ export default function ThemeSettings() {
     muted: '',
     mutedForeground: '',
     border: '',
+    button: '',
+    buttonHover: '',
+    buttonHoverForeground: '',
     customCss: '',
   });
   const [showSubmitModal, setShowSubmitModal] = useState(false);
@@ -102,6 +108,9 @@ export default function ThemeSettings() {
         muted: editingTheme.muted,
         mutedForeground: editingTheme.mutedForeground,
         border: editingTheme.border,
+        button: editingTheme.button || '',
+        buttonHover: editingTheme.buttonHover || '',
+        buttonHoverForeground: editingTheme.buttonHoverForeground || '',
         customCss: editingTheme.customCss || '',
       });
     } else if (selectedThemeForDerive) {
@@ -118,6 +127,9 @@ export default function ThemeSettings() {
         muted: selectedThemeForDerive.muted,
         mutedForeground: selectedThemeForDerive.mutedForeground,
         border: selectedThemeForDerive.border,
+        button: selectedThemeForDerive.button || '',
+        buttonHover: selectedThemeForDerive.buttonHover || '',
+        buttonHoverForeground: selectedThemeForDerive.buttonHoverForeground || '',
         customCss: selectedThemeForDerive.customCss || '',
       });
     }
@@ -436,6 +448,9 @@ export default function ThemeSettings() {
               muted: '#1e293b',
               mutedForeground: '#94a3b8',
               border: '#334155',
+              button: '#3b82f6',
+              buttonHover: '#60a5fa',
+              buttonHoverForeground: '#ffffff',
               customCss: '',
             });
           }}
@@ -566,6 +581,33 @@ export default function ThemeSettings() {
                       type="color"
                       value={themeData.border}
                       onChange={(e) => setThemeData({ ...themeData, border: e.target.value })}
+                      className="w-full h-10 rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>Button</label>
+                    <input
+                      type="color"
+                      value={themeData.button}
+                      onChange={(e) => setThemeData({ ...themeData, button: e.target.value })}
+                      className="w-full h-10 rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>Button Hover</label>
+                    <input
+                      type="color"
+                      value={themeData.buttonHover}
+                      onChange={(e) => setThemeData({ ...themeData, buttonHover: e.target.value })}
+                      className="w-full h-10 rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>Button Hover Text</label>
+                    <input
+                      type="color"
+                      value={themeData.buttonHoverForeground}
+                      onChange={(e) => setThemeData({ ...themeData, buttonHoverForeground: e.target.value })}
                       className="w-full h-10 rounded"
                     />
                   </div>

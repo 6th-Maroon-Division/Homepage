@@ -62,6 +62,9 @@ export type ThemeMinAggregateOutputType = {
   muted: string | null
   mutedForeground: string | null
   border: string | null
+  button: string | null
+  buttonHover: string | null
+  buttonHoverForeground: string | null
 }
 
 export type ThemeMaxAggregateOutputType = {
@@ -88,6 +91,9 @@ export type ThemeMaxAggregateOutputType = {
   muted: string | null
   mutedForeground: string | null
   border: string | null
+  button: string | null
+  buttonHover: string | null
+  buttonHoverForeground: string | null
 }
 
 export type ThemeCountAggregateOutputType = {
@@ -114,6 +120,9 @@ export type ThemeCountAggregateOutputType = {
   muted: number
   mutedForeground: number
   border: number
+  button: number
+  buttonHover: number
+  buttonHoverForeground: number
   _all: number
 }
 
@@ -154,6 +163,9 @@ export type ThemeMinAggregateInputType = {
   muted?: true
   mutedForeground?: true
   border?: true
+  button?: true
+  buttonHover?: true
+  buttonHoverForeground?: true
 }
 
 export type ThemeMaxAggregateInputType = {
@@ -180,6 +192,9 @@ export type ThemeMaxAggregateInputType = {
   muted?: true
   mutedForeground?: true
   border?: true
+  button?: true
+  buttonHover?: true
+  buttonHoverForeground?: true
 }
 
 export type ThemeCountAggregateInputType = {
@@ -206,6 +221,9 @@ export type ThemeCountAggregateInputType = {
   muted?: true
   mutedForeground?: true
   border?: true
+  button?: true
+  buttonHover?: true
+  buttonHoverForeground?: true
   _all?: true
 }
 
@@ -319,6 +337,9 @@ export type ThemeGroupByOutputType = {
   muted: string
   mutedForeground: string
   border: string
+  button: string | null
+  buttonHover: string | null
+  buttonHoverForeground: string | null
   _count: ThemeCountAggregateOutputType | null
   _avg: ThemeAvgAggregateOutputType | null
   _sum: ThemeSumAggregateOutputType | null
@@ -368,6 +389,9 @@ export type ThemeWhereInput = {
   muted?: Prisma.StringFilter<"Theme"> | string
   mutedForeground?: Prisma.StringFilter<"Theme"> | string
   border?: Prisma.StringFilter<"Theme"> | string
+  button?: Prisma.StringNullableFilter<"Theme"> | string | null
+  buttonHover?: Prisma.StringNullableFilter<"Theme"> | string | null
+  buttonHoverForeground?: Prisma.StringNullableFilter<"Theme"> | string | null
   parentTheme?: Prisma.XOR<Prisma.ThemeNullableScalarRelationFilter, Prisma.ThemeWhereInput> | null
   childThemes?: Prisma.ThemeListRelationFilter
   createdBy?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
@@ -399,6 +423,9 @@ export type ThemeOrderByWithRelationInput = {
   muted?: Prisma.SortOrder
   mutedForeground?: Prisma.SortOrder
   border?: Prisma.SortOrder
+  button?: Prisma.SortOrderInput | Prisma.SortOrder
+  buttonHover?: Prisma.SortOrderInput | Prisma.SortOrder
+  buttonHoverForeground?: Prisma.SortOrderInput | Prisma.SortOrder
   parentTheme?: Prisma.ThemeOrderByWithRelationInput
   childThemes?: Prisma.ThemeOrderByRelationAggregateInput
   createdBy?: Prisma.UserOrderByWithRelationInput
@@ -433,6 +460,9 @@ export type ThemeWhereUniqueInput = Prisma.AtLeast<{
   muted?: Prisma.StringFilter<"Theme"> | string
   mutedForeground?: Prisma.StringFilter<"Theme"> | string
   border?: Prisma.StringFilter<"Theme"> | string
+  button?: Prisma.StringNullableFilter<"Theme"> | string | null
+  buttonHover?: Prisma.StringNullableFilter<"Theme"> | string | null
+  buttonHoverForeground?: Prisma.StringNullableFilter<"Theme"> | string | null
   parentTheme?: Prisma.XOR<Prisma.ThemeNullableScalarRelationFilter, Prisma.ThemeWhereInput> | null
   childThemes?: Prisma.ThemeListRelationFilter
   createdBy?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
@@ -464,6 +494,9 @@ export type ThemeOrderByWithAggregationInput = {
   muted?: Prisma.SortOrder
   mutedForeground?: Prisma.SortOrder
   border?: Prisma.SortOrder
+  button?: Prisma.SortOrderInput | Prisma.SortOrder
+  buttonHover?: Prisma.SortOrderInput | Prisma.SortOrder
+  buttonHoverForeground?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.ThemeCountOrderByAggregateInput
   _avg?: Prisma.ThemeAvgOrderByAggregateInput
   _max?: Prisma.ThemeMaxOrderByAggregateInput
@@ -498,6 +531,9 @@ export type ThemeScalarWhereWithAggregatesInput = {
   muted?: Prisma.StringWithAggregatesFilter<"Theme"> | string
   mutedForeground?: Prisma.StringWithAggregatesFilter<"Theme"> | string
   border?: Prisma.StringWithAggregatesFilter<"Theme"> | string
+  button?: Prisma.StringNullableWithAggregatesFilter<"Theme"> | string | null
+  buttonHover?: Prisma.StringNullableWithAggregatesFilter<"Theme"> | string | null
+  buttonHoverForeground?: Prisma.StringNullableWithAggregatesFilter<"Theme"> | string | null
 }
 
 export type ThemeCreateInput = {
@@ -521,6 +557,9 @@ export type ThemeCreateInput = {
   muted: string
   mutedForeground: string
   border: string
+  button?: string | null
+  buttonHover?: string | null
+  buttonHoverForeground?: string | null
   parentTheme?: Prisma.ThemeCreateNestedOneWithoutChildThemesInput
   childThemes?: Prisma.ThemeCreateNestedManyWithoutParentThemeInput
   createdBy?: Prisma.UserCreateNestedOneWithoutCustomThemesInput
@@ -552,6 +591,9 @@ export type ThemeUncheckedCreateInput = {
   muted: string
   mutedForeground: string
   border: string
+  button?: string | null
+  buttonHover?: string | null
+  buttonHoverForeground?: string | null
   childThemes?: Prisma.ThemeUncheckedCreateNestedManyWithoutParentThemeInput
   usersWithTheme?: Prisma.UserUncheckedCreateNestedManyWithoutSelectedThemeInput
   submissions?: Prisma.ThemeSubmissionUncheckedCreateNestedManyWithoutThemeInput
@@ -578,6 +620,9 @@ export type ThemeUpdateInput = {
   muted?: Prisma.StringFieldUpdateOperationsInput | string
   mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   border?: Prisma.StringFieldUpdateOperationsInput | string
+  button?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHoverForeground?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTheme?: Prisma.ThemeUpdateOneWithoutChildThemesNestedInput
   childThemes?: Prisma.ThemeUpdateManyWithoutParentThemeNestedInput
   createdBy?: Prisma.UserUpdateOneWithoutCustomThemesNestedInput
@@ -609,6 +654,9 @@ export type ThemeUncheckedUpdateInput = {
   muted?: Prisma.StringFieldUpdateOperationsInput | string
   mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   border?: Prisma.StringFieldUpdateOperationsInput | string
+  button?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHoverForeground?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   childThemes?: Prisma.ThemeUncheckedUpdateManyWithoutParentThemeNestedInput
   usersWithTheme?: Prisma.UserUncheckedUpdateManyWithoutSelectedThemeNestedInput
   submissions?: Prisma.ThemeSubmissionUncheckedUpdateManyWithoutThemeNestedInput
@@ -638,6 +686,9 @@ export type ThemeCreateManyInput = {
   muted: string
   mutedForeground: string
   border: string
+  button?: string | null
+  buttonHover?: string | null
+  buttonHoverForeground?: string | null
 }
 
 export type ThemeUpdateManyMutationInput = {
@@ -661,6 +712,9 @@ export type ThemeUpdateManyMutationInput = {
   muted?: Prisma.StringFieldUpdateOperationsInput | string
   mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   border?: Prisma.StringFieldUpdateOperationsInput | string
+  button?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHoverForeground?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type ThemeUncheckedUpdateManyInput = {
@@ -687,6 +741,9 @@ export type ThemeUncheckedUpdateManyInput = {
   muted?: Prisma.StringFieldUpdateOperationsInput | string
   mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   border?: Prisma.StringFieldUpdateOperationsInput | string
+  button?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHoverForeground?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type ThemeNullableScalarRelationFilter = {
@@ -728,6 +785,9 @@ export type ThemeCountOrderByAggregateInput = {
   muted?: Prisma.SortOrder
   mutedForeground?: Prisma.SortOrder
   border?: Prisma.SortOrder
+  button?: Prisma.SortOrder
+  buttonHover?: Prisma.SortOrder
+  buttonHoverForeground?: Prisma.SortOrder
 }
 
 export type ThemeAvgOrderByAggregateInput = {
@@ -760,6 +820,9 @@ export type ThemeMaxOrderByAggregateInput = {
   muted?: Prisma.SortOrder
   mutedForeground?: Prisma.SortOrder
   border?: Prisma.SortOrder
+  button?: Prisma.SortOrder
+  buttonHover?: Prisma.SortOrder
+  buttonHoverForeground?: Prisma.SortOrder
 }
 
 export type ThemeMinOrderByAggregateInput = {
@@ -786,6 +849,9 @@ export type ThemeMinOrderByAggregateInput = {
   muted?: Prisma.SortOrder
   mutedForeground?: Prisma.SortOrder
   border?: Prisma.SortOrder
+  button?: Prisma.SortOrder
+  buttonHover?: Prisma.SortOrder
+  buttonHoverForeground?: Prisma.SortOrder
 }
 
 export type ThemeSumOrderByAggregateInput = {
@@ -954,6 +1020,9 @@ export type ThemeCreateWithoutUsersWithThemeInput = {
   muted: string
   mutedForeground: string
   border: string
+  button?: string | null
+  buttonHover?: string | null
+  buttonHoverForeground?: string | null
   parentTheme?: Prisma.ThemeCreateNestedOneWithoutChildThemesInput
   childThemes?: Prisma.ThemeCreateNestedManyWithoutParentThemeInput
   createdBy?: Prisma.UserCreateNestedOneWithoutCustomThemesInput
@@ -984,6 +1053,9 @@ export type ThemeUncheckedCreateWithoutUsersWithThemeInput = {
   muted: string
   mutedForeground: string
   border: string
+  button?: string | null
+  buttonHover?: string | null
+  buttonHoverForeground?: string | null
   childThemes?: Prisma.ThemeUncheckedCreateNestedManyWithoutParentThemeInput
   submissions?: Prisma.ThemeSubmissionUncheckedCreateNestedManyWithoutThemeInput
 }
@@ -1014,6 +1086,9 @@ export type ThemeCreateWithoutCreatedByInput = {
   muted: string
   mutedForeground: string
   border: string
+  button?: string | null
+  buttonHover?: string | null
+  buttonHoverForeground?: string | null
   parentTheme?: Prisma.ThemeCreateNestedOneWithoutChildThemesInput
   childThemes?: Prisma.ThemeCreateNestedManyWithoutParentThemeInput
   usersWithTheme?: Prisma.UserCreateNestedManyWithoutSelectedThemeInput
@@ -1043,6 +1118,9 @@ export type ThemeUncheckedCreateWithoutCreatedByInput = {
   muted: string
   mutedForeground: string
   border: string
+  button?: string | null
+  buttonHover?: string | null
+  buttonHoverForeground?: string | null
   childThemes?: Prisma.ThemeUncheckedCreateNestedManyWithoutParentThemeInput
   usersWithTheme?: Prisma.UserUncheckedCreateNestedManyWithoutSelectedThemeInput
   submissions?: Prisma.ThemeSubmissionUncheckedCreateNestedManyWithoutThemeInput
@@ -1090,6 +1168,9 @@ export type ThemeUpdateWithoutUsersWithThemeInput = {
   muted?: Prisma.StringFieldUpdateOperationsInput | string
   mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   border?: Prisma.StringFieldUpdateOperationsInput | string
+  button?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHoverForeground?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTheme?: Prisma.ThemeUpdateOneWithoutChildThemesNestedInput
   childThemes?: Prisma.ThemeUpdateManyWithoutParentThemeNestedInput
   createdBy?: Prisma.UserUpdateOneWithoutCustomThemesNestedInput
@@ -1120,6 +1201,9 @@ export type ThemeUncheckedUpdateWithoutUsersWithThemeInput = {
   muted?: Prisma.StringFieldUpdateOperationsInput | string
   mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   border?: Prisma.StringFieldUpdateOperationsInput | string
+  button?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHoverForeground?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   childThemes?: Prisma.ThemeUncheckedUpdateManyWithoutParentThemeNestedInput
   submissions?: Prisma.ThemeSubmissionUncheckedUpdateManyWithoutThemeNestedInput
 }
@@ -1167,6 +1251,9 @@ export type ThemeScalarWhereInput = {
   muted?: Prisma.StringFilter<"Theme"> | string
   mutedForeground?: Prisma.StringFilter<"Theme"> | string
   border?: Prisma.StringFilter<"Theme"> | string
+  button?: Prisma.StringNullableFilter<"Theme"> | string | null
+  buttonHover?: Prisma.StringNullableFilter<"Theme"> | string | null
+  buttonHoverForeground?: Prisma.StringNullableFilter<"Theme"> | string | null
 }
 
 export type ThemeCreateWithoutChildThemesInput = {
@@ -1190,6 +1277,9 @@ export type ThemeCreateWithoutChildThemesInput = {
   muted: string
   mutedForeground: string
   border: string
+  button?: string | null
+  buttonHover?: string | null
+  buttonHoverForeground?: string | null
   parentTheme?: Prisma.ThemeCreateNestedOneWithoutChildThemesInput
   createdBy?: Prisma.UserCreateNestedOneWithoutCustomThemesInput
   usersWithTheme?: Prisma.UserCreateNestedManyWithoutSelectedThemeInput
@@ -1220,6 +1310,9 @@ export type ThemeUncheckedCreateWithoutChildThemesInput = {
   muted: string
   mutedForeground: string
   border: string
+  button?: string | null
+  buttonHover?: string | null
+  buttonHoverForeground?: string | null
   usersWithTheme?: Prisma.UserUncheckedCreateNestedManyWithoutSelectedThemeInput
   submissions?: Prisma.ThemeSubmissionUncheckedCreateNestedManyWithoutThemeInput
 }
@@ -1250,6 +1343,9 @@ export type ThemeCreateWithoutParentThemeInput = {
   muted: string
   mutedForeground: string
   border: string
+  button?: string | null
+  buttonHover?: string | null
+  buttonHoverForeground?: string | null
   childThemes?: Prisma.ThemeCreateNestedManyWithoutParentThemeInput
   createdBy?: Prisma.UserCreateNestedOneWithoutCustomThemesInput
   usersWithTheme?: Prisma.UserCreateNestedManyWithoutSelectedThemeInput
@@ -1279,6 +1375,9 @@ export type ThemeUncheckedCreateWithoutParentThemeInput = {
   muted: string
   mutedForeground: string
   border: string
+  button?: string | null
+  buttonHover?: string | null
+  buttonHoverForeground?: string | null
   childThemes?: Prisma.ThemeUncheckedCreateNestedManyWithoutParentThemeInput
   usersWithTheme?: Prisma.UserUncheckedCreateNestedManyWithoutSelectedThemeInput
   submissions?: Prisma.ThemeSubmissionUncheckedCreateNestedManyWithoutThemeInput
@@ -1326,6 +1425,9 @@ export type ThemeUpdateWithoutChildThemesInput = {
   muted?: Prisma.StringFieldUpdateOperationsInput | string
   mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   border?: Prisma.StringFieldUpdateOperationsInput | string
+  button?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHoverForeground?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTheme?: Prisma.ThemeUpdateOneWithoutChildThemesNestedInput
   createdBy?: Prisma.UserUpdateOneWithoutCustomThemesNestedInput
   usersWithTheme?: Prisma.UserUpdateManyWithoutSelectedThemeNestedInput
@@ -1356,6 +1458,9 @@ export type ThemeUncheckedUpdateWithoutChildThemesInput = {
   muted?: Prisma.StringFieldUpdateOperationsInput | string
   mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   border?: Prisma.StringFieldUpdateOperationsInput | string
+  button?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHoverForeground?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   usersWithTheme?: Prisma.UserUncheckedUpdateManyWithoutSelectedThemeNestedInput
   submissions?: Prisma.ThemeSubmissionUncheckedUpdateManyWithoutThemeNestedInput
 }
@@ -1397,6 +1502,9 @@ export type ThemeCreateWithoutSubmissionsInput = {
   muted: string
   mutedForeground: string
   border: string
+  button?: string | null
+  buttonHover?: string | null
+  buttonHoverForeground?: string | null
   parentTheme?: Prisma.ThemeCreateNestedOneWithoutChildThemesInput
   childThemes?: Prisma.ThemeCreateNestedManyWithoutParentThemeInput
   createdBy?: Prisma.UserCreateNestedOneWithoutCustomThemesInput
@@ -1427,6 +1535,9 @@ export type ThemeUncheckedCreateWithoutSubmissionsInput = {
   muted: string
   mutedForeground: string
   border: string
+  button?: string | null
+  buttonHover?: string | null
+  buttonHoverForeground?: string | null
   childThemes?: Prisma.ThemeUncheckedCreateNestedManyWithoutParentThemeInput
   usersWithTheme?: Prisma.UserUncheckedCreateNestedManyWithoutSelectedThemeInput
 }
@@ -1468,6 +1579,9 @@ export type ThemeUpdateWithoutSubmissionsInput = {
   muted?: Prisma.StringFieldUpdateOperationsInput | string
   mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   border?: Prisma.StringFieldUpdateOperationsInput | string
+  button?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHoverForeground?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTheme?: Prisma.ThemeUpdateOneWithoutChildThemesNestedInput
   childThemes?: Prisma.ThemeUpdateManyWithoutParentThemeNestedInput
   createdBy?: Prisma.UserUpdateOneWithoutCustomThemesNestedInput
@@ -1498,6 +1612,9 @@ export type ThemeUncheckedUpdateWithoutSubmissionsInput = {
   muted?: Prisma.StringFieldUpdateOperationsInput | string
   mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   border?: Prisma.StringFieldUpdateOperationsInput | string
+  button?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHoverForeground?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   childThemes?: Prisma.ThemeUncheckedUpdateManyWithoutParentThemeNestedInput
   usersWithTheme?: Prisma.UserUncheckedUpdateManyWithoutSelectedThemeNestedInput
 }
@@ -1525,6 +1642,9 @@ export type ThemeCreateManyCreatedByInput = {
   muted: string
   mutedForeground: string
   border: string
+  button?: string | null
+  buttonHover?: string | null
+  buttonHoverForeground?: string | null
 }
 
 export type ThemeUpdateWithoutCreatedByInput = {
@@ -1548,6 +1668,9 @@ export type ThemeUpdateWithoutCreatedByInput = {
   muted?: Prisma.StringFieldUpdateOperationsInput | string
   mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   border?: Prisma.StringFieldUpdateOperationsInput | string
+  button?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHoverForeground?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTheme?: Prisma.ThemeUpdateOneWithoutChildThemesNestedInput
   childThemes?: Prisma.ThemeUpdateManyWithoutParentThemeNestedInput
   usersWithTheme?: Prisma.UserUpdateManyWithoutSelectedThemeNestedInput
@@ -1577,6 +1700,9 @@ export type ThemeUncheckedUpdateWithoutCreatedByInput = {
   muted?: Prisma.StringFieldUpdateOperationsInput | string
   mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   border?: Prisma.StringFieldUpdateOperationsInput | string
+  button?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHoverForeground?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   childThemes?: Prisma.ThemeUncheckedUpdateManyWithoutParentThemeNestedInput
   usersWithTheme?: Prisma.UserUncheckedUpdateManyWithoutSelectedThemeNestedInput
   submissions?: Prisma.ThemeSubmissionUncheckedUpdateManyWithoutThemeNestedInput
@@ -1605,6 +1731,9 @@ export type ThemeUncheckedUpdateManyWithoutCreatedByInput = {
   muted?: Prisma.StringFieldUpdateOperationsInput | string
   mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   border?: Prisma.StringFieldUpdateOperationsInput | string
+  button?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHoverForeground?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type ThemeCreateManyParentThemeInput = {
@@ -1630,6 +1759,9 @@ export type ThemeCreateManyParentThemeInput = {
   muted: string
   mutedForeground: string
   border: string
+  button?: string | null
+  buttonHover?: string | null
+  buttonHoverForeground?: string | null
 }
 
 export type ThemeUpdateWithoutParentThemeInput = {
@@ -1653,6 +1785,9 @@ export type ThemeUpdateWithoutParentThemeInput = {
   muted?: Prisma.StringFieldUpdateOperationsInput | string
   mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   border?: Prisma.StringFieldUpdateOperationsInput | string
+  button?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHoverForeground?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   childThemes?: Prisma.ThemeUpdateManyWithoutParentThemeNestedInput
   createdBy?: Prisma.UserUpdateOneWithoutCustomThemesNestedInput
   usersWithTheme?: Prisma.UserUpdateManyWithoutSelectedThemeNestedInput
@@ -1682,6 +1817,9 @@ export type ThemeUncheckedUpdateWithoutParentThemeInput = {
   muted?: Prisma.StringFieldUpdateOperationsInput | string
   mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   border?: Prisma.StringFieldUpdateOperationsInput | string
+  button?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHoverForeground?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   childThemes?: Prisma.ThemeUncheckedUpdateManyWithoutParentThemeNestedInput
   usersWithTheme?: Prisma.UserUncheckedUpdateManyWithoutSelectedThemeNestedInput
   submissions?: Prisma.ThemeSubmissionUncheckedUpdateManyWithoutThemeNestedInput
@@ -1710,6 +1848,9 @@ export type ThemeUncheckedUpdateManyWithoutParentThemeInput = {
   muted?: Prisma.StringFieldUpdateOperationsInput | string
   mutedForeground?: Prisma.StringFieldUpdateOperationsInput | string
   border?: Prisma.StringFieldUpdateOperationsInput | string
+  button?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHover?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  buttonHoverForeground?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 
@@ -1785,6 +1926,9 @@ export type ThemeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   muted?: boolean
   mutedForeground?: boolean
   border?: boolean
+  button?: boolean
+  buttonHover?: boolean
+  buttonHoverForeground?: boolean
   parentTheme?: boolean | Prisma.Theme$parentThemeArgs<ExtArgs>
   childThemes?: boolean | Prisma.Theme$childThemesArgs<ExtArgs>
   createdBy?: boolean | Prisma.Theme$createdByArgs<ExtArgs>
@@ -1817,6 +1961,9 @@ export type ThemeSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   muted?: boolean
   mutedForeground?: boolean
   border?: boolean
+  button?: boolean
+  buttonHover?: boolean
+  buttonHoverForeground?: boolean
   parentTheme?: boolean | Prisma.Theme$parentThemeArgs<ExtArgs>
   createdBy?: boolean | Prisma.Theme$createdByArgs<ExtArgs>
 }, ExtArgs["result"]["theme"]>
@@ -1845,6 +1992,9 @@ export type ThemeSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   muted?: boolean
   mutedForeground?: boolean
   border?: boolean
+  button?: boolean
+  buttonHover?: boolean
+  buttonHoverForeground?: boolean
   parentTheme?: boolean | Prisma.Theme$parentThemeArgs<ExtArgs>
   createdBy?: boolean | Prisma.Theme$createdByArgs<ExtArgs>
 }, ExtArgs["result"]["theme"]>
@@ -1873,9 +2023,12 @@ export type ThemeSelectScalar = {
   muted?: boolean
   mutedForeground?: boolean
   border?: boolean
+  button?: boolean
+  buttonHover?: boolean
+  buttonHoverForeground?: boolean
 }
 
-export type ThemeOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "isPublic" | "isDefaultLight" | "isDefaultDark" | "isEnabled" | "customCss" | "type" | "parentThemeId" | "createdById" | "createdAt" | "updatedAt" | "background" | "foreground" | "primary" | "primaryForeground" | "secondary" | "secondaryForeground" | "accent" | "accentForeground" | "muted" | "mutedForeground" | "border", ExtArgs["result"]["theme"]>
+export type ThemeOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "isPublic" | "isDefaultLight" | "isDefaultDark" | "isEnabled" | "customCss" | "type" | "parentThemeId" | "createdById" | "createdAt" | "updatedAt" | "background" | "foreground" | "primary" | "primaryForeground" | "secondary" | "secondaryForeground" | "accent" | "accentForeground" | "muted" | "mutedForeground" | "border" | "button" | "buttonHover" | "buttonHoverForeground", ExtArgs["result"]["theme"]>
 export type ThemeInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   parentTheme?: boolean | Prisma.Theme$parentThemeArgs<ExtArgs>
   childThemes?: boolean | Prisma.Theme$childThemesArgs<ExtArgs>
@@ -1926,6 +2079,9 @@ export type $ThemePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     muted: string
     mutedForeground: string
     border: string
+    button: string | null
+    buttonHover: string | null
+    buttonHoverForeground: string | null
   }, ExtArgs["result"]["theme"]>
   composites: {}
 }
@@ -2377,6 +2533,9 @@ export interface ThemeFieldRefs {
   readonly muted: Prisma.FieldRef<"Theme", 'String'>
   readonly mutedForeground: Prisma.FieldRef<"Theme", 'String'>
   readonly border: Prisma.FieldRef<"Theme", 'String'>
+  readonly button: Prisma.FieldRef<"Theme", 'String'>
+  readonly buttonHover: Prisma.FieldRef<"Theme", 'String'>
+  readonly buttonHoverForeground: Prisma.FieldRef<"Theme", 'String'>
 }
     
 
