@@ -322,10 +322,10 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         {slots.filter((s) => !s._deleted).length === 0 ? (
           <p className="text-center py-6" style={{ color: 'var(--muted-foreground)' }}>No slots added yet. Click &quot;Add Slot&quot; to start.</p>
         ) : (
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {slots.map((slot, slotIndex) =>
               slot._deleted ? null : (
-                <div key={slotIndex} className="border rounded-lg p-4 space-y-3" style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}>
+                <div key={slotIndex} className="border rounded-lg p-4 space-y-3 flex flex-col" style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}>
                   <div className="flex gap-3 items-start">
                     <div className="flex-1">
                       <label className="block text-sm font-medium mb-2" style={{ color: 'var(--muted-foreground)' }}>
