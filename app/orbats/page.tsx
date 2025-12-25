@@ -2,6 +2,9 @@
 import { prisma } from '@/lib/prisma';
 import CalendarWithOps from './components/CalendarWithOps';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 type OrbatWithDates = {
   id: number;
   name: string;
