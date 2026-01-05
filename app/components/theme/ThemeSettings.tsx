@@ -278,6 +278,9 @@ export default function ThemeSettings() {
           muted: '',
           mutedForeground: '',
           border: '',
+          button: '',
+          buttonHover: '',
+          buttonHoverForeground: '',
           customCss: '',
         });
       } else {
