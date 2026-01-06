@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useToast } from '../ui/ToastContainer';
 import LoadingSpinner from '../ui/LoadingSpinner';
 
@@ -38,30 +38,40 @@ type OrbatFormProps = {
 
 export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { showSuccess, showError } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [name, setName] = useState(initialData?.name || '');
   const [description, setDescription] = useState(initialData?.description || '');
-  const [eventDate, setEventDate] = useState(initialData?.eventDate || '');
-  const [startTime, setStartTime] = useState(initialData?.startTime || '');
-  const [endTime, setEndTime] = useState(initialData?.endTime || '');
-  const [slots, setSlots] = useState<Slot[]>(initialData?.slots || []);
-
-  // Pre-fill date and times from URL parameter on create mode
-  useEffect(() => {
-    if (mode === 'create' && !initialData) {
-      const dateParam = searchParams.get('date');
-      if (dateParam) {
-        setEventDate(dateParam);
-        // Set default times only if not already set
-        if (!startTime) setStartTime('19:00');
-        if (!endTime) setEndTime('21:00');
-      }
+  const [eventDate, setEventDate] = useState(() => {
+    if (initialData?.eventDate) return initialData.eventDate;
+    // Only try to get from searchParams if we're in create mode and it's the client
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('date') || '';
     }
-  }, [mode, initialData, searchParams, startTime, endTime]);
+    return '';
+  });
+  const [startTime, setStartTime] = useState(() => {
+    if (initialData?.startTime) return initialData.startTime;
+    // Set default time if we have a date parameter
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('date') ? '19:00' : '';
+    }
+    return '';
+  });
+  const [endTime, setEndTime] = useState(() => {
+    if (initialData?.endTime) return initialData.endTime;
+    // Set default time if we have a date parameter
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('date') ? '21:00' : '';
+    }
+    return '';
+  });
+  const [slots, setSlots] = useState<Slot[]>(initialData?.slots || []);
 
   const addSlot = () => {
     const newOrderIndex = slots.filter((s) => !s._deleted).length;

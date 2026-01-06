@@ -5,19 +5,17 @@ import { useEffect, useState } from 'react';
 
 export default function LinkAccountPrompt() {
   const { data: session, status } = useSession();
-  const [dismissed, setDismissed] = useState(false);
+  const [dismissed, setDismissed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('linkAccountPromptDismissed') === 'true';
+    }
+    return false;
+  });
   const [hasSteam, setHasSteam] = useState(false);
   const [hasDiscord, setHasDiscord] = useState(false);
 
   useEffect(() => {
-    if (status === 'authenticated' && session?.user) {
-      // Check if dismissed in this session
-      const isDismissed = sessionStorage.getItem('linkAccountPromptDismissed');
-      if (isDismissed) {
-        setDismissed(true);
-        return;
-      }
-
+    if (status === 'authenticated' && session?.user && !dismissed) {
       // Fetch user's auth providers
       fetch('/api/user/auth-providers')
         .then(res => res.json())
@@ -27,7 +25,7 @@ export default function LinkAccountPrompt() {
         })
         .catch(console.error);
     }
-  }, [status, session]);
+  }, [status, session, dismissed]);
 
   const handleDismiss = () => {
     sessionStorage.setItem('linkAccountPromptDismissed', 'true');
