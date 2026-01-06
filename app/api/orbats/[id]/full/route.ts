@@ -30,6 +30,11 @@ export async function GET(
             },
           },
         },
+        frequencies: {
+          include: {
+            radioFrequency: true,
+          },
+        },
       },
     });
 
@@ -43,6 +48,8 @@ export async function GET(
       name: orbat.name,
       description: orbat.description,
       eventDate: orbat.eventDate ? orbat.eventDate.toISOString() : null,
+      startTime: orbat.startTime || null,
+      endTime: orbat.endTime || null,
       slots: orbat.slots.map((slot) => ({
         id: slot.id,
         name: slot.name,
@@ -63,6 +70,8 @@ export async function GET(
           })),
         })),
       })),
+      frequencies: orbat.frequencies,
+      tempFrequencies: orbat.tempFrequencies,
     };
 
     return NextResponse.json(clientOrbat);

@@ -8,6 +8,7 @@ type SubslotInput = {
   name: string;
   orderIndex: number;
   maxSignups: number;
+  radioFrequencyId?: number | null;
 };
 
 type SlotInput = {
@@ -23,6 +24,14 @@ type OrbatInput = {
   startTime?: string | null;
   endTime?: string | null;
   slots: SlotInput[];
+  frequencyIds?: number[];
+  tempFrequencies?: Array<{
+    frequency: string;
+    type: 'SR' | 'LR';
+    isAdditional: boolean;
+    channel: string;
+    callsign: string;
+  }>;
 };
 
 export async function POST(request: NextRequest) {
@@ -56,36 +65,52 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create the OrbAT with all nested data
-    const orbat = await prisma.orbat.create({
-      data: {
-        name: body.name.trim(),
-        description: body.description?.trim() || null,
-        eventDate: body.eventDate ? new Date(body.eventDate) : null,
-        startTime: body.startTime || null,
-        endTime: body.endTime || null,
-        createdById: session.user.id,
-        slots: {
-          create: body.slots.map((slot) => ({
-            name: slot.name.trim(),
-            orderIndex: slot.orderIndex,
-            subslots: {
-              create: slot.subslots.map((subslot) => ({
-                name: subslot.name.trim(),
-                orderIndex: subslot.orderIndex,
-                maxSignups: subslot.maxSignups,
-              })),
-            },
-          })),
-        },
-      },
-      include: {
-        slots: {
-          include: {
-            subslots: true,
+    // Create the OrbAT with all nested data in a transaction
+    const orbat = await prisma.$transaction(async (tx) => {
+      // Create the OrbAT
+      const newOrbat = await tx.orbat.create({
+        data: {
+          name: body.name.trim(),
+          description: body.description?.trim() || null,
+          eventDate: body.eventDate ? new Date(body.eventDate) : null,
+          startTime: body.startTime || null,
+          endTime: body.endTime || null,
+          createdById: session.user.id,
+          tempFrequencies: body.tempFrequencies || [],
+          slots: {
+            create: body.slots.map((slot) => ({
+              name: slot.name.trim(),
+              orderIndex: slot.orderIndex,
+              subslots: {
+                create: slot.subslots.map((subslot) => ({
+                  name: subslot.name.trim(),
+                  orderIndex: subslot.orderIndex,
+                  maxSignups: subslot.maxSignups,
+                })),
+              },
+            })),
+          },
+          frequencies: {
+            create: (body.frequencyIds || []).map((freqId) => ({
+              radioFrequencyId: freqId,
+            })),
           },
         },
-      },
+        include: {
+          slots: {
+            include: {
+              subslots: true,
+            },
+          },
+          frequencies: {
+            include: {
+              radioFrequency: true,
+            },
+          },
+        },
+      });
+
+      return newOrbat;
     });
 
     return NextResponse.json(orbat, { status: 201 });

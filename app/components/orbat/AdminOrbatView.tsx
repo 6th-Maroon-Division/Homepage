@@ -33,7 +33,11 @@ type ClientOrbat = {
   name: string;
   description: string | null;
   eventDate: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
   slots: ClientSlot[];
+  frequencies?: any[];
+  tempFrequencies?: any;
 };
 
 type AdminOrbatViewProps = {
@@ -288,6 +292,69 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
           availableSubslots={getAvailableSubslots()}
           onMove={handleMove}
         />
+      )}
+
+      {/* Radio Frequencies Section - at bottom */}
+      {((orbat.frequencies && orbat.frequencies.length > 0) || (orbat.tempFrequencies && orbat.tempFrequencies.length > 0)) && (
+        <div className="border rounded-lg p-6" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+          <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--foreground)' }}>Radio Frequencies</h2>
+          <div className="space-y-3">
+            {/* Combine and sort frequencies by callsign */}
+            {(() => {
+              const allFreqs: any[] = [];
+              
+              // Add saved frequencies
+              if (orbat.frequencies && orbat.frequencies.length > 0) {
+                orbat.frequencies.forEach((f: any) => {
+                  allFreqs.push({
+                    _id: `saved-${f.radioFrequencyId}`,
+                    callsign: f.radioFrequency?.callsign || 'N/A',
+                    frequency: f.radioFrequency?.frequency,
+                    type: f.radioFrequency?.type,
+                    isAdditional: f.radioFrequency?.isAdditional,
+                    channel: f.radioFrequency?.channel,
+                    isTemp: false,
+                  });
+                });
+              }
+              
+              // Add temporary frequencies
+              if (Array.isArray(orbat.tempFrequencies) && orbat.tempFrequencies.length > 0) {
+                orbat.tempFrequencies.forEach((f: any) => {
+                  allFreqs.push({
+                    _id: `temp-${f._id || f.frequency}`,
+                    callsign: f.callsign || 'N/A',
+                    frequency: f.frequency,
+                    type: f.type,
+                    isAdditional: f.isAdditional,
+                    channel: f.channel,
+                    isTemp: true,
+                  });
+                });
+              }
+
+              // Sort by callsign
+              allFreqs.sort((a, b) => (a.callsign || '').localeCompare(b.callsign || ''));
+
+              return allFreqs.map((freq) => (
+                <div
+                  key={freq._id}
+                  className="border-l-4 pl-4 py-2"
+                  style={{ borderColor: freq.isTemp ? '#f59e0b' : 'var(--primary)', color: 'var(--foreground)' }}
+                >
+                  <div className="font-semibold text-base">
+                    {freq.callsign}
+                    {freq.isTemp && <span className="ml-2 text-xs font-normal" style={{ color: '#f59e0b' }}>(Temporary)</span>}
+                  </div>
+                  <div className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
+                    {freq.frequency} · <span style={{ color: 'var(--primary)' }}>{freq.isAdditional ? 'A' : ''}{freq.type}</span>
+                    {freq.channel && ` · ${freq.channel}`}
+                  </div>
+                </div>
+              ));
+            })()}
+          </div>
+        </div>
       )}
 
       {/* Confirm Remove Signup Modal */}

@@ -15,7 +15,7 @@ export default async function AdminPage() {
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* Category Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <Link
             href="/admin/orbats"
             className="border rounded-lg p-8 transition-colors"
@@ -32,6 +32,15 @@ export default async function AdminPage() {
           >
             <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>Users</h2>
             <p style={{ color: 'var(--muted-foreground)' }}>Manage user accounts and permissions</p>
+          </Link>
+
+          <Link
+            href="/admin/radio-frequencies"
+            className="border rounded-lg p-8 transition-colors"
+            style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
+          >
+            <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>Radio Frequencies</h2>
+            <p style={{ color: 'var(--muted-foreground)' }}>Manage radio frequencies for slots</p>
           </Link>
         </div>
       </div>

@@ -9,6 +9,7 @@ type SubslotInput = {
   name: string;
   orderIndex: number;
   maxSignups: number;
+  radioFrequencyId?: number | null;
   _deleted?: boolean;
 };
 
@@ -27,6 +28,14 @@ type OrbatUpdateInput = {
   startTime?: string | null;
   endTime?: string | null;
   slots: SlotInput[];
+  frequencyIds?: number[];
+  tempFrequencies?: Array<{
+    frequency: string;
+    type: 'SR' | 'LR';
+    isAdditional: boolean;
+    channel: string;
+    callsign: string;
+  }>;
 };
 
 export async function PATCH(
@@ -119,8 +128,24 @@ export async function PATCH(
           eventDate: body.eventDate ? new Date(body.eventDate) : null,
           startTime: body.startTime || null,
           endTime: body.endTime || null,
+          tempFrequencies: body.tempFrequencies || [],
         },
       });
+
+      // Delete all existing frequency associations and recreate them
+      await tx.orbatRadioFrequency.deleteMany({
+        where: { orbatId: orbatId },
+      });
+
+      // Create new frequency associations
+      if (body.frequencyIds && body.frequencyIds.length > 0) {
+        await tx.orbatRadioFrequency.createMany({
+          data: body.frequencyIds.map((freqId) => ({
+            orbatId: orbatId,
+            radioFrequencyId: freqId,
+          })),
+        });
+      }
 
       // Process each slot
       for (const slotInput of body.slots.filter((s) => !s._deleted)) {
@@ -189,6 +214,11 @@ export async function PATCH(
               subslots: {
                 orderBy: { orderIndex: 'asc' },
               },
+            },
+          },
+          frequencies: {
+            include: {
+              radioFrequency: true,
             },
           },
         },

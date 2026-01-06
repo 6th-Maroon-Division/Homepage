@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '../ui/ToastContainer';
 import LoadingSpinner from '../ui/LoadingSpinner';
@@ -72,6 +72,114 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     return '';
   });
   const [slots, setSlots] = useState<Slot[]>(initialData?.slots || []);
+  const [radioFrequencies, setRadioFrequencies] = useState<Array<{
+    id: number;
+    frequency: string;
+    type: string;
+    isAdditional: boolean;
+    channel?: string | null;
+    callsign?: string | null;
+  }>>([]);
+  const [isLoadingFrequencies, setIsLoadingFrequencies] = useState(true);
+  
+  // Temporary frequencies for this operation
+  type TempFrequency = {
+    _id: string;
+    frequency: string;
+    type: 'SR' | 'LR';
+    isAdditional: boolean;
+    channel: string;
+    callsign: string;
+  };
+  const [tempFrequencies, setTempFrequencies] = useState<TempFrequency[]>([]);
+  const [selectedFrequencyIds, setSelectedFrequencyIds] = useState<number[]>([]);
+  const [tempFreqForm, setTempFreqForm] = useState({
+    frequency: '',
+    type: 'SR' as 'SR' | 'LR',
+    isAdditional: false,
+    channel: '',
+    callsign: '',
+  });
+  const [isAddingTempFreq, setIsAddingTempFreq] = useState(false);
+
+  // Fetch radio frequencies on mount
+  useEffect(() => {
+    const fetchFrequencies = async () => {
+      try {
+        const response = await fetch('/api/radio-frequencies');
+        if (response.ok) {
+          const data = await response.json();
+          setRadioFrequencies(data);
+        }
+      } catch (error) {
+        console.error('Error fetching radio frequencies:', error);
+      } finally {
+        setIsLoadingFrequencies(false);
+      }
+    };
+
+    // Load existing frequencies if editing
+    if (mode === 'edit' && initialData?.id) {
+      const fetchOrbatFrequencies = async () => {
+        try {
+          const response = await fetch(`/api/orbats/${initialData.id}/full`);
+          if (response.ok) {
+            const orbat = await response.json();
+            if (orbat.frequencies) {
+              const freqIds = orbat.frequencies.map((f: any) => f.radioFrequencyId);
+              setSelectedFrequencyIds(freqIds);
+            }
+            if (orbat.tempFrequencies && Array.isArray(orbat.tempFrequencies) && orbat.tempFrequencies.length > 0) {
+              // Load temporary frequencies from the orbat
+              const loadedTempFreqs = orbat.tempFrequencies.map((f: any) => ({
+                _id: f._id || Math.random().toString(36).substr(2, 9),
+                frequency: f.frequency,
+                type: f.type,
+                isAdditional: f.isAdditional,
+                channel: f.channel || '',
+                callsign: f.callsign || '',
+              }));
+              setTempFrequencies(loadedTempFreqs);
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching orbat frequencies:', error);
+        }
+      };
+      fetchOrbatFrequencies();
+    }
+
+    fetchFrequencies();
+  }, [mode, initialData?.id]);
+
+  const addTempFrequency = () => {
+    if (!tempFreqForm.frequency.trim()) {
+      showError('Frequency is required');
+      return;
+    }
+
+    const newFreq: TempFrequency = {
+      _id: Math.random().toString(36).substr(2, 9),
+      frequency: tempFreqForm.frequency.trim(),
+      type: tempFreqForm.type,
+      isAdditional: tempFreqForm.isAdditional,
+      channel: tempFreqForm.channel.trim(),
+      callsign: tempFreqForm.callsign.trim(),
+    };
+
+    setTempFrequencies([...tempFrequencies, newFreq]);
+    setTempFreqForm({
+      frequency: '',
+      type: 'SR',
+      isAdditional: false,
+      channel: '',
+      callsign: '',
+    });
+  };
+
+  const removeTempFrequency = (id: string) => {
+    setTempFrequencies(tempFrequencies.filter((f) => f._id !== id));
+  };
 
   const addSlot = () => {
     const newOrderIndex = slots.filter((s) => !s._deleted).length;
@@ -124,7 +232,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     slotIndex: number,
     subslotIndex: number,
     field: keyof Subslot,
-    value: string | number
+    value: string | number | null
   ) => {
     const newSlots = [...slots];
     (newSlots[slotIndex].subslots[subslotIndex] as Record<string, unknown>)[field] = value;
@@ -193,6 +301,8 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         startTime: startTime || null,
         endTime: endTime || null,
         slots,
+        frequencyIds: selectedFrequencyIds,
+        tempFrequencies,
       };
 
       const url = mode === 'create' ? '/api/orbats' : `/api/orbats/${initialData?.id}`;
@@ -394,47 +504,49 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
                     ) : (
                       slot.subslots.map((subslot, subslotIndex) =>
                         subslot._deleted ? null : (
-                          <div key={subslotIndex} className="flex gap-2 items-end">
-                            <div className="flex-1">
-                              <input
-                                type="text"
-                                value={subslot.name}
-                                onChange={(e) =>
-                                  updateSubslot(slotIndex, subslotIndex, 'name', e.target.value)
-                                }
-                                className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2"
-                                style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
-                                placeholder="e.g., Platoon Leader, Squad Leader"
-                                required
-                              />
+                          <div key={subslotIndex} className="border border-gray-600 rounded p-2 space-y-2" style={{ backgroundColor: 'var(--background)' }}>
+                            <div className="flex gap-2">
+                              <div className="flex-1">
+                                <input
+                                  type="text"
+                                  value={subslot.name}
+                                  onChange={(e) =>
+                                    updateSubslot(slotIndex, subslotIndex, 'name', e.target.value)
+                                  }
+                                  className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2"
+                                  style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                                  placeholder="e.g., Platoon Leader, Squad Leader"
+                                  required
+                                />
+                              </div>
+                              <div className="w-24">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={subslot.maxSignups}
+                                  onChange={(e) =>
+                                    updateSubslot(
+                                      slotIndex,
+                                      subslotIndex,
+                                      'maxSignups',
+                                      parseInt(e.target.value) || 1
+                                    )
+                                  }
+                                  className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2"
+                                  style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                                  title="Max signups"
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeSubslot(slotIndex, subslotIndex)}
+                                className="px-3 py-2 text-sm"
+                                style={{ color: '#ef4444' }}
+                                title="Remove subslot"
+                              >
+                                ×
+                              </button>
                             </div>
-                            <div className="w-24">
-                              <input
-                                type="number"
-                                min="1"
-                                value={subslot.maxSignups}
-                                onChange={(e) =>
-                                  updateSubslot(
-                                    slotIndex,
-                                    subslotIndex,
-                                    'maxSignups',
-                                    parseInt(e.target.value) || 1
-                                  )
-                                }
-                                className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2"
-                                style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
-                                title="Max signups"
-                              />
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => removeSubslot(slotIndex, subslotIndex)}
-                              className="px-3 py-2 text-sm"
-                              style={{ color: '#ef4444' }}
-                              title="Remove subslot"
-                            >
-                              ×
-                            </button>
                           </div>
                         )
                       )
@@ -443,6 +555,235 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
                 </div>
               )
             )}
+          </div>
+        )}
+      </div>
+
+      {/* Radio Frequencies for Operation */}
+      <div className="border rounded-lg p-6 space-y-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+        <h2 className="text-xl font-semibold" style={{ color: 'var(--foreground)' }}>Radio Frequencies</h2>
+        <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>Assign radio frequencies for this operation</p>
+
+        {/* Add Existing Frequency Dropdown */}
+        <div className="space-y-2 p-4 rounded-md" style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}>
+          <label className="block text-sm font-medium" style={{ color: 'var(--muted-foreground)' }}>Add Existing Frequency</label>
+          <div className="flex gap-2">
+            <select
+              onChange={(e) => {
+                if (e.target.value) {
+                  const freqId = parseInt(e.target.value);
+                  if (!selectedFrequencyIds.includes(freqId)) {
+                    setSelectedFrequencyIds([...selectedFrequencyIds, freqId]);
+                  }
+                  e.target.value = '';
+                }
+              }}
+              className="flex-1 px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2"
+              style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+            >
+              <option value="">Select a frequency...</option>
+              {radioFrequencies
+                .filter((f) => !selectedFrequencyIds.includes(f.id))
+                .map((freq) => (
+                  <option key={freq.id} value={freq.id}>
+                    {freq.frequency} ({freq.type}) {freq.channel ? `- ${freq.channel}` : ''} {freq.callsign ? `/ ${freq.callsign}` : ''}
+                  </option>
+                ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setIsAddingTempFreq(true)}
+              className="px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
+              style={{ backgroundColor: '#16a34a', color: '#ffffff' }}
+            >
+              + Temporary
+            </button>
+          </div>
+        </div>
+
+        {/* Assigned Frequencies Display */}
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>Assigned Frequencies</h3>
+          {selectedFrequencyIds.length === 0 && tempFrequencies.length === 0 ? (
+            <div className="p-4 rounded-md border-2 border-dashed text-center" style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}>
+              <p style={{ color: 'var(--muted-foreground)' }}>No radio frequencies assigned.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {/* Display selected existing frequencies */}
+              {selectedFrequencyIds.map((freqId) => {
+                const freq = radioFrequencies.find((f) => f.id === freqId);
+                if (!freq) return null;
+                return (
+                  <div
+                    key={`existing-${freqId}`}
+                    className="rounded-lg border p-3"
+                    style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="font-semibold text-lg" style={{ color: 'var(--foreground)' }}>
+                        {freq.frequency}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedFrequencyIds(selectedFrequencyIds.filter((id) => id !== freqId))}
+                        className="text-lg font-bold"
+                        style={{ color: '#ef4444' }}
+                        title="Remove"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <div className="space-y-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                      <div>
+                        <span style={{ color: 'var(--primary)' }} className="font-medium">
+                          {freq.isAdditional ? 'A' : ''}{freq.type}
+                        </span>
+                      </div>
+                      {freq.callsign && <div>Callsign: {freq.callsign}</div>}
+                      {freq.channel && <div>Channel: {freq.channel}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+              
+              {/* Display temporary frequencies */}
+              {tempFrequencies.map((freq) => (
+                <div
+                  key={freq._id}
+                  className="rounded-lg border p-3 opacity-75"
+                  style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="font-semibold text-lg" style={{ color: 'var(--foreground)' }}>
+                      {freq.frequency}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeTempFrequency(freq._id)}
+                      className="text-lg font-bold"
+                      style={{ color: '#ef4444' }}
+                      title="Remove"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div className="space-y-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                    <div>
+                      <span style={{ color: '#f59e0b' }} className="font-medium">
+                        {freq.isAdditional ? 'A' : ''}{freq.type} (Temp)
+                      </span>
+                    </div>
+                    {freq.callsign && <div>Callsign: {freq.callsign}</div>}
+                    {freq.channel && <div>Channel: {freq.channel}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Add Temporary Frequency Dialog */}
+        {isAddingTempFreq && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="rounded-lg border p-6 max-w-md w-full space-y-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--foreground)' }}>Create Temporary Frequency</h3>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--muted-foreground)' }}>Frequency *</label>
+                <input
+                  type="text"
+                  value={tempFreqForm.frequency}
+                  onChange={(e) => setTempFreqForm({ ...tempFreqForm, frequency: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
+                  style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                  placeholder="e.g., 70.0"
+                  autoFocus
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--muted-foreground)' }}>Type *</label>
+                  <select
+                    value={tempFreqForm.type}
+                    onChange={(e) => setTempFreqForm({ ...tempFreqForm, type: e.target.value as 'SR' | 'LR' })}
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
+                    style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                  >
+                    <option value="SR">SR</option>
+                    <option value="LR">LR</option>
+                  </select>
+                </div>
+
+                <div className="flex items-end">
+                  <label className="flex items-center gap-2 cursor-pointer w-full" style={{ color: 'var(--foreground)' }}>
+                    <input
+                      type="checkbox"
+                      checked={tempFreqForm.isAdditional}
+                      onChange={(e) => setTempFreqForm({ ...tempFreqForm, isAdditional: e.target.checked })}
+                      className="w-4 h-4 rounded"
+                    />
+                    <span className="text-sm font-medium">Additional</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--muted-foreground)' }}>Channel</label>
+                <input
+                  type="text"
+                  value={tempFreqForm.channel}
+                  onChange={(e) => setTempFreqForm({ ...tempFreqForm, channel: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
+                  style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                  placeholder="e.g., SR Channel 1"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--muted-foreground)' }}>Callsign</label>
+                <input
+                  type="text"
+                  value={tempFreqForm.callsign}
+                  onChange={(e) => setTempFreqForm({ ...tempFreqForm, callsign: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
+                  style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                  placeholder="e.g., Command Net"
+                />
+              </div>
+
+              <div className="flex gap-2 justify-end pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAddingTempFreq(false);
+                    setTempFreqForm({
+                      frequency: '',
+                      type: 'SR',
+                      isAdditional: false,
+                      channel: '',
+                      callsign: '',
+                    });
+                  }}
+                  className="px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                  style={{ backgroundColor: 'var(--secondary)', color: 'var(--foreground)' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    addTempFrequency();
+                    setIsAddingTempFreq(false);
+                  }}
+                  className="px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                  style={{ backgroundColor: '#16a34a', color: '#ffffff' }}
+                >
+                  Add
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

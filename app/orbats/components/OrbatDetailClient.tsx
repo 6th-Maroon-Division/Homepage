@@ -18,6 +18,14 @@ type ClientSubslot = {
   orderIndex: number;
   maxSignups: number;
   signups: ClientSignup[];
+  radioFrequency?: {
+    id: number;
+    frequency: string;
+    type: 'SR' | 'LR';
+    isAdditional: boolean;
+    channel?: string | null;
+    callsign?: string | null;
+  } | null;
 };
 
 type ClientSlot = {
@@ -32,7 +40,11 @@ type ClientOrbat = {
   name: string;
   description: string | null;
   eventDate: string | null; // ISO string or null
+  startTime?: string | null;
+  endTime?: string | null;
   slots: ClientSlot[];
+  frequencies?: any[];
+  tempFrequencies?: any;
 };
 
 type OrbatDetailClientProps = {
@@ -51,6 +63,14 @@ type ApiSubslot = {
       username: string;
     } | null;
   }[];
+  radioFrequency?: {
+    id: number;
+    frequency: string;
+    type: 'SR' | 'LR';
+    isAdditional: boolean;
+    channel?: string | null;
+    callsign?: string | null;
+  } | null;
 };
 
 export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailClientProps) {
@@ -302,6 +322,64 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
           </article>
         ))}
       </section>
+
+      {/* Radio Frequencies Section - at bottom */}
+      {((orbat.frequencies && orbat.frequencies.length > 0) || (orbat.tempFrequencies && orbat.tempFrequencies.length > 0)) && (
+        <div className="border rounded-lg p-6" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+          <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--foreground)' }}>Radio Frequencies</h2>
+          <div className="space-y-3">
+            {/* Combine and sort frequencies by callsign */}
+            {(() => {
+              const allFreqs: any[] = [];
+              
+              // Add saved frequencies
+              if (orbat.frequencies && orbat.frequencies.length > 0) {
+                orbat.frequencies.forEach((f: any) => {
+                  allFreqs.push({
+                    _id: `saved-${f.radioFrequencyId}`,
+                    callsign: f.radioFrequency?.callsign || 'N/A',
+                    frequency: f.radioFrequency?.frequency,
+                    type: f.radioFrequency?.type,
+                    isAdditional: f.radioFrequency?.isAdditional,
+                    channel: f.radioFrequency?.channel,
+                  });
+                });
+              }
+              
+              // Add temporary frequencies
+              if (Array.isArray(orbat.tempFrequencies) && orbat.tempFrequencies.length > 0) {
+                orbat.tempFrequencies.forEach((f: any) => {
+                  allFreqs.push({
+                    _id: `temp-${f._id || f.frequency}`,
+                    callsign: f.callsign || 'N/A',
+                    frequency: f.frequency,
+                    type: f.type,
+                    isAdditional: f.isAdditional,
+                    channel: f.channel,
+                  });
+                });
+              }
+
+              // Sort by callsign
+              allFreqs.sort((a, b) => (a.callsign || '').localeCompare(b.callsign || ''));
+
+              return allFreqs.map((freq) => (
+                <div
+                  key={freq._id}
+                  className="border-l-4 pl-4 py-2"
+                  style={{ borderColor: 'var(--primary)', color: 'var(--foreground)' }}
+                >
+                  <div className="font-semibold text-base">{freq.callsign}</div>
+                  <div className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
+                    {freq.frequency} · <span style={{ color: 'var(--primary)' }}>{freq.isAdditional ? 'A' : ''}{freq.type}</span>
+                    {freq.channel && ` · ${freq.channel}`}
+                  </div>
+                </div>
+              ));
+            })()}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

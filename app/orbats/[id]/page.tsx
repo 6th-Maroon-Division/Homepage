@@ -31,6 +31,11 @@ export default async function OrbatPage({ params }: OrbatPageProps) {
           },
         },
       },
+      frequencies: {
+        include: {
+          radioFrequency: true,
+        },
+      },
       createdBy: true,
     },
   });
@@ -45,6 +50,8 @@ export default async function OrbatPage({ params }: OrbatPageProps) {
     name: orbat.name,
     description: orbat.description,
     eventDate: orbat.eventDate ? orbat.eventDate.toISOString() : null,
+    startTime: orbat.startTime || null,
+    endTime: orbat.endTime || null,
     slots: orbat.slots.map((slot) => ({
       id: slot.id,
       name: slot.name,
@@ -68,6 +75,8 @@ export default async function OrbatPage({ params }: OrbatPageProps) {
         })),
       })),
     })),
+    frequencies: orbat.frequencies,
+    tempFrequencies: orbat.tempFrequencies,
   };
 
   return (

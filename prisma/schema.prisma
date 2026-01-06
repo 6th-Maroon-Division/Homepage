@@ -12,6 +12,11 @@ enum AuthProvider {
   steam
 }
 
+enum FrequencyType {
+  SR
+  LR
+}
+
 model User {
   id                Int                @id @default(autoincrement())
   username          String?
@@ -35,16 +40,18 @@ model AuthAccount {
 }
 
 model Orbat {
-  id          Int       @id @default(autoincrement())
-  name        String
-  description String?
-  eventDate   DateTime?
-  startTime   String?
-  endTime     String?
-  createdBy   User      @relation("OrbatCreator", fields: [createdById], references: [id])
-  createdById Int
-  createdAt   DateTime  @default(now())
-  slots       Slot[]
+  id               Int       @id @default(autoincrement())
+  name             String
+  description      String?
+  eventDate        DateTime?
+  startTime        String?
+  endTime          String?
+  createdBy        User      @relation("OrbatCreator", fields: [createdById], references: [id])
+  createdById      Int
+  createdAt        DateTime  @default(now())
+  slots            Slot[]
+  frequencies      OrbatRadioFrequency[]
+  tempFrequencies  Json?     @default("[]") // Store temporary frequencies as JSON array
 }
 
 model Slot {
@@ -57,13 +64,35 @@ model Slot {
 }
 
 model Subslot {
-  id          Int       @id @default(autoincrement())
-  slot        Slot      @relation(fields: [slotId], references: [id], onDelete: Cascade)
-  slotId      Int
-  name        String
-  orderIndex  Int
-  maxSignups  Int       @default(1)
-  signups     Signup[]
+  id         Int       @id @default(autoincrement())
+  slot       Slot      @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  slotId     Int
+  name       String
+  orderIndex Int
+  maxSignups Int       @default(1)
+  signups    Signup[]
+}
+
+model RadioFrequency {
+  id           Int       @id @default(autoincrement())
+  frequency    String    @unique // e.g., "70.0"
+  type         FrequencyType // SR or LR
+  isAdditional Boolean   @default(false) // True for ASR (Additional Short Range), etc
+  channel      String?   // e.g., "SR Channel 1", "LR Channel 1"
+  callsign     String?   // Optional callsign
+  createdAt    DateTime  @default(now())
+  orbats       OrbatRadioFrequency[]
+}
+
+model OrbatRadioFrequency {
+  id              Int      @id @default(autoincrement())
+  orbat           Orbat    @relation(fields: [orbatId], references: [id], onDelete: Cascade)
+  orbatId         Int
+  radioFrequency  RadioFrequency @relation(fields: [radioFrequencyId], references: [id], onDelete: Cascade)
+  radioFrequencyId Int
+
+  @@unique([orbatId, radioFrequencyId])
+  @@index([orbatId])
 }
 
 model Signup {

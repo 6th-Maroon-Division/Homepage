@@ -24,6 +24,7 @@ export default function TopBar() {
     { href: '/admin', label: 'Dashboard' },
     { href: '/admin/orbats', label: 'OrbATs' },
     { href: '/admin/users', label: 'Users' },
+    { href: '/admin/radio-frequencies', label: 'Frequencies' },
   ];
 
   const navLinks = isAdminRoute ? adminNavLinks : publicNavLinks;
