@@ -167,7 +167,7 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
   return (
     <div className="space-y-6">
       {/* Header */}
-      <header className="space-y-2">
+      <div className="border rounded-lg p-6" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: 'var(--foreground)' }}>{orbat.name}</h1>
@@ -190,10 +190,14 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
             Admin View
           </span>
         </div>
-      </header>
+      </div>
 
       {/* Slots grid */}
-      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
+      <section className={`grid gap-4 md:gap-6 ${
+        orbat.slots.length === 1 ? 'grid-cols-1' :
+        orbat.slots.length === 2 ? 'grid-cols-1 md:grid-cols-2' :
+        'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'
+      }`}>
         {orbat.slots.map((slot) => (
           <article
             key={slot.id}

@@ -24,7 +24,6 @@ export default function TopBar() {
     { href: '/admin', label: 'Dashboard' },
     { href: '/admin/orbats', label: 'OrbATs' },
     { href: '/admin/users', label: 'Users' },
-    { href: '/admin/themes', label: 'Themes' },
   ];
 
   const navLinks = isAdminRoute ? adminNavLinks : publicNavLinks;
@@ -35,6 +34,19 @@ export default function TopBar() {
     }
     return pathname?.startsWith(href);
   };
+  // Get page title based on pathname
+  const getPageTitle = () => {
+    if (pathname === '/') return null;
+    if (pathname === '/orbats') return 'Operations';
+    if (pathname === '/settings') return 'Settings';
+    if (pathname?.startsWith('/admin/orbats')) return 'Manage OrbATs';
+    if (pathname?.startsWith('/admin/users')) return 'User Management';
+    if (pathname?.startsWith('/admin')) return 'Admin Dashboard';
+    return null;
+  };
+
+  const pageTitle = getPageTitle();
+
   return (
     <div style={{ backgroundColor: 'var(--muted)', color: 'var(--foreground)' }}>
       <div className="p-4 flex justify-between items-center">
@@ -74,6 +86,15 @@ export default function TopBar() {
             ))}
           </nav>
         </div>
+
+        {/* Page Title (Center) */}
+        {pageTitle && (
+          <div className="hidden md:block absolute left-1/2 transform -translate-x-1/2">
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--foreground)' }}>
+              {pageTitle}
+            </h1>
+          </div>
+        )}
 
         {/* Desktop Actions */}
         <div className="hidden md:flex space-x-4 items-center">

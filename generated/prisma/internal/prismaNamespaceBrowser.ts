@@ -56,9 +56,7 @@ export const ModelName = {
   Orbat: 'Orbat',
   Slot: 'Slot',
   Subslot: 'Subslot',
-  Signup: 'Signup',
-  Theme: 'Theme',
-  ThemeSubmission: 'ThemeSubmission'
+  Signup: 'Signup'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -83,7 +81,6 @@ export const UserScalarFieldEnum = {
   email: 'email',
   avatarUrl: 'avatarUrl',
   isAdmin: 'isAdmin',
-  selectedThemeId: 'selectedThemeId',
   createdAt: 'createdAt'
 } as const
 
@@ -143,68 +140,6 @@ export const SignupScalarFieldEnum = {
 } as const
 
 export type SignupScalarFieldEnum = (typeof SignupScalarFieldEnum)[keyof typeof SignupScalarFieldEnum]
-
-
-export const ThemeScalarFieldEnum = {
-  id: 'id',
-  name: 'name',
-  isPublic: 'isPublic',
-  isDefaultLight: 'isDefaultLight',
-  isDefaultDark: 'isDefaultDark',
-  isEnabled: 'isEnabled',
-  customCss: 'customCss',
-  type: 'type',
-  parentThemeId: 'parentThemeId',
-  createdById: 'createdById',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt',
-  background: 'background',
-  foreground: 'foreground',
-  primary: 'primary',
-  primaryForeground: 'primaryForeground',
-  secondary: 'secondary',
-  secondaryForeground: 'secondaryForeground',
-  accent: 'accent',
-  accentForeground: 'accentForeground',
-  muted: 'muted',
-  mutedForeground: 'mutedForeground',
-  border: 'border',
-  button: 'button',
-  buttonHover: 'buttonHover',
-  buttonHoverForeground: 'buttonHoverForeground'
-} as const
-
-export type ThemeScalarFieldEnum = (typeof ThemeScalarFieldEnum)[keyof typeof ThemeScalarFieldEnum]
-
-
-export const ThemeSubmissionScalarFieldEnum = {
-  id: 'id',
-  themeId: 'themeId',
-  submittedById: 'submittedById',
-  status: 'status',
-  message: 'message',
-  adminMessage: 'adminMessage',
-  submissionType: 'submissionType',
-  snapshotName: 'snapshotName',
-  snapshotBackground: 'snapshotBackground',
-  snapshotForeground: 'snapshotForeground',
-  snapshotPrimary: 'snapshotPrimary',
-  snapshotPrimaryForeground: 'snapshotPrimaryForeground',
-  snapshotSecondary: 'snapshotSecondary',
-  snapshotSecondaryForeground: 'snapshotSecondaryForeground',
-  snapshotAccent: 'snapshotAccent',
-  snapshotAccentForeground: 'snapshotAccentForeground',
-  snapshotMuted: 'snapshotMuted',
-  snapshotMutedForeground: 'snapshotMutedForeground',
-  snapshotBorder: 'snapshotBorder',
-  snapshotButton: 'snapshotButton',
-  snapshotButtonHover: 'snapshotButtonHover',
-  snapshotCustomCss: 'snapshotCustomCss',
-  createdAt: 'createdAt',
-  reviewedAt: 'reviewedAt'
-} as const
-
-export type ThemeSubmissionScalarFieldEnum = (typeof ThemeSubmissionScalarFieldEnum)[keyof typeof ThemeSubmissionScalarFieldEnum]
 
 
 export const SortOrder = {

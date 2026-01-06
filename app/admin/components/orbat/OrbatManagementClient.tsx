@@ -64,76 +64,72 @@ export default function OrbatManagementClient({ orbats: initialOrbats }: OrbatMa
   });
 
   return (
-    <div className="space-y-4">
-      {/* Header with Create Button */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-xl font-semibold" style={{ color: 'var(--foreground)' }}>Operations List</h2>
-        </div>
-        <Link
-          href="/admin/orbats/new"
-          className="px-4 py-2 rounded-md transition-colors font-medium"
-          style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
-        >
-          Create New OrbAT
-        </Link>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="flex gap-2">
-          <button
-            onClick={() => setFilter('all')}
-            className="px-4 py-2 rounded-md font-medium transition-colors"
-            style={{
-              backgroundColor: filter === 'all' ? 'var(--primary)' : 'var(--secondary)',
-              color: filter === 'all' ? 'var(--primary-foreground)' : 'var(--foreground)'
-            }}
-          >
-            All ({orbats.length})
-          </button>
-          <button
-            onClick={() => setFilter('upcoming')}
-            className="px-4 py-2 rounded-md font-medium transition-colors"
-            style={{
-              backgroundColor: filter === 'upcoming' ? 'var(--primary)' : 'var(--secondary)',
-              color: filter === 'upcoming' ? 'var(--primary-foreground)' : 'var(--foreground)'
-            }}
-          >
-            Upcoming ({upcomingOrbats.length})
-          </button>
-          <button
-            onClick={() => setFilter('past')}
-            className="px-4 py-2 rounded-md font-medium transition-colors"
-            style={{
-              backgroundColor: filter === 'past' ? 'var(--primary)' : 'var(--secondary)',
-              color: filter === 'past' ? 'var(--primary-foreground)' : 'var(--foreground)'
-            }}
-          >
-            Past ({pastOrbats.length})
-          </button>
-        </div>
-
-        <input
-          type="text"
-          placeholder="Search operations..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="flex-1 px-4 py-2 border rounded-md focus:outline-none focus:ring-2"
-          style={{ 
-            backgroundColor: 'var(--background)', 
-            borderColor: 'var(--border)', 
-            color: 'var(--foreground)'
-          }}
-        />
-      </div>
-
+    <div>
       {/* OrbATs Table */}
       <div className="border rounded-lg overflow-hidden" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
-        <div className="px-6 py-4" style={{ borderBottomWidth: '1px', borderColor: 'var(--border)' }}>
-          <h2 className="text-xl font-semibold" style={{ color: 'var(--foreground)' }}>
-            {filter === 'all' ? 'All OrbATs' : filter === 'upcoming' ? 'Upcoming Operations' : 'Past Operations'}
-          </h2>
+        <div className="px-6 py-4 flex justify-between items-center" style={{ borderBottomWidth: '1px', borderColor: 'var(--border)' }}>
+          <div>
+            <h2 className="text-xl font-semibold" style={{ color: 'var(--foreground)' }}>Operations List</h2>
+            <p className="text-sm mt-1" style={{ color: 'var(--muted-foreground)' }}>
+              {filter === 'all' ? 'All OrbATs' : filter === 'upcoming' ? 'Upcoming Operations' : 'Past Operations'}
+            </p>
+          </div>
+          <Link
+            href="/admin/orbats/new"
+            className="px-4 py-2 rounded-md transition-colors font-medium"
+            style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+          >
+            Create New OrbAT
+          </Link>
+        </div>
+
+        {/* Filters */}
+        <div className="px-6 py-4 flex flex-col sm:flex-row gap-4" style={{ borderBottomWidth: '1px', borderColor: 'var(--border)' }}>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setFilter('all')}
+              className="px-4 py-2 rounded-md font-medium transition-colors"
+              style={{
+                backgroundColor: filter === 'all' ? 'var(--primary)' : 'var(--muted)',
+                color: filter === 'all' ? 'var(--primary-foreground)' : 'var(--foreground)'
+              }}
+            >
+              All ({orbats.length})
+            </button>
+            <button
+              onClick={() => setFilter('upcoming')}
+              className="px-4 py-2 rounded-md font-medium transition-colors"
+              style={{
+                backgroundColor: filter === 'upcoming' ? 'var(--primary)' : 'var(--muted)',
+                color: filter === 'upcoming' ? 'var(--primary-foreground)' : 'var(--foreground)'
+              }}
+            >
+              Upcoming ({upcomingOrbats.length})
+            </button>
+            <button
+              onClick={() => setFilter('past')}
+              className="px-4 py-2 rounded-md font-medium transition-colors"
+              style={{
+                backgroundColor: filter === 'past' ? 'var(--primary)' : 'var(--muted)',
+                color: filter === 'past' ? 'var(--primary-foreground)' : 'var(--foreground)'
+              }}
+            >
+              Past ({pastOrbats.length})
+            </button>
+          </div>
+
+          <input
+            type="text"
+            placeholder="Search operations..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 px-4 py-2 border rounded-md focus:outline-none focus:ring-2"
+            style={{ 
+              backgroundColor: 'var(--background)', 
+              borderColor: 'var(--border)', 
+              color: 'var(--foreground)'
+            }}
+          />
         </div>
 
         {filteredOrbats.length === 0 ? (

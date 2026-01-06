@@ -133,58 +133,64 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
   });
 
   return (
-    <div className="space-y-4">
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="flex gap-2">
-          <button
-            onClick={() => setFilter('all')}
-            className="px-4 py-2 rounded-md font-medium transition-colors"
-            style={{
-              backgroundColor: filter === 'all' ? 'var(--primary)' : 'var(--secondary)',
-              color: filter === 'all' ? 'var(--primary-foreground)' : 'var(--foreground)'
-            }}
-          >
-            All Users ({users.length})
-          </button>
-          <button
-            onClick={() => setFilter('admin')}
-            className="px-4 py-2 rounded-md font-medium transition-colors"
-            style={{
-              backgroundColor: filter === 'admin' ? 'var(--primary)' : 'var(--secondary)',
-              color: filter === 'admin' ? 'var(--primary-foreground)' : 'var(--foreground)'
-            }}
-          >
-            Admins ({users.filter(u => u.isAdmin).length})
-          </button>
-          <button
-            onClick={() => setFilter('regular')}
-            className="px-4 py-2 rounded-md font-medium transition-colors"
-            style={{
-              backgroundColor: filter === 'regular' ? 'var(--primary)' : 'var(--secondary)',
-              color: filter === 'regular' ? 'var(--primary-foreground)' : 'var(--foreground)'
-            }}
-          >
-            Regular ({users.filter(u => !u.isAdmin).length})
-          </button>
-        </div>
-
-        <input
-          type="text"
-          placeholder="Search users..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="flex-1 px-4 py-2 border rounded-md focus:outline-none focus:ring-2"
-          style={{ 
-            backgroundColor: 'var(--background)', 
-            borderColor: 'var(--border)', 
-            color: 'var(--foreground)'
-          }}
-        />
-      </div>
-
+    <div>
       {/* Users Table */}
       <div className="border rounded-lg overflow-hidden" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+        <div className="px-6 py-4" style={{ borderBottomWidth: '1px', borderColor: 'var(--border)' }}>
+          <h2 className="text-xl font-semibold" style={{ color: 'var(--foreground)' }}>User Management</h2>
+          <p className="text-sm mt-1" style={{ color: 'var(--muted-foreground)' }}>
+            Manage user accounts, roles, and permissions
+          </p>
+        </div>
+
+        {/* Filters */}
+        <div className="px-6 py-4 flex flex-col sm:flex-row gap-4" style={{ borderBottomWidth: '1px', borderColor: 'var(--border)' }}>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setFilter('all')}
+              className="px-4 py-2 rounded-md font-medium transition-colors"
+              style={{
+                backgroundColor: filter === 'all' ? 'var(--primary)' : 'var(--muted)',
+                color: filter === 'all' ? 'var(--primary-foreground)' : 'var(--foreground)'
+              }}
+            >
+              All Users ({users.length})
+            </button>
+            <button
+              onClick={() => setFilter('admin')}
+              className="px-4 py-2 rounded-md font-medium transition-colors"
+              style={{
+                backgroundColor: filter === 'admin' ? 'var(--primary)' : 'var(--muted)',
+                color: filter === 'admin' ? 'var(--primary-foreground)' : 'var(--foreground)'
+              }}
+            >
+              Admins ({users.filter(u => u.isAdmin).length})
+            </button>
+            <button
+              onClick={() => setFilter('regular')}
+              className="px-4 py-2 rounded-md font-medium transition-colors"
+              style={{
+                backgroundColor: filter === 'regular' ? 'var(--primary)' : 'var(--muted)',
+                color: filter === 'regular' ? 'var(--primary-foreground)' : 'var(--foreground)'
+              }}
+            >
+              Regular ({users.filter(u => !u.isAdmin).length})
+            </button>
+          </div>
+
+          <input
+            type="text"
+            placeholder="Search users..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 px-4 py-2 border rounded-md focus:outline-none focus:ring-2"
+            style={{ 
+              backgroundColor: 'var(--background)', 
+              borderColor: 'var(--border)', 
+              color: 'var(--foreground)'
+            }}
+          />
+        </div>
         {filteredUsers.length === 0 ? (
           <div className="px-6 py-12 text-center" style={{ color: 'var(--muted-foreground)' }}>
             <p>No users found</p>

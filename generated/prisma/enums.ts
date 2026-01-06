@@ -15,20 +15,3 @@ export const AuthProvider = {
 } as const
 
 export type AuthProvider = (typeof AuthProvider)[keyof typeof AuthProvider]
-
-
-export const SubmissionStatus = {
-  pending: 'pending',
-  approved: 'approved',
-  rejected: 'rejected'
-} as const
-
-export type SubmissionStatus = (typeof SubmissionStatus)[keyof typeof SubmissionStatus]
-
-
-export const ThemeType = {
-  original: 'original',
-  derived: 'derived'
-} as const
-
-export type ThemeType = (typeof ThemeType)[keyof typeof ThemeType]

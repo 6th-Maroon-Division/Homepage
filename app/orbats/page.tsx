@@ -44,16 +44,12 @@ export default async function OrbatsPage() {
   return (
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        <header className="space-y-2">
-          <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: 'var(--foreground)' }}>Operations</h1>
-          <p className="text-sm sm:text-base" style={{ color: 'var(--muted-foreground)' }}>
-            Click days in the calendar to jump to operations. Use Prev/Next to
-            change months. If multiple ops exist on a day, you&apos;ll see a
-            list to choose from.
-          </p>
-        </header>
-
-        <CalendarWithOps initialYear={initialYear} initialMonth={initialMonth} ops={uiOps} />
+        <CalendarWithOps 
+          initialYear={initialYear} 
+          initialMonth={initialMonth} 
+          ops={uiOps}
+          helpText="Click days in the calendar to jump to operations. Use Prev/Next to change months. If multiple ops exist on a day, you'll see a list to choose from."
+        />
       </div>
     </main>
   );

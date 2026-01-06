@@ -44,13 +44,6 @@ export default async function UsersManagementPage() {
   return (
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        <header className="space-y-2">
-          <h1 className="text-2xl sm:text-3xl font-bold">User Management</h1>
-          <p className="text-sm sm:text-base" style={{ color: 'var(--muted-foreground)' }}>
-            Manage user accounts, roles, and permissions
-          </p>
-        </header>
-
         <UserManagementClient users={serializedUsers} currentUserId={session.user.id} />
       </div>
     </main>

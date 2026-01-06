@@ -188,17 +188,17 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
   return (
     <div className="space-y-6">
       {/* Header */}
-      <header className="space-y-2">
+      <div className="border rounded-lg p-6" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
         <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: 'var(--foreground)' }}>{orbat.name}</h1>
 
         {orbat.description && (
-          <p className="text-sm sm:text-base" style={{ color: 'var(--muted-foreground)' }}>
+          <p className="text-sm sm:text-base mt-2" style={{ color: 'var(--muted-foreground)' }}>
             {orbat.description}
           </p>
         )}
 
         {eventDate && (
-          <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+          <p className="text-xs mt-2" style={{ color: 'var(--muted-foreground)' }}>
             Event date:{' '}
             {eventDate.toLocaleString('en-GB', {
               dateStyle: 'medium',
@@ -208,15 +208,19 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
         )}
 
         {isPast && (
-          <p className="text-xs font-semibold" style={{ color: '#f59e0b' }}>
+          <p className="text-xs font-semibold mt-2" style={{ color: '#f59e0b' }}>
             This operation is in the past. Signups are closed, existing
             participants are shown below.
           </p>
         )}
-      </header>
+      </div>
 
       {/* Slots grid */}
-      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
+      <section className={`grid gap-4 md:gap-6 ${
+        orbat.slots.length === 1 ? 'grid-cols-1' :
+        orbat.slots.length === 2 ? 'grid-cols-1 md:grid-cols-2' :
+        'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'
+      }`}>
         {orbat.slots.map((slot) => (
           <article
             key={slot.id}

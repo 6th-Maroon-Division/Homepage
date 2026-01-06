@@ -4,7 +4,6 @@ import "./globals.css";
 import TopBar from "./components/layout/TopBar";
 import AuthSessionProvider from "./components/layout/SessionProvider";
 import { ToastProvider } from "./components/ui/ToastContainer";
-import { ThemeProvider } from "./components/theme/ThemeProvider";
 import LinkAccountPrompt from "./components/auth/LinkAccountPrompt";
 
 const geistSans = Geist({
@@ -28,54 +27,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  const theme = localStorage.getItem('theme');
-                  if (theme) {
-                    const parsed = JSON.parse(theme);
-                    const root = document.documentElement;
-                    root.style.setProperty('--background', parsed.background);
-                    root.style.setProperty('--foreground', parsed.foreground);
-                    root.style.setProperty('--primary', parsed.primary);
-                    root.style.setProperty('--primary-foreground', parsed.primaryForeground);
-                    root.style.setProperty('--secondary', parsed.secondary);
-                    root.style.setProperty('--secondary-foreground', parsed.secondaryForeground);
-                    root.style.setProperty('--accent', parsed.accent);
-                    root.style.setProperty('--accent-foreground', parsed.accentForeground);
-                    root.style.setProperty('--muted', parsed.muted);
-                    root.style.setProperty('--muted-foreground', parsed.mutedForeground);
-                    root.style.setProperty('--border', parsed.border);
-                    
-                    if (parsed.customCss) {
-                      const style = document.createElement('style');
-                      style.id = 'custom-theme-css';
-                      style.textContent = parsed.customCss;
-                      document.head.appendChild(style);
-                    }
-                  }
-                } catch (e) {}
-              })();
-            `,
-          }}
-        />
-      </head>
+    <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        suppressHydrationWarning
       >
         <AuthSessionProvider>
-          <ThemeProvider>
-            <ToastProvider>
-              <TopBar />
-              {children}
-              <LinkAccountPrompt />
-            </ToastProvider>
-          </ThemeProvider>
+          <ToastProvider>
+            <TopBar />
+            {children}
+            <LinkAccountPrompt />
+          </ToastProvider>
         </AuthSessionProvider>
       </body>
     </html>

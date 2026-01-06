@@ -69,13 +69,3 @@ export type Subslot = Prisma.SubslotModel
  * 
  */
 export type Signup = Prisma.SignupModel
-/**
- * Model Theme
- * 
- */
-export type Theme = Prisma.ThemeModel
-/**
- * Model ThemeSubmission
- * 
- */
-export type ThemeSubmission = Prisma.ThemeSubmissionModel

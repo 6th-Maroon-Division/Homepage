@@ -16,6 +16,7 @@ type CalendarWithOpsProps = {
   initialMonth: number; // 0-based (0 = Jan)
   ops: UiOp[];
   isAdmin?: boolean;
+  helpText?: string;
 };
 
 function getMonthCalendar(year: number, month: number) {
@@ -57,7 +58,7 @@ function formatHumanDate(date: Date) {
   });
 }
 
-export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmin = false }: CalendarWithOpsProps) {
+export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmin = false, helpText }: CalendarWithOpsProps) {
   const router = useRouter();
 
   const [currentYear, setCurrentYear] = useState(initialYear);
@@ -156,6 +157,12 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
     <div className={isAdmin ? '' : 'grid grid-cols-1 lg:grid-cols-[2fr,3fr] gap-6'}>
       {/* Calendar */}
       <section className="rounded-lg border p-4 space-y-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+        {/* Help Text */}
+        {helpText && (
+          <div className="p-3 rounded-md text-sm" style={{ backgroundColor: 'var(--muted)', color: 'var(--foreground)', border: '1px solid var(--border)' }}>
+            {helpText}
+          </div>
+        )}
         {/* Month navigation */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">

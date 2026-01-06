@@ -4,7 +4,6 @@ import { useSession } from 'next-auth/react';
 import { redirect, useSearchParams } from 'next/navigation';
 import { useState, useEffect, Suspense } from 'react';
 import Image from 'next/image';
-import ThemeSettings from '@/app/components/theme/ThemeSettings';
 
 function SettingsContent() {
   const { data: session, status } = useSession();
@@ -87,13 +86,6 @@ function SettingsContent() {
   return (
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        <header className="space-y-2">
-          <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: 'var(--foreground)' }}>Settings</h1>
-          <p className="text-sm sm:text-base" style={{ color: 'var(--muted-foreground)' }}>
-            Manage your profile information and account settings
-          </p>
-        </header>
-
         <div className="border rounded-lg p-6" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
           <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--foreground)' }}>Profile Information</h2>
           
@@ -259,8 +251,6 @@ function SettingsContent() {
             </div>
           )}
         </div>
-
-        <ThemeSettings />
       </div>
     </main>
   );

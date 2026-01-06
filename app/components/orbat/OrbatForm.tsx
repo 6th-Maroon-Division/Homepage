@@ -217,12 +217,25 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {error && (
-        <div className="bg-red-900/30 border border-red-800 text-red-400 px-4 py-3 rounded-md">
-          {error}
-        </div>
-      )}
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="border rounded-lg p-6" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+        <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: 'var(--foreground)' }}>
+          {mode === 'create' ? 'Create New OrbAT' : 'Edit OrbAT'}
+        </h1>
+        <p className="text-sm sm:text-base mt-2" style={{ color: 'var(--muted-foreground)' }}>
+          {mode === 'create' 
+            ? 'Set up a new operation with slots and subslots' 
+            : 'Modify operation details, slots, and subslots'}
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {error && (
+          <div className="bg-red-900/30 border border-red-800 text-red-400 px-4 py-3 rounded-md">
+            {error}
+          </div>
+        )}
 
       {/* Basic Info */}
       <div className="border rounded-lg p-6 space-y-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
@@ -445,5 +458,6 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         </button>
       </div>
     </form>
+    </div>
   );
 }

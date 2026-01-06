@@ -14,13 +14,6 @@ export default async function AdminPage() {
   return (
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        <header className="space-y-2">
-          <h1 className="text-2xl sm:text-3xl font-bold">Admin Panel</h1>
-          <p className="text-sm sm:text-base" style={{ color: 'var(--muted-foreground)' }}>
-            Manage operations and system settings
-          </p>
-        </header>
-
         {/* Category Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Link
@@ -39,15 +32,6 @@ export default async function AdminPage() {
           >
             <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>Users</h2>
             <p style={{ color: 'var(--muted-foreground)' }}>Manage user accounts and permissions</p>
-          </Link>
-
-          <Link
-            href="/admin/themes"
-            className="border rounded-lg p-8 transition-colors"
-            style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
-          >
-            <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>Themes</h2>
-            <p style={{ color: 'var(--muted-foreground)' }}>Manage themes and review user submissions</p>
           </Link>
         </div>
       </div>

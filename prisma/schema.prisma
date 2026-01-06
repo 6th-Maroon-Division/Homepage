@@ -18,14 +18,10 @@ model User {
   email             String?
   avatarUrl         String?
   isAdmin           Boolean            @default(false)
-  selectedThemeId   Int?
   createdAt         DateTime           @default(now())
   accounts          AuthAccount[]
   orbats            Orbat[]            @relation("OrbatCreator")
   signups           Signup[]
-  selectedTheme     Theme?             @relation("UserSelectedTheme", fields: [selectedThemeId], references: [id])
-  customThemes      Theme[]            @relation("UserThemes")
-  themeSubmissions  ThemeSubmission[]
 }
 
 model AuthAccount {
@@ -82,91 +78,3 @@ model Signup {
   @@index([userId])  // Indexing for fast lookup
 }
 
-model Theme {
-  id                Int                @id @default(autoincrement())
-  name              String
-  isPublic          Boolean            @default(false)
-  isDefaultLight    Boolean            @default(false)
-  isDefaultDark     Boolean            @default(false)
-  isEnabled         Boolean            @default(true)
-  customCss         String?            @db.Text
-  type              ThemeType          @default(original)
-  
-  // For derived themes - links to parent public theme
-  parentTheme       Theme?             @relation("ThemeHierarchy", fields: [parentThemeId], references: [id], onDelete: Cascade)
-  parentThemeId     Int?
-  childThemes       Theme[]            @relation("ThemeHierarchy")
-  
-  createdBy         User?              @relation("UserThemes", fields: [createdById], references: [id], onDelete: Cascade)
-  createdById       Int?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  
-  // Color scheme
-  background        String
-  foreground        String
-  primary           String
-  primaryForeground String
-  secondary         String
-  secondaryForeground String
-  accent            String
-  accentForeground  String
-  muted             String
-  mutedForeground   String
-  border            String
-  button            String?
-  buttonHover       String?
-  buttonHoverForeground String?
-  
-  usersWithTheme    User[]             @relation("UserSelectedTheme")
-  submissions       ThemeSubmission[]
-  
-  @@index([createdById])
-  @@index([parentThemeId])
-}
-
-model ThemeSubmission {
-  id          Int       @id @default(autoincrement())
-  theme       Theme     @relation(fields: [themeId], references: [id], onDelete: Cascade)
-  themeId     Int
-  submittedBy User      @relation(fields: [submittedById], references: [id], onDelete: Cascade)
-  submittedById Int
-  status      SubmissionStatus @default(pending)
-  message     String?   @db.Text
-  adminMessage String?  @db.Text  // Admin feedback/rejection reason
-  submissionType String @default("new")  // "new" = new theme, "update" = update parent theme
-  
-  // Snapshot of theme data at submission time
-  snapshotName              String
-  snapshotBackground        String
-  snapshotForeground        String
-  snapshotPrimary           String
-  snapshotPrimaryForeground String
-  snapshotSecondary         String
-  snapshotSecondaryForeground String
-  snapshotAccent            String
-  snapshotAccentForeground  String
-  snapshotMuted             String
-  snapshotMutedForeground   String
-  snapshotBorder            String
-  snapshotButton            String?
-  snapshotButtonHover       String?
-  snapshotCustomCss         String?            @db.Text
-  
-  createdAt   DateTime  @default(now())
-  reviewedAt  DateTime?
-  
-  @@index([themeId])
-  @@index([submittedById])
-}
-
-enum SubmissionStatus {
-  pending
-  approved
-  rejected
-}
-
-enum ThemeType {
-  original  // User-created theme that becomes public
-  derived   // Theme based on a public theme with modifications
-}
