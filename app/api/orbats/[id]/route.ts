@@ -36,6 +36,12 @@ type OrbatUpdateInput = {
     channel: string;
     callsign: string;
   }>;
+  bluforCountry?: string | null;
+  bluforRelationship?: string | null;
+  opforCountry?: string | null;
+  opforRelationship?: string | null;
+  indepCountry?: string | null;
+  indepRelationship?: string | null;
 };
 
 export async function PATCH(
@@ -128,6 +134,12 @@ export async function PATCH(
           eventDate: body.eventDate ? new Date(body.eventDate) : null,
           startTime: body.startTime || null,
           endTime: body.endTime || null,
+          bluforCountry: body.bluforCountry || null,
+          bluforRelationship: body.bluforRelationship || null,
+          opforCountry: body.opforCountry || null,
+          opforRelationship: body.opforRelationship || null,
+          indepCountry: body.indepCountry || null,
+          indepRelationship: body.indepRelationship || null,
           tempFrequencies: body.tempFrequencies || [],
         },
       });

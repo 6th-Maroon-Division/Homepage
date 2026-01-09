@@ -52,6 +52,15 @@ model Orbat {
   slots            Slot[]
   frequencies      OrbatRadioFrequency[]
   tempFrequencies  Json?     @default("[]") // Store temporary frequencies as JSON array
+  // BLUFOR faction
+  bluforCountry    String?
+  bluforRelationship String?
+  // OPFOR faction
+  opforCountry     String?
+  opforRelationship String?
+  // Independent faction
+  indepCountry     String?
+  indepRelationship String?
 }
 
 model Slot {

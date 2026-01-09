@@ -29,6 +29,12 @@ type OrbatData = {
   startTime?: string;
   endTime?: string;
   slots: Slot[];
+  bluforCountry?: string | null;
+  bluforRelationship?: string | null;
+  opforCountry?: string | null;
+  opforRelationship?: string | null;
+  indepCountry?: string | null;
+  indepRelationship?: string | null;
 };
 
 type OrbatFormProps = {
@@ -71,6 +77,12 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     }
     return '';
   });
+  const [bluforCountry, setBluforCountry] = useState(initialData?.bluforCountry || '');
+  const [bluforRelationship, setBluforRelationship] = useState(initialData?.bluforRelationship || '');
+  const [opforCountry, setOpforCountry] = useState(initialData?.opforCountry || '');
+  const [opforRelationship, setOpforRelationship] = useState(initialData?.opforRelationship || '');
+  const [indepCountry, setIndepCountry] = useState(initialData?.indepCountry || '');
+  const [indepRelationship, setIndepRelationship] = useState(initialData?.indepRelationship || '');
   const [slots, setSlots] = useState<Slot[]>(initialData?.slots || []);
   const [radioFrequencies, setRadioFrequencies] = useState<Array<{
     id: number;
@@ -303,6 +315,12 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         slots,
         frequencyIds: selectedFrequencyIds,
         tempFrequencies,
+        bluforCountry: bluforCountry || null,
+        bluforRelationship: bluforRelationship || null,
+        opforCountry: opforCountry || null,
+        opforRelationship: opforRelationship || null,
+        indepCountry: indepCountry || null,
+        indepRelationship: indepRelationship || null,
       };
 
       const url = mode === 'create' ? '/api/orbats' : `/api/orbats/${initialData?.id}`;
@@ -434,6 +452,112 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
               className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2"
               style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
             />
+          </div>
+        </div>
+      </div>
+
+      {/* Factions */}
+      <div className="border rounded-lg p-6 space-y-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+        <h2 className="text-xl font-semibold" style={{ color: 'var(--foreground)' }}>Factions</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* BLUFOR */}
+          <div className="border rounded-lg p-4 space-y-3" style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}>
+            <h3 className="font-semibold text-sm" style={{ color: 'var(--foreground)' }}>BLUFOR</h3>
+            <div>
+              <label htmlFor="bluforCountry" className="block text-xs font-medium mb-1" style={{ color: 'var(--muted-foreground)' }}>
+                Country
+              </label>
+              <input
+                type="text"
+                id="bluforCountry"
+                value={bluforCountry}
+                onChange={(e) => setBluforCountry(e.target.value)}
+                className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2"
+                style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                placeholder="e.g., Hungary"
+              />
+            </div>
+            <div>
+              <label htmlFor="bluforRelationship" className="block text-xs font-medium mb-1" style={{ color: 'var(--muted-foreground)' }}>
+                Relationship
+              </label>
+              <input
+                type="text"
+                id="bluforRelationship"
+                value={bluforRelationship}
+                onChange={(e) => setBluforRelationship(e.target.value)}
+                className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2"
+                style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                placeholder="e.g., Friendly"
+              />
+            </div>
+          </div>
+
+          {/* OPFOR */}
+          <div className="border rounded-lg p-4 space-y-3" style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}>
+            <h3 className="font-semibold text-sm" style={{ color: 'var(--foreground)' }}>OPFOR</h3>
+            <div>
+              <label htmlFor="opforCountry" className="block text-xs font-medium mb-1" style={{ color: 'var(--muted-foreground)' }}>
+                Country
+              </label>
+              <input
+                type="text"
+                id="opforCountry"
+                value={opforCountry}
+                onChange={(e) => setOpforCountry(e.target.value)}
+                className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2"
+                style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                placeholder="e.g., Romania"
+              />
+            </div>
+            <div>
+              <label htmlFor="opforRelationship" className="block text-xs font-medium mb-1" style={{ color: 'var(--muted-foreground)' }}>
+                Relationship
+              </label>
+              <input
+                type="text"
+                id="opforRelationship"
+                value={opforRelationship}
+                onChange={(e) => setOpforRelationship(e.target.value)}
+                className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2"
+                style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                placeholder="e.g., Hostile"
+              />
+            </div>
+          </div>
+
+          {/* Independent */}
+          <div className="border rounded-lg p-4 space-y-3" style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}>
+            <h3 className="font-semibold text-sm" style={{ color: 'var(--foreground)' }}>Independent</h3>
+            <div>
+              <label htmlFor="indepCountry" className="block text-xs font-medium mb-1" style={{ color: 'var(--muted-foreground)' }}>
+                Country
+              </label>
+              <input
+                type="text"
+                id="indepCountry"
+                value={indepCountry}
+                onChange={(e) => setIndepCountry(e.target.value)}
+                className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2"
+                style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                placeholder="e.g., NATO"
+              />
+            </div>
+            <div>
+              <label htmlFor="indepRelationship" className="block text-xs font-medium mb-1" style={{ color: 'var(--muted-foreground)' }}>
+                Relationship
+              </label>
+              <input
+                type="text"
+                id="indepRelationship"
+                value={indepRelationship}
+                onChange={(e) => setIndepRelationship(e.target.value)}
+                className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2"
+                style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                placeholder="e.g., Friendly"
+              />
+            </div>
           </div>
         </div>
       </div>

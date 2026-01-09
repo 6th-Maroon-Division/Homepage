@@ -112,6 +112,12 @@ async function main() {
       eventDate: pastDate,
       startTime: '19:00',
       endTime: '21:30',
+      bluforCountry: 'Hungary',
+      bluforRelationship: 'Friendly',
+      opforCountry: 'Romania',
+      opforRelationship: 'Hostile',
+      indepCountry: 'NATO',
+      indepRelationship: 'Friendly',
     },
   });
 
@@ -191,6 +197,12 @@ async function main() {
       description: 'Another completed op on the same day as Past Thunder.',
       createdById: admin.id,
       eventDate: pastDate,
+      bluforCountry: 'Poland',
+      bluforRelationship: 'Friendly',
+      opforCountry: 'Belarus',
+      opforRelationship: 'Hostile',
+      indepCountry: 'Ukraine',
+      indepRelationship: 'Neutral',
     },
   });
 
@@ -261,6 +273,12 @@ async function main() {
       description: 'Live operation scheduled soon.',
       createdById: admin.id,
       eventDate: presentDate,
+      bluforCountry: 'Czech Republic',
+      bluforRelationship: 'Friendly',
+      opforCountry: 'Russia',
+      opforRelationship: 'Hostile',
+      indepCountry: 'Slovakia',
+      indepRelationship: 'Friendly',
     },
   });
 
@@ -341,6 +359,12 @@ async function main() {
       description: 'Planned operation with multiple squads.',
       createdById: admin.id,
       eventDate: futureDate,
+      bluforCountry: 'Germany',
+      bluforRelationship: 'Friendly',
+      opforCountry: 'Syria',
+      opforRelationship: 'Hostile',
+      indepCountry: 'UN Forces',
+      indepRelationship: 'Friendly',
     },
   });
 
@@ -446,6 +470,12 @@ async function main() {
       description: 'Second op on the same future day.',
       createdById: admin.id,
       eventDate: futureDate,
+      bluforCountry: 'United Kingdom',
+      bluforRelationship: 'Friendly',
+      opforCountry: 'Iran',
+      opforRelationship: 'Hostile',
+      indepCountry: 'UAE',
+      indepRelationship: 'Neutral',
     },
   });
 

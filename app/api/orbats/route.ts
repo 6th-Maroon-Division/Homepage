@@ -32,6 +32,12 @@ type OrbatInput = {
     channel: string;
     callsign: string;
   }>;
+  bluforCountry?: string | null;
+  bluforRelationship?: string | null;
+  opforCountry?: string | null;
+  opforRelationship?: string | null;
+  indepCountry?: string | null;
+  indepRelationship?: string | null;
 };
 
 export async function POST(request: NextRequest) {
@@ -75,6 +81,12 @@ export async function POST(request: NextRequest) {
           eventDate: body.eventDate ? new Date(body.eventDate) : null,
           startTime: body.startTime || null,
           endTime: body.endTime || null,
+          bluforCountry: body.bluforCountry || null,
+          bluforRelationship: body.bluforRelationship || null,
+          opforCountry: body.opforCountry || null,
+          opforRelationship: body.opforRelationship || null,
+          indepCountry: body.indepCountry || null,
+          indepRelationship: body.indepRelationship || null,
           createdById: session.user.id,
           tempFrequencies: body.tempFrequencies || [],
           slots: {

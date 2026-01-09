@@ -52,6 +52,12 @@ export default async function OrbatPage({ params }: OrbatPageProps) {
     eventDate: orbat.eventDate ? orbat.eventDate.toISOString() : null,
     startTime: orbat.startTime || null,
     endTime: orbat.endTime || null,
+    bluforCountry: orbat.bluforCountry || null,
+    bluforRelationship: orbat.bluforRelationship || null,
+    opforCountry: orbat.opforCountry || null,
+    opforRelationship: orbat.opforRelationship || null,
+    indepCountry: orbat.indepCountry || null,
+    indepRelationship: orbat.indepRelationship || null,
     slots: orbat.slots.map((slot) => ({
       id: slot.id,
       name: slot.name,
