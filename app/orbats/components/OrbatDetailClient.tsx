@@ -124,6 +124,16 @@ function getIntelColor(field: string, value: string): string {
   }
 }
 
+// Helper function to get color for faction relationships
+function getRelationshipColor(relationship: string): string {
+  switch (relationship) {
+    case 'Friendly': return '#22c55e'; // green
+    case 'Neutral': return '#f59e0b'; // amber
+    case 'Hostile': return '#ef4444'; // red
+    default: return 'var(--muted-foreground)';
+  }
+}
+
 export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailClientProps) {
   const [orbat, setOrbat] = useState<ClientOrbat>(initialOrbat);
   const [loadingSubslotId, setLoadingSubslotId] = useState<number | null>(null);
@@ -293,19 +303,19 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
               {orbat.bluforCountry && (
                 <div>
                   <p className="font-semibold" style={{ color: 'var(--foreground)' }}>BLUFOR: {orbat.bluforCountry}</p>
-                  {orbat.bluforRelationship && <p style={{ color: 'var(--muted-foreground)' }}>Support: {orbat.bluforRelationship}</p>}
+                  {orbat.bluforRelationship && <p style={{ color: getRelationshipColor(orbat.bluforRelationship) }}>Support: {orbat.bluforRelationship}</p>}
                 </div>
               )}
               {orbat.opforCountry && (
                 <div>
                   <p className="font-semibold" style={{ color: 'var(--foreground)' }}>OPFOR: {orbat.opforCountry}</p>
-                  {orbat.opforRelationship && <p style={{ color: 'var(--muted-foreground)' }}>Rel: {orbat.opforRelationship}</p>}
+                  {orbat.opforRelationship && <p style={{ color: getRelationshipColor(orbat.opforRelationship) }}>Rel: {orbat.opforRelationship}</p>}
                 </div>
               )}
               {orbat.indepCountry && (
                 <div>
                   <p className="font-semibold" style={{ color: 'var(--foreground)' }}>Indep: {orbat.indepCountry}</p>
-                  {orbat.indepRelationship && <p style={{ color: 'var(--muted-foreground)' }}>Rel: {orbat.indepRelationship}</p>}
+                  {orbat.indepRelationship && <p style={{ color: getRelationshipColor(orbat.indepRelationship) }}>Rel: {orbat.indepRelationship}</p>}
                 </div>
               )}
             </div>

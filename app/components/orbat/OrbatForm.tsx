@@ -497,15 +497,18 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
               <label htmlFor="bluforRelationship" className="block text-xs font-medium mb-1" style={{ color: 'var(--muted-foreground)' }}>
                 Relationship
               </label>
-              <input
-                type="text"
+              <select
                 id="bluforRelationship"
                 value={bluforRelationship}
                 onChange={(e) => setBluforRelationship(e.target.value)}
                 className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2"
                 style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
-                placeholder="e.g., Friendly"
-              />
+              >
+                <option value="">Select relationship</option>
+                <option value="Friendly">Friendly</option>
+                <option value="Neutral">Neutral</option>
+                <option value="Hostile">Hostile</option>
+              </select>
             </div>
           </div>
 
@@ -530,15 +533,18 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
               <label htmlFor="opforRelationship" className="block text-xs font-medium mb-1" style={{ color: 'var(--muted-foreground)' }}>
                 Relationship
               </label>
-              <input
-                type="text"
+              <select
                 id="opforRelationship"
                 value={opforRelationship}
                 onChange={(e) => setOpforRelationship(e.target.value)}
                 className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2"
                 style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
-                placeholder="e.g., Hostile"
-              />
+              >
+                <option value="">Select relationship</option>
+                <option value="Friendly">Friendly</option>
+                <option value="Neutral">Neutral</option>
+                <option value="Hostile">Hostile</option>
+              </select>
             </div>
           </div>
 
@@ -563,15 +569,18 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
               <label htmlFor="indepRelationship" className="block text-xs font-medium mb-1" style={{ color: 'var(--muted-foreground)' }}>
                 Relationship
               </label>
-              <input
-                type="text"
+              <select
                 id="indepRelationship"
                 value={indepRelationship}
                 onChange={(e) => setIndepRelationship(e.target.value)}
                 className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2"
                 style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
-                placeholder="e.g., Friendly"
-              />
+              >
+                <option value="">Select relationship</option>
+                <option value="Friendly">Friendly</option>
+                <option value="Neutral">Neutral</option>
+                <option value="Hostile">Hostile</option>
+              </select>
             </div>
           </div>
         </div>
