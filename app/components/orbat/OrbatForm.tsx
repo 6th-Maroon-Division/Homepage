@@ -124,8 +124,159 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     callsign: '',
   });
   const [isAddingTempFreq, setIsAddingTempFreq] = useState(false);
+  const [templates, setTemplates] = useState<Array<{ id: number; name: string; category: string | null }>>([]);
+  const [recentOrbats, setRecentOrbats] = useState<Array<{ id: number; name: string }>>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
 
   // Fetch radio frequencies on mount
+  useEffect(() => {
+    // Fetch templates
+    const fetchTemplates = async () => {
+      try {
+        const response = await fetch('/api/templates');
+        if (response.ok) {
+          const data = await response.json();
+          setTemplates(data);
+        }
+      } catch (error) {
+        console.error('Error fetching templates:', error);
+      }
+    };
+
+    // Fetch recent orbats
+    const fetchRecentOrbats = async () => {
+      try {
+        const response = await fetch('/api/orbats?limit=5');
+        if (response.ok) {
+          const data = await response.json();
+          setRecentOrbats(data);
+        }
+      } catch (error) {
+        console.error('Error fetching recent orbats:', error);
+      }
+    };
+
+    Promise.all([fetchTemplates(), fetchRecentOrbats()]).finally(() => {
+      setIsLoadingTemplates(false);
+    });
+  }, []);
+
+  const handleLoadTemplate = async () => {
+    if (!selectedTemplate) return;
+    
+    let templateType: 'template' | 'orbat' = 'template';
+    let templateId = selectedTemplate;
+    
+    if (selectedTemplate.includes('-')) {
+      const [type, id] = selectedTemplate.split('-');
+      templateType = type as 'template' | 'orbat';
+      templateId = id;
+    }
+    
+    const endpoint = templateType === 'template' 
+      ? `/api/templates/${templateId}`
+      : `/api/orbats/${templateId}`;
+    
+    try {
+      const response = await fetch(endpoint);
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Pre-fill form with template data
+        if (data.name) setName(`${data.name} - Copy`);
+        if (data.description) setDescription(data.description);
+        
+        // Handle slots - for templates use slotsJson, for orbats use slots
+        let slots = null;
+        if (data.slotsJson) {
+          slots = data.slotsJson;
+          if (typeof slots === 'string') {
+            slots = JSON.parse(slots);
+          }
+        } else if (data.slots) {
+          slots = data.slots;
+        }
+        if (slots) setSlots(slots);
+        
+        if (data.bluforCountry) setBluforCountry(data.bluforCountry);
+        if (data.bluforRelationship) setBluforRelationship(data.bluforRelationship);
+        if (data.opforCountry) setOpforCountry(data.opforCountry);
+        if (data.opforRelationship) setOpforRelationship(data.opforRelationship);
+        if (data.indepCountry) setIndepCountry(data.indepCountry);
+        if (data.indepRelationship) setIndepRelationship(data.indepRelationship);
+        if (data.iedThreat) setIedThreat(data.iedThreat);
+        if (data.civilianRelationship) setCivilianRelationship(data.civilianRelationship);
+        if (data.rulesOfEngagement) setRulesOfEngagement(data.rulesOfEngagement);
+        if (data.airspace) setAirspace(data.airspace);
+        if (data.inGameTimezone) setInGameTimezone(data.inGameTimezone);
+        if (data.operationDay) setOperationDay(data.operationDay);
+        if (data.startTime) setStartTime(data.startTime);
+        if (data.endTime) setEndTime(data.endTime);
+        
+        showSuccess(`${templateType === 'template' ? 'Template' : 'OrbAT'} loaded successfully`);
+        setSelectedTemplate('');
+      }
+    } catch (error) {
+      console.error('Error loading template:', error);
+      showError(`Failed to load ${templateType}`);
+    }
+  };
+
+  // Fetch radio frequencies on mount
+  useEffect(() => {
+    // Load template if templateId is in query params
+
+    const loadTemplateFromQueryParam = async () => {
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const templateId = params.get('templateId');
+        
+        if (templateId && mode === 'create') {
+          try {
+            const response = await fetch(`/api/templates/${templateId}`);
+            if (response.ok) {
+              const template = await response.json();
+              
+              // Pre-fill form with template data
+              if (template.name) setName(`${template.name} - Copy`);
+              if (template.description) setDescription(template.description);
+              if (template.slotsJson) {
+                // Parse slots if needed
+                let parsedSlots = template.slotsJson;
+                if (typeof parsedSlots === 'string') {
+                  parsedSlots = JSON.parse(parsedSlots);
+                }
+                setSlots(parsedSlots);
+              }
+              if (template.bluforCountry) setBluforCountry(template.bluforCountry);
+              if (template.bluforRelationship) setBluforRelationship(template.bluforRelationship);
+              if (template.opforCountry) setOpforCountry(template.opforCountry);
+              if (template.opforRelationship) setOpforRelationship(template.opforRelationship);
+              if (template.indepCountry) setIndepCountry(template.indepCountry);
+              if (template.indepRelationship) setIndepRelationship(template.indepRelationship);
+              if (template.iedThreat) setIedThreat(template.iedThreat);
+              if (template.civilianRelationship) setCivilianRelationship(template.civilianRelationship);
+              if (template.rulesOfEngagement) setRulesOfEngagement(template.rulesOfEngagement);
+              if (template.airspace) setAirspace(template.airspace);
+              if (template.inGameTimezone) setInGameTimezone(template.inGameTimezone);
+              if (template.operationDay) setOperationDay(template.operationDay);
+              if (template.startTime) setStartTime(template.startTime);
+              if (template.endTime) setEndTime(template.endTime);
+              
+              showSuccess('Template loaded successfully');
+            }
+          } catch (error) {
+            console.error('Error loading template:', error);
+            showError('Failed to load template');
+          }
+        }
+      }
+    };
+
+    loadTemplateFromQueryParam();
+  }, [mode, showSuccess, showError]);
+
   useEffect(() => {
     const fetchFrequencies = async () => {
       try {
@@ -381,6 +532,75 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
             ? 'Set up a new operation with slots and subslots' 
             : 'Modify operation details, slots, and subslots'}
         </p>
+      </div>
+
+      {/* Template Loader */}
+      <div className="border rounded-lg overflow-hidden" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+        <div className="px-6 py-4 flex justify-between items-center" style={{ borderBottomWidth: '1px', borderColor: 'var(--border)' }}>
+          <div>
+            <h2 className="text-lg font-semibold" style={{ color: 'var(--foreground)' }}>Load from Template</h2>
+            <p className="text-sm mt-1" style={{ color: 'var(--muted-foreground)' }}>
+              Pre-fill this form with a saved template
+            </p>
+          </div>
+          <div className="flex gap-2 items-center">
+            <select
+              value={selectedTemplate}
+              onChange={(e) => setSelectedTemplate(e.target.value)}
+              disabled={isLoadingTemplates || templates.length === 0}
+              className="border rounded-lg px-3 py-2 text-sm"
+              style={{
+                backgroundColor: 'var(--background)',
+                borderColor: 'var(--border)',
+                color: 'var(--foreground)',
+              }}
+            >
+              <option value="">
+                {isLoadingTemplates ? 'Loading...' : (templates.length === 0 && recentOrbats.length === 0) ? 'No templates available' : 'Select template...'}
+              </option>
+              
+              {/* Templates group */}
+              {templates.length > 0 && (
+                <optgroup label="Templates">
+                  {templates
+                    .filter(t => !(mode === 'edit' && initialData?.id && t.id === initialData.id))
+                    .map((template) => (
+                      <option key={`template-${template.id}`} value={`template-${template.id}`}>
+                        {template.name} {template.category ? `(${template.category})` : ''}
+                      </option>
+                    ))}
+                </optgroup>
+              )}
+              
+              {/* Recent OrbATs group */}
+              {recentOrbats.length > 0 && (
+                <optgroup label="Recent OrbATs">
+                  {recentOrbats
+                    .filter(o => !(mode === 'edit' && initialData?.id && o.id === initialData.id))
+                    .map((orbat) => (
+                      <option key={`orbat-${orbat.id}`} value={`orbat-${orbat.id}`}>
+                        {orbat.name}
+                      </option>
+                    ))}
+                </optgroup>
+              )}
+            </select>
+            <button
+              type="button"
+              onClick={handleLoadTemplate}
+              disabled={!selectedTemplate || isLoadingTemplates}
+              className="px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
+              style={{
+                backgroundColor: 'var(--primary)',
+                color: 'var(--primary-foreground)',
+              }}
+              onMouseEnter={(e) => !selectedTemplate || isLoadingTemplates ? null : ((e.currentTarget.style.backgroundColor = 'var(--button-hover)') || (e.currentTarget.style.color = 'var(--button-hover-foreground)'))}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--primary)') || (e.currentTarget.style.color = 'var(--primary-foreground)')}
+            >
+              Load Template
+            </button>
+          </div>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">

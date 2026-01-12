@@ -11,6 +11,31 @@ type SubslotInput = {
   radioFrequencyId?: number | null;
 };
 
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const limit = parseInt(searchParams.get('limit') || '5', 10);
+    const maxLimit = Math.min(limit, 50); // Cap at 50 to prevent excessive queries
+
+    const orbats = await prisma.orbat.findMany({
+      take: maxLimit,
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    return NextResponse.json(orbats);
+  } catch (error) {
+    console.error('Error fetching OrbATs:', error);
+    return NextResponse.json({ error: 'Failed to fetch OrbATs' }, { status: 500 });
+  }
+}
+
+
 type SlotInput = {
   name: string;
   orderIndex: number;

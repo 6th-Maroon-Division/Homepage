@@ -50,6 +50,49 @@ type OrbatUpdateInput = {
   operationDay?: string | null;
 };
 
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session || !session.user?.isAdmin) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const orbatId = parseInt(id, 10);
+
+    if (isNaN(orbatId)) {
+      return NextResponse.json({ error: 'Invalid OrbAT ID' }, { status: 400 });
+    }
+
+    const orbat = await prisma.orbat.findUnique({
+      where: { id: orbatId },
+      include: {
+        slots: {
+          include: {
+            subslots: true,
+          },
+          orderBy: {
+            orderIndex: 'asc',
+          },
+        },
+      },
+    });
+
+    if (!orbat) {
+      return NextResponse.json({ error: 'OrbAT not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(orbat);
+  } catch (error) {
+    console.error('Error fetching OrbAT:', error);
+    return NextResponse.json({ error: 'Failed to fetch OrbAT' }, { status: 500 });
+  }
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
