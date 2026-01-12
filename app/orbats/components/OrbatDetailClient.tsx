@@ -51,6 +51,12 @@ type ClientOrbat = {
   opforRelationship?: string | null;
   indepCountry?: string | null;
   indepRelationship?: string | null;
+  iedThreat?: string | null;
+  civilianRelationship?: string | null;
+  rulesOfEngagement?: string | null;
+  airspace?: string | null;
+  inGameTimezone?: string | null;
+  operationDay?: string | null;
 };
 
 type OrbatDetailClientProps = {
@@ -78,6 +84,45 @@ type ApiSubslot = {
     callsign?: string | null;
   } | null;
 };
+
+// Helper function to get color based on field value
+function getIntelColor(field: string, value: string): string {
+  switch (field) {
+    case 'iedThreat':
+      switch (value) {
+        case 'None': return '#22c55e'; // green
+        case 'Low': return '#84cc16'; // lime
+        case 'Medium': return '#f59e0b'; // amber
+        case 'High': return '#ef4444'; // red
+        case 'Very High': return '#dc2626'; // dark red
+        default: return 'var(--primary)';
+      }
+    case 'civilianRelationship':
+      switch (value) {
+        case 'Friendly': return '#22c55e'; // green
+        case 'Neutral': return '#f59e0b'; // amber
+        case 'Hostile': return '#ef4444'; // red
+        default: return 'var(--primary)';
+      }
+    case 'airspace':
+      switch (value) {
+        case 'Friendly': return '#22c55e'; // green
+        case 'Contested': return '#f59e0b'; // amber
+        case 'Hostile': return '#ef4444'; // red
+        default: return 'var(--primary)';
+      }
+    case 'rulesOfEngagement':
+      switch (value) {
+        case 'Hold Fire': return '#ef4444'; // red
+        case 'Return Fire': return '#f59e0b'; // amber
+        case 'PID': return '#84cc16'; // lime
+        case 'Weapons Free': return '#22c55e'; // green
+        default: return 'var(--primary)';
+      }
+    default:
+      return 'var(--primary)';
+  }
+}
 
 export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailClientProps) {
   const [orbat, setOrbat] = useState<ClientOrbat>(initialOrbat);
@@ -364,11 +409,13 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
         ))}
       </section>
 
-      {/* Radio Frequencies Section - at bottom */}
-      {((orbat.frequencies && orbat.frequencies.length > 0) || (orbat.tempFrequencies && orbat.tempFrequencies.length > 0)) && (
-        <div className="border rounded-lg p-6" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
-          <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--foreground)' }}>Radio Frequencies</h2>
-          <div className="space-y-3">
+      {/* Radio Frequencies and Extra Intel Section - at bottom */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Radio Frequencies Box */}
+        {((orbat.frequencies && orbat.frequencies.length > 0) || (orbat.tempFrequencies && orbat.tempFrequencies.length > 0)) && (
+        <div className="border rounded-lg p-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+          <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--foreground)' }}>Radio Frequencies</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
             {/* Combine and sort frequencies by callsign */}
             {(() => {
               const allFreqs: any[] = [];
@@ -407,11 +454,11 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
               return allFreqs.map((freq) => (
                 <div
                   key={freq._id}
-                  className="border-l-4 pl-4 py-2"
+                  className="border-l-4 pl-3 py-1"
                   style={{ borderColor: 'var(--primary)', color: 'var(--foreground)' }}
                 >
-                  <div className="font-semibold text-base">{freq.callsign}</div>
-                  <div className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
+                  <div className="font-semibold text-sm">{freq.callsign}</div>
+                  <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
                     {freq.frequency} · <span style={{ color: 'var(--primary)' }}>{freq.isAdditional ? 'A' : ''}{freq.type}</span>
                     {freq.channel && ` · ${freq.channel}`}
                   </div>
@@ -420,7 +467,53 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
             })()}
           </div>
         </div>
-      )}
+        )}
+
+        {/* Extra Intel Box */}
+        {(orbat.iedThreat || orbat.civilianRelationship || orbat.rulesOfEngagement || orbat.airspace || orbat.inGameTimezone || orbat.operationDay) && (
+        <div className="border rounded-lg p-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+          <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--foreground)' }}>Extra Intel</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+            {orbat.iedThreat && (
+              <div className="border-l-4 pl-3 py-1" style={{ borderColor: getIntelColor('iedThreat', orbat.iedThreat) }}>
+                <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>IED/Trap/Mine Threat</div>
+                <div className="font-semibold text-sm" style={{ color: getIntelColor('iedThreat', orbat.iedThreat) }}>{orbat.iedThreat}</div>
+              </div>
+            )}
+            {orbat.civilianRelationship && (
+              <div className="border-l-4 pl-3 py-1" style={{ borderColor: getIntelColor('civilianRelationship', orbat.civilianRelationship) }}>
+                <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Civilian Relationship</div>
+                <div className="font-semibold text-sm" style={{ color: getIntelColor('civilianRelationship', orbat.civilianRelationship) }}>{orbat.civilianRelationship}</div>
+              </div>
+            )}
+            {orbat.rulesOfEngagement && (
+              <div className="border-l-4 pl-3 py-1" style={{ borderColor: getIntelColor('rulesOfEngagement', orbat.rulesOfEngagement) }}>
+                <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Rules of Engagement</div>
+                <div className="font-semibold text-sm" style={{ color: getIntelColor('rulesOfEngagement', orbat.rulesOfEngagement) }}>{orbat.rulesOfEngagement}</div>
+              </div>
+            )}
+            {orbat.airspace && (
+              <div className="border-l-4 pl-3 py-1" style={{ borderColor: getIntelColor('airspace', orbat.airspace) }}>
+                <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Airspace</div>
+                <div className="font-semibold text-sm" style={{ color: getIntelColor('airspace', orbat.airspace) }}>{orbat.airspace}</div>
+              </div>
+            )}
+            {orbat.inGameTimezone && (
+              <div className="border-l-4 pl-3 py-1" style={{ borderColor: 'var(--primary)' }}>
+                <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>In Game Timezone</div>
+                <div className="font-semibold text-sm" style={{ color: 'var(--foreground)' }}>{orbat.inGameTimezone}</div>
+              </div>
+            )}
+            {orbat.operationDay && (
+              <div className="border-l-4 pl-3 py-1" style={{ borderColor: 'var(--primary)' }}>
+                <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Operation Day</div>
+                <div className="font-semibold text-sm" style={{ color: 'var(--foreground)' }}>{orbat.operationDay}</div>
+              </div>
+            )}
+          </div>
+        </div>
+        )}
+      </div>
     </div>
   );
 }

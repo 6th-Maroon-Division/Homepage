@@ -49,6 +49,20 @@ export default async function EditOrbatPage({ params }: EditOrbatPageProps) {
     eventDate: orbat.eventDate ? orbat.eventDate.toISOString().slice(0, 10) : '',
     startTime: orbat.startTime || '',
     endTime: orbat.endTime || '',
+    // Faction fields
+    bluforCountry: orbat.bluforCountry || '',
+    bluforRelationship: orbat.bluforRelationship || '',
+    opforCountry: orbat.opforCountry || '',
+    opforRelationship: orbat.opforRelationship || '',
+    indepCountry: orbat.indepCountry || '',
+    indepRelationship: orbat.indepRelationship || '',
+    // Extra Intel fields
+    iedThreat: orbat.iedThreat || '',
+    civilianRelationship: orbat.civilianRelationship || '',
+    rulesOfEngagement: orbat.rulesOfEngagement || '',
+    airspace: orbat.airspace || '',
+    inGameTimezone: orbat.inGameTimezone || '',
+    operationDay: orbat.operationDay || '',
     slots: orbat.slots.map((slot) => ({
       id: slot.id,
       name: slot.name,

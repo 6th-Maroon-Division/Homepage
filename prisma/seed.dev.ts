@@ -118,6 +118,12 @@ async function main() {
       opforRelationship: 'Hostile',
       indepCountry: 'NATO',
       indepRelationship: 'Friendly',
+      iedThreat: 'High',
+      civilianRelationship: 'Friendly',
+      rulesOfEngagement: 'PID',
+      airspace: 'Contested',
+      inGameTimezone: '4:00',
+      operationDay: 'Final Day',
     },
   });
 
@@ -190,6 +196,14 @@ async function main() {
     ],
   });
 
+  // Link radio frequencies to Past Thunder
+  await prisma.orbatRadioFrequency.createMany({
+    data: [
+      { orbatId: pastOp1.id, radioFrequencyId: srFreq1.id },
+      { orbatId: pastOp1.id, radioFrequencyId: lrFreq1.id },
+    ],
+  });
+
   // --- Operation 2: Past Dagger ---
   const pastOp2 = await prisma.orbat.create({
     data: {
@@ -203,6 +217,12 @@ async function main() {
       opforRelationship: 'Hostile',
       indepCountry: 'Ukraine',
       indepRelationship: 'Neutral',
+      iedThreat: 'Medium',
+      civilianRelationship: 'Neutral',
+      rulesOfEngagement: 'Return Fire',
+      airspace: 'Friendly',
+      inGameTimezone: '3:30',
+      operationDay: 'Day 2',
     },
   });
 
@@ -265,6 +285,15 @@ async function main() {
     ],
   });
 
+  // Link radio frequencies to Past Dagger
+  await prisma.orbatRadioFrequency.createMany({
+    data: [
+      { orbatId: pastOp2.id, radioFrequencyId: srFreq2.id },
+      { orbatId: pastOp2.id, radioFrequencyId: lrFreq1.id },
+      { orbatId: pastOp2.id, radioFrequencyId: asrFreq.id },
+    ],
+  });
+
   // =============== PRESENT OP ===============
 
   const presentOp = await prisma.orbat.create({
@@ -279,6 +308,12 @@ async function main() {
       opforRelationship: 'Hostile',
       indepCountry: 'Slovakia',
       indepRelationship: 'Friendly',
+      iedThreat: 'Low',
+      civilianRelationship: 'Friendly',
+      rulesOfEngagement: 'PID',
+      airspace: 'Contested',
+      inGameTimezone: '5:00',
+      operationDay: 'Day 1',
     },
   });
 
@@ -350,6 +385,16 @@ async function main() {
     ],
   });
 
+  // Link radio frequencies to Present Spear
+  await prisma.orbatRadioFrequency.createMany({
+    data: [
+      { orbatId: presentOp.id, radioFrequencyId: srFreq1.id },
+      { orbatId: presentOp.id, radioFrequencyId: srFreq2.id },
+      { orbatId: presentOp.id, radioFrequencyId: lrFreq1.id },
+      { orbatId: presentOp.id, radioFrequencyId: alrFreq.id },
+    ],
+  });
+
   // =============== FUTURE OPS ===============
 
   // --- Operation 3: Future Storm ---
@@ -365,6 +410,12 @@ async function main() {
       opforRelationship: 'Hostile',
       indepCountry: 'UN Forces',
       indepRelationship: 'Friendly',
+      iedThreat: 'High',
+      civilianRelationship: 'Friendly',
+      rulesOfEngagement: 'PID',
+      airspace: 'Hostile',
+      inGameTimezone: '6:00',
+      operationDay: 'Day 3',
     },
   });
 
@@ -463,6 +514,16 @@ async function main() {
     ],
   });
 
+  // Link radio frequencies to Future Storm
+  await prisma.orbatRadioFrequency.createMany({
+    data: [
+      { orbatId: futureOp1.id, radioFrequencyId: srFreq1.id },
+      { orbatId: futureOp1.id, radioFrequencyId: lrFreq1.id },
+      { orbatId: futureOp1.id, radioFrequencyId: asrFreq.id },
+      { orbatId: futureOp1.id, radioFrequencyId: alrFreq.id },
+    ],
+  });
+
   // --- Operation 4: Future Saber ---
   const futureOp2 = await prisma.orbat.create({
     data: {
@@ -476,6 +537,12 @@ async function main() {
       opforRelationship: 'Hostile',
       indepCountry: 'UAE',
       indepRelationship: 'Neutral',
+      iedThreat: 'Very High',
+      civilianRelationship: 'Hostile',
+      rulesOfEngagement: 'Weapons Free',
+      airspace: 'Hostile',
+      inGameTimezone: '7:00',
+      operationDay: 'Final Day',
     },
   });
 
@@ -534,6 +601,15 @@ async function main() {
   await prisma.signup.createMany({
     data: [
       { subslotId: future2AlphaLeader.id, userId: bob.id },
+    ],
+  });
+
+  // Link radio frequencies to Future Saber
+  await prisma.orbatRadioFrequency.createMany({
+    data: [
+      { orbatId: futureOp2.id, radioFrequencyId: srFreq1.id },
+      { orbatId: futureOp2.id, radioFrequencyId: srFreq2.id },
+      { orbatId: futureOp2.id, radioFrequencyId: lrFreq1.id },
     ],
   });
 

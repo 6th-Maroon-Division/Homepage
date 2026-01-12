@@ -61,6 +61,13 @@ model Orbat {
   // Independent faction
   indepCountry     String?
   indepRelationship String?
+  // Extra Intel
+  iedThreat        String?   // IED/Trap/Mine Threat
+  civilianRelationship String? // Civilian Relationship
+  rulesOfEngagement String?  // Rules of Engagement
+  airspace         String?   // Airspace
+  inGameTimezone   String?   // In Game Timezone
+  operationDay     String?   // Operation Day
 }
 
 model Slot {

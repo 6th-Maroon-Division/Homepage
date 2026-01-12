@@ -60,6 +60,20 @@ export default async function AdminOrbatPage({ params }: AdminOrbatPageProps) {
     eventDate: orbat.eventDate ? orbat.eventDate.toISOString() : null,
     startTime: orbat.startTime || null,
     endTime: orbat.endTime || null,
+    // Faction fields
+    bluforCountry: orbat.bluforCountry || null,
+    bluforRelationship: orbat.bluforRelationship || null,
+    opforCountry: orbat.opforCountry || null,
+    opforRelationship: orbat.opforRelationship || null,
+    indepCountry: orbat.indepCountry || null,
+    indepRelationship: orbat.indepRelationship || null,
+    // Extra Intel fields
+    iedThreat: orbat.iedThreat || null,
+    civilianRelationship: orbat.civilianRelationship || null,
+    rulesOfEngagement: orbat.rulesOfEngagement || null,
+    airspace: orbat.airspace || null,
+    inGameTimezone: orbat.inGameTimezone || null,
+    operationDay: orbat.operationDay || null,
     slots: orbat.slots.map((slot) => ({
       id: slot.id,
       name: slot.name,

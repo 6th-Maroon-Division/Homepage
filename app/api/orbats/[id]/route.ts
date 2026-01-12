@@ -42,6 +42,12 @@ type OrbatUpdateInput = {
   opforRelationship?: string | null;
   indepCountry?: string | null;
   indepRelationship?: string | null;
+  iedThreat?: string | null;
+  civilianRelationship?: string | null;
+  rulesOfEngagement?: string | null;
+  airspace?: string | null;
+  inGameTimezone?: string | null;
+  operationDay?: string | null;
 };
 
 export async function PATCH(
@@ -140,6 +146,12 @@ export async function PATCH(
           opforRelationship: body.opforRelationship || null,
           indepCountry: body.indepCountry || null,
           indepRelationship: body.indepRelationship || null,
+          iedThreat: body.iedThreat || null,
+          civilianRelationship: body.civilianRelationship || null,
+          rulesOfEngagement: body.rulesOfEngagement || null,
+          airspace: body.airspace || null,
+          inGameTimezone: body.inGameTimezone || null,
+          operationDay: body.operationDay || null,
           tempFrequencies: body.tempFrequencies || [],
         },
       });

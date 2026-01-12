@@ -58,6 +58,12 @@ export default async function OrbatPage({ params }: OrbatPageProps) {
     opforRelationship: orbat.opforRelationship || null,
     indepCountry: orbat.indepCountry || null,
     indepRelationship: orbat.indepRelationship || null,
+    iedThreat: orbat.iedThreat || null,
+    civilianRelationship: orbat.civilianRelationship || null,
+    rulesOfEngagement: orbat.rulesOfEngagement || null,
+    airspace: orbat.airspace || null,
+    inGameTimezone: orbat.inGameTimezone || null,
+    operationDay: orbat.operationDay || null,
     slots: orbat.slots.map((slot) => ({
       id: slot.id,
       name: slot.name,

@@ -35,6 +35,12 @@ type OrbatData = {
   opforRelationship?: string | null;
   indepCountry?: string | null;
   indepRelationship?: string | null;
+  iedThreat?: string | null;
+  civilianRelationship?: string | null;
+  rulesOfEngagement?: string | null;
+  airspace?: string | null;
+  inGameTimezone?: string | null;
+  operationDay?: string | null;
 };
 
 type OrbatFormProps = {
@@ -83,6 +89,12 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
   const [opforRelationship, setOpforRelationship] = useState(initialData?.opforRelationship || '');
   const [indepCountry, setIndepCountry] = useState(initialData?.indepCountry || '');
   const [indepRelationship, setIndepRelationship] = useState(initialData?.indepRelationship || '');
+  const [iedThreat, setIedThreat] = useState(initialData?.iedThreat || '');
+  const [civilianRelationship, setCivilianRelationship] = useState(initialData?.civilianRelationship || '');
+  const [rulesOfEngagement, setRulesOfEngagement] = useState(initialData?.rulesOfEngagement || '');
+  const [airspace, setAirspace] = useState(initialData?.airspace || '');
+  const [inGameTimezone, setInGameTimezone] = useState(initialData?.inGameTimezone || '');
+  const [operationDay, setOperationDay] = useState(initialData?.operationDay || '');
   const [slots, setSlots] = useState<Slot[]>(initialData?.slots || []);
   const [radioFrequencies, setRadioFrequencies] = useState<Array<{
     id: number;
@@ -92,7 +104,6 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     channel?: string | null;
     callsign?: string | null;
   }>>([]);
-  const [isLoadingFrequencies, setIsLoadingFrequencies] = useState(true);
   
   // Temporary frequencies for this operation
   type TempFrequency = {
@@ -125,8 +136,6 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         }
       } catch (error) {
         console.error('Error fetching radio frequencies:', error);
-      } finally {
-        setIsLoadingFrequencies(false);
       }
     };
 
@@ -138,12 +147,12 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
           if (response.ok) {
             const orbat = await response.json();
             if (orbat.frequencies) {
-              const freqIds = orbat.frequencies.map((f: any) => f.radioFrequencyId);
+              const freqIds = orbat.frequencies.map((f: { radioFrequencyId: number }) => f.radioFrequencyId);
               setSelectedFrequencyIds(freqIds);
             }
             if (orbat.tempFrequencies && Array.isArray(orbat.tempFrequencies) && orbat.tempFrequencies.length > 0) {
               // Load temporary frequencies from the orbat
-              const loadedTempFreqs = orbat.tempFrequencies.map((f: any) => ({
+              const loadedTempFreqs = orbat.tempFrequencies.map((f: { _id?: string; frequency: string; type: 'SR' | 'LR'; isAdditional: boolean; channel?: string; callsign?: string }) => ({
                 _id: f._id || Math.random().toString(36).substr(2, 9),
                 frequency: f.frequency,
                 type: f.type,
@@ -321,6 +330,12 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         opforRelationship: opforRelationship || null,
         indepCountry: indepCountry || null,
         indepRelationship: indepRelationship || null,
+        iedThreat: iedThreat || null,
+        civilianRelationship: civilianRelationship || null,
+        rulesOfEngagement: rulesOfEngagement || null,
+        airspace: airspace || null,
+        inGameTimezone: inGameTimezone || null,
+        operationDay: operationDay || null,
       };
 
       const url = mode === 'create' ? '/api/orbats' : `/api/orbats/${initialData?.id}`;
@@ -558,6 +573,118 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
                 placeholder="e.g., Friendly"
               />
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Extra Intel */}
+      <div className="border rounded-lg p-6 space-y-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+        <h2 className="text-xl font-semibold" style={{ color: 'var(--foreground)' }}>Extra Intel</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="iedThreat" className="block text-sm font-medium mb-2" style={{ color: 'var(--muted-foreground)' }}>
+              IED/Trap/Mine Threat
+            </label>
+            <select
+              id="iedThreat"
+              value={iedThreat}
+              onChange={(e) => setIedThreat(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2"
+              style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+            >
+              <option value="">Select threat level</option>
+              <option value="None">None</option>
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+              <option value="Very High">Very High</option>
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="civilianRelationship" className="block text-sm font-medium mb-2" style={{ color: 'var(--muted-foreground)' }}>
+              Civilian Relationship
+            </label>
+            <select
+              id="civilianRelationship"
+              value={civilianRelationship}
+              onChange={(e) => setCivilianRelationship(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2"
+              style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+            >
+              <option value="">Select relationship</option>
+              <option value="Friendly">Friendly</option>
+              <option value="Neutral">Neutral</option>
+              <option value="Hostile">Hostile</option>
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="rulesOfEngagement" className="block text-sm font-medium mb-2" style={{ color: 'var(--muted-foreground)' }}>
+              Rules of Engagement
+            </label>
+            <select
+              id="rulesOfEngagement"
+              value={rulesOfEngagement}
+              onChange={(e) => setRulesOfEngagement(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2"
+              style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+            >
+              <option value="">Select ROE</option>
+              <option value="Hold Fire">Hold Fire</option>
+              <option value="Return Fire">Return Fire</option>
+              <option value="PID">PID (Positive Identification)</option>
+              <option value="Weapons Free">Weapons Free</option>
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="airspace" className="block text-sm font-medium mb-2" style={{ color: 'var(--muted-foreground)' }}>
+              Airspace
+            </label>
+            <select
+              id="airspace"
+              value={airspace}
+              onChange={(e) => setAirspace(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2"
+              style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+            >
+              <option value="">Select airspace status</option>
+              <option value="Friendly">Friendly</option>
+              <option value="Contested">Contested</option>
+              <option value="Hostile">Hostile</option>
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="inGameTimezone" className="block text-sm font-medium mb-2" style={{ color: 'var(--muted-foreground)' }}>
+              In Game Timezone
+            </label>
+            <input
+              type="text"
+              id="inGameTimezone"
+              value={inGameTimezone}
+              onChange={(e) => setInGameTimezone(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2"
+              style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+              placeholder="e.g., 4:00"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="operationDay" className="block text-sm font-medium mb-2" style={{ color: 'var(--muted-foreground)' }}>
+              Operation Day
+            </label>
+            <input
+              type="text"
+              id="operationDay"
+              value={operationDay}
+              onChange={(e) => setOperationDay(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2"
+              style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+              placeholder="e.g., Final Day"
+            />
           </div>
         </div>
       </div>
