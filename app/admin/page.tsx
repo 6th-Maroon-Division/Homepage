@@ -26,6 +26,15 @@ export default async function AdminPage() {
           </Link>
           
           <Link
+            href="/admin/templates"
+            className="border rounded-lg p-8 transition-colors"
+            style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
+          >
+            <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>Templates</h2>
+            <p style={{ color: 'var(--muted-foreground)' }}>Create and manage ORBAT templates</p>
+          </Link>
+
+          <Link
             href="/admin/users"
             className="border rounded-lg p-8 transition-colors"
             style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}

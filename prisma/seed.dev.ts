@@ -14,6 +14,7 @@ async function main() {
   await prisma.subslot.deleteMany();
   await prisma.slot.deleteMany();
   await prisma.orbat.deleteMany();
+  await prisma.orbatTemplate.deleteMany();
   await prisma.radioFrequency.deleteMany();
   await prisma.authAccount.deleteMany();
   await prisma.user.deleteMany();
@@ -613,7 +614,138 @@ async function main() {
     ],
   });
 
-  console.log('✅ Development seed complete with radio frequencies, operations, squads, and signups.');
+  // =============== TEMPLATES ===============
+
+  // --- Standard Squad Template ---
+  const standardSquadTemplate = await prisma.orbatTemplate.create({
+    data: {
+      name: 'Standard Squad',
+      description: 'A standard 2-squad template with squad leaders, riflemen, and support roles.',
+      category: 'Main Op',
+      createdById: admin.id,
+      slotsJson: JSON.stringify([
+        {
+          name: 'Alpha Squad',
+          orderIndex: 1,
+          subslots: [
+            { name: 'Squad Leader', orderIndex: 1, maxSignups: 1 },
+            { name: 'Rifleman', orderIndex: 2, maxSignups: 2 },
+            { name: 'Medic', orderIndex: 3, maxSignups: 1 },
+          ],
+        },
+        {
+          name: 'Bravo Squad',
+          orderIndex: 2,
+          subslots: [
+            { name: 'Squad Leader', orderIndex: 1, maxSignups: 1 },
+            { name: 'Auto Rifleman', orderIndex: 2, maxSignups: 1 },
+            { name: 'Rifleman', orderIndex: 3, maxSignups: 1 },
+          ],
+        },
+      ]),
+      bluforCountry: 'United States',
+      bluforRelationship: 'Friendly',
+      opforCountry: null,
+      opforRelationship: null,
+      iedThreat: 'Medium',
+      rulesOfEngagement: 'PID',
+      inGameTimezone: 'UTC+0',
+      operationDay: 'Day 1',
+    },
+  });
+
+  // --- Light Recon Template ---
+  const lightReconTemplate = await prisma.orbatTemplate.create({
+    data: {
+      name: 'Light Reconnaissance',
+      description: 'Small recon team setup with marksmen and scouts.',
+      category: 'Side Op',
+      createdById: admin.id,
+      slotsJson: JSON.stringify([
+        {
+          name: 'Recon Team',
+          orderIndex: 1,
+          subslots: [
+            { name: 'Team Lead', orderIndex: 1, maxSignups: 1 },
+            { name: 'Scout', orderIndex: 2, maxSignups: 1 },
+            { name: 'Marksman', orderIndex: 3, maxSignups: 1 },
+          ],
+        },
+      ]),
+      bluforCountry: 'United States',
+      bluforRelationship: 'Friendly',
+      opforCountry: 'Unknown',
+      opforRelationship: 'Hostile',
+      iedThreat: 'Low',
+      civilianRelationship: 'Neutral',
+      rulesOfEngagement: 'Return Fire',
+      inGameTimezone: 'UTC+0',
+      operationDay: 'Day 1',
+      startTime: '14:00',
+      endTime: '18:00',
+    },
+  });
+
+  // --- Full Platoon Template ---
+  const fullPlatoonTemplate = await prisma.orbatTemplate.create({
+    data: {
+      name: 'Full Platoon',
+      description: 'Complete platoon with 3 squads, command element, and support.',
+      category: 'Main Op',
+      createdById: admin.id,
+      slotsJson: JSON.stringify([
+        {
+          name: 'Platoon Command',
+          orderIndex: 1,
+          subslots: [
+            { name: 'Platoon Leader', orderIndex: 1, maxSignups: 1 },
+            { name: 'Sergeant', orderIndex: 2, maxSignups: 1 },
+          ],
+        },
+        {
+          name: 'Alpha Squad',
+          orderIndex: 2,
+          subslots: [
+            { name: 'Squad Leader', orderIndex: 1, maxSignups: 1 },
+            { name: 'Rifleman', orderIndex: 2, maxSignups: 2 },
+            { name: 'Grenadier', orderIndex: 3, maxSignups: 1 },
+          ],
+        },
+        {
+          name: 'Bravo Squad',
+          orderIndex: 3,
+          subslots: [
+            { name: 'Squad Leader', orderIndex: 1, maxSignups: 1 },
+            { name: 'Auto Rifleman', orderIndex: 2, maxSignups: 1 },
+            { name: 'Rifleman', orderIndex: 3, maxSignups: 1 },
+          ],
+        },
+        {
+          name: 'Charlie Squad',
+          orderIndex: 4,
+          subslots: [
+            { name: 'Squad Leader', orderIndex: 1, maxSignups: 1 },
+            { name: 'Medic', orderIndex: 2, maxSignups: 1 },
+            { name: 'Rifleman', orderIndex: 3, maxSignups: 1 },
+          ],
+        },
+      ]),
+      bluforCountry: 'United States',
+      bluforRelationship: 'Friendly',
+      opforCountry: 'Russia',
+      opforRelationship: 'Hostile',
+      iedThreat: 'High',
+      civilianRelationship: 'Neutral',
+      rulesOfEngagement: 'Weapons Free',
+      airspace: 'Contested',
+      inGameTimezone: 'UTC+2',
+      operationDay: 'Day 2',
+      startTime: '10:00',
+      endTime: '20:00',
+    },
+  });
+
+  console.log('✅ Development seed complete with radio frequencies, operations, squads, signups, and templates.');
 }
 
 main()

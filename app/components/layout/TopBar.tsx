@@ -23,6 +23,7 @@ export default function TopBar() {
   const adminNavLinks = [
     { href: '/admin', label: 'Dashboard' },
     { href: '/admin/orbats', label: 'OrbATs' },
+    { href: '/admin/templates', label: 'Templates' },
     { href: '/admin/users', label: 'Users' },
     { href: '/admin/radio-frequencies', label: 'Frequencies' },
   ];
@@ -41,6 +42,7 @@ export default function TopBar() {
     if (pathname === '/orbats') return 'Operations';
     if (pathname === '/settings') return 'Settings';
     if (pathname?.startsWith('/admin/orbats')) return 'Manage OrbATs';
+    if (pathname?.startsWith('/admin/templates')) return 'ORBAT Templates';
     if (pathname?.startsWith('/admin/users')) return 'User Management';
     if (pathname?.startsWith('/admin')) return 'Admin Dashboard';
     return null;
@@ -65,7 +67,7 @@ export default function TopBar() {
                 style={{
                   backgroundColor: isActive(link.href) ? 'var(--secondary)' : 'transparent',
                   color: isActive(link.href) ? 'var(--foreground)' : 'var(--foreground)',
-                  border: '1px solid var(--border)',
+                  border: isActive(link.href) ? '1px solid var(--primary)' : '1px solid var(--border)',
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive(link.href)) {
