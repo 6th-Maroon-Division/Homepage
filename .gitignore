@@ -52,6 +52,9 @@ next-env.d.ts
 *.swo
 *~
 
+# AI instructions (project-specific)
+.github/copilot-instructions.md
+
 # OS
 .DS_Store
 Thumbs.db
