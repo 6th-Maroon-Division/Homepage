@@ -62,8 +62,21 @@ export const authOptions: AuthOptions = {
       });
 
       // Check if we have an existing session (for account linking)
-      // We'll use the user object passed by NextAuth if available
-      const existingUserId = user?.id ? parseInt(user.id as string) : null;
+      // We need to look up the actual database user ID, not use the provider ID
+      let existingUserId: number | null = null;
+      if (user?.id) {
+        // Try to find an existing user by checking all their auth accounts
+        const existingAccount = await prisma.authAccount.findFirst({
+          where: {
+            OR: [
+              { provider: 'discord', providerUserId: user.id },
+              { provider: 'steam', providerUserId: user.id },
+            ],
+          },
+          select: { userId: true },
+        });
+        existingUserId = existingAccount?.userId ?? null;
+      }
 
       if (!authAccount) {
         if (existingUserId) {
