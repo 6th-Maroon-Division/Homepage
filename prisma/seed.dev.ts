@@ -10,6 +10,9 @@ function daysFromNow(days: number) {
 
 async function main() {
   // Clear existing data in the right order (avoid FK issues)
+  await prisma.trainingRequest.deleteMany();
+  await prisma.userTraining.deleteMany();
+  await prisma.training.deleteMany();
   await prisma.signup.deleteMany();
   await prisma.subslot.deleteMany();
   await prisma.slot.deleteMany();
@@ -745,7 +748,249 @@ async function main() {
     },
   });
 
-  console.log('✅ Development seed complete with radio frequencies, operations, squads, signups, and templates.');
+  // --- Training System ---
+  console.log('Seeding training system...');
+
+  // Create training categories
+  const combatCategory = await prisma.trainingCategory.create({
+    data: { name: 'Combat', orderIndex: 0 },
+  });
+
+  const medicalCategory = await prisma.trainingCategory.create({
+    data: { name: 'Medical', orderIndex: 1 },
+  });
+
+  const aviationCategory = await prisma.trainingCategory.create({
+    data: { name: 'Aviation', orderIndex: 2 },
+  });
+
+  const leadershipCategory = await prisma.trainingCategory.create({
+    data: { name: 'Leadership', orderIndex: 3 },
+  });
+
+  const communicationCategory = await prisma.trainingCategory.create({
+    data: { name: 'Communication', orderIndex: 4 },
+  });
+
+  const technicalCategory = await prisma.trainingCategory.create({
+    data: { name: 'Technical', orderIndex: 5 },
+  });
+
+  const otherCategory = await prisma.trainingCategory.create({
+    data: { name: 'Other', orderIndex: 6 },
+  });
+
+  // Create trainings
+  const basicCombat = await prisma.training.create({
+    data: {
+      name: 'Basic Combat Training',
+      description: 'Fundamental combat tactics, weapon handling, and squad movements',
+      categoryId: combatCategory.id,
+      duration: 120,
+      isActive: true,
+    },
+  });
+
+  const advancedCombat = await prisma.training.create({
+    data: {
+      name: 'Advanced Combat Training',
+      description: 'Advanced tactics, CQB techniques, and coordinated assaults',
+      categoryId: combatCategory.id,
+      duration: 180,
+      isActive: true,
+    },
+  });
+
+  const medicalTraining = await prisma.training.create({
+    data: {
+      name: 'Combat Medic Certification',
+      description: 'Field medical procedures, triage, and casualty evacuation',
+      categoryId: medicalCategory.id,
+      duration: 150,
+      isActive: true,
+    },
+  });
+
+  const aviationBasic = await prisma.training.create({
+    data: {
+      name: 'Basic Aviation Training',
+      description: 'Helicopter piloting fundamentals and basic flight maneuvers',
+      categoryId: aviationCategory.id,
+      duration: 240,
+      isActive: true,
+    },
+  });
+
+  const leadershipTraining = await prisma.training.create({
+    data: {
+      name: 'Squad Leadership Course',
+      description: 'Leadership principles, squad management, and tactical decision making',
+      categoryId: leadershipCategory.id,
+      duration: 180,
+      isActive: true,
+    },
+  });
+
+  const radioComms = await prisma.training.create({
+    data: {
+      name: 'Radio Communications',
+      description: 'Radio procedures, call signs, and tactical communications',
+      categoryId: communicationCategory.id,
+      duration: 90,
+      isActive: true,
+    },
+  });
+
+  const sniperTraining = await prisma.training.create({
+    data: {
+      name: 'Sniper School',
+      description: 'Long-range marksmanship, camouflage, and reconnaissance',
+      categoryId: combatCategory.id,
+      duration: 300,
+      isActive: true,
+    },
+  });
+
+  const explosivesTraining = await prisma.training.create({
+    data: {
+      name: 'Explosives & Demolition',
+      description: 'Safe handling and deployment of explosives, mine clearing',
+      categoryId: technicalCategory.id,
+      duration: 180,
+      isActive: false, // Inactive training for testing
+    },
+  });
+
+  // Assign trainings to users
+  await prisma.userTraining.create({
+    data: {
+      userId: alice.id,
+      trainingId: basicCombat.id,
+      notes: 'Completed with excellent performance',
+      completedAt: new Date('2026-01-01'),
+    },
+  });
+
+  await prisma.userTraining.create({
+    data: {
+      userId: alice.id,
+      trainingId: medicalTraining.id,
+      needsRetraining: true, // Needs retraining
+      notes: 'Annual recertification required',
+      completedAt: new Date('2026-01-05'),
+    },
+  });
+
+  await prisma.userTraining.create({
+    data: {
+      userId: bob.id,
+      trainingId: basicCombat.id,
+      completedAt: new Date('2026-01-02'),
+    },
+  });
+
+  await prisma.userTraining.create({
+    data: {
+      userId: bob.id,
+      trainingId: aviationBasic.id,
+      completedAt: new Date('2026-01-10'),
+      notes: 'Certified for rotary wing operations',
+    },
+  });
+
+  await prisma.userTraining.create({
+    data: {
+      userId: charlie.id,
+      trainingId: basicCombat.id,
+      completedAt: new Date('2025-12-15'),
+    },
+  });
+
+  await prisma.userTraining.create({
+    data: {
+      userId: charlie.id,
+      trainingId: leadershipTraining.id,
+      completedAt: new Date('2026-01-08'),
+      notes: 'Shows strong leadership potential',
+    },
+  });
+
+  // Admin trainings
+  await prisma.userTraining.create({
+    data: {
+      userId: admin.id,
+      trainingId: basicCombat.id,
+      completedAt: new Date('2025-12-01'),
+      notes: 'Training administrator',
+    },
+  });
+
+  await prisma.userTraining.create({
+    data: {
+      userId: admin.id,
+      trainingId: leadershipTraining.id,
+      completedAt: new Date('2025-12-10'),
+      notes: 'Leadership role for admin',
+    },
+  });
+
+  // Hidden training (admin testing)
+  await prisma.userTraining.create({
+    data: {
+      userId: diana.id,
+      trainingId: sniperTraining.id,
+      isHidden: true, // This won't show up for Diana
+      completedAt: new Date('2025-11-20'),
+      notes: 'Classified training record',
+    },
+  });
+
+  // Create training requests
+  await prisma.trainingRequest.create({
+    data: {
+      userId: alice.id,
+      trainingId: advancedCombat.id,
+      status: 'pending',
+      requestMessage: 'I would like to progress to advanced combat training after completing basic.',
+      requestedAt: new Date('2026-01-12'),
+    },
+  });
+
+  await prisma.trainingRequest.create({
+    data: {
+      userId: bob.id,
+      trainingId: leadershipTraining.id,
+      status: 'pending',
+      requestMessage: 'Interested in taking on squad leader roles in future operations.',
+      requestedAt: new Date('2026-01-11'),
+    },
+  });
+
+  await prisma.trainingRequest.create({
+    data: {
+      userId: charlie.id,
+      trainingId: radioComms.id,
+      status: 'approved',
+      requestMessage: 'Need radio training for RTO role',
+      adminResponse: 'Approved - training scheduled for next week',
+      requestedAt: new Date('2026-01-05'),
+      updatedAt: new Date('2026-01-06'),
+    },
+  });
+
+  await prisma.trainingRequest.create({
+    data: {
+      userId: diana.id,
+      trainingId: medicalTraining.id,
+      status: 'rejected',
+      requestMessage: 'I want to be a medic',
+      adminResponse: 'Please complete basic combat training first',
+      requestedAt: new Date('2026-01-03'),
+      updatedAt: new Date('2026-01-04'),
+    },
+  });
+
+  console.log('✅ Development seed complete with radio frequencies, operations, squads, signups, templates, and trainings.');
 }
 
 main()

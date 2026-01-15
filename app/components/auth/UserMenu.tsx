@@ -60,6 +60,20 @@ export default function UserMenu() {
       {isOpen && (
         <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 z-50" style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)' }}>
           <Link
+            href="/trainings"
+            className="block px-4 py-2 transition-colors"
+            style={{ color: 'var(--foreground)' }}
+            onClick={() => setIsOpen(false)}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--button-hover)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            My Trainings
+          </Link>
+          <Link
             href="/settings"
             className="block px-4 py-2 transition-colors"
             style={{ color: 'var(--foreground)' }}

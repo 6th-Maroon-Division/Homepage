@@ -19,10 +19,16 @@ export default async function UsersManagementPage() {
     ],
     include: {
       accounts: true,
+      userTrainings: {
+        include: {
+          training: true,
+        },
+      },
       _count: {
         select: {
           signups: true,
           orbats: true,
+          userTrainings: true,
         },
       },
     },
@@ -39,6 +45,17 @@ export default async function UsersManagementPage() {
     providers: user.accounts.map((acc) => acc.provider),
     signupCount: user._count.signups,
     orbatCount: user._count.orbats,
+    trainingCount: user._count.userTrainings,
+    trainings: user.userTrainings.map((ut) => ({
+      id: ut.id,
+      trainingId: ut.trainingId,
+      trainingName: ut.training.name,
+      needsRetraining: ut.needsRetraining,
+      isHidden: ut.isHidden,
+      notes: ut.notes,
+      completedAt: ut.completedAt.toISOString(),
+      assignedAt: ut.assignedAt.toISOString(),
+    })),
   }));
 
   return (

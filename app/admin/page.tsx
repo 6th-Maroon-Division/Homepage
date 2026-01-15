@@ -51,6 +51,15 @@ export default async function AdminPage() {
             <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>Radio Frequencies</h2>
             <p style={{ color: 'var(--muted-foreground)' }}>Manage radio frequencies for slots</p>
           </Link>
+
+          <Link
+            href="/admin/trainings"
+            className="border rounded-lg p-8 transition-colors"
+            style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
+          >
+            <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>Trainings</h2>
+            <p style={{ color: 'var(--muted-foreground)' }}>Create trainings and manage requests</p>
+          </Link>
         </div>
       </div>
     </main>

@@ -28,6 +28,9 @@ model User {
   orbats            Orbat[]            @relation("OrbatCreator")
   signups           Signup[]
   orbatTemplates    OrbatTemplate[]
+  userTrainings     UserTraining[]
+  trainingRequests  TrainingRequest[]
+  handledRequests   TrainingRequest[]  @relation("TrainingRequestHandledBy")
 }
 
 model AuthAccount {
@@ -161,3 +164,69 @@ model OrbatTemplate {
   isActive              Boolean   @default(true)
 }
 
+enum TrainingRequestStatus {
+  pending
+  approved
+  rejected
+  completed
+}
+
+model Training {
+  id                Int                @id @default(autoincrement())
+  name              String
+  description       String?
+  category          TrainingCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId        Int?               // Foreign key to TrainingCategory
+  duration          Int?               // Duration in minutes
+  isActive          Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  userTrainings     UserTraining[]
+  trainingRequests  TrainingRequest[]
+}
+
+model TrainingCategory {
+  id        Int         @id @default(autoincrement())
+  name      String      @unique
+  orderIndex Int        @default(0)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  trainings Training[]
+}
+
+model UserTraining {
+  id              Int       @id @default(autoincrement())
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          Int
+  training        Training  @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  trainingId      Int
+  completedAt     DateTime  @default(now())
+  needsRetraining Boolean   @default(false) // Flag to indicate retraining is needed
+  isHidden        Boolean   @default(false) // Admin can hide this training from user view
+  notes           String?   // Admin notes about completion
+  assignedAt      DateTime  @default(now())
+
+  @@unique([userId, trainingId])
+  @@index([userId])
+  @@index([trainingId])
+}
+
+model TrainingRequest {
+  id              Int                   @id @default(autoincrement())
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          Int
+  training        Training              @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  trainingId      Int
+  status          TrainingRequestStatus @default(pending)
+  requestMessage  String?               // User's message/reason for requesting
+  adminResponse   String?               // Admin's response or notes
+  handledByAdmin  User?                 @relation("TrainingRequestHandledBy", fields: [handledByAdminId], references: [id])
+  handledByAdminId Int?
+  requestedAt     DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@index([userId])
+  @@index([trainingId])
+  @@index([status])
+  @@index([handledByAdminId])
+}

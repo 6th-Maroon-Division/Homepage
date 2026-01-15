@@ -26,6 +26,7 @@ export default function TopBar() {
     { href: '/admin/templates', label: 'Templates' },
     { href: '/admin/users', label: 'Users' },
     { href: '/admin/radio-frequencies', label: 'Frequencies' },
+    { href: '/admin/trainings', label: 'Trainings' },
   ];
 
   const navLinks = isAdminRoute ? adminNavLinks : publicNavLinks;
@@ -41,9 +42,11 @@ export default function TopBar() {
     if (pathname === '/') return null;
     if (pathname === '/orbats') return 'Operations';
     if (pathname === '/settings') return 'Settings';
+    if (pathname === '/trainings') return 'Training Center';
     if (pathname?.startsWith('/admin/orbats')) return 'Manage OrbATs';
     if (pathname?.startsWith('/admin/templates')) return 'ORBAT Templates';
     if (pathname?.startsWith('/admin/users')) return 'User Management';
+    if (pathname?.startsWith('/admin/trainings')) return 'Training Management';
     if (pathname?.startsWith('/admin')) return 'Admin Dashboard';
     return null;
   };
