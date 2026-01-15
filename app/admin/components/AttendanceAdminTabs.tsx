@@ -47,7 +47,7 @@ export function AttendanceAdminTabs({ orbatId }: { orbatId: number }) {
           <AttendanceManagement orbatId={orbatId} />
         </div>
       ) : (
-        <LegacyDataMappingClient signupsOrbatId={orbatId} />
+        <LegacyDataMappingClient />
       )}
     </div>
   );
