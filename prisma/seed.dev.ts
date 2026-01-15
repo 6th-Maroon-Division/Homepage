@@ -751,6 +751,12 @@ async function main() {
   // --- Training System ---
   console.log('Seeding training system...');
 
+  // Clean existing training data to ensure idempotent seeding
+  await prisma.trainingRequest.deleteMany({});
+  await prisma.userTraining.deleteMany({});
+  await prisma.training.deleteMany({});
+  await prisma.trainingCategory.deleteMany({});
+
   // Create training categories
   const combatCategory = await prisma.trainingCategory.create({
     data: { name: 'Combat', orderIndex: 0 },

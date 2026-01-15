@@ -31,6 +31,10 @@ model User {
   userTrainings     UserTraining[]
   trainingRequests  TrainingRequest[]
   handledRequests   TrainingRequest[]  @relation("TrainingRequestHandledBy")
+  attendances       Attendance[]
+  attendanceLogs    AttendanceLog[]
+  attendanceSessions AttendanceSession[]
+  legacyMappings    LegacyAttendanceData[]
 }
 
 model AuthAccount {
@@ -55,6 +59,7 @@ model Orbat {
   createdAt        DateTime  @default(now())
   slots            Slot[]
   frequencies      OrbatRadioFrequency[]
+  attendances      Attendance[]
   tempFrequencies  Json?     @default("[]") // Store temporary frequencies as JSON array
   // BLUFOR faction
   bluforCountry    String?
@@ -122,9 +127,82 @@ model Signup {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    Int
   createdAt DateTime @default(now())
+  attendance Attendance?
 
   @@unique([subslotId, userId])
   @@index([userId])  // Indexing for fast lookup
+}
+
+enum AttendanceStatus {
+  present      // Full attendance
+  absent       // Manually marked absent
+  late         // Arrived after first hour
+  gone_early   // Left before last hour
+  partial      // Both late and gone_early with >=60 mins total missed
+  no_show      // Never checked in
+}
+
+model Attendance {
+  id                    Int              @id @default(autoincrement())
+  signup                Signup?          @relation(fields: [signupId], references: [id], onDelete: Cascade)
+  signupId              Int?             @unique
+  orbat                 Orbat            @relation(fields: [orbatId], references: [id], onDelete: Cascade)
+  orbatId               Int
+  user                  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                Int
+  status                AttendanceStatus @default(absent)
+  
+  // Time tracking - individual sessions for multiple check-in/check-outs
+  sessions              AttendanceSession[]
+  minutesLate           Int              @default(0) // Minutes late in first hour (from first session)
+  minutesGoneEarly      Int              @default(0) // Minutes early in last hour (from last session)
+  totalMinutesMissed    Int              @default(0) // minutesLate + minutesGoneEarly
+  totalMinutesPresent   Int              @default(0) // Sum of all session durations
+  
+  notes                 String?          // Optional admin notes
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  logs                  AttendanceLog[]
+
+  @@index([orbatId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model AttendanceSession {
+  id              Int       @id @default(autoincrement())
+  attendance      Attendance? @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  attendanceId    Int?
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          Int
+  checkedInAt     DateTime
+  checkedOutAt    DateTime?
+  durationMinutes Int?      // Calculated when checked out: (checkedOutAt - checkedInAt) in minutes
+  sessionDate     DateTime  // Date of the session (for querying by date)
+  timestamp       DateTime  @default(now())
+
+  @@index([userId])
+  @@index([sessionDate])
+  @@index([attendanceId])
+  @@index([timestamp])
+}
+
+model AttendanceLog {
+  id              Int      @id @default(autoincrement())
+  attendance      Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  attendanceId    Int
+  action          String   // "created", "status_changed", "notes_updated", "time_updated", "deleted"
+  source          String   @default("manual") // "manual" or "automated_system"
+  changedBy       User?    @relation(fields: [changedById], references: [id], onDelete: SetNull)
+  changedById     Int?
+  previousValue   Json?    // Previous state (for updates)
+  newValue        Json?    // New state (for updates)
+  timestamp       DateTime @default(now())
+
+  @@index([attendanceId])
+  @@index([changedById])
+  @@index([timestamp])
+  @@index([source])
 }
 
 model OrbatTemplate {
@@ -229,4 +307,29 @@ model TrainingRequest {
   @@index([trainingId])
   @@index([status])
   @@index([handledByAdminId])
+}
+
+// Legacy data tables for import process - stays as legacy only
+model LegacyAttendanceData {
+  id              Int              @id @default(autoincrement())
+  legacyName      String           // Discord username + rank from old system (e.g., "Maj Stas")
+  legacyUserId    String?          // User ID from legacy CSV (e.g., "12345") - used to match records across imports
+  legacyStatus    String           // Original status code: P, A, NA, LOA, NO, EO
+  legacyNotes     String?          // Notes from original data
+  legacyEventDate DateTime?        // Event date from legacy system (e.g., "9-Jan-2025")
+  
+  // Mapping to actual system (user only, no signup/orbat)
+  mappedUser      User?            @relation(fields: [mappedUserId], references: [id], onDelete: SetNull)
+  mappedUserId    Int?             // Link to actual user in system after mapping
+  
+  // Status tracking
+  isMapped        Boolean          @default(false)
+  
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([isMapped])
+  @@index([legacyUserId])
+  @@index([mappedUserId])
+  @@index([legacyEventDate])
 }

@@ -60,6 +60,15 @@ export default async function AdminPage() {
             <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>Trainings</h2>
             <p style={{ color: 'var(--muted-foreground)' }}>Create trainings and manage requests</p>
           </Link>
+
+          <Link
+            href="/admin/attendance"
+            className="border rounded-lg p-8 transition-colors"
+            style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
+          >
+            <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>Attendance</h2>
+            <p style={{ color: 'var(--muted-foreground)' }}>Track and manage operation attendance</p>
+          </Link>
         </div>
       </div>
     </main>
