@@ -10,6 +10,8 @@ function daysFromNow(days: number) {
 
 async function main() {
   // Clear existing data in the right order (avoid FK issues)
+  await prisma.messageRecipient.deleteMany();
+  await prisma.message.deleteMany();
   await prisma.trainingRequest.deleteMany();
   await prisma.userTraining.deleteMany();
   await prisma.training.deleteMany();
@@ -996,7 +998,96 @@ async function main() {
     },
   });
 
-  console.log('✅ Development seed complete with radio frequencies, operations, squads, signups, templates, and trainings.');
+  // --- Sample Messages for Inbox Testing ---
+  // Message 1: ORBAT announcement to all users
+  const orbatMessage = await prisma.message.create({
+    data: {
+      title: 'New Operation: Desert Storm',
+      body: 'A new operation has been scheduled for this Saturday at 1900 UTC. All members are encouraged to sign up early!',
+      type: 'orbat',
+      actionUrl: '/orbats',
+      createdById: admin.id,
+    },
+  });
+
+  // Create recipients for all users
+  const allUsers = [admin, alice, bob, charlie, diana];
+  for (const user of allUsers) {
+    await prisma.messageRecipient.create({
+      data: {
+        messageId: orbatMessage.id,
+        userId: user.id,
+        audienceType: 'all',
+        isRead: false,
+        channel: 'web',
+      },
+    });
+  }
+
+  // Message 2: Training reminder to specific users
+  const trainingMessage = await prisma.message.create({
+    data: {
+      title: 'Training Reminder: Radio Communications',
+      body: 'Your requested Radio Communications training has been approved and will begin next week. Please check the training schedule for details.',
+      type: 'training',
+      actionUrl: '/trainings',
+      createdById: admin.id,
+    },
+  });
+
+  await prisma.messageRecipient.createMany({
+    data: [
+      { messageId: trainingMessage.id, userId: charlie.id, audienceType: 'user', isRead: false, channel: 'web' },
+      { messageId: trainingMessage.id, userId: bob.id, audienceType: 'user', isRead: true, channel: 'web', readAt: new Date() },
+    ],
+  });
+
+  // Message 3: Admin alert (admin-only)
+  const adminAlertMessage = await prisma.message.create({
+    data: {
+      title: 'New Training Requests Pending',
+      body: 'There are 2 new training requests awaiting approval. Please review them when you have time.',
+      type: 'alert',
+      actionUrl: '/admin/trainings',
+      createdById: admin.id,
+    },
+  });
+
+  await prisma.messageRecipient.create({
+    data: {
+      messageId: adminAlertMessage.id,
+      userId: admin.id,
+      audienceType: 'admin',
+      isRead: false,
+      channel: 'web',
+    },
+  });
+
+  // Message 4: General announcement
+  const generalMessage = await prisma.message.create({
+    data: {
+      title: 'Welcome to 6MD Management Platform',
+      body: 'Welcome! You can now receive notifications about operations, trainings, and important announcements directly in your inbox.',
+      type: 'general',
+      actionUrl: null,
+      createdById: admin.id,
+    },
+  });
+
+  for (const user of allUsers) {
+    await prisma.messageRecipient.create({
+      data: {
+        messageId: generalMessage.id,
+        userId: user.id,
+        audienceType: 'all',
+        isRead: user.id === admin.id, // Mark read for admin only
+        readAt: user.id === admin.id ? new Date() : null,
+        channel: 'web',
+      },
+    });
+  }
+
+  console.log('✅ Development seed complete with radio frequencies, operations, squads, signups, templates, trainings, and messages.');
 }
 
 main()

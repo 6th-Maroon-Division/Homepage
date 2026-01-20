@@ -35,6 +35,63 @@ model User {
   attendanceLogs    AttendanceLog[]
   attendanceSessions AttendanceSession[]
   legacyMappings    LegacyAttendanceData[]
+  createdMessages   Message[]          @relation("MessageCreator")
+  messageRecipients MessageRecipient[]
+}
+
+enum MessageType {
+  orbat
+  training
+  rankup
+  general
+  alert
+}
+
+enum AudienceType {
+  user      // Direct to user
+  rank      // To all users with specific rank
+  all       // Broadcast to all users
+  admin     // Admin-only alerts
+}
+
+enum DeliveryChannel {
+  web
+  discord   // Future: Discord DM or channel delivery
+}
+
+model Message {
+  id           Int       @id @default(autoincrement())
+  title        String
+  body         String    @db.Text
+  type         MessageType @default(general)
+  actionUrl    String?
+  createdBy    User?     @relation("MessageCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdById  Int?
+  createdAt    DateTime  @default(now())
+  recipients   MessageRecipient[]
+
+  @@index([type])
+  @@index([createdAt])
+}
+
+model MessageRecipient {
+  id            Int       @id @default(autoincrement())
+  message       Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  messageId     Int
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        Int
+  audienceType  AudienceType
+  audienceValue String?   // e.g., rankId for rank-based, null for all/user/admin
+  isRead        Boolean   @default(false)
+  readAt        DateTime?
+  deliveredAt   DateTime  @default(now())
+  channel       DeliveryChannel @default(web)
+  metadata      Json?     // Flexible storage for future delivery-specific data
+
+  @@unique([messageId, userId])
+  @@index([userId, isRead])
+  @@index([messageId])
+  @@index([audienceType])
 }
 
 model AuthAccount {

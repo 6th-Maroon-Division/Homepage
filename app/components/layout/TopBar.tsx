@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import UserMenu from '../auth/UserMenu';
+import UnifiedInbox from '../ui/UnifiedInbox';
 
 export default function TopBar() {
   const { data: session } = useSession();
@@ -158,7 +159,10 @@ export default function TopBar() {
               </a>
             </div>
           ) : (
-            <UserMenu />
+            <>
+              <UnifiedInbox />
+              <UserMenu />
+            </>
           )}
         </div>
 
