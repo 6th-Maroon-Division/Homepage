@@ -69,6 +69,24 @@ export default async function AdminPage() {
             <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>Attendance</h2>
             <p style={{ color: 'var(--muted-foreground)' }}>Track and manage operation attendance</p>
           </Link>
+
+          <Link
+            href="/admin/ranks"
+            className="border rounded-lg p-8 transition-colors"
+            style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
+          >
+            <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>Ranks</h2>
+            <p style={{ color: 'var(--muted-foreground)' }}>Configure ranks and progression system</p>
+          </Link>
+
+          <Link
+            href="/admin/messaging"
+            className="border rounded-lg p-8 transition-colors"
+            style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
+          >
+            <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>Messaging</h2>
+            <p style={{ color: 'var(--muted-foreground)' }}>Send notifications to users</p>
+          </Link>
         </div>
       </div>
     </main>

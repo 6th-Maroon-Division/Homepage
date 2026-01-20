@@ -12,10 +12,16 @@ type Rank = {
   autoRankupEnabled: boolean;
 };
 
+type DragState = {
+  draggedIndex: number | null;
+  dragOverIndex: number | null;
+};
+
 export default function RankConfigClient() {
   const { showToast } = useToast();
   const [ranks, setRanks] = useState<Rank[]>([]);
   const [loading, setLoading] = useState(false);
+  const [dragState, setDragState] = useState<DragState>({ draggedIndex: null, dragOverIndex: null });
 
   const [form, setForm] = useState<Partial<Rank>>({
     name: '',
@@ -105,6 +111,33 @@ export default function RankConfigClient() {
     }
   };
 
+  const handleDragStart = (index: number) => {
+    setDragState({ ...dragState, draggedIndex: index });
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (dragState.draggedIndex === null || dragState.draggedIndex === index) return;
+    setDragState({ ...dragState, dragOverIndex: index });
+  };
+
+  const handleDrop = (index: number) => {
+    if (dragState.draggedIndex === null) return;
+
+    const reordered = [...ranks];
+    const [dragged] = reordered.splice(dragState.draggedIndex, 1);
+    reordered.splice(index, 0, dragged);
+
+    // Update orderIndex for all items
+    const updated = reordered.map((r, idx) => ({ ...r, orderIndex: idx }));
+    setRanks(updated);
+    setDragState({ draggedIndex: null, dragOverIndex: null });
+  };
+
+  const handleDragEnd = () => {
+    setDragState({ draggedIndex: null, dragOverIndex: null });
+  };
+
   return (
     <div className="rounded-lg border p-6" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
       <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--foreground)' }}>Manage Ranks</h2>
@@ -129,14 +162,6 @@ export default function RankConfigClient() {
           type="number"
           className="border rounded-md px-3 py-2"
           style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
-          placeholder="Order"
-          value={form.orderIndex ?? 0}
-          onChange={(e) => setForm((f) => ({ ...f, orderIndex: Number(e.target.value) }))}
-        />
-        <input
-          type="number"
-          className="border rounded-md px-3 py-2"
-          style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
           placeholder="Attendance Required (optional)"
           value={form.attendanceRequiredSinceLastRank ?? ''}
           onChange={(e) => {
@@ -151,6 +176,8 @@ export default function RankConfigClient() {
             checked={!!form.autoRankupEnabled}
             onChange={(e) => setForm((f) => ({ ...f, autoRankupEnabled: e.target.checked }))}
           />
+        </div>
+        <div className="flex items-center gap-2">
           <button
             className="ml-auto px-4 py-2 rounded-md"
             style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
@@ -169,20 +196,37 @@ export default function RankConfigClient() {
       ) : (
         <div className="space-y-2">
           {ranks.map((r, idx) => (
-            <div key={r.id} className="p-3 rounded-md border" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)' }}>
-              <div className="grid grid-cols-1 md:grid-cols-6 gap-2 items-center">
+            <div
+              key={r.id}
+              draggable
+              onDragStart={() => handleDragStart(idx)}
+              onDragOver={(e) => handleDragOver(e, idx)}
+              onDrop={() => handleDrop(idx)}
+              onDragEnd={handleDragEnd}
+              className="p-3 rounded-md border cursor-move"
+              style={{
+                borderColor: dragState.dragOverIndex === idx ? 'var(--primary)' : 'var(--border)',
+                backgroundColor: dragState.draggedIndex === idx ? 'var(--muted)' : 'var(--background)',
+                opacity: dragState.draggedIndex === idx ? 0.5 : 1,
+              }}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-2 items-center">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-mono" style={{ color: 'var(--muted-foreground)' }}>#{r.orderIndex}</span>
+                  <input
+                    className="border rounded-md px-2 py-1 flex-1"
+                    style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                    value={r.name}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setRanks((list) => list.map((x) => (x.id === r.id ? { ...x, name: v } : x)));
+                    }}
+                  />
+                </div>
                 <input
                   className="border rounded-md px-2 py-1"
                   style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
-                  value={r.name}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setRanks((list) => list.map((x) => (x.id === r.id ? { ...x, name: v } : x)));
-                  }}
-                />
-                <input
-                  className="border rounded-md px-2 py-1"
-                  style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                  placeholder="Abbr."
                   value={r.abbreviation}
                   onChange={(e) => {
                     const v = e.target.value;
@@ -193,16 +237,7 @@ export default function RankConfigClient() {
                   type="number"
                   className="border rounded-md px-2 py-1"
                   style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
-                  value={r.orderIndex}
-                  onChange={(e) => {
-                    const v = Number(e.target.value);
-                    setRanks((list) => list.map((x) => (x.id === r.id ? { ...x, orderIndex: v } : x)));
-                  }}
-                />
-                <input
-                  type="number"
-                  className="border rounded-md px-2 py-1"
-                  style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                  placeholder="Attendance"
                   value={r.attendanceRequiredSinceLastRank ?? ''}
                   onChange={(e) => {
                     const val = e.target.value;
