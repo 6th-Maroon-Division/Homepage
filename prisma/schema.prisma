@@ -37,6 +37,10 @@ model User {
   legacyMappings    LegacyAttendanceData[]
   createdMessages   Message[]          @relation("MessageCreator")
   messageRecipients MessageRecipient[]
+  // Rank system
+  userRank          UserRank?
+  rankHistory       RankHistory[]
+  promotionProposals PromotionProposal[]
 }
 
 enum MessageType {
@@ -114,6 +118,7 @@ model Orbat {
   createdBy        User      @relation("OrbatCreator", fields: [createdById], references: [id])
   createdById      Int
   createdAt        DateTime  @default(now())
+  isMainOp         Boolean   @default(false)
   slots            Slot[]
   frequencies      OrbatRadioFrequency[]
   attendances      Attendance[]
@@ -313,11 +318,18 @@ model Training {
   category          TrainingCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   categoryId        Int?               // Foreign key to TrainingCategory
   duration          Int?               // Duration in minutes
+  // Rank/training prerequisites
+  requiredForNewPeople Boolean         @default(false)
   isActive          Boolean            @default(true)
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   userTrainings     UserTraining[]
   trainingRequests  TrainingRequest[]
+  // Relations for prerequisites and rank transitions
+  rankRequirement   TrainingRankRequirement?
+  requiresTrainings TrainingTrainingRequirement[] @relation("RequiresTutorial")
+  requiredByTrainings TrainingTrainingRequirement[] @relation("RequiredBy")
+  rankTransitions   RankTransitionRequirement[] @relation("RankTransitionRequirement")
 }
 
 model TrainingCategory {
@@ -389,4 +401,132 @@ model LegacyAttendanceData {
   @@index([legacyUserId])
   @@index([mappedUserId])
   @@index([legacyEventDate])
+}
+
+// =====================
+// Rank System - Phase 1
+// =====================
+
+model Rank {
+  id                              Int       @id @default(autoincrement())
+  name                            String    @unique
+  abbreviation                    String    @unique
+  orderIndex                      Int
+
+  attendanceRequiredSinceLastRank Int?
+  autoRankupEnabled               Boolean   @default(false)
+
+  // Relations
+  userRanks                       UserRank[]
+  trainingRequirementsMin         TrainingRankRequirement[]
+  transitionRequirementsTarget    RankTransitionRequirement[]
+
+  createdAt                       DateTime  @default(now())
+  updatedAt                       DateTime  @updatedAt
+}
+
+model UserRank {
+  id                      Int       @id @default(autoincrement())
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                  Int       @unique
+
+  currentRank             Rank?     @relation(fields: [currentRankId], references: [id], onDelete: SetNull)
+  currentRankId           Int?
+
+  lastRankedUpAt          DateTime  @default(now())
+  attendanceSinceLastRank Int       @default(0)
+
+  retired                 Boolean   @default(false)
+  interviewDone           Boolean   @default(false)
+
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([currentRankId])
+}
+
+model RankHistory {
+  id                           Int       @id @default(autoincrement())
+  user                         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                       Int
+
+  previousRankName             String?
+  newRankName                  String
+
+  attendanceTotalAtChange      Int
+  attendanceDeltaSinceLastRank Int
+
+  triggeredBy                  String    @db.VarChar(20)
+  triggeredByUserId            Int?
+  triggeredByDiscordId         String?
+
+  outcome                      String?   @db.VarChar(20)
+  declineReason                String?
+  note                         String?
+
+  createdAt                    DateTime  @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([triggeredBy])
+}
+
+model RankTransitionRequirement {
+  id                Int       @id @default(autoincrement())
+  targetRank        Rank      @relation(fields: [targetRankId], references: [id], onDelete: Cascade)
+  targetRankId      Int
+
+  requiredTrainings Training[] @relation("RankTransitionRequirement")
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([targetRankId])
+  @@index([targetRankId])
+}
+
+model TrainingRankRequirement {
+  id              Int       @id @default(autoincrement())
+  training        Training  @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  trainingId      Int
+  minimumRank     Rank?     @relation(fields: [minimumRankId], references: [id], onDelete: SetNull)
+  minimumRankId   Int?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([trainingId])
+  @@index([trainingId])
+  @@index([minimumRankId])
+}
+
+model TrainingTrainingRequirement {
+  id                   Int       @id @default(autoincrement())
+  training             Training  @relation("RequiresTutorial", fields: [trainingId], references: [id], onDelete: Cascade)
+  trainingId           Int
+  requiredTraining     Training  @relation("RequiredBy", fields: [requiredTrainingId], references: [id], onDelete: Cascade)
+  requiredTrainingId   Int
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@unique([trainingId, requiredTrainingId])
+  @@index([trainingId])
+  @@index([requiredTrainingId])
+}
+
+model PromotionProposal {
+  id                           Int       @id @default(autoincrement())
+  user                         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                       Int
+  currentRankId                Int
+  nextRankId                   Int
+  attendanceTotalAtProposal    Int
+  attendanceDeltaSinceLastRank Int
+  status                       String    @db.VarChar(20)
+  createdAt                    DateTime  @default(now())
+  updatedAt                    DateTime  @updatedAt
+
+  @@unique([userId, nextRankId])
+  @@index([userId])
+  @@index([status])
 }

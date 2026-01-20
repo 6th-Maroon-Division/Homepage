@@ -12,6 +12,14 @@ async function main() {
   // Clear existing data in the right order (avoid FK issues)
   await prisma.messageRecipient.deleteMany();
   await prisma.message.deleteMany();
+  // Rank system clears
+  await prisma.promotionProposal?.deleteMany?.({});
+  await prisma.rankHistory?.deleteMany?.({});
+  await prisma.userRank?.deleteMany?.({});
+  await prisma.rankTransitionRequirement?.deleteMany?.({});
+  await prisma.trainingTrainingRequirement?.deleteMany?.({});
+  await prisma.trainingRankRequirement?.deleteMany?.({});
+  await prisma.rank?.deleteMany?.({});
   await prisma.trainingRequest.deleteMany();
   await prisma.userTraining.deleteMany();
   await prisma.training.deleteMany();
@@ -869,6 +877,12 @@ async function main() {
     },
   });
 
+  // Mark BCT as required for new people
+  await prisma.training.update({
+    where: { id: basicCombat.id },
+    data: { requiredForNewPeople: true },
+  });
+
   // Assign trainings to users
   await prisma.userTraining.create({
     data: {
@@ -983,6 +997,82 @@ async function main() {
       adminResponse: 'Approved - training scheduled for next week',
       requestedAt: new Date('2026-01-05'),
       updatedAt: new Date('2026-01-06'),
+    },
+  });
+
+  // --- Rank System Seed ---
+  console.log('Seeding rank system...');
+
+  // Create ranks
+  await prisma.rank.createMany({
+    data: [
+      { name: 'Cadet', abbreviation: 'Cdt', orderIndex: 0, attendanceRequiredSinceLastRank: null, autoRankupEnabled: false },
+      { name: 'Recruit', abbreviation: 'Rct', orderIndex: 1, attendanceRequiredSinceLastRank: 5, autoRankupEnabled: true },
+      { name: 'Private', abbreviation: 'Pvt', orderIndex: 2, attendanceRequiredSinceLastRank: 10, autoRankupEnabled: true },
+      { name: 'Lance Corporal', abbreviation: 'LCpl', orderIndex: 3, attendanceRequiredSinceLastRank: 10, autoRankupEnabled: false },
+      { name: 'Corporal', abbreviation: 'Cpl', orderIndex: 4, attendanceRequiredSinceLastRank: 20, autoRankupEnabled: false },
+      { name: 'Sergeant', abbreviation: 'Sgt', orderIndex: 5, attendanceRequiredSinceLastRank: 25, autoRankupEnabled: false },
+      { name: 'Staff Sergeant', abbreviation: 'SSgt', orderIndex: 6, attendanceRequiredSinceLastRank: 30, autoRankupEnabled: false },
+      { name: 'Warrant Officer 1', abbreviation: 'WO1', orderIndex: 7, attendanceRequiredSinceLastRank: 35, autoRankupEnabled: false },
+      { name: 'Warrant Officer 2', abbreviation: 'WO2', orderIndex: 8, attendanceRequiredSinceLastRank: 40, autoRankupEnabled: false },
+      { name: 'Second Lieutenant', abbreviation: '2Lt', orderIndex: 9, attendanceRequiredSinceLastRank: 45, autoRankupEnabled: false },
+      { name: 'Major', abbreviation: 'Maj', orderIndex: 10, attendanceRequiredSinceLastRank: null, autoRankupEnabled: false },
+    ],
+    skipDuplicates: true,
+  });
+
+  const ranks = await prisma.rank.findMany();
+  const byAbbr: Record<string, number> = {};
+  for (const r of ranks) byAbbr[r.abbreviation] = r.id;
+
+  // Assign ranks to users
+  await prisma.userRank.create({
+    data: {
+      userId: admin.id,
+      currentRankId: byAbbr['Maj'],
+      attendanceSinceLastRank: 0,
+      retired: false,
+      interviewDone: true,
+    },
+  });
+
+  await prisma.userRank.create({
+    data: {
+      userId: alice.id,
+      currentRankId: byAbbr['Pvt'],
+      attendanceSinceLastRank: 8,
+      retired: false,
+      interviewDone: true,
+    },
+  });
+
+  await prisma.userRank.create({
+    data: {
+      userId: bob.id,
+      currentRankId: byAbbr['LCpl'],
+      attendanceSinceLastRank: 12,
+      retired: false,
+      interviewDone: true,
+    },
+  });
+
+  await prisma.userRank.create({
+    data: {
+      userId: charlie.id,
+      currentRankId: byAbbr['Cpl'],
+      attendanceSinceLastRank: 20,
+      retired: false,
+      interviewDone: true,
+    },
+  });
+
+  await prisma.userRank.create({
+    data: {
+      userId: diana.id,
+      currentRankId: byAbbr['Sgt'],
+      attendanceSinceLastRank: 25,
+      retired: false,
+      interviewDone: true,
     },
   });
 
