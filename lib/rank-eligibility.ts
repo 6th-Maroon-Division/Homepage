@@ -32,7 +32,7 @@ export async function getCurrentAttendance(userId: number): Promise<number> {
     where: {
       userId,
       orbat: { isMainOp: true },
-      status: { in: PRESENT_STATUSES as unknown as string[] },
+      status: { in: PRESENT_STATUSES as any },
     },
   });
 }

@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
           data: {
             userId: Number(userId),
             previousRankName: eligibility.currentRank?.name || null,
-            newRankName: eligibility.nextRank.name,
+            newRankName: eligibility.nextRank!.name,
             attendanceTotalAtChange: eligibility.attendance.currentAttendance,
             attendanceDeltaSinceLastRank: Math.max(
               0,

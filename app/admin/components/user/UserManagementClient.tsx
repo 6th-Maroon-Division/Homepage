@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
 import { useToast } from '@/app/components/ui/ToastContainer';
@@ -35,6 +35,7 @@ type UserManagementClientProps = {
 
 export default function UserManagementClient({ users: initialUsers, currentUserId }: UserManagementClientProps) {
   const [users, setUsers] = useState<User[]>(initialUsers);
+  const [activeTab, setActiveTab] = useState<'all' | 'unranked'>('all');
   const [filter, setFilter] = useState<'all' | 'admin' | 'regular'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmAdmin, setConfirmAdmin] = useState<{ userId: number; currentIsAdmin: boolean; username: string | null } | null>(null);
@@ -44,7 +45,122 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
   const [trainingModalData, setTrainingModalData] = useState<{ userId: number; trainingId: string; notes: string; needsRetraining: boolean; isHidden: boolean } | null>(null);
   const [availableTrainings, setAvailableTrainings] = useState<Array<{ id: number; name: string; category: string | null; duration: number | null }>>([]);
   const [loadingTrainings, setLoadingTrainings] = useState(false);
+  
+  // Unranked users state
+  const [unrankedUsers, setUnrankedUsers] = useState<any[]>([]);
+  const [unrankedLoading, setUnrankedLoading] = useState(false);
+  const [unrankedFilter, setUnrankedFilter] = useState<'all' | 'needsInterview' | 'needsBCT' | 'retired'>('all');
+  const [selectedUnranked, setSelectedUnranked] = useState<Set<number>>(new Set());
+  const [ranks, setRanks] = useState<Array<{ id: number; name: string; abbreviation: string }>>([]);
+  
   const { showSuccess, showError } = useToast();
+
+  // Fetch unranked users
+  const fetchUnrankedUsers = async () => {
+    setUnrankedLoading(true);
+    try {
+      let interview = 'all';
+      let bct = 'all';
+      let retired = 'all';
+      
+      if (unrankedFilter === 'needsInterview') {
+        interview = 'notDone';
+      } else if (unrankedFilter === 'needsBCT') {
+        bct = 'notDone';
+      } else if (unrankedFilter === 'retired') {
+        retired = 'retired';
+      }
+      
+      const res = await fetch(
+        `/api/admin/users/unranked?interview=${interview}&bct=${bct}&retired=${retired}`
+      );
+      const data = await res.json();
+      setUnrankedUsers(data.users || []);
+    } catch (e) {
+      showError('Failed to load unranked users');
+    } finally {
+      setUnrankedLoading(false);
+    }
+  };
+
+  // Fetch ranks for bulk assignment
+  const fetchRanks = async () => {
+    try {
+      const res = await fetch('/api/ranks');
+      const data = await res.json();
+      setRanks(data.ranks || []);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Load unranked users when tab switches or filter changes
+  useEffect(() => {
+    if (activeTab === 'unranked') {
+      // Debounce to prevent spam
+      const timer = setTimeout(() => {
+        fetchUnrankedUsers();
+        if (ranks.length === 0) {
+          fetchRanks();
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab, unrankedFilter]);
+
+  // Reload when filters change
+  const handleUnrankedFilterChange = (filter: 'all' | 'needsInterview' | 'needsBCT' | 'retired') => {
+    setUnrankedFilter(filter);
+  };
+
+  // Bulk actions for unranked users
+  const bulkAssignRank = async (rankId: number) => {
+    try {
+      const res = await fetch('/api/admin/users/bulk-rank-assign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userIds: Array.from(selectedUnranked), rankId }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      showSuccess(`Assigned rank to ${selectedUnranked.size} users`);
+      setSelectedUnranked(new Set());
+      fetchUnrankedUsers();
+    } catch (e) {
+      showError('Failed to assign ranks');
+    }
+  };
+
+  const bulkToggleInterview = async () => {
+    try {
+      const res = await fetch('/api/admin/users/bulk-interview-toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userIds: Array.from(selectedUnranked) }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      showSuccess(`Toggled interview for ${selectedUnranked.size} users`);
+      setSelectedUnranked(new Set());
+      fetchUnrankedUsers();
+    } catch (e) {
+      showError('Failed to toggle interview');
+    }
+  };
+
+  const bulkToggleRetired = async () => {
+    try {
+      const res = await fetch('/api/admin/users/bulk-retire-toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userIds: Array.from(selectedUnranked) }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      showSuccess(`Toggled retired for ${selectedUnranked.size} users`);
+      setSelectedUnranked(new Set());
+      fetchUnrankedUsers();
+    } catch (e) {
+      showError('Failed to toggle retired');
+    }
+  };
 
   const handleToggleAdmin = async (userId: number, currentIsAdmin: boolean) => {
     if (userId === currentUserId) {
@@ -217,7 +333,36 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
 
   return (
     <div>
-      {/* Users Table */}
+      {/* Tabs */}
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => setActiveTab('all')}
+          className="px-6 py-3 rounded-lg font-medium transition-colors"
+          style={{
+            backgroundColor: activeTab === 'all' ? 'var(--primary)' : 'var(--secondary)',
+            color: activeTab === 'all' ? 'var(--primary-foreground)' : 'var(--foreground)',
+            borderWidth: '1px',
+            borderColor: activeTab === 'all' ? 'var(--primary)' : 'var(--border)'
+          }}
+        >
+          All Users
+        </button>
+        <button
+          onClick={() => setActiveTab('unranked')}
+          className="px-6 py-3 rounded-lg font-medium transition-colors"
+          style={{
+            backgroundColor: activeTab === 'unranked' ? 'var(--primary)' : 'var(--secondary)',
+            color: activeTab === 'unranked' ? 'var(--primary-foreground)' : 'var(--foreground)',
+            borderWidth: '1px',
+            borderColor: activeTab === 'unranked' ? 'var(--primary)' : 'var(--border)'
+          }}
+        >
+          Unranked Users
+        </button>
+      </div>
+
+      {/* All Users Tab */}
+      {activeTab === 'all' && (
       <div className="border rounded-lg overflow-hidden" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
         <div className="px-6 py-4" style={{ borderBottomWidth: '1px', borderColor: 'var(--border)' }}>
           <h2 className="text-xl font-semibold" style={{ color: 'var(--foreground)' }}>User Management</h2>
@@ -651,7 +796,9 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
               </tbody>
             </table>
           </div>
-        )}      </div>
+        )}
+      </div>
+      )}
 
       {/* Confirm Modals */}
       <ConfirmModal
@@ -834,6 +981,183 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Unranked Users Tab */}
+      {activeTab === 'unranked' && (
+        <div className="border rounded-lg overflow-hidden" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+          <div className="px-6 py-4" style={{ borderBottomWidth: '1px', borderColor: 'var(--border)' }}>
+            <h2 className="text-xl font-semibold" style={{ color: 'var(--foreground)' }}>Unranked Users</h2>
+            <p className="text-sm mt-1" style={{ color: 'var(--muted-foreground)' }}>
+              Onboard and manage unranked personnel
+            </p>
+          </div>
+
+          {/* Filters */}
+          <div className="px-6 py-4 flex gap-2" style={{ borderBottomWidth: '1px', borderColor: 'var(--border)' }}>
+            <button
+              onClick={() => handleUnrankedFilterChange('all')}
+              className="px-4 py-2 rounded-md font-medium transition-colors"
+              style={{
+                backgroundColor: unrankedFilter === 'all' ? 'var(--primary)' : 'var(--muted)',
+                color: unrankedFilter === 'all' ? 'var(--primary-foreground)' : 'var(--foreground)'
+              }}
+            >
+              All Unranked ({unrankedUsers.length})
+            </button>
+            <button
+              onClick={() => handleUnrankedFilterChange('needsInterview')}
+              className="px-4 py-2 rounded-md font-medium transition-colors"
+              style={{
+                backgroundColor: unrankedFilter === 'needsInterview' ? 'var(--primary)' : 'var(--muted)',
+                color: unrankedFilter === 'needsInterview' ? 'var(--primary-foreground)' : 'var(--foreground)'
+              }}
+            >
+              Needs Interview
+            </button>
+            <button
+              onClick={() => handleUnrankedFilterChange('needsBCT')}
+              className="px-4 py-2 rounded-md font-medium transition-colors"
+              style={{
+                backgroundColor: unrankedFilter === 'needsBCT' ? 'var(--primary)' : 'var(--muted)',
+                color: unrankedFilter === 'needsBCT' ? 'var(--primary-foreground)' : 'var(--foreground)'
+              }}
+            >
+              Needs BCT
+            </button>
+            <button
+              onClick={() => handleUnrankedFilterChange('retired')}
+              className="px-4 py-2 rounded-md font-medium transition-colors"
+              style={{
+                backgroundColor: unrankedFilter === 'retired' ? 'var(--primary)' : 'var(--muted)',
+                color: unrankedFilter === 'retired' ? 'var(--primary-foreground)' : 'var(--foreground)'
+              }}
+            >
+              Retired
+            </button>
+          </div>
+
+          {/* Bulk Actions */}
+          {selectedUnranked.size > 0 && (
+            <div className="px-6 py-3 flex gap-2 flex-wrap" style={{ backgroundColor: 'var(--muted)', borderBottomWidth: '1px', borderColor: 'var(--border)' }}>
+              <span className="text-sm font-medium py-2" style={{ color: 'var(--foreground)' }}>
+                {selectedUnranked.size} selected:
+              </span>
+              {ranks.map((rank) => (
+                <button
+                  key={rank.id}
+                  className="px-3 py-1 rounded-md text-sm font-medium"
+                  style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                  onClick={() => bulkAssignRank(rank.id)}
+                >
+                  → {rank.abbreviation}
+                </button>
+              ))}
+              <button
+                className="px-3 py-1 rounded-md text-sm font-medium"
+                style={{ backgroundColor: 'var(--accent)', color: 'white' }}
+                onClick={bulkToggleInterview}
+              >
+                Toggle Interview
+              </button>
+              <button
+                className="px-3 py-1 rounded-md text-sm font-medium"
+                style={{ backgroundColor: 'var(--accent)', color: 'white' }}
+                onClick={bulkToggleRetired}
+              >
+                Toggle Retired
+              </button>
+            </div>
+          )}
+
+          {/* Users Table */}
+          {unrankedLoading ? (
+            <div className="px-6 py-12 text-center" style={{ color: 'var(--muted-foreground)' }}>
+              <p>Loading...</p>
+            </div>
+          ) : unrankedUsers.length === 0 ? (
+            <div className="px-6 py-12 text-center" style={{ color: 'var(--muted-foreground)' }}>
+              <p>No unranked users found</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead style={{ backgroundColor: 'var(--muted)' }}>
+                  <tr>
+                    <th className="px-6 py-3 text-left">
+                      <input
+                        type="checkbox"
+                        checked={selectedUnranked.size === unrankedUsers.length && unrankedUsers.length > 0}
+                        onChange={() => {
+                          if (selectedUnranked.size === unrankedUsers.length) {
+                            setSelectedUnranked(new Set());
+                          } else {
+                            setSelectedUnranked(new Set(unrankedUsers.map((u) => u.id)));
+                          }
+                        }}
+                      />
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
+                      Username
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
+                      Interview
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
+                      BCT
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
+                      Retired
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
+                      Attendance
+                    </th>
+                  </tr>
+                </thead>
+                <tbody style={{ backgroundColor: 'var(--secondary)' }}>
+                  {unrankedUsers.map((user) => (
+                    <tr key={user.id} style={{ borderTopWidth: '1px', borderColor: 'var(--border)' }}>
+                      <td className="px-6 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedUnranked.has(user.id)}
+                          onChange={() => {
+                            const newSelected = new Set(selectedUnranked);
+                            if (newSelected.has(user.id)) {
+                              newSelected.delete(user.id);
+                            } else {
+                              newSelected.add(user.id);
+                            }
+                            setSelectedUnranked(newSelected);
+                          }}
+                        />
+                      </td>
+                      <td className="px-6 py-4" style={{ color: 'var(--foreground)' }}>
+                        {user.username}
+                      </td>
+                      <td className="px-6 py-4" style={{ color: 'var(--foreground)' }}>
+                        <span className={user.userRank?.interviewDone ? 'text-green-500' : 'text-red-500'}>
+                          {user.userRank?.interviewDone ? '✓' : '✗'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4" style={{ color: 'var(--foreground)' }}>
+                        <span className={user.bctCompleted ? 'text-green-500' : 'text-red-500'}>
+                          {user.bctCompleted ? '✓' : '✗'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4" style={{ color: 'var(--foreground)' }}>
+                        {user.userRank?.retired ? 'Yes' : 'No'}
+                      </td>
+                      <td className="px-6 py-4" style={{ color: 'var(--foreground)' }}>
+                        {user.attendanceTotal}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>
