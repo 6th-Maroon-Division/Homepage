@@ -9,13 +9,15 @@ export type ToastData = {
   message: string;
   type: ToastType;
   duration?: number;
+  actionLabel?: string;
+  actionUrl?: string;
 };
 
 type ToastProps = ToastData & {
   onClose: (id: string) => void;
 };
 
-export default function Toast({ id, message, type, duration = 5000, onClose }: ToastProps) {
+export default function Toast({ id, message, type, duration = 5000, actionLabel, actionUrl, onClose }: ToastProps) {
   useEffect(() => {
     if (duration > 0) {
       const timer = setTimeout(() => {
@@ -57,11 +59,21 @@ export default function Toast({ id, message, type, duration = 5000, onClose }: T
 
   return (
     <div
-      className={`${styles[type]} text-white px-4 py-3 rounded-lg shadow-lg border-l-4 flex items-center gap-3 min-w-[300px] max-w-md animate-slide-in`}
+      className={`${styles[type]} text-white px-4 py-3 rounded-lg shadow-lg border-l-4 flex items-center gap-3 min-w-75 max-w-md animate-slide-in`}
       role="alert"
     >
       <div className="shrink-0">{icons[type]}</div>
       <div className="flex-1 text-sm font-medium">{message}</div>
+      {actionLabel && actionUrl && (
+        <button
+          onClick={() => {
+            window.location.href = actionUrl;
+          }}
+          className="shrink-0 px-2 py-1 rounded text-xs font-semibold bg-white/20 hover:bg-white/30 transition-colors"
+        >
+          {actionLabel}
+        </button>
+      )}
       <button
         onClick={() => onClose(id)}
         className="shrink-0 hover:bg-white/20 rounded p-1 transition-colors"

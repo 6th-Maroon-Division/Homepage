@@ -4,7 +4,12 @@ import { createContext, useContext, useState, useCallback, ReactNode } from 'rea
 import Toast, { ToastData, ToastType } from './Toast';
 
 type ToastContextType = {
-  showToast: (message: string, type?: ToastType, duration?: number) => void;
+  showToast: (
+    message: string,
+    type?: ToastType,
+    duration?: number,
+    action?: { label: string; url: string }
+  ) => void;
   showSuccess: (message: string, duration?: number) => void;
   showError: (message: string, duration?: number) => void;
   showWarning: (message: string, duration?: number) => void;
@@ -32,9 +37,24 @@ export function ToastProvider({ children }: ToastProviderProps) {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
-  const showToast = useCallback((message: string, type: ToastType = 'info', duration = 5000) => {
+  const showToast = useCallback((
+    message: string,
+    type: ToastType = 'info',
+    duration = 5000,
+    action?: { label: string; url: string }
+  ) => {
     const id = Math.random().toString(36).substring(2, 9);
-    setToasts((prev) => [...prev, { id, message, type, duration }]);
+    setToasts((prev) => [
+      ...prev,
+      {
+        id,
+        message,
+        type,
+        duration,
+        actionLabel: action?.label,
+        actionUrl: action?.url,
+      },
+    ]);
   }, []);
 
   const showSuccess = useCallback((message: string, duration = 5000) => {

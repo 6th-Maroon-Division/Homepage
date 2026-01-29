@@ -8,6 +8,7 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import UserMenu from '../auth/UserMenu';
 import UnifiedInbox from '../ui/UnifiedInbox';
+import AdminPromotionsToast from './AdminPromotionsToast';
 
 export default function TopBar() {
   const { data: session } = useSession();
@@ -42,6 +43,7 @@ export default function TopBar() {
     if (pathname?.startsWith('/admin/ranks')) return 'Rank Management';
     if (pathname?.startsWith('/admin/messaging')) return 'Messaging System';
     if (pathname?.startsWith('/admin/attendance')) return 'Attendance Management';
+    if (pathname?.startsWith('/admin/promotions')) return 'Pending Promotions';
     if (pathname?.startsWith('/admin/orbats')) return 'Manage OrbATs';
     if (pathname?.startsWith('/admin/templates')) return 'ORBAT Templates';
     if (pathname?.startsWith('/admin/users')) return 'User Management';
@@ -158,6 +160,7 @@ export default function TopBar() {
             </div>
           ) : (
             <>
+              <AdminPromotionsToast />
               <UnifiedInbox />
               <UserMenu />
             </>

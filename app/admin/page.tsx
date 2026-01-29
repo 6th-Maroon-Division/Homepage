@@ -80,6 +80,15 @@ export default async function AdminPage() {
           </Link>
 
           <Link
+            href="/admin/promotions"
+            className="border rounded-lg p-8 transition-colors"
+            style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
+          >
+            <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>Promotions</h2>
+            <p style={{ color: 'var(--muted-foreground)' }}>Review pending rankups</p>
+          </Link>
+
+          <Link
             href="/admin/messaging"
             className="border rounded-lg p-8 transition-colors"
             style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
