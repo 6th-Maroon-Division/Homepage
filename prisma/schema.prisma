@@ -34,7 +34,8 @@ model User {
   attendances       Attendance[]
   attendanceLogs    AttendanceLog[]
   attendanceSessions AttendanceSession[]
-  legacyMappings    LegacyAttendanceData[]
+  legacyAttendanceData LegacyAttendanceData[]
+  legacyUserData    LegacyUserData[]
   createdMessages   Message[]          @relation("MessageCreator")
   messageRecipients MessageRecipient[]
   // Rank system
@@ -529,4 +530,27 @@ model PromotionProposal {
   @@unique([userId, nextRankId])
   @@index([userId])
   @@index([status])
+}
+
+model LegacyUserData {
+  id                    Int       @id @default(autoincrement())
+  legacyId              String    // ID from CSV
+  discordUsername       String    // NAME from CSV
+  rankName              String    // Rank from CSV
+  dateJoined            String?   // Date Joined from CSV (string as dates vary in format)
+  tigSinceLastPromo     Int       // TIG Since Last Promo from CSV - becomes attendanceSinceLastRank
+  totalTig              Int       // TOTAL TIG from CSV (appears unused but stored)
+  oldData               Int       // Old Data from CSV - historical attendance to preserve
+  mappedUser            User?     @relation(fields: [mappedUserId], references: [id], onDelete: SetNull)
+  mappedUserId          Int?
+  isMapped              Boolean   @default(false)
+  isApplied             Boolean   @default(false) // Whether this legacy data has been applied to UserRank
+  importedAt            DateTime  @default(now())
+  notes                 String?   // For tracking import issues or manual adjustments
+
+  @@index([discordUsername])
+  @@index([isMapped])
+  @@index([isApplied])
+  @@index([mappedUserId])
+  @@index([legacyId])
 }
