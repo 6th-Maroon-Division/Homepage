@@ -11,13 +11,35 @@ export default async function AdminTrainingsPage() {
     redirect('/');
   }
 
-  const [trainings, trainingRequests] = await Promise.all([
+  const [trainings, trainingRequests, ranks] = await Promise.all([
     prisma.training.findMany({
       include: {
         _count: {
           select: {
             userTrainings: true,
             trainingRequests: true,
+          },
+        },
+        rankRequirement: {
+          include: {
+            minimumRank: {
+              select: {
+                id: true,
+                name: true,
+                abbreviation: true,
+                orderIndex: true,
+              },
+            },
+          },
+        },
+        requiresTrainings: {
+          include: {
+            requiredTraining: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         },
       },
@@ -43,6 +65,15 @@ export default async function AdminTrainingsPage() {
       },
       orderBy: { requestedAt: 'desc' },
     }),
+    prisma.rank.findMany({
+      orderBy: { orderIndex: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        abbreviation: true,
+        orderIndex: true,
+      },
+    }),
   ]);
 
   // Serialize for client
@@ -50,6 +81,8 @@ export default async function AdminTrainingsPage() {
     ...training,
     createdAt: training.createdAt.toISOString(),
     updatedAt: training.updatedAt.toISOString(),
+    minimumRank: training.rankRequirement?.minimumRank || null,
+    requiredTrainings: training.requiresTrainings.map((r) => r.requiredTraining),
   }));
 
   const serializedRequests = trainingRequests.map((request) => ({
@@ -72,6 +105,7 @@ export default async function AdminTrainingsPage() {
     <main className="min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         <TrainingManagementClient
+          ranks={ranks}
           trainings={serializedTrainings}
           allRequests={serializedRequests}
         />

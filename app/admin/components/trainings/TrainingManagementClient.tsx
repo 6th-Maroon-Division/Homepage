@@ -6,6 +6,13 @@ import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
 
+type Rank = {
+  id: number;
+  name: string;
+  abbreviation: string;
+  orderIndex: number;
+};
+
 type Training = {
   id: number;
   name: string;
@@ -19,6 +26,8 @@ type Training = {
     userTrainings: number;
     trainingRequests: number;
   };
+  minimumRank: Rank | null;
+  requiredTrainings: { id: number; name: string }[];
 };
 
 type Category = {
@@ -61,10 +70,12 @@ type TrainingRequest = {
 type TrainingManagementClientProps = {
   trainings: Training[];
   allRequests: TrainingRequest[];
+  ranks: Rank[];
 };
 
 export default function TrainingManagementClient({
   trainings: initialTrainings,
+  ranks,
   allRequests: initialRequests,
 }: TrainingManagementClientProps) {
   const { showSuccess, showError } = useToast();
@@ -89,6 +100,11 @@ export default function TrainingManagementClient({
   const [trainingModalOpen, setTrainingModalOpen] = useState(false);
   const [trainingSearchTerm, setTrainingSearchTerm] = useState('');
   const [trainingCategoryFilter, setTrainingCategoryFilter] = useState<'all' | string>('all');
+  
+  // Requirements management state
+  const [expandedRequirements, setExpandedRequirements] = useState<number | null>(null);
+  const [selectedRankForTraining, setSelectedRankForTraining] = useState<{ [trainingId: number]: number | null }>({});
+  const [selectedPrerequisite, setSelectedPrerequisite] = useState<{ [trainingId: number]: number | null }>({});
 
   // Training form state
   const [formData, setFormData] = useState({
@@ -268,6 +284,108 @@ export default function TrainingManagementClient({
     });
     setEditingId(null);
     setTrainingModalOpen(false);
+  };
+
+  // Requirements management functions
+  const handleSetRankRequirement = async (trainingId: number) => {
+    const rankId = selectedRankForTraining[trainingId];
+    if (!rankId) return;
+
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/trainings/${trainingId}/requirements`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ minimumRankId: rankId }),
+      });
+
+      if (response.ok) {
+        showSuccess('Rank requirement set successfully');
+        await refreshTrainings();
+        setSelectedRankForTraining((prev) => ({ ...prev, [trainingId]: null }));
+      } else {
+        const data = await response.json();
+        showError(data.error || 'Failed to set rank requirement');
+      }
+    } catch (error) {
+      console.error('Error setting rank requirement:', error);
+      showError('Error setting rank requirement');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRemoveRankRequirement = async (trainingId: number) => {
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/trainings/${trainingId}/requirements`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        showSuccess('Rank requirement removed successfully');
+        await refreshTrainings();
+      } else {
+        showError('Failed to remove rank requirement');
+      }
+    } catch (error) {
+      console.error('Error removing rank requirement:', error);
+      showError('Error removing rank requirement');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleAddPrerequisite = async (trainingId: number) => {
+    const prerequisiteId = selectedPrerequisite[trainingId];
+    if (!prerequisiteId || prerequisiteId === trainingId) {
+      showError('Invalid prerequisite selection');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/trainings/${trainingId}/prerequisites`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requiredTrainingId: prerequisiteId }),
+      });
+
+      if (response.ok) {
+        showSuccess('Prerequisite added successfully');
+        await refreshTrainings();
+        setSelectedPrerequisite((prev) => ({ ...prev, [trainingId]: null }));
+      } else {
+        const data = await response.json();
+        showError(data.error || 'Failed to add prerequisite');
+      }
+    } catch (error) {
+      console.error('Error adding prerequisite:', error);
+      showError('Error adding prerequisite');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRemovePrerequisite = async (trainingId: number, prerequisiteId: number) => {
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/trainings/${trainingId}/prerequisites/${prerequisiteId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        showSuccess('Prerequisite removed successfully');
+        await refreshTrainings();
+      } else {
+        showError('Failed to remove prerequisite');
+      }
+    } catch (error) {
+      console.error('Error removing prerequisite:', error);
+      showError('Error removing prerequisite');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Handle training request actions
@@ -595,6 +713,18 @@ export default function TrainingManagementClient({
                       Edit
                     </button>
                     <button
+                      onClick={() => 
+                        setExpandedRequirements(expandedRequirements === training.id ? null : training.id)
+                      }
+                      className="px-3 py-1 text-sm rounded transition-colors"
+                      style={{
+                        backgroundColor: 'var(--accent)',
+                        color: 'var(--accent-foreground)',
+                      }}
+                    >
+                      {expandedRequirements === training.id ? 'Hide Requirements' : 'Requirements'}
+                    </button>
+                    <button
                       onClick={() => setDeleteId(training.id)}
                       className="px-3 py-1 text-sm rounded transition-colors"
                       style={{
@@ -606,6 +736,126 @@ export default function TrainingManagementClient({
                     </button>
                   </div>
                 </div>
+
+                {/* Requirements Management */}
+                {expandedRequirements === training.id && (
+                  <div className="mt-4 p-4 rounded-lg border space-y-4" style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}>
+                    {/* Rank Requirement */}
+                    <div>
+                      <h4 className="font-medium mb-2" style={{ color: 'var(--foreground)' }}>
+                        Minimum Rank Requirement
+                      </h4>
+                      {training.minimumRank ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm px-2 py-1 rounded" style={{ backgroundColor: 'var(--muted)', color: 'var(--foreground)' }}>
+                            {training.minimumRank.abbreviation} - {training.minimumRank.name}
+                          </span>
+                          <button
+                            onClick={() => handleRemoveRankRequirement(training.id)}
+                            disabled={isSaving}
+                            className="text-sm px-2 py-1 rounded"
+                            style={{ backgroundColor: 'var(--destructive)', color: 'var(--destructive-foreground)' }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={selectedRankForTraining[training.id] || ''}
+                            onChange={(e) => 
+                              setSelectedRankForTraining((prev) => ({
+                                ...prev,
+                                [training.id]: parseInt(e.target.value) || null,
+                              }))
+                            }
+                            className="px-3 py-2 rounded border text-sm"
+                            style={{
+                              backgroundColor: 'var(--secondary)',
+                              borderColor: 'var(--border)',
+                              color: 'var(--foreground)',
+                            }}
+                          >
+                            <option value="">Select a rank...</option>
+                            {ranks.map((rank) => (
+                              <option key={rank.id} value={rank.id}>
+                                {rank.abbreviation} - {rank.name}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => handleSetRankRequirement(training.id)}
+                            disabled={isSaving || !selectedRankForTraining[training.id]}
+                            className="text-sm px-3 py-2 rounded disabled:opacity-50"
+                            style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                          >
+                            Set Rank
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Training Prerequisites */}
+                    <div>
+                      <h4 className="font-medium mb-2" style={{ color: 'var(--foreground)' }}>
+                        Training Prerequisites
+                      </h4>
+                      {training.requiredTrainings && training.requiredTrainings.length > 0 && (
+                        <div className="space-y-2 mb-3">
+                          {training.requiredTrainings.map((req) => (
+                            <div key={req.id} className="flex items-center gap-2">
+                              <span className="text-sm px-2 py-1 rounded" style={{ backgroundColor: 'var(--muted)', color: 'var(--foreground)' }}>
+                                {req.name}
+                              </span>
+                              <button
+                                onClick={() => handleRemovePrerequisite(training.id, req.id)}
+                                disabled={isSaving}
+                                className="text-sm px-2 py-1 rounded"
+                                style={{ backgroundColor: 'var(--destructive)', color: 'var(--destructive-foreground)' }}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={selectedPrerequisite[training.id] || ''}
+                          onChange={(e) => 
+                            setSelectedPrerequisite((prev) => ({
+                              ...prev,
+                              [training.id]: parseInt(e.target.value) || null,
+                            }))
+                          }
+                          className="px-3 py-2 rounded border text-sm flex-1"
+                          style={{
+                            backgroundColor: 'var(--secondary)',
+                            borderColor: 'var(--border)',
+                            color: 'var(--foreground)',
+                          }}
+                        >
+                          <option value="">Add prerequisite...</option>
+                          {trainings
+                            .filter((t) => t.id !== training.id && !(training.requiredTrainings || []).some((r) => r.id === t.id))
+                            .map((t) => (
+                              <option key={t.id} value={t.id}>
+                                {t.name}
+                              </option>
+                            ))}
+                        </select>
+                        <button
+                          onClick={() => handleAddPrerequisite(training.id)}
+                          disabled={isSaving || !selectedPrerequisite[training.id]}
+                          className="text-sm px-3 py-2 rounded disabled:opacity-50"
+                          style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
             {filteredTrainings.length === 0 && (

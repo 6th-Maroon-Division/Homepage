@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
+import { canRequestTraining, getUnmetRequirements } from '@/lib/training-gating';
 
 // GET /api/training-requests - Get training requests (user sees their own, admin sees all)
 export async function GET(request: NextRequest) {
@@ -96,6 +97,25 @@ export async function POST(request: NextRequest) {
 
     if (!trainingId) {
       return NextResponse.json({ error: 'trainingId is required' }, { status: 400 });
+    }
+
+    // Check if user meets requirements
+    const canRequest = await canRequestTraining(session.user.id, parseInt(trainingId));
+    if (!canRequest) {
+      const unmet = await getUnmetRequirements(session.user.id, parseInt(trainingId));
+      const errors: string[] = [];
+      
+      if (unmet.missingRank) {
+        errors.push(`Requires rank: ${unmet.missingRank.name}`);
+      }
+      if (unmet.missingTrainings.length > 0) {
+        errors.push(`Missing trainings: ${unmet.missingTrainings.map(t => t.name).join(', ')}`);
+      }
+      
+      return NextResponse.json(
+        { error: 'Requirements not met', details: errors },
+        { status: 403 }
+      );
     }
 
     // Check if user already has this training

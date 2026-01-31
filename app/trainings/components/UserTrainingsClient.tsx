@@ -13,6 +13,11 @@ type Training = {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  minimumRank?: { id: number; name: string; abbreviation: string } | null;
+  requiredTrainings?: Array<{ id: number; name: string }>;
+  canRequest?: boolean;
+  missingRank?: { id: number; name: string; abbreviation: string } | null;
+  missingTrainings?: Array<{ id: number; name: string }>;
 };
 
 type Category = {
@@ -418,12 +423,28 @@ export default function UserTrainingsClient({
                     {name}
                   </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {trainings.map((training) => (
+                    {trainings.map((training) => {
+                      const isLocked = training.canRequest === false;
+                      const hasRankRequirement = !!training.missingRank;
+                      const hasTrainingRequirements = training.missingTrainings && training.missingTrainings.length > 0;
+                      
+                      return (
                     <div
                       key={training.id}
-                      className="p-4 rounded-lg border"
-                      style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}
+                      className="p-4 rounded-lg border relative"
+                      style={{ 
+                        backgroundColor: 'var(--background)', 
+                        borderColor: 'var(--border)',
+                        opacity: isLocked ? 0.6 : 1,
+                      }}
                     >
+                      {isLocked && (
+                        <div className="absolute top-2 right-2">
+                          <svg className="w-6 h-6" fill="var(--muted-foreground)" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      )}
                       <h3 className="font-semibold text-lg" style={{ color: 'var(--foreground)' }}>
                         {training.name}
                       </h3>
@@ -437,8 +458,39 @@ export default function UserTrainingsClient({
                           Duration: {training.duration} minutes
                         </p>
                       )}
+
+                      {/* Requirements display */}
+                      {(training.minimumRank || (training.requiredTrainings && training.requiredTrainings.length > 0)) && (
+                        <div className="mt-3 space-y-1">
+                          {training.minimumRank && (
+                            <div className="text-xs flex items-center gap-1" style={{ color: hasRankRequirement ? 'var(--destructive)' : 'var(--muted-foreground)' }}>
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                              </svg>
+                              <span>Requires: {training.minimumRank.abbreviation} ({training.minimumRank.name})</span>
+                            </div>
+                          )}
+                          {training.requiredTrainings && training.requiredTrainings.length > 0 && (
+                            <div className="text-xs flex items-start gap-1" style={{ color: hasTrainingRequirements ? 'var(--destructive)' : 'var(--muted-foreground)' }}>
+                              <svg className="w-4 h-4 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z" />
+                              </svg>
+                              <div>
+                                <span>Prerequisites:</span>
+                                <ul className="ml-4 list-disc">
+                                  {training.requiredTrainings.map(req => (
+                                    <li key={req.id} className={training.missingTrainings?.some(m => m.id === req.id) ? 'text-red-500' : ''}>
+                                      {req.name}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       
-                      {selectedTrainingId === training.id ? (
+                      {selectedTrainingId === training.id && !isLocked ? (
                         <div className="mt-4 space-y-2">
                           <textarea
                             value={requestMessage}
@@ -482,18 +534,20 @@ export default function UserTrainingsClient({
                         </div>
                       ) : (
                         <button
-                          onClick={() => setSelectedTrainingId(training.id)}
-                          className="mt-4 w-full px-4 py-2 rounded font-medium transition-colors"
+                          onClick={() => !isLocked && setSelectedTrainingId(training.id)}
+                          disabled={isLocked}
+                          title={isLocked ? `Locked: ${hasRankRequirement ? `Requires ${training.missingRank?.name}` : ''} ${hasTrainingRequirements ? `Missing: ${training.missingTrainings?.map(t => t.name).join(', ')}` : ''}` : ''}
+                          className="mt-4 w-full px-4 py-2 rounded font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                           style={{
                             backgroundColor: 'var(--primary)',
                             color: 'var(--primary-foreground)',
                           }}
                         >
-                          Request Training
+                          {isLocked ? 'Locked' : 'Request Training'}
                         </button>
                       )}
                     </div>
-                  ))}
+                  )})}
                 </div>
               </div>
               )

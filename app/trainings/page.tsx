@@ -37,11 +37,55 @@ export default async function TrainingsPage() {
     orderBy: { requestedAt: 'desc' },
   });
 
-  // Fetch all available trainings (active only)
+  // Fetch all available trainings (active only) with requirements
   const allTrainings = await prisma.training.findMany({
     where: { isActive: true },
+    include: {
+      rankRequirement: {
+        include: {
+          minimumRank: {
+            select: {
+              id: true,
+              name: true,
+              abbreviation: true,
+              orderIndex: true,
+            },
+          },
+        },
+      },
+      requiresTrainings: {
+        include: {
+          requiredTraining: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+    },
     orderBy: { name: 'asc' },
   });
+
+  // Get user's rank
+  const userRank = await prisma.userRank.findUnique({
+    where: { userId },
+    include: {
+      currentRank: {
+        select: {
+          id: true,
+          name: true,
+          abbreviation: true,
+          orderIndex: true,
+        },
+      },
+    },
+  });
+
+  // Get user's completed trainings
+  const completedTrainingIds = new Set(
+    userTrainings.map((ut) => ut.trainingId)
+  );
 
   // Serialize dates
   const serializedUserTrainings = userTrainings.map((ut) => ({
@@ -66,11 +110,36 @@ export default async function TrainingsPage() {
     },
   }));
 
-  const serializedAllTrainings = allTrainings.map((training) => ({
-    ...training,
-    createdAt: training.createdAt.toISOString(),
-    updatedAt: training.updatedAt.toISOString(),
-  }));
+  const serializedAllTrainings = allTrainings.map((training) => {
+    // Check if user meets requirements
+    let meetsRankRequirement = true;
+    let missingRank: { id: number; name: string; abbreviation: string } | null = null;
+    
+    if (training.rankRequirement?.minimumRank) {
+      const minRank = training.rankRequirement.minimumRank;
+      if (!userRank?.currentRank || userRank.currentRank.orderIndex < minRank.orderIndex) {
+        meetsRankRequirement = false;
+        missingRank = minRank;
+      }
+    }
+
+    const missingTrainings = training.requiresTrainings
+      .filter((req) => !completedTrainingIds.has(req.requiredTraining.id))
+      .map((req) => req.requiredTraining);
+
+    const canRequest = meetsRankRequirement && missingTrainings.length === 0;
+
+    return {
+      ...training,
+      createdAt: training.createdAt.toISOString(),
+      updatedAt: training.updatedAt.toISOString(),
+      minimumRank: training.rankRequirement?.minimumRank || null,
+      requiredTrainings: training.requiresTrainings.map((req) => req.requiredTraining),
+      canRequest,
+      missingRank,
+      missingTrainings,
+    };
+  });
 
   return (
     <main className="min-h-screen">
