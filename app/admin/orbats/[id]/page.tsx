@@ -33,7 +33,15 @@ export default async function AdminOrbatPage({ params }: AdminOrbatPageProps) {
             orderBy: { orderIndex: 'asc' },
             include: {
               signups: {
-                include: { user: true },
+                include: {
+                  user: {
+                    include: {
+                      userRank: {
+                        include: { currentRank: { select: { abbreviation: true, name: true } } },
+                      },
+                    },
+                  },
+                },
               },
             },
           },
@@ -89,6 +97,8 @@ export default async function AdminOrbatPage({ params }: AdminOrbatPageProps) {
             ? {
                 id: s.user.id,
                 username: s.user.username ?? 'Unknown',
+                rankAbbreviation: s.user.userRank?.currentRank?.abbreviation,
+                rankName: s.user.userRank?.currentRank?.name,
               }
             : {
                 id: null,

@@ -10,6 +10,8 @@ type ClientSignup = {
   user: {
     id: number | null;
     username: string;
+    rankAbbreviation?: string;
+    rankName?: string;
   } | null;
 };
 
@@ -321,14 +323,18 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
 
                     {hasSignup ? (
                       <div className="space-y-1 pl-2" style={{ borderLeft: '2px solid var(--primary)' }}>
-                        {sub.signups.map((signup) => (
+                        {sub.signups.map((signup) => {
+                          const username = signup.user?.username ?? 'Unknown';
+                          const rankAbbr = signup.user?.rankAbbreviation;
+                          const displayName = rankAbbr ? `[${rankAbbr}] ${username}` : username;
+                          return (
                           <div
                             key={signup.id}
                             className="flex justify-between items-center text-sm rounded px-2 py-1"
                             style={{ backgroundColor: 'var(--background)' }}
                           >
                             <span style={{ color: 'var(--foreground)' }}>
-                              {signup.user?.username ?? 'Unknown'}
+                              {displayName}
                             </span>
                             <div className="flex gap-1">
                               <button
@@ -357,7 +363,8 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
                               </button>
                             </div>
                           </div>
-                        ))}
+                        );
+                        })}
                       </div>
                     ) : (
                       <div className="text-xs italic pl-2" style={{ color: 'var(--muted-foreground)' }}>Empty</div>
