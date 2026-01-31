@@ -33,6 +33,7 @@ export default function PendingPromotionsClient() {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isActing, setIsActing] = useState(false);
+  const [isRunningAutoRankup, setIsRunningAutoRankup] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
   const fetchProposals = useCallback(async () => {
@@ -164,6 +165,45 @@ export default function PendingPromotionsClient() {
       nextRankLabel: p.nextRank?.abbreviation || p.nextRank?.name || 'Unknown',
     }));
   }, [proposals]);
+
+  const handleAutoRankup = async () => {
+    if (!confirm('Run auto rankup process? This will promote all eligible users.')) return;
+
+    setIsRunningAutoRankup(true);
+    try {
+      const res = awahandleAutoRankup}
+            disabled={isRunningAutoRankup || isLoading}
+            className="px-3 py-2 rounded-md text-sm font-medium transition-colors"
+            style={{
+              backgroundColor: 'var(--accent)',
+              color: 'var(--accent-foreground)',
+            }}
+          >
+            {isRunningAutoRankup ? <LoadingSpinner size="sm" /> : 'Auto Rankup'}
+          </button>
+          <button
+            onClick={it fetch('/api/ranks/auto-rankup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!res.ok) throw new Error('Failed to run auto rankup');
+      const data = await res.json();
+      
+      showSuccess(`Auto rankup complete: ${data.promoted} promoted, ${data.failed} failed`);
+      
+      if (data.errors.length > 0) {
+        console.warn('Auto rankup errors:', data.errors);
+      }
+      
+      await fetchProposals();
+    } catch (error) {
+      console.error('Error running auto rankup:', error);
+      showError('Failed to run auto rankup');
+    } finally {
+      setIsRunningAutoRankup(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
