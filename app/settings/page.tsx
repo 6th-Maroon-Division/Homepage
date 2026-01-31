@@ -13,6 +13,8 @@ function SettingsContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [linkedProviders, setLinkedProviders] = useState<string[]>([]);
+  const [userRank, setUserRank] = useState<any>(null);
+  const [loadingRank, setLoadingRank] = useState(true);
 
   useEffect(() => {
     // Check for success/error messages from account linking
@@ -35,8 +37,15 @@ function SettingsContent() {
         .then(res => res.json())
         .then(data => setLinkedProviders(data.providers))
         .catch(console.error);
+
+      // Fetch user rank
+      fetch(`/api/users/${session?.user?.id}/rank`)
+        .then(res => res.json())
+        .then(data => setUserRank(data))
+        .catch(err => console.error('Failed to fetch rank:', err))
+        .finally(() => setLoadingRank(false));
     }
-  }, [status]);
+  }, [status, session?.user?.id]);
 
   if (status === 'loading') {
     return (
@@ -136,6 +145,37 @@ function SettingsContent() {
               <p className="mt-2 text-sm" style={{ color: 'var(--muted-foreground)' }}>
                 Avatar is synced from your Discord account
               </p>
+            </div>
+
+            {/* Rank Information */}
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>
+                Rank Information
+              </label>
+              {loadingRank ? (
+                <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>Loading rank...</p>
+              ) : userRank?.currentRank ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <div className="px-3 py-1 rounded-md font-semibold" style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}>
+                      {userRank.currentRank.abbreviation}
+                    </div>
+                    <span style={{ color: 'var(--foreground)' }}>{userRank.currentRank.name}</span>
+                  </div>
+                  <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                    Attendance since last rank: {userRank.attendanceSinceLastRank || 0}
+                  </p>
+                  <a
+                    href="/settings/rank-history"
+                    className="text-xs font-medium transition-colors"
+                    style={{ color: 'var(--primary)' }}
+                  >
+                    View rank history →
+                  </a>
+                </div>
+              ) : (
+                <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>No rank assigned</p>
+              )}
             </div>
 
             {message && (

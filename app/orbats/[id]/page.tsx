@@ -25,7 +25,19 @@ export default async function OrbatPage({ params }: OrbatPageProps) {
             orderBy: { orderIndex: 'asc' },
             include: {
               signups: {
-                include: { user: true },
+                include: {
+                  user: {
+                    include: {
+                      userRank: {
+                        include: {
+                          currentRank: {
+                            select: { abbreviation: true, name: true },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
               },
             },
           },
@@ -79,10 +91,14 @@ export default async function OrbatPage({ params }: OrbatPageProps) {
             ? {
                 id: s.user.id,
                 username: s.user.username ?? 'Unknown',
+                rankAbbreviation: s.user.userRank?.currentRank?.abbreviation ?? null,
+                rankName: s.user.userRank?.currentRank?.name ?? null,
               }
             : {
                 id: null,
                 username: 'Unknown',
+                rankAbbreviation: null,
+                rankName: null,
               },
         })),
       })),

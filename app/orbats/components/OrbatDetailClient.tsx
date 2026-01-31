@@ -9,6 +9,8 @@ type ClientSignup = {
   user: {
     id: number | null;
     username: string;
+    rankAbbreviation?: string | null;
+    rankName?: string | null;
   } | null;
 };
 
@@ -368,7 +370,11 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
                       {hasSignup && (
                         <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
                           {sub.signups
-                            .map((s) => s.user?.username ?? 'Unknown')
+                            .map((s) => {
+                              const username = s.user?.username ?? 'Unknown';
+                              const rankAbbr = s.user?.rankAbbreviation;
+                              return rankAbbr ? `[${rankAbbr}] ${username}` : username;
+                            })
                             .join(', ')}
                         </div>
                       )}
