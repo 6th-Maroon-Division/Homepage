@@ -41,7 +41,8 @@ export async function POST() {
 
     const results = {
       promoted: [] as PromotionResult[],
-      failed: [] as PromotionResult[],
+      errors: [] as PromotionResult[],
+      ineligible: [] as PromotionResult[],
     };
 
     for (const userRank of usersWithRanks) {
@@ -51,11 +52,7 @@ export async function POST() {
 
         const currentRank = userRank.currentRank;
         if (!currentRank) {
-          results.failed.push({
-            userId: userRank.userId,
-            username: userRank.user.username,
-            reason: 'No current rank assigned',
-          });
+          // Skip users without ranks - don't count as error
           continue;
         }
 
@@ -79,11 +76,7 @@ export async function POST() {
         }
 
         if (!nextRank.attendanceRequiredSinceLastRank) {
-          results.failed.push({
-            userId: userRank.userId,
-            username: userRank.user.username,
-            reason: 'Next rank has no attendance requirement configured',
-          });
+          // Skip ranks without attendance requirements - don't count as error
           continue;
         }
 
@@ -103,10 +96,10 @@ export async function POST() {
         const attendanceDelta = attendance - attendanceSinceLastRank;
 
         if (attendanceDelta < nextRank.attendanceRequiredSinceLastRank) {
-          results.failed.push({
+          results.ineligible.push({
             userId: userRank.userId,
             username: userRank.user.username,
-            reason: `Need ${nextRank.attendanceRequiredSinceLastRank - attendanceDelta} more attendance ops`,
+            reason: `Need ${nextRank.attendanceRequiredSinceLastRank - attendanceDelta} more attendance`,
           });
           continue;
         }
@@ -166,7 +159,7 @@ export async function POST() {
         });
       } catch (error) {
         console.error(`Error promoting user ${userRank.userId}:`, error);
-        results.failed.push({
+        results.errors.push({
           userId: userRank.userId,
           username: userRank.user.username,
           reason: 'Internal error during promotion',
@@ -176,9 +169,11 @@ export async function POST() {
 
     return NextResponse.json({
       promoted: results.promoted,
-      failed: results.failed,
+      errors: results.errors,
+      ineligible: results.ineligible,
       promotedCount: results.promoted.length,
-      failedCount: results.failed.length,
+      errorsCount: results.errors.length,
+      ineligibleCount: results.ineligible.length,
     });
   } catch (error) {
     console.error('Error in auto-rankup:', error);

@@ -179,10 +179,23 @@ export default function PendingPromotionsClient() {
       if (!res.ok) throw new Error('Failed to run auto rankup');
       const data = await res.json();
       
-      showSuccess(`Auto rankup complete: ${data.promotedCount} promoted, ${data.failedCount} failed`);
+      // Build success message
+      let message = `${data.promotedCount} promoted`;
+      if (data.errorsCount > 0) {
+        message += `, ${data.errorsCount} errors`;
+      }
+      if (data.ineligibleCount > 0) {
+        message += `, ${data.ineligibleCount} not eligible`;
+      }
       
-      if (data.failed && data.failed.length > 0) {
-        console.warn('Auto rankup failures:', data.failed);
+      showSuccess(`Auto rankup complete: ${message}`);
+      
+      // Log details for debugging
+      if (data.errors && data.errors.length > 0) {
+        console.error('Auto rankup errors:', data.errors);
+      }
+      if (data.ineligible && data.ineligible.length > 0) {
+        console.info('Ineligible users:', data.ineligible);
       }
       
       await fetchProposals();
