@@ -67,6 +67,7 @@ export async function POST() {
             name: true,
             abbreviation: true,
             attendanceRequiredSinceLastRank: true,
+            autoRankupEnabled: true,
           },
         });
 
@@ -77,6 +78,11 @@ export async function POST() {
 
         if (!nextRank.attendanceRequiredSinceLastRank) {
           // Skip ranks without attendance requirements - don't count as error
+          continue;
+        }
+
+        if (!nextRank.autoRankupEnabled) {
+          // Skip ranks that require manual approval
           continue;
         }
 
