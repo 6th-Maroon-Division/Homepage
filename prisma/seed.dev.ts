@@ -2,6 +2,7 @@
 // @ts-nocheck
 // prisma/seed.dev.ts - Development seed with test data and radio frequencies
 import { prisma } from '../lib/prisma';
+import { seedPermissions, grantAdminPermissions } from './seed-permissions';
 
 function daysFromNow(days: number) {
   const now = new Date();
@@ -10,6 +11,7 @@ function daysFromNow(days: number) {
 
 async function main() {
   // Clear existing data in the right order (avoid FK issues)
+  await prisma.userPermission.deleteMany();
   await prisma.messageRecipient.deleteMany();
   await prisma.message.deleteMany();
   // Rank system clears
@@ -80,6 +82,9 @@ async function main() {
     },
   });
 
+  // --- Permissions System ---
+  await seedPermissions();
+
   // --- Admin User ---
   const admin = await prisma.user.create({
     data: {
@@ -93,6 +98,9 @@ async function main() {
       },
     },
   });
+
+  // Grant admin full permissions
+  await grantAdminPermissions(admin.id);
 
   const alice = await prisma.user.create({
     data: { username: 'Alice' },

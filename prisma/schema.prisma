@@ -42,6 +42,8 @@ model User {
   userRank          UserRank?
   rankHistory       RankHistory[]
   promotionProposals PromotionProposal[]
+  // Permissions system
+  userPermissions   UserPermission[]
 }
 
 enum MessageType {
@@ -107,6 +109,34 @@ model AuthAccount {
   providerUserId String
 
   @@unique([provider, providerUserId])
+}
+
+model Permission {
+  id              Int                @id @default(autoincrement())
+  key             String             @unique // e.g., "user:edit", "training:mark", "orbat:delete"
+  description     String?
+  defaultValue    Int                @default(0) // Default value for new users (0-255)
+  maxValue        Int                @default(255)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  userPermissions UserPermission[]
+
+  @@index([key])
+}
+
+model UserPermission {
+  id              Int         @id @default(autoincrement())
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          Int
+  permission      Permission  @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  permissionId    Int
+  value           Int         // 0-255, where higher value = more permissions
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([userId, permissionId])
+  @@index([userId])
+  @@index([permissionId])
 }
 
 model Orbat {

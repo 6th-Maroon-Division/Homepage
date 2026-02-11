@@ -19,6 +19,7 @@ interface ExtendedJWT extends JWT {
   avatarUrl?: string | null;
   isAdmin?: boolean;
   createdAt?: Date;
+  permissions?: Record<string, number>;
 }
 
 export const authOptions: AuthOptions = {
@@ -156,6 +157,17 @@ export const authOptions: AuthOptions = {
           extendedToken.avatarUrl = authAccount.user.avatarUrl;
           extendedToken.isAdmin = authAccount.user.isAdmin;
           extendedToken.createdAt = authAccount.user.createdAt;
+          
+          // Fetch user permissions
+          const userPermissions = await prisma.userPermission.findMany({
+            where: { userId: authAccount.user.id },
+            include: { permission: true },
+          });
+          const permissions: Record<string, number> = {};
+          for (const up of userPermissions) {
+            permissions[up.permission.key] = up.value;
+          }
+          extendedToken.permissions = permissions;
         }
       }
       return token;
@@ -170,6 +182,7 @@ export const authOptions: AuthOptions = {
         session.user.avatarUrl = extendedToken.avatarUrl ?? null;
         session.user.isAdmin = extendedToken.isAdmin as boolean;
         session.user.createdAt = extendedToken.createdAt as Date;
+        session.user.permissions = extendedToken.permissions ?? {};
       }
       return session;
     },

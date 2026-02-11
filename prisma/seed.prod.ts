@@ -2,9 +2,11 @@
 // @ts-nocheck
 // prisma/seed.prod.ts - Production seed with admin user and operational radio frequencies
 import { prisma } from '../lib/prisma';
+import { seedPermissions, grantAdminPermissions } from './seed-permissions';
 
 async function main() {
   // Clear existing data in the right order (avoid FK issues)
+  await prisma.userPermission.deleteMany();
   await prisma.signup.deleteMany();
   await prisma.subslot.deleteMany();
   await prisma.slot.deleteMany();
@@ -13,8 +15,11 @@ async function main() {
   await prisma.authAccount.deleteMany();
   await prisma.user.deleteMany();
 
+  // --- Permissions System ---
+  await seedPermissions();
+
   // --- Create Admin User ---
-  await prisma.user.create({
+  const admin = await prisma.user.create({
     data: {
       username: 'chilla55',
       isAdmin: true,
@@ -26,6 +31,9 @@ async function main() {
       },
     },
   });
+
+  // Grant admin full permissions
+  await grantAdminPermissions(admin.id);
 
   // --- Create Operational Radio Frequencies ---
   // LR (Long Range) Nets
