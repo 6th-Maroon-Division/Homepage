@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
+import { checkPermission } from '@/lib/auth-middleware';
 
 // GET /api/trainings - Get all trainings (with optional filtering)
 export async function GET(request: NextRequest) {
@@ -54,8 +55,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.isAdmin) {
-      return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 403 });
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    const hasPermission = await checkPermission(session.user.id, 'training:create');
+    if (!hasPermission) {
+      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
     const body = await request.json();
