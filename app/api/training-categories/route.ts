@@ -22,7 +22,25 @@ export async function GET() {
 }
 
 // POST /api/training-categories - Create a new category (admin only)
-export async function POST(request: NextRequest) {\n  const session = await getServerSession(authOptions);\n\n  if (!session?.user?.id) {\n    return NextResponse.json(\n      { error: 'Unauthorized' },\n      { status: 401 }\n    );\n  }\n  \n  const hasPermission = await checkPermission(session.user.id, 'training:create');\n  if (!hasPermission) {\n    return NextResponse.json(\n      { error: 'Forbidden' },\n      { status: 403 }\n    );\n  }\n\n  try {
+export async function POST(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    );
+  }
+  
+  const hasPermission = await checkPermission(session.user.id, 'training:create');
+  if (!hasPermission) {
+    return NextResponse.json(
+      { error: 'Forbidden' },
+      { status: 403 }
+    );
+  }
+
+  try {
     const body = await request.json();
     const { name } = body;
 

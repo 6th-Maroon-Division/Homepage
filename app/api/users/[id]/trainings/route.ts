@@ -26,6 +26,7 @@ export async function GET(
   }
 
   try {
+    const { id } = await params;
     const userTrainings = await prisma.userTraining.findMany({
       where: { userId: parseInt(id) },
       include: { training: true },

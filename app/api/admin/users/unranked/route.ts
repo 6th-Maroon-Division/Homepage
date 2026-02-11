@@ -169,7 +169,7 @@ export async function GET(request: NextRequest) {
     // Mark users as completed if they have all required trainings
     users.forEach((user) => {
       const completedTrainings = userTrainingMap.get(user.id);
-      const hasAllTrainings = completedTrainings && completedTrainings.size === requiredTrainings.length;
+      const hasAllTrainings = completedTrainings ? completedTrainings.size === requiredTrainings.length : false;
       bctMap.set(user.id, hasAllTrainings);
     });
   }
