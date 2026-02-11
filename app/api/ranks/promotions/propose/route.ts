@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkRankupEligibility } from '@/lib/rank-eligibility';
+import { checkPermission } from '@/lib/auth-middleware';
 
 async function notifyAdminsOfProposal(userId: number, nextRankName: string) {
   const admins = await prisma.user.findMany({ where: { isAdmin: true }, select: { id: true } });
@@ -31,7 +32,12 @@ async function notifyAdminsOfProposal(userId: number, nextRankName: string) {
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.isAdmin) {
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  
+  const hasPermission = await checkPermission(session.user.id, 'rank:manage_promotions');
+  if (!hasPermission) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

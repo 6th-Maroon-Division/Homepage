@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { NextResponse } from 'next/server';
+import { checkPermission } from '@/lib/auth-middleware';
 
 export async function GET(
   request: Request,
@@ -45,9 +46,17 @@ export async function PUT(
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user?.isAdmin) {
+    if (!session?.user?.id) {
       return NextResponse.json(
-        { error: 'Unauthorized - admin access required' },
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+    
+    const hasPermission = await checkPermission(session.user.id, 'orbat:edit');
+    if (!hasPermission) {
+      return NextResponse.json(
+        { error: 'Forbidden' },
         { status: 403 }
       );
     }
@@ -145,9 +154,17 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user?.isAdmin) {
+    if (!session?.user?.id) {
       return NextResponse.json(
-        { error: 'Unauthorized - admin access required' },
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+    
+    const hasPermission = await checkPermission(session.user.id, 'orbat:delete');
+    if (!hasPermission) {
+      return NextResponse.json(
+        { error: 'Forbidden' },
         { status: 403 }
       );
     }

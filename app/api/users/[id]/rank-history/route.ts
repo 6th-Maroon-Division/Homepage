@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
+import { checkPermission } from '@/lib/auth-middleware';
 
 const PAGE_SIZE = 20;
 
@@ -12,16 +13,19 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
     const userId = parseInt(id);
 
-    // Check if user is viewing their own history or if they're an admin
-    if (session.user.id !== userId && !session.user.isAdmin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    // Check if user is viewing their own history or if they have user:manage permission
+    if (session.user.id !== userId) {
+      const hasPermission = await checkPermission(session.user.id, 'user:manage');
+      if (!hasPermission) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
     }
 
     // Get query parameters for pagination

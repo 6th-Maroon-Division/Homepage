@@ -3,13 +3,19 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
+import { checkPermission } from '@/lib/auth-middleware';
 
 // POST - Apply mapped legacy data to create/update UserRank entries
 export async function POST() {
   const session = await getServerSession(authOptions);
 
-  if (!session?.user?.isAdmin) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  
+  const hasPermission = await checkPermission(session.user.id, 'admin:system');
+  if (!hasPermission) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   try {
