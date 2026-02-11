@@ -26,6 +26,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/?error=UserNotFound', baseUrl));
     }
     
+    // Fetch user permissions
+    const userPermissions = await prisma.userPermission.findMany({
+      where: { userId: user.id },
+      include: { permission: true },
+    });
+    const permissions: Record<string, number> = {};
+    for (const up of userPermissions) {
+      permissions[up.permission.key] = up.value;
+    }
+    
     // Create a NextAuth-compatible session token
     const token = await encode({
       token: {
@@ -36,6 +46,7 @@ export async function GET(request: NextRequest) {
         avatarUrl: user.avatarUrl,
         isAdmin: user.isAdmin,
         createdAt: user.createdAt,
+        permissions,
       },
       secret: process.env.NEXTAUTH_SECRET!,
       maxAge: 30 * 24 * 60 * 60, // 30 days
