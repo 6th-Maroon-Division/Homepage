@@ -67,12 +67,15 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
     try {
       const res = await fetch(`/api/users/${userId}/permissions`);
       if (!res.ok) {
-        throw new Error('Failed to fetch permissions');
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to fetch permissions');
       }
       const data = await res.json();
+      console.log('Fetched permissions:', data); // Debug log
       setUserPermissions(data.permissions || []);
     } catch (e) {
-      showError('Failed to load permissions');
+      console.error('Permission fetch error:', e); // Debug log
+      showError(e instanceof Error ? e.message : 'Failed to load permissions');
       setUserPermissions([]);
     } finally {
       setLoadingPermissions(false);
@@ -1076,8 +1079,13 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                   Set permission values (0-255). Higher values grant more authority in hierarchical checks. 0 = no permission.
                 </p>
 
-                <div className="space-y-3">
-                  {userPermissions.map((perm) => (
+                {userPermissions.length === 0 ? (
+                  <div className="py-8 text-center" style={{ color: 'var(--muted-foreground)' }}>
+                    <p>No permissions available</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {userPermissions.map((perm) => (
                     <div
                       key={perm.id}
                       className="p-3 rounded border"
@@ -1172,7 +1180,8 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                       </div>
                     </div>
                   ))}
-                </div>
+                  </div>
+                )}
 
                 <div className="flex gap-2 pt-4">
                   <button
