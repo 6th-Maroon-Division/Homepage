@@ -583,15 +583,15 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                       >
                         {expandedUserId === user.id ? 'Hide' : 'View'} Trainings
                       </button>
+                      <span style={{ color: 'var(--border)' }}>|</span>
+                      <button
+                        onClick={() => openPermissionsModal(user.id, user.username)}
+                        className="text-purple-400 hover:text-purple-300 font-medium"
+                      >
+                        Permissions {user.id === currentUserId && '(Read-only)'}
+                      </button>
                       {user.id !== currentUserId && (
                         <>
-                          <span style={{ color: 'var(--border)' }}>|</span>
-                          <button
-                            onClick={() => openPermissionsModal(user.id, user.username)}
-                            className="text-purple-400 hover:text-purple-300 font-medium"
-                          >
-                            Permissions
-                          </button>
                           <span style={{ color: 'var(--border)' }}>|</span>
                           <button
                             onClick={() => handleToggleAdmin(user.id, user.isAdmin)}
@@ -1066,7 +1066,7 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-xl font-bold mb-4" style={{ color: 'var(--foreground)' }}>
-              Manage Permissions - {permissionsModalData.username}
+              {permissionsModalData.userId === currentUserId ? 'Your Permissions' : `Manage Permissions - ${permissionsModalData.username}`}
             </h2>
 
             {loadingPermissions ? (
@@ -1075,6 +1075,13 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
               </div>
             ) : (
               <div className="space-y-4">
+                {permissionsModalData.userId === currentUserId && (
+                  <div className="px-3 py-2 rounded border" style={{ backgroundColor: 'var(--muted)', borderColor: 'var(--border)' }}>
+                    <p className="text-sm" style={{ color: 'var(--foreground)' }}>
+                      ℹ️ You cannot modify your own permissions. This is a read-only view.
+                    </p>
+                  </div>
+                )}
                 <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
                   Set permission values (0-255). Higher values grant more authority in hierarchical checks. 0 = no permission.
                 </p>
@@ -1107,6 +1114,7 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                             max={perm.maxValue}
                             value={perm.currentValue}
                             onChange={(e) => {
+                              if (permissionsModalData.userId === currentUserId) return;
                               const value = Math.max(0, Math.min(perm.maxValue, parseInt(e.target.value) || 0));
                               setUserPermissions(
                                 userPermissions.map((p) =>
@@ -1114,11 +1122,13 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                                 )
                               );
                             }}
+                            disabled={permissionsModalData.userId === currentUserId}
                             className="w-20 px-2 py-1 rounded border text-center"
                             style={{
                               backgroundColor: 'var(--background)',
                               borderColor: 'var(--border)',
                               color: 'var(--foreground)',
+                              opacity: permissionsModalData.userId === currentUserId ? 0.6 : 1,
                             }}
                           />
                           <span className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
@@ -1128,73 +1138,77 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                       </div>
                       
                       {/* Quick action buttons */}
-                      <div className="flex gap-2 mt-2">
-                        <button
-                          onClick={() => {
-                            setUserPermissions(
-                              userPermissions.map((p) =>
-                                p.id === perm.id ? { ...p, currentValue: 0 } : p
-                              )
-                            );
-                          }}
-                          className="px-2 py-1 text-xs rounded"
-                          style={{
-                            backgroundColor: 'var(--muted)',
-                            color: 'var(--foreground)',
-                          }}
-                        >
-                          None (0)
-                        </button>
-                        <button
-                          onClick={() => {
-                            setUserPermissions(
-                              userPermissions.map((p) =>
-                                p.id === perm.id ? { ...p, currentValue: 100 } : p
-                              )
-                            );
-                          }}
-                          className="px-2 py-1 text-xs rounded"
-                          style={{
-                            backgroundColor: 'var(--muted)',
-                            color: 'var(--foreground)',
-                          }}
-                        >
-                          Standard (100)
-                        </button>
-                        <button
-                          onClick={() => {
-                            setUserPermissions(
-                              userPermissions.map((p) =>
-                                p.id === perm.id ? { ...p, currentValue: 255 } : p
-                              )
-                            );
-                          }}
-                          className="px-2 py-1 text-xs rounded"
-                          style={{
-                            backgroundColor: 'var(--muted)',
-                            color: 'var(--foreground)',
-                          }}
-                        >
-                          Full (255)
-                        </button>
-                      </div>
+                      {permissionsModalData.userId !== currentUserId && (
+                        <div className="flex gap-2 mt-2">
+                          <button
+                            onClick={() => {
+                              setUserPermissions(
+                                userPermissions.map((p) =>
+                                  p.id === perm.id ? { ...p, currentValue: 0 } : p
+                                )
+                              );
+                            }}
+                            className="px-2 py-1 text-xs rounded"
+                            style={{
+                              backgroundColor: 'var(--muted)',
+                              color: 'var(--foreground)',
+                            }}
+                          >
+                            None (0)
+                          </button>
+                          <button
+                            onClick={() => {
+                              setUserPermissions(
+                                userPermissions.map((p) =>
+                                  p.id === perm.id ? { ...p, currentValue: 100 } : p
+                                )
+                              );
+                            }}
+                            className="px-2 py-1 text-xs rounded"
+                            style={{
+                              backgroundColor: 'var(--muted)',
+                              color: 'var(--foreground)',
+                            }}
+                          >
+                            Standard (100)
+                          </button>
+                          <button
+                            onClick={() => {
+                              setUserPermissions(
+                                userPermissions.map((p) =>
+                                  p.id === perm.id ? { ...p, currentValue: 255 } : p
+                                )
+                              );
+                            }}
+                            className="px-2 py-1 text-xs rounded"
+                            style={{
+                              backgroundColor: 'var(--muted)',
+                              color: 'var(--foreground)',
+                            }}
+                          >
+                            Full (255)
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                   </div>
                 )}
 
                 <div className="flex gap-2 pt-4">
-                  <button
-                    onClick={saveUserPermissions}
-                    disabled={savingPermissions}
-                    className="flex-1 px-4 py-2 rounded font-medium transition-colors disabled:opacity-50"
-                    style={{
-                      backgroundColor: 'var(--primary)',
-                      color: 'var(--primary-foreground)',
-                    }}
-                  >
-                    {savingPermissions ? 'Saving...' : 'Save Permissions'}
-                  </button>
+                  {permissionsModalData.userId !== currentUserId && (
+                    <button
+                      onClick={saveUserPermissions}
+                      disabled={savingPermissions}
+                      className="flex-1 px-4 py-2 rounded font-medium transition-colors disabled:opacity-50"
+                      style={{
+                        backgroundColor: 'var(--primary)',
+                        color: 'var(--primary-foreground)',
+                      }}
+                    >
+                      {savingPermissions ? 'Saving...' : 'Save Permissions'}
+                    </button>
+                  )}
 
                   <button
                     onClick={() => setPermissionsModalData(null)}
@@ -1206,7 +1220,7 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                       border: '1px solid var(--border)',
                     }}
                   >
-                    Cancel
+                    {permissionsModalData.userId === currentUserId ? 'Close' : 'Cancel'}
                   </button>
                 </div>
               </div>
