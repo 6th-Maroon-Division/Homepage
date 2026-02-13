@@ -3,12 +3,23 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import TrainingManagementClient from '@/app/admin/components/trainings/TrainingManagementClient';
+import { checkPermission } from '@/lib/auth-middleware';
 
 export default async function AdminTrainingsPage() {
   const session = await getServerSession(authOptions);
 
-  if (!session?.user?.isAdmin) {
+  if (!session?.user?.id) {
     redirect('/');
+  }
+  
+  // Check if user has any training permission
+  const hasPermission = session.user.isAdmin || 
+    await checkPermission(session.user.id, 'training:create') ||
+    await checkPermission(session.user.id, 'training:edit') ||
+    await checkPermission(session.user.id, 'training:delete');
+  
+  if (!hasPermission) {
+    redirect('/admin');
   }
 
   const [trainings, trainingRequests, ranks] = await Promise.all([

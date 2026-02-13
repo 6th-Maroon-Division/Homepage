@@ -3,12 +3,20 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import TemplateManagementClient from '@/app/admin/components/templates/TemplateManagementClient';
+import { checkPermission } from '@/lib/auth-middleware';
 
 export default async function AdminTemplatesPage() {
   const session = await getServerSession(authOptions);
 
-  if (!session?.user?.isAdmin) {
+  if (!session?.user?.id) {
     redirect('/');
+  }
+  
+  // Check if user has ORBAT edit permission (templates are for ORBATs)
+  const hasPermission = session.user.isAdmin || await checkPermission(session.user.id, 'orbat:edit');
+  
+  if (!hasPermission) {
+    redirect('/admin');
   }
 
   const templates = await prisma.orbatTemplate.findMany({
