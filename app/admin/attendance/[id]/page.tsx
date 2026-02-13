@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import AttendanceManagement from '@/app/admin/components/AttendanceManagement';
 import Link from 'next/link';
+import { checkPermission } from '@/lib/auth-middleware';
 
 export default async function OrbatAttendancePage({
   params,
@@ -12,8 +13,15 @@ export default async function OrbatAttendancePage({
 }) {
   const session = await getServerSession(authOptions);
 
-  if (!session || !session.user?.isAdmin) {
+  if (!session?.user?.id) {
     redirect('/');
+  }
+  
+  // Check if user has attendance edit permission
+  const hasPermission = session.user.isAdmin || await checkPermission(session.user.id, 'attendance:edit');
+  
+  if (!hasPermission) {
+    redirect('/admin');
   }
 
   const { id } = await params;

@@ -20,6 +20,7 @@ export default function TopBar() {
   const publicNavLinks = [
     { href: '/', label: 'Home' },
     { href: '/orbats', label: 'Operations' },
+    { href: '/trainings', label: 'Trainings' },
   ];
 
   const adminNavLinks = [

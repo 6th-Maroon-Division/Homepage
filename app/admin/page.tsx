@@ -7,7 +7,9 @@ import Link from 'next/link';
 export default async function AdminPage() {
   const session = await getServerSession(authOptions);
 
-  if (!session || !session.user?.isAdmin) {
+  // Allow access if user is admin OR has any permissions
+  const hasAnyPermissions = session?.user?.permissions && Object.keys(session.user.permissions).length > 0;
+  if (!session || (!session.user?.isAdmin && !hasAnyPermissions)) {
     redirect('/');
   }
 
