@@ -17,8 +17,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Check if user has permission to manage users
-  const hasPermission = await checkPermission(session.user.id, 'user:manage');
+  // Check if user has permission to manage permissions
+  const hasPermission = await checkPermission(session.user.id, 'user:manage_permissions');
   if (!hasPermission) {
     return NextResponse.json({ error: 'Forbidden: Insufficient permissions' }, { status: 403 });
   }
@@ -89,8 +89,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Check if user has permission to manage users
-  const hasPermission = await checkPermission(session.user.id, 'user:manage');
+  // Check if user has permission to manage permissions
+  const hasPermission = await checkPermission(session.user.id, 'user:manage_permissions');
   if (!hasPermission) {
     return NextResponse.json({ error: 'Forbidden: Insufficient permissions' }, { status: 403 });
   }

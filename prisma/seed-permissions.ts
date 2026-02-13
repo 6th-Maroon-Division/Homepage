@@ -47,6 +47,7 @@ export async function grantAdminPermissions(userId: number) {
     "user:edit",
     "user:promote",
     "user:manage",
+    "user:manage_permissions",
     "training:create",
     "training:edit",
     "training:delete",

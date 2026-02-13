@@ -21,6 +21,11 @@ export const PERMISSIONS = {
     defaultValue: 0,
     maxValue: 255,
   },
+  "user:manage_permissions": {
+    description: "Manage user permissions (grant/revoke)",
+    defaultValue: 0,
+    maxValue: 255,
+  },
 
   // Training permissions
   "training:create": {
