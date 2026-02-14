@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '../ui/ToastContainer';
 import ConfirmModal from '../ui/ConfirmModal';
+import { usePermission } from '@/app/hooks/usePermissions';
 
 type DeleteOrbatButtonProps = {
   orbatId: number;
@@ -14,6 +15,10 @@ export default function DeleteOrbatButton({ orbatId }: DeleteOrbatButtonProps) {
   const [showConfirm, setShowConfirm] = useState(false);
   const router = useRouter();
   const { showSuccess, showError } = useToast();
+  const hasDeletePermission = usePermission('orbat:delete');
+
+  if (!hasDeletePermission) return null;
+
   const handleDelete = async () => {
     setIsDeleting(true);
     try {

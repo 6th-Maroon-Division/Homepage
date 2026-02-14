@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
+import { usePermission } from '@/app/hooks/usePermissions';
 
 interface OrbatTemplate {
   id: number;
@@ -33,6 +34,9 @@ export default function TemplateManagementClient({ templates: initialTemplates }
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const { showError, showSuccess } = useToast();
+
+  const canEditOrbat = usePermission('orbat:edit');
+  const canDeleteOrbat = usePermission('orbat:delete');
 
   // Get unique categories
   const categories: string[] = ['all', ...Array.from(new Set(templates.map(t => t.category).filter((c): c is string => Boolean(c))))];
@@ -92,21 +96,23 @@ export default function TemplateManagementClient({ templates: initialTemplates }
               Manage ORBAT templates
             </p>
           </div>
-          <Link
-            href="/admin/templates/new"
-            className="px-4 py-2 rounded-md transition-colors font-medium"
-            style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--button-hover)';
-              e.currentTarget.style.color = 'var(--button-hover-foreground)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--primary)';
-              e.currentTarget.style.color = 'var(--primary-foreground)';
-            }}
-          >
-            Create New Template
-          </Link>
+          {canEditOrbat && (
+            <Link
+              href="/admin/templates/new"
+              className="px-4 py-2 rounded-md transition-colors font-medium"
+              style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--button-hover)';
+                e.currentTarget.style.color = 'var(--button-hover-foreground)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--primary)';
+                e.currentTarget.style.color = 'var(--primary-foreground)';
+              }}
+            >
+              Create New Template
+            </Link>
+          )}
         </div>
 
         {/* Filters */}
@@ -222,30 +228,34 @@ export default function TemplateManagementClient({ templates: initialTemplates }
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
-                        <Link
-                          href={`/admin/templates/${template.id}`}
-                          className="px-3 py-1 rounded text-sm font-medium transition-colors"
-                          style={{
-                            backgroundColor: 'var(--primary)',
-                            color: 'var(--primary-foreground)'
-                          }}
-                        >
-                          Edit
-                        </Link>
-                        <button
-                          onClick={() => {
-                            setTemplateToDelete(template);
-                            setShowDeleteConfirm(true);
-                          }}
-                          disabled={isDeleting}
-                          className="px-3 py-1 rounded text-sm font-medium transition-colors disabled:opacity-50"
-                          style={{
-                            backgroundColor: '#dc2626',
-                            color: 'white'
-                          }}
-                        >
+                        {canEditOrbat && (
+                          <Link
+                            href={`/admin/templates/${template.id}`}
+                            className="px-3 py-1 rounded text-sm font-medium transition-colors"
+                            style={{
+                              backgroundColor: 'var(--primary)',
+                              color: 'var(--primary-foreground)'
+                            }}
+                          >
+                            Edit
+                          </Link>
+                        )}
+                        {canDeleteOrbat && (
+                          <button
+                            onClick={() => {
+                              setTemplateToDelete(template);
+                              setShowDeleteConfirm(true);
+                            }}
+                            disabled={isDeleting}
+                            className="px-3 py-1 rounded text-sm font-medium transition-colors disabled:opacity-50"
+                            style={{
+                              backgroundColor: '#dc2626',
+                              color: 'white'
+                            }}
+                          >
                           Delete
                         </button>
+                        )}
                       </div>
                     </td>
                   </tr>

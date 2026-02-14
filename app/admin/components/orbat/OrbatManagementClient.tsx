@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import DeleteOrbatButton from '../../../components/orbat/DeleteOrbatButton';
+import { usePermission } from '@/app/hooks/usePermissions';
 
 type Orbat = {
   id: number;
@@ -27,6 +28,9 @@ export default function OrbatManagementClient({ orbats: initialOrbats }: OrbatMa
   const [orbats] = useState<Orbat[]>(initialOrbats);
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  const canCreateOrbat = usePermission('orbat:create');
+  const canEditOrbat = usePermission('orbat:edit');
 
   const now = new Date();
 
@@ -74,21 +78,23 @@ export default function OrbatManagementClient({ orbats: initialOrbats }: OrbatMa
               {filter === 'all' ? 'All OrbATs' : filter === 'upcoming' ? 'Upcoming Operations' : 'Past Operations'}
             </p>
           </div>
-          <Link
-            href="/admin/orbats/new"
-            className="px-4 py-2 rounded-md transition-colors font-medium"
-            style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--button-hover)';
-              e.currentTarget.style.color = 'var(--button-hover-foreground)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--primary)';
-              e.currentTarget.style.color = 'var(--primary-foreground)';
-            }}
-          >
-            Create New OrbAT
-          </Link>
+          {canCreateOrbat && (
+            <Link
+              href="/admin/orbats/new"
+              className="px-4 py-2 rounded-md transition-colors font-medium"
+              style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--button-hover)';
+                e.currentTarget.style.color = 'var(--button-hover-foreground)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--primary)';
+                e.currentTarget.style.color = 'var(--primary-foreground)';
+              }}
+            >
+              Create New OrbAT
+            </Link>
+          )}
         </div>
 
         {/* Filters */}
@@ -226,14 +232,18 @@ export default function OrbatManagementClient({ orbats: initialOrbats }: OrbatMa
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
-                        <Link
-                          href={`/admin/orbats/${orbat.id}/edit`}
-                          className="font-medium hover:underline"
-                          style={{ color: 'var(--primary)' }}
-                        >
-                          Edit
-                        </Link>
-                        <span style={{ color: 'var(--border)' }}>|</span>
+                        {canEditOrbat && (
+                          <>
+                            <Link
+                              href={`/admin/orbats/${orbat.id}/edit`}
+                              className="font-medium hover:underline"
+                              style={{ color: 'var(--primary)' }}
+                            >
+                              Edit
+                            </Link>
+                            <span style={{ color: 'var(--border)' }}>|</span>
+                          </>
+                        )}
                         <DeleteOrbatButton orbatId={orbat.id} />
                       </td>
                     </tr>

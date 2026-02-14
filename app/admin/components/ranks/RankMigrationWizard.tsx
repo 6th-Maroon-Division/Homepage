@@ -4,6 +4,7 @@
 import { useState, useCallback } from 'react';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
+import { usePermission } from '@/app/hooks/usePermissions';
 
 type Step = 'confirmation' | 'strategy' | 'mapping' | 'preview' | 'apply';
 type Strategy = 'recalculate' | 'grandfather' | 'map';
@@ -51,6 +52,8 @@ export default function RankMigrationWizard({ ranks }: Props) {
   const [loading, setLoading] = useState(false);
   const [applying, setApplying] = useState(false);
   const { showSuccess, showError } = useToast();
+
+  const canEditRanks = usePermission('rank:edit');
 
   const totalUsers = ranks.reduce((sum, rank) => sum + rank.userCount, 0);
 
@@ -138,6 +141,19 @@ export default function RankMigrationWizard({ ranks }: Props) {
     }
     return true;
   };
+
+  if (!canEditRanks) {
+    return (
+      <div
+        className="border rounded-lg p-6"
+        style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
+      >
+        <p className="text-center" style={{ color: 'var(--muted-foreground)' }}>
+          You do not have permission to migrate ranks.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

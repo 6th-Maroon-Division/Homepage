@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
+import { usePermission } from '@/app/hooks/usePermissions';
 
 type Rank = {
   id: number;
@@ -114,6 +115,12 @@ export default function TrainingManagementClient({
     duration: '',
     isActive: true,
   });
+
+  // Permission checks
+  const canCreateTraining = usePermission('training:create');
+  const canEditTraining = usePermission('training:edit');
+  const canDeleteTraining = usePermission('training:delete');
+  const canApproveRequests = usePermission('training:approve_request');
 
   // Fetch categories on mount
   useEffect(() => {
@@ -647,20 +654,22 @@ export default function TrainingManagementClient({
                 ))}
               </select>
             </div>
-            <button
-              onClick={() => {
-                resetForm();
-                setActiveTab('trainings');
-                setTrainingModalOpen(true);
-              }}
-              className="px-4 py-2 rounded font-medium transition-colors"
-              style={{
-                backgroundColor: 'var(--primary)',
-                color: 'var(--primary-foreground)',
-              }}
-            >
-              New Training
-            </button>
+            {canCreateTraining && (
+              <button
+                onClick={() => {
+                  resetForm();
+                  setActiveTab('trainings');
+                  setTrainingModalOpen(true);
+                }}
+                className="px-4 py-2 rounded font-medium transition-colors"
+                style={{
+                  backgroundColor: 'var(--primary)',
+                  color: 'var(--primary-foreground)',
+                }}
+              >
+                New Training
+              </button>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -702,38 +711,44 @@ export default function TrainingManagementClient({
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => handleEdit(training)}
-                      className="px-3 py-1 text-sm rounded transition-colors"
-                      style={{
-                        backgroundColor: 'var(--primary)',
-                        color: 'var(--primary-foreground)',
-                      }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => 
-                        setExpandedRequirements(expandedRequirements === training.id ? null : training.id)
-                      }
-                      className="px-3 py-1 text-sm rounded transition-colors"
-                      style={{
-                        backgroundColor: 'var(--accent)',
-                        color: 'var(--accent-foreground)',
-                      }}
-                    >
-                      {expandedRequirements === training.id ? 'Hide Requirements' : 'Requirements'}
-                    </button>
-                    <button
-                      onClick={() => setDeleteId(training.id)}
-                      className="px-3 py-1 text-sm rounded transition-colors"
-                      style={{
-                        backgroundColor: 'var(--destructive)',
-                        color: 'var(--destructive-foreground)',
-                      }}
-                    >
-                      Delete
-                    </button>
+                    {canEditTraining && (
+                      <>
+                        <button
+                          onClick={() => handleEdit(training)}
+                          className="px-3 py-1 text-sm rounded transition-colors"
+                          style={{
+                            backgroundColor: 'var(--primary)',
+                            color: 'var(--primary-foreground)',
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => 
+                            setExpandedRequirements(expandedRequirements === training.id ? null : training.id)
+                          }
+                          className="px-3 py-1 text-sm rounded transition-colors"
+                          style={{
+                            backgroundColor: 'var(--accent)',
+                            color: 'var(--accent-foreground)',
+                          }}
+                        >
+                          {expandedRequirements === training.id ? 'Hide Requirements' : 'Requirements'}
+                        </button>
+                      </>
+                    )}
+                    {canDeleteTraining && (
+                      <button
+                        onClick={() => setDeleteId(training.id)}
+                        className="px-3 py-1 text-sm rounded transition-colors"
+                        style={{
+                          backgroundColor: 'var(--destructive)',
+                          color: 'var(--destructive-foreground)',
+                        }}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1096,30 +1111,32 @@ export default function TrainingManagementClient({
                       Requested: {new Date(request.requestedAt).toLocaleDateString()}
                     </p>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setRequestActionModal({ requestId: request.id, status: 'approved' })}
-                      disabled={isSaving}
-                      className="px-4 py-2 text-sm rounded transition-colors disabled:opacity-50"
-                      style={{
-                        backgroundColor: 'var(--primary)',
-                        color: 'var(--primary-foreground)',
-                      }}
-                    >
-                      Approve
-                    </button>
-                    <button
-                      onClick={() => setRequestActionModal({ requestId: request.id, status: 'rejected' })}
-                      disabled={isSaving}
-                      className="px-4 py-2 text-sm rounded transition-colors disabled:opacity-50"
-                      style={{
-                        backgroundColor: 'var(--destructive)',
-                        color: 'var(--destructive-foreground)',
-                      }}
-                    >
-                      Reject
-                    </button>
-                  </div>
+                  {canApproveRequests && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setRequestActionModal({ requestId: request.id, status: 'approved' })}
+                        disabled={isSaving}
+                        className="px-4 py-2 text-sm rounded transition-colors disabled:opacity-50"
+                        style={{
+                          backgroundColor: 'var(--primary)',
+                          color: 'var(--primary-foreground)',
+                        }}
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => setRequestActionModal({ requestId: request.id, status: 'rejected' })}
+                        disabled={isSaving}
+                        className="px-4 py-2 text-sm rounded transition-colors disabled:opacity-50"
+                        style={{
+                          backgroundColor: 'var(--destructive)',
+                          color: 'var(--destructive-foreground)',
+                        }}
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

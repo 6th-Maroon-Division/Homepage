@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
 import { useToast } from '@/app/components/ui/ToastContainer';
+import { usePermission } from '@/app/hooks/usePermissions';
 
 type User = {
   id: number;
@@ -60,6 +61,11 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
   const [ranks, setRanks] = useState<Array<{ id: number; name: string; abbreviation: string }>>([]);
   
   const { showSuccess, showError } = useToast();
+
+  // Permission checks
+  const canManageUsers = usePermission('user:manage');
+  const canManagePermissions = usePermission('user:manage_permissions');
+  const canMarkTrainings = usePermission('training:mark');
 
   // Fetch user permissions
   const fetchUserPermissions = async (userId: number) => {
@@ -583,14 +589,18 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                       >
                         {expandedUserId === user.id ? 'Hide' : 'View'} Trainings
                       </button>
-                      <span style={{ color: 'var(--border)' }}>|</span>
-                      <button
-                        onClick={() => openPermissionsModal(user.id, user.username)}
-                        className="text-purple-400 hover:text-purple-300 font-medium"
-                      >
-                        Permissions {user.id === currentUserId && '(Read-only)'}
-                      </button>
-                      {user.id !== currentUserId && (
+                      {canManagePermissions && (
+                        <>
+                          <span style={{ color: 'var(--border)' }}>|</span>
+                          <button
+                            onClick={() => openPermissionsModal(user.id, user.username)}
+                            className="text-purple-400 hover:text-purple-300 font-medium"
+                          >
+                            Permissions {user.id === currentUserId && '(Read-only)'}
+                          </button>
+                        </>
+                      )}
+                      {canManageUsers && user.id !== currentUserId && (
                         <>
                           <span style={{ color: 'var(--border)' }}>|</span>
                           <button
@@ -661,61 +671,63 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                                         Completed: {new Date(training.completedAt).toLocaleDateString('en-GB')}
                                       </p>
                                     </div>
-                                    <div className="flex gap-2 ml-2">
-                                      <button
-                                        onClick={() => {
-                                          const updatedTraining = { ...training };
-                                          setTrainingModalData({
-                                            userId: user.id,
-                                            trainingId: training.trainingId.toString(),
-                                            notes: training.notes || '',
-                                            needsRetraining: training.needsRetraining,
-                                            isHidden: training.isHidden,
-                                          });
-                                        }}
-                                        className="px-2 py-1 text-xs rounded"
-                                        style={{
-                                          backgroundColor: 'var(--primary)',
-                                          color: 'var(--primary-foreground)',
-                                        }}
-                                      >
-                                        Edit
-                                      </button>
-                                      <button
-                                        onClick={async () => {
-                                          if (!confirm('Remove this training from the user?')) return;
-                                          setIsLoading(true);
-                                          try {
-                                            const res = await fetch(`/api/user-trainings/${training.id}`, {
-                                              method: 'DELETE',
+                                    {canMarkTrainings && (
+                                      <div className="flex gap-2 ml-2">
+                                        <button
+                                          onClick={() => {
+                                            const updatedTraining = { ...training };
+                                            setTrainingModalData({
+                                              userId: user.id,
+                                              trainingId: training.trainingId.toString(),
+                                              notes: training.notes || '',
+                                              needsRetraining: training.needsRetraining,
+                                              isHidden: training.isHidden,
                                             });
-                                            if (res.ok) {
-                                              setUsers(users.map(u => 
-                                                u.id === user.id 
-                                                  ? { ...u, trainings: u.trainings.filter(t => t.id !== training.id), trainingCount: u.trainingCount - 1 }
-                                                  : u
-                                              ));
-                                              showSuccess('Training removed');
-                                            } else {
-                                              showError('Failed to remove training');
+                                          }}
+                                          className="px-2 py-1 text-xs rounded"
+                                          style={{
+                                            backgroundColor: 'var(--primary)',
+                                            color: 'var(--primary-foreground)',
+                                          }}
+                                        >
+                                          Edit
+                                        </button>
+                                        <button
+                                          onClick={async () => {
+                                            if (!confirm('Remove this training from the user?')) return;
+                                            setIsLoading(true);
+                                            try {
+                                              const res = await fetch(`/api/user-trainings/${training.id}`, {
+                                                method: 'DELETE',
+                                              });
+                                              if (res.ok) {
+                                                setUsers(users.map(u => 
+                                                  u.id === user.id 
+                                                    ? { ...u, trainings: u.trainings.filter(t => t.id !== training.id), trainingCount: u.trainingCount - 1 }
+                                                    : u
+                                                ));
+                                                showSuccess('Training removed');
+                                              } else {
+                                                showError('Failed to remove training');
+                                              }
+                                            } catch (error) {
+                                              console.error('Error:', error);
+                                              showError('Error removing training');
+                                            } finally {
+                                              setIsLoading(false);
                                             }
-                                          } catch (error) {
-                                            console.error('Error:', error);
-                                            showError('Error removing training');
-                                          } finally {
-                                            setIsLoading(false);
-                                          }
-                                        }}
-                                        disabled={isLoading}
-                                        className="px-2 py-1 text-xs rounded"
-                                        style={{
-                                          backgroundColor: 'var(--destructive)',
-                                          color: 'var(--destructive-foreground)',
-                                        }}
-                                      >
-                                        Remove
-                                      </button>
-                                    </div>
+                                          }}
+                                          disabled={isLoading}
+                                          className="px-2 py-1 text-xs rounded"
+                                          style={{
+                                            backgroundColor: 'var(--destructive)',
+                                            color: 'var(--destructive-foreground)',
+                                          }}
+                                        >
+                                          Remove
+                                        </button>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               ))}

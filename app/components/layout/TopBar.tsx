@@ -282,7 +282,7 @@ export default function TopBar() {
                 >
                   Settings
                 </Link>
-                {session.user?.isAdmin && (
+                {(session.user?.isAdmin || (session.user?.permissions && Object.keys(session.user.permissions).length > 0)) && (
                   <Link
                     href="/admin"
                     onClick={() => setMobileMenuOpen(false)}
