@@ -11,6 +11,24 @@ export async function GET(
   try {
     const { id } = await params;
     const templateId = parseInt(id);
+    
+    const session = await getServerSession(authOptions);
+    
+    // Allow access if user has any template or ORBAT permission
+    if (session?.user?.id) {
+      const [canManageTemplates, canCreateOrbat, canEditOrbat] = await Promise.all([
+        checkPermission(session.user.id, 'template:create'),
+        checkPermission(session.user.id, 'orbat:create'),
+        checkPermission(session.user.id, 'orbat:edit'),
+      ]);
+      
+      if (!canManageTemplates && !canCreateOrbat && !canEditOrbat && !session.user.isAdmin) {
+        return NextResponse.json(
+          { error: 'Forbidden' },
+          { status: 403 }
+        );
+      }
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const template = await (prisma as any).orbatTemplate.findUnique({
