@@ -4,29 +4,21 @@ import { PERMISSIONS } from "../lib/permissions";
 /**
  * Seed all permissions into the database
  * Called during development and production seeding
+ * Uses a transaction for atomicity and better performance
  */
 export async function seedPermissions() {
   console.log("🔐 Seeding permissions...");
 
-  for (const [key, metadata] of Object.entries(PERMISSIONS)) {
-    const existing = await prisma.permission.findUnique({
-      where: { key },
-    });
-
-    if (existing) {
-      // Update if exists
-      await prisma.permission.update({
+  await prisma.$transaction(async (tx) => {
+    for (const [key, metadata] of Object.entries(PERMISSIONS)) {
+      await tx.permission.upsert({
         where: { key },
-        data: {
+        update: {
           description: metadata.description,
           defaultValue: metadata.defaultValue,
           maxValue: metadata.maxValue,
         },
-      });
-    } else {
-      // Create if doesn't exist
-      await prisma.permission.create({
-        data: {
+        create: {
           key,
           description: metadata.description,
           defaultValue: metadata.defaultValue,
@@ -34,13 +26,14 @@ export async function seedPermissions() {
         },
       });
     }
-  }
+  });
 
   console.log(`✅ Seeded ${Object.keys(PERMISSIONS).length} permissions`);
 }
 
 /**
  * Set admin user to have full permissions (255 for all)
+ * Uses a transaction for atomicity and better performance
  */
 export async function grantAdminPermissions(userId: number) {
   const adminPermKeys = [
@@ -68,28 +61,40 @@ export async function grantAdminPermissions(userId: number) {
     "admin:system",
   ] as const;
 
-  for (const key of adminPermKeys) {
-    const permission = await prisma.permission.findUnique({
-      where: { key },
+  await prisma.$transaction(async (tx) => {
+    // Fetch all permissions at once
+    const permissions = await tx.permission.findMany({
+      where: {
+        key: {
+          in: adminPermKeys,
+        },
+      },
     });
 
-    if (permission) {
-      await prisma.userPermission.upsert({
-        where: {
-          userId_permissionId: {
-            userId,
-            permissionId: permission.id,
+    // Create permission map for faster lookup
+    const permissionMap = new Map(permissions.map((p) => [p.key, p.id]));
+
+    // Upsert all user permissions
+    for (const key of adminPermKeys) {
+      const permissionId = permissionMap.get(key);
+      if (permissionId) {
+        await tx.userPermission.upsert({
+          where: {
+            userId_permissionId: {
+              userId,
+              permissionId,
+            },
           },
-        },
-        update: { value: 255 },
-        create: {
-          userId,
-          permissionId: permission.id,
-          value: 255,
-        },
-      });
+          update: { value: 255 },
+          create: {
+            userId,
+            permissionId,
+            value: 255,
+          },
+        });
+      }
     }
-  }
+  });
 
   console.log(`✅ Granted full admin permissions to user ${userId}`);
 }
