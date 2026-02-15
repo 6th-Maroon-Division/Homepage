@@ -36,7 +36,7 @@ export async function seedPermissions() {
  * Uses a transaction for atomicity and better performance
  */
 export async function grantAdminPermissions(userId: number) {
-  const adminPermKeys = [
+  const adminPermKeys: string[] = [
     "user:edit",
     "user:promote",
     "user:manage",
@@ -59,7 +59,7 @@ export async function grantAdminPermissions(userId: number) {
     "rank:delete",
     "rank:manage_promotions",
     "admin:system",
-  ] as const;
+  ];
 
   await prisma.$transaction(async (tx) => {
     // Fetch all permissions at once
