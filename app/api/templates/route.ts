@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const hasPermission = await checkPermission(session.user.id, 'orbat:create');
+    const hasPermission = await checkPermission(session.user.id, 'template:create');
     if (!hasPermission) {
       return NextResponse.json(
         { error: 'Forbidden' },

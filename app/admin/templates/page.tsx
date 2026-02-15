@@ -12,8 +12,10 @@ export default async function AdminTemplatesPage() {
     redirect('/');
   }
   
-  // Check if user has ORBAT edit permission (templates are for ORBATs)
-  const hasPermission = session.user.isAdmin || await checkPermission(session.user.id, 'orbat:edit');
+  // Check if user has template management permissions
+  const canEditTemplates = await checkPermission(session.user.id, 'template:edit');
+  const canCreateTemplates = await checkPermission(session.user.id, 'template:create');
+  const hasPermission = session.user.isAdmin || canEditTemplates || canCreateTemplates;
   
   if (!hasPermission) {
     redirect('/admin');

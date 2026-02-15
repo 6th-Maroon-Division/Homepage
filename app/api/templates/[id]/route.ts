@@ -53,7 +53,7 @@ export async function PUT(
       );
     }
     
-    const hasPermission = await checkPermission(session.user.id, 'orbat:edit');
+    const hasPermission = await checkPermission(session.user.id, 'template:edit');
     if (!hasPermission) {
       return NextResponse.json(
         { error: 'Forbidden' },
@@ -161,7 +161,7 @@ export async function DELETE(
       );
     }
     
-    const hasPermission = await checkPermission(session.user.id, 'orbat:delete');
+    const hasPermission = await checkPermission(session.user.id, 'template:delete');
     if (!hasPermission) {
       return NextResponse.json(
         { error: 'Forbidden' },

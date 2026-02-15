@@ -35,8 +35,9 @@ export default function TemplateManagementClient({ templates: initialTemplates }
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const { showError, showSuccess } = useToast();
 
-  const canEditOrbat = usePermission('orbat:edit');
-  const canDeleteOrbat = usePermission('orbat:delete');
+  const canCreateTemplate = usePermission('template:create');
+  const canEditTemplate = usePermission('template:edit');
+  const canDeleteTemplate = usePermission('template:delete');
 
   // Get unique categories
   const categories: string[] = ['all', ...Array.from(new Set(templates.map(t => t.category).filter((c): c is string => Boolean(c))))];
@@ -96,7 +97,7 @@ export default function TemplateManagementClient({ templates: initialTemplates }
               Manage ORBAT templates
             </p>
           </div>
-          {canEditOrbat && (
+          {canCreateTemplate && (
             <Link
               href="/admin/templates/new"
               className="px-4 py-2 rounded-md transition-colors font-medium"
@@ -228,7 +229,7 @@ export default function TemplateManagementClient({ templates: initialTemplates }
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
-                        {canEditOrbat && (
+                        {canEditTemplate && (
                           <Link
                             href={`/admin/templates/${template.id}`}
                             className="px-3 py-1 rounded text-sm font-medium transition-colors"
@@ -240,7 +241,7 @@ export default function TemplateManagementClient({ templates: initialTemplates }
                             Edit
                           </Link>
                         )}
-                        {canDeleteOrbat && (
+                        {canDeleteTemplate && (
                           <button
                             onClick={() => {
                               setTemplateToDelete(template);

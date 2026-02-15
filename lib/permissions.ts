@@ -71,6 +71,23 @@ export const PERMISSIONS = {
     maxValue: 255,
   },
 
+  // Template permissions
+  "template:create": {
+    description: "Create ORBAT templates",
+    defaultValue: 0,
+    maxValue: 255,
+  },
+  "template:edit": {
+    description: "Edit ORBAT templates",
+    defaultValue: 0,
+    maxValue: 255,
+  },
+  "template:delete": {
+    description: "Delete ORBAT templates",
+    defaultValue: 0,
+    maxValue: 255,
+  },
+
   // Attendance permissions
   "attendance:edit": {
     description: "Edit attendance records",
