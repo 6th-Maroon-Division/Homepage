@@ -4,7 +4,6 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
-import { PERMISSIONS } from '@/lib/permissions';
 
 /**
  * GET /api/users/[id]/permissions

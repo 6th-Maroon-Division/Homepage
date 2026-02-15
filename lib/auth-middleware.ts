@@ -7,11 +7,9 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 /**
  * Extend NextRequest with user session
  */
-declare global {
-  namespace Express {
-    interface Request {
-      session?: Awaited<ReturnType<typeof getServerSession>>;
-    }
+declare module 'next' {
+  interface NextRequest {
+    session?: Awaited<ReturnType<typeof getServerSession>>;
   }
 }
 

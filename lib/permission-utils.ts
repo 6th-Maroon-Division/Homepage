@@ -9,15 +9,6 @@ export async function getUserPermissionValue(
   userId: number,
   permissionKey: PermissionKey
 ): Promise<number> {
-  const userPermission = await prisma.userPermission.findUnique({
-    where: {
-      userId_permissionId: {
-        userId,
-        permissionId: -1, // Placeholder, will be found by permission key
-      },
-    },
-  });
-
   // Find permission by key first
   const permission = await prisma.permission.findUnique({
     where: { key: permissionKey },
@@ -126,7 +117,7 @@ export async function setUserPermission(
   }
 
   // Get or create permission
-  let permission = await prisma.permission.findUnique({
+  const permission = await prisma.permission.findUnique({
     where: { key: permissionKey },
   });
 
@@ -177,7 +168,7 @@ export async function setUserPermissions(
   const errors = results.filter((r) => r.status === "rejected");
   if (errors.length > 0) {
     throw new Error(
-      `Failed to set some permissions: ${errors.map((e) => (e as any).reason).join(", ")}`
+      `Failed to set some permissions: ${errors.map((e) => (e as PromiseRejectedResult).reason).join(", ")}`
     );
   }
 }

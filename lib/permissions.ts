@@ -147,6 +147,6 @@ export function isValidPermissionKey(key: string): key is PermissionKey {
 /**
  * Validate permission value (0-255)
  */
-export function isValidPermissionValue(value: any): value is number {
+export function isValidPermissionValue(value: unknown): value is number {
   return typeof value === "number" && value >= 0 && value <= 255;
 }

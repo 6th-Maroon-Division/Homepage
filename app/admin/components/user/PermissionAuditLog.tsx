@@ -1,7 +1,7 @@
 // app/admin/components/user/PermissionAuditLog.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
@@ -22,7 +22,7 @@ type AuditLog = {
     avatarUrl: string | null;
   };
   createdAt: string;
-  metadata: any;
+  metadata: Record<string, unknown> | null;
 };
 
 type PermissionAuditLogProps = {
@@ -37,11 +37,7 @@ export default function PermissionAuditLog({ userId, username }: PermissionAudit
   const [totalCount, setTotalCount] = useState(0);
   const { showError } = useToast();
 
-  useEffect(() => {
-    fetchAuditLogs();
-  }, [userId, filter]);
-
-  const fetchAuditLogs = async () => {
+  const fetchAuditLogs = useCallback(async () => {
     setIsLoading(true);
     try {
       const params = new URLSearchParams({ limit: '50' });
@@ -64,7 +60,11 @@ export default function PermissionAuditLog({ userId, username }: PermissionAudit
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [userId, filter, showError]);
+
+  useEffect(() => {
+    fetchAuditLogs();
+  }, [fetchAuditLogs]);
 
   const getActionColor = (action: string) => {
     switch (action) {
@@ -146,7 +146,7 @@ export default function PermissionAuditLog({ userId, username }: PermissionAudit
               <div className="flex items-start gap-3">
                 {/* Action Icon */}
                 <div
-                  className={`text-2xl font-bold ${getActionColor(log.action)} flex-shrink-0`}
+                  className={`text-2xl font-bold ${getActionColor(log.action)} shrink-0`}
                   title={log.action}
                 >
                   {getActionIcon(log.action)}

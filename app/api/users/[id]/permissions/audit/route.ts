@@ -40,7 +40,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const actionFilter = searchParams.get('action') as 'GRANT' | 'REVOKE' | 'MODIFY' | null;
 
   // Build where clause
-  const where: any = {
+  const where: Record<string, unknown> = {
     targetUserId: userId,
   };
 
