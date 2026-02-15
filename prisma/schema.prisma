@@ -44,6 +44,8 @@ model User {
   promotionProposals PromotionProposal[]
   // Permissions system
   userPermissions   UserPermission[]
+  permissionChangesActor  PermissionAuditLog[] @relation("PermissionActor")
+  permissionChangesTarget PermissionAuditLog[] @relation("PermissionTarget")
 }
 
 enum MessageType {
@@ -120,6 +122,7 @@ model Permission {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   userPermissions UserPermission[]
+  auditLogs       PermissionAuditLog[]
 
   @@index([key])
 }
@@ -137,6 +140,34 @@ model UserPermission {
   @@unique([userId, permissionId])
   @@index([userId])
   @@index([permissionId])
+}
+
+enum PermissionAction {
+  GRANT    // New permission granted (0 -> X)
+  REVOKE   // Permission removed (X -> 0)
+  MODIFY   // Permission value changed (X -> Y)
+}
+
+model PermissionAuditLog {
+  id              Int               @id @default(autoincrement())
+  actor           User              @relation("PermissionActor", fields: [actorId], references: [id], onDelete: Cascade)
+  actorId         Int               // Who made the change
+  targetUser      User              @relation("PermissionTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  targetUserId    Int               // Whose permissions changed
+  permission      Permission        @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  permissionId    Int               // Which permission was modified
+  action          PermissionAction  // Type of change
+  oldValue        Int?              // Previous value (null if newly granted)
+  newValue        Int?              // New value (null if revoked)
+  reason          String?           // Optional reason for the change
+  metadata        Json?             // Additional context (IP address, user agent, etc.)
+  createdAt       DateTime          @default(now())
+
+  @@index([actorId])
+  @@index([targetUserId])
+  @@index([permissionId])
+  @@index([createdAt])
+  @@index([action])
 }
 
 model Orbat {

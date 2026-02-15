@@ -5,6 +5,7 @@ import Image from 'next/image';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import { usePermission } from '@/app/hooks/usePermissions';
+import PermissionAuditLog from './PermissionAuditLog';
 
 type User = {
   id: number;
@@ -52,6 +53,9 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
   const [userPermissions, setUserPermissions] = useState<Array<{ id: number; key: string; description: string; currentValue: number; maxValue: number }>>([]);
   const [loadingPermissions, setLoadingPermissions] = useState(false);
   const [savingPermissions, setSavingPermissions] = useState(false);
+  
+  // Permission audit log state
+  const [auditLogModalData, setAuditLogModalData] = useState<{ userId: number; username: string | null } | null>(null);
   
   // Unranked users state
   const [unrankedUsers, setUnrankedUsers] = useState<any[]>([]);
@@ -597,6 +601,14 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                             className="text-purple-400 hover:text-purple-300 font-medium"
                           >
                             Permissions {user.id === currentUserId && '(Read-only)'}
+                          </button>
+                          <span style={{ color: 'var(--border)' }}>|</span>
+                          <button
+                            onClick={() => setAuditLogModalData({ userId: user.id, username: user.username })}
+                            className="text-cyan-400 hover:text-cyan-300 font-medium"
+                            title="View permission change history"
+                          >
+                            History
                           </button>
                         </>
                       )}
@@ -1237,6 +1249,38 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Permission Audit Log Modal */}
+      {auditLogModalData && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+          onClick={() => setAuditLogModalData(null)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-lg max-w-4xl w-full p-6 max-h-[80vh] overflow-y-auto"
+            style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold" style={{ color: 'var(--foreground)' }}>
+                Permission Change History
+              </h2>
+              <button
+                onClick={() => setAuditLogModalData(null)}
+                className="text-2xl font-bold"
+                style={{ color: 'var(--muted-foreground)' }}
+              >
+                ×
+              </button>
+            </div>
+            
+            <PermissionAuditLog 
+              userId={auditLogModalData.userId} 
+              username={auditLogModalData.username}
+            />
           </div>
         </div>
       )}

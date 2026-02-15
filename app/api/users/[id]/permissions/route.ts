@@ -136,7 +136,59 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
   // Update permissions in a transaction
   await prisma.$transaction(async (tx) => {
+    // Fetch current permission values for audit logging
+    const currentPermissions = await tx.userPermission.findMany({
+      where: { userId },
+      select: { permissionId: true, value: true },
+    });
+    
+    const currentPermissionMap = new Map<number, number>();
+    currentPermissions.forEach((p) => currentPermissionMap.set(p.permissionId, p.value));
+
+    // Capture request metadata for audit
+    const metadata = {
+      ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown',
+      userAgent: req.headers.get('user-agent') || 'unknown',
+    };
+
     for (const perm of permissions) {
+      const oldValue = currentPermissionMap.get(perm.permissionId);
+      const newValue = perm.value;
+
+      // Determine action type
+      let action: 'GRANT' | 'REVOKE' | 'MODIFY';
+      if (oldValue === undefined || oldValue === 0) {
+        if (newValue > 0) {
+          action = 'GRANT';
+        } else {
+          // No change (0 -> 0), skip audit log
+          continue;
+        }
+      } else {
+        if (newValue === 0) {
+          action = 'REVOKE';
+        } else if (newValue !== oldValue) {
+          action = 'MODIFY';
+        } else {
+          // No change, skip audit log
+          continue;
+        }
+      }
+
+      // Create audit log entry
+      await tx.permissionAuditLog.create({
+        data: {
+          actorId: session.user.id,
+          targetUserId: userId,
+          permissionId: perm.permissionId,
+          action,
+          oldValue: oldValue ?? null,
+          newValue: newValue === 0 ? null : newValue,
+          metadata,
+        },
+      });
+
+      // Update the actual permission
       if (perm.value === 0) {
         // Delete the permission record if value is 0 (no permission)
         await tx.userPermission.deleteMany({
