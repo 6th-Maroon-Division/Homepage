@@ -9,20 +9,26 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     
+    // Require authentication for template access
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+    
     // Allow access if user has any template or ORBAT permission
-    if (session?.user?.id) {
-      const [canManageTemplates, canCreateOrbat, canEditOrbat] = await Promise.all([
-        checkPermission(session.user.id, 'template:create'),
-        checkPermission(session.user.id, 'orbat:create'),
-        checkPermission(session.user.id, 'orbat:edit'),
-      ]);
-      
-      if (!canManageTemplates && !canCreateOrbat && !canEditOrbat && !session.user.isAdmin) {
-        return NextResponse.json(
-          { error: 'Forbidden' },
-          { status: 403 }
-        );
-      }
+    const [canManageTemplates, canCreateOrbat, canEditOrbat] = await Promise.all([
+      checkPermission(session.user.id, 'template:create'),
+      checkPermission(session.user.id, 'orbat:create'),
+      checkPermission(session.user.id, 'orbat:edit'),
+    ]);
+    
+    if (!canManageTemplates && !canCreateOrbat && !canEditOrbat && !session.user.isAdmin) {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403 }
+      );
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

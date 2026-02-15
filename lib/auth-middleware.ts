@@ -15,8 +15,17 @@ declare module 'next' {
 
 /**
  * Check if user has a permission (simple check, no hierarchy)
+ * Prefers session-based check to avoid database queries when possible
  */
 export async function checkPermission(userId: number, permission: PermissionKey): Promise<boolean> {
+  // Try to get permissions from session first (cached in JWT)
+  const session = await getServerSession(authOptions);
+  if (session?.user?.id === userId && session.user.permissions) {
+    const value = session.user.permissions[permission] ?? 0;
+    return value > 0;
+  }
+  
+  // Fall back to database query if session not available or user doesn't match
   const userPerm = await prisma.userPermission.findFirst({
     where: {
       userId,
@@ -29,34 +38,43 @@ export async function checkPermission(userId: number, permission: PermissionKey)
 /**
  * Check if user can perform action on target (hierarchy aware)
  * Returns true if actor's permission value > target's permission value
+ * Prefers session-based check for actor to avoid database queries when possible
  */
 export async function checkHierarchyPermission(
   actorId: number,
   targetId: number,
   permission: PermissionKey
 ): Promise<boolean> {
-  const [actorPerm, targetPerm] = await Promise.all([
-    prisma.userPermission.findFirst({
-      where: {
-        userId: actorId,
-        permission: { key: permission },
-      },
-    }),
-    prisma.userPermission.findFirst({
-      where: {
-        userId: targetId,
-        permission: { key: permission },
-      },
-    }),
-  ]);
-
-  const actorValue = actorPerm?.value ?? 0;
-  const targetValue = targetPerm?.value ?? 0;
-
   // Same user gets automatic access
   if (actorId === targetId) {
     return true;
   }
+
+  // Try to get actor permissions from session first (cached in JWT)
+  const session = await getServerSession(authOptions);
+  let actorValue = 0;
+  
+  if (session?.user?.id === actorId && session.user.permissions) {
+    actorValue = session.user.permissions[permission] ?? 0;
+  } else {
+    // Fall back to database query for actor
+    const actorPerm = await prisma.userPermission.findFirst({
+      where: {
+        userId: actorId,
+        permission: { key: permission },
+      },
+    });
+    actorValue = actorPerm?.value ?? 0;
+  }
+
+  // Always query database for target user's permission
+  const targetPerm = await prisma.userPermission.findFirst({
+    where: {
+      userId: targetId,
+      permission: { key: permission },
+    },
+  });
+  const targetValue = targetPerm?.value ?? 0;
 
   // Actor must have higher value than target
   return actorValue > targetValue;

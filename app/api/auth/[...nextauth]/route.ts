@@ -121,9 +121,9 @@ export const authOptions: AuthOptions = {
     },
 
     async jwt({ token, profile, trigger }) {
-      // Always refresh user data from database to ensure consistency
-      // This handles cases where the database was reset or user data changed
-      const shouldRefresh = profile || trigger === 'signIn' || trigger === 'update' || !token.id;
+      // Refresh user data from database on signIn or explicit update trigger
+      // Permissions are cached in JWT to avoid unnecessary database queries
+      const shouldRefresh = trigger === 'signIn' || trigger === 'update' || !token.id;
       
       if (shouldRefresh && token.sub) {
         // Try to find the user by checking both Discord and Steam accounts
