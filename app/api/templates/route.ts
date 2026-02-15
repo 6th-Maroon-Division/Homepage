@@ -7,6 +7,23 @@ import type { NextRequest } from 'next/server';
 
 export async function GET() {
   try {
+    const session = await getServerSession(authOptions);
+    
+    // Allow access if user has any template or ORBAT creation permission
+    if (session?.user?.id) {
+      const [canManageTemplates, canCreateOrbat] = await Promise.all([
+        checkPermission(session.user.id, 'template:create'),
+        checkPermission(session.user.id, 'orbat:create'),
+      ]);
+      
+      if (!canManageTemplates && !canCreateOrbat && !session.user.isAdmin) {
+        return NextResponse.json(
+          { error: 'Forbidden' },
+          { status: 403 }
+        );
+      }
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const templates = await (prisma as any).orbatTemplate.findMany({
       where: { isActive: true },
