@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Build where clause - users without rank OR users needing required trainings
-  const where: Record<string, any> = {
+  const where: NonNullable<Parameters<typeof prisma.user.findMany>[0]>['where'] = {
     OR: [
       { userRank: null },
       { userRank: { currentRankId: null } },
@@ -74,7 +74,9 @@ export async function GET(request: NextRequest) {
 
   // Apply interview filter
   if (interview && interview !== 'all') {
-    where.AND = where.AND || [];
+    if (!Array.isArray(where.AND)) {
+      where.AND = [];
+    }
     if (interview === 'done') {
       where.AND.push({ userRank: { interviewDone: true } });
     } else {
@@ -89,7 +91,9 @@ export async function GET(request: NextRequest) {
 
   // Apply retired filter
   if (retired && retired !== 'all') {
-    where.AND = where.AND || [];
+    if (!Array.isArray(where.AND)) {
+      where.AND = [];
+    }
     if (retired === 'retired') {
       where.AND.push({ userRank: { retired: true } });
     } else {
@@ -104,7 +108,9 @@ export async function GET(request: NextRequest) {
 
   // Required trainings filter - check if user has all trainings
   if (bct && bct !== 'all') {
-    where.AND = where.AND || [];
+    if (!Array.isArray(where.AND)) {
+      where.AND = [];
+    }
     if (bct === 'done') {
       // Users who are NOT in the usersNeedingTraining list (have all trainings)
       where.AND.push({ id: { notIn: usersNeedingTraining.length > 0 ? usersNeedingTraining : [-1] } });
@@ -145,7 +151,7 @@ export async function GET(request: NextRequest) {
   const attendanceMap = new Map(attendanceData.map((a) => [a.userId, a._count.id]));
 
   // Check if users have all required trainings completed
-  let bctMap: Map<number, boolean> = new Map();
+  const bctMap: Map<number, boolean> = new Map();
   if (requiredTrainings.length > 0) {
     const userTrainings = await prisma.userTraining.findMany({
       where: {

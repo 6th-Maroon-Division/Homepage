@@ -120,7 +120,7 @@ export const authOptions: AuthOptions = {
       return true;
     },
 
-    async jwt({ token, profile, trigger }) {
+    async jwt({ token, trigger }) {
       // Refresh user data from database on signIn, explicit update trigger,
       // or when token is missing a valid numeric user id
       // Permissions are cached in JWT to avoid unnecessary database queries
