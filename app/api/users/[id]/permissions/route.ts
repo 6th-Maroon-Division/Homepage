@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
+import { canModifyUserPermissions } from '@/lib/user-permission-guards';
 
 /**
  * GET /api/users/[id]/permissions
@@ -102,7 +103,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 
   // Prevent users from modifying their own permissions (even admins)
-  if (userId === session.user.id) {
+  if (!canModifyUserPermissions(session.user.id, userId)) {
     return NextResponse.json({ error: 'Cannot modify your own permissions' }, { status: 400 });
   }
 

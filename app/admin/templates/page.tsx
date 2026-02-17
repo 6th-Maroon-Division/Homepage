@@ -12,10 +12,18 @@ export default async function AdminTemplatesPage() {
     redirect('/');
   }
   
-  // Check if user has template management permissions
-  const canEditTemplates = await checkPermission(session.user.id, 'template:edit');
-  const canCreateTemplates = await checkPermission(session.user.id, 'template:create');
-  const hasPermission = session.user.isAdmin || canEditTemplates || canCreateTemplates;
+  // Allow access to templates for template managers and ORBAT creators/editors.
+  // ORBAT-only access is rendered in read-only mode.
+  const [canEditTemplates, canCreateTemplates, canDeleteTemplates, canCreateOrbat, canEditOrbat] = await Promise.all([
+    checkPermission(session.user.id, 'template:edit'),
+    checkPermission(session.user.id, 'template:create'),
+    checkPermission(session.user.id, 'template:delete'),
+    checkPermission(session.user.id, 'orbat:create'),
+    checkPermission(session.user.id, 'orbat:edit'),
+  ]);
+  const canManageTemplates = session.user.isAdmin || canEditTemplates || canCreateTemplates || canDeleteTemplates;
+  const hasPermission = canManageTemplates || canCreateOrbat || canEditOrbat;
+  const isReadOnly = !canManageTemplates && (canCreateOrbat || canEditOrbat);
   
   if (!hasPermission) {
     redirect('/admin');
@@ -55,7 +63,7 @@ export default async function AdminTemplatesPage() {
   return (
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        <TemplateManagementClient templates={serializedTemplates} />
+        <TemplateManagementClient templates={serializedTemplates} isReadOnly={isReadOnly} />
       </div>
     </main>
   );

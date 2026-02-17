@@ -23,11 +23,15 @@ export async function GET(
     }
     
     // Allow access if user has any template or ORBAT permission
-    const [canManageTemplates, canCreateOrbat, canEditOrbat] = await Promise.all([
+    const [canCreateTemplate, canEditTemplate, canDeleteTemplate, canCreateOrbat, canEditOrbat] = await Promise.all([
       checkPermission(session.user.id, 'template:create'),
+      checkPermission(session.user.id, 'template:edit'),
+      checkPermission(session.user.id, 'template:delete'),
       checkPermission(session.user.id, 'orbat:create'),
       checkPermission(session.user.id, 'orbat:edit'),
     ]);
+
+    const canManageTemplates = canCreateTemplate || canEditTemplate || canDeleteTemplate;
     
     if (!canManageTemplates && !canCreateOrbat && !canEditOrbat && !session.user.isAdmin) {
       return NextResponse.json(
