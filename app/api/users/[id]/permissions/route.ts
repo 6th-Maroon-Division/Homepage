@@ -5,6 +5,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 import { canModifyUserPermissions } from '@/lib/user-permission-guards';
+import { validatePermissionUpdateEntries } from '@/lib/permission-api-logic';
 
 /**
  * GET /api/users/[id]/permissions
@@ -110,18 +111,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const body = await req.json();
   const { permissions } = body;
 
-  if (!Array.isArray(permissions)) {
-    return NextResponse.json({ error: 'Invalid permissions format' }, { status: 400 });
-  }
-
-  // Validate all permission data
-  for (const perm of permissions) {
-    if (typeof perm.permissionId !== 'number' || typeof perm.value !== 'number') {
-      return NextResponse.json({ error: 'Invalid permission data' }, { status: 400 });
-    }
-    if (perm.value < 0 || perm.value > 255) {
-      return NextResponse.json({ error: 'Permission value must be between 0 and 255' }, { status: 400 });
-    }
+  const validation = validatePermissionUpdateEntries(permissions);
+  if (!validation.valid) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
   // Verify target user exists

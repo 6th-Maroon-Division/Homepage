@@ -1,7 +1,7 @@
 # Permission System Audit Report
 
 **Status:** ✅ COMPLETE  
-**Last Updated:** February 15, 2026  
+**Last Updated:** February 18, 2026  
 **Initial Audit:** February 13, 2026
 
 ## ✅ What's Correct
@@ -23,7 +23,8 @@ All API routes have been successfully migrated from `isAdmin` to granular permis
 
 **ORBAT System:**
 - `/api/orbats/*` → `orbat:create/edit/delete`
-- `/api/templates/*` → `orbat:edit/delete`
+- `/api/templates/*` (POST/PUT/DELETE) → `template:create/edit/delete`
+- `/api/templates/*` (GET) → `template:*` OR `orbat:create/edit` OR admin
 - `/api/signups/*` → `orbat:edit`
 
 **Attendance:**
@@ -63,7 +64,7 @@ if (!hasPermission) redirect('/admin');
 - `/app/admin/messaging/page.tsx` → `admin:system`
 - `/app/admin/promotions/page.tsx` → `rank:manage_promotions`
 - `/app/admin/trainings/page.tsx` → `training:create/edit/delete`
-- `/app/admin/templates/page.tsx` → `orbat:edit`
+- `/app/admin/templates/page.tsx` → `template:*` (manage) OR `orbat:create/edit` (read-only)
 - `/app/admin/import/page.tsx` → `admin:system`
 - `/app/admin/orbats/new/page.tsx` → `orbat:create`
 - `/app/admin/orbats/[id]/page.tsx` → `orbat:edit`
@@ -99,7 +100,7 @@ Permission hooks from `/app/hooks/usePermissions.ts` now used throughout admin U
 - `UserManagementClient` → Multiple permission checks
 - `TrainingManagementClient` → 4 permission checks (create/edit/delete/approve)
 - `OrbatManagementClient` → 2 permission checks (create/edit)
-- `TemplateManagementClient` → 2 permission checks (edit/delete)
+- `TemplateManagementClient` → 3 template permission checks + read-only mode support
 - `RadioFrequenciesManagement` → `usePermission('orbat:edit')`
 - `RankMigrationWizard` → `usePermission('rank:edit')`
 - `TopBar` & `UserMenu` → Permission-aware navigation
@@ -148,7 +149,7 @@ if (!hasPermission) return NextResponse.json({ error: 'Forbidden' }, { status: 4
 
 ## 📊 Permission System Summary
 
-**Total Permissions:** 19
+**Total Permissions:** 22
 1. `user:edit` - Edit user details
 2. `user:promote` - Promote users to higher ranks
 3. `user:manage` - Full user management
@@ -161,13 +162,16 @@ if (!hasPermission) return NextResponse.json({ error: 'Forbidden' }, { status: 4
 10. `orbat:create` - Create ORBATs
 11. `orbat:edit` - Edit ORBATs
 12. `orbat:delete` - Delete ORBATs
-13. `attendance:edit` - Edit attendance records
-14. `attendance:view` - View detailed attendance
-15. `rank:create` - Create ranks
-16. `rank:edit` - Edit ranks
-17. `rank:delete` - Delete ranks
-18. `rank:manage_promotions` - Handle promotions
-19. `admin:system` - Full system admin access
+13. `template:create` - Create ORBAT templates
+14. `template:edit` - Edit ORBAT templates
+15. `template:delete` - Delete ORBAT templates
+16. `attendance:edit` - Edit attendance records
+17. `attendance:view` - View detailed attendance
+18. `rank:create` - Create ranks
+19. `rank:edit` - Edit ranks
+20. `rank:delete` - Delete ranks
+21. `rank:manage_promotions` - Handle promotions
+22. `admin:system` - Full system admin access
 
 ## 🎯 Final Implementation Status
 
@@ -185,6 +189,7 @@ if (!hasPermission) return NextResponse.json({ error: 'Forbidden' }, { status: 4
 **Strengths:**
 - ✅ All API operations protected with granular permissions
 - ✅ Self-permission modification blocked (400 error)
+- ✅ Self-permission modification covered by backend tests (`npm run test:permissions`)
 - ✅ Permission management requires special `user:manage_permissions` permission
 - ✅ Sparse database storage (only non-zero values stored)
 - ✅ Hierarchy system (0-255 integer values for future role-based comparisons)
@@ -192,6 +197,7 @@ if (!hasPermission) return NextResponse.json({ error: 'Forbidden' }, { status: 4
 - ✅ UI reflects user's actual capabilities (no unauthorized buttons shown)
 - ✅ Admin pages accessible to authorized non-admin users
 - ✅ Navigation dynamically adapts to permissions
+- ✅ Templates support explicit read-only mode for ORBAT-only users
 
 **Audit Results:** System is production-ready with comprehensive permission enforcement at all layers.
 

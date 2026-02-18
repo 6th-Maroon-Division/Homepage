@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { NextResponse } from 'next/server';
 import { checkPermission } from '@/lib/auth-middleware';
+import { canAccessTemplateReadApi } from '@/lib/permission-api-logic';
 
 export async function GET(
   request: Request,
@@ -31,9 +32,14 @@ export async function GET(
       checkPermission(session.user.id, 'orbat:edit'),
     ]);
 
-    const canManageTemplates = canCreateTemplate || canEditTemplate || canDeleteTemplate;
-    
-    if (!canManageTemplates && !canCreateOrbat && !canEditOrbat && !session.user.isAdmin) {
+    if (!canAccessTemplateReadApi({
+      isAdmin: Boolean(session.user.isAdmin),
+      canCreateTemplate,
+      canEditTemplate,
+      canDeleteTemplate,
+      canCreateOrbat,
+      canEditOrbat,
+    })) {
       return NextResponse.json(
         { error: 'Forbidden' },
         { status: 403 }

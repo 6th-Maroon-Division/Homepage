@@ -10,11 +10,11 @@ A comprehensive web-based management platform for the 6th Maroon Division Arma 3
 - **Admin Panel**: Comprehensive admin tools for managing operations, users, and signups
 - **Calendar View**: Visual calendar interface for browsing and creating operations
 - **Responsive Design**: Mobile-friendly interface with a modern dark theme
-- **Granular Permission System**: 19 fine-grained permissions for role-based access control
+- **Granular Permission System**: 22 fine-grained permissions for role-based access control
 
 ## Permission System
 
-The platform uses a comprehensive permission system with 19 granular permissions organized into 6 domains:
+The platform uses a comprehensive permission system with 22 granular permissions organized into 7 domains:
 
 ### Permission Domains
 
@@ -33,8 +33,13 @@ The platform uses a comprehensive permission system with 19 granular permissions
 
 **Operations (ORBATs) (3 permissions)**
 - `orbat:create` - Create new operations
-- `orbat:edit` - Edit operations and templates
+- `orbat:edit` - Edit operations
 - `orbat:delete` - Delete operations
+
+**Templates (3 permissions)**
+- `template:create` - Create ORBAT templates
+- `template:edit` - Edit ORBAT templates
+- `template:delete` - Delete ORBAT templates
 
 **Attendance (2 permissions)**
 - `attendance:view` - View detailed attendance records
@@ -60,6 +65,12 @@ The platform uses a comprehensive permission system with 19 granular permissions
    - UI buttons/actions hidden from users without permissions
    - Navigation adapts dynamically to user capabilities
 
+### Template Access Rules
+
+- `template:create/edit/delete` (or admin) = full template management UI
+- `orbat:create` or `orbat:edit` = read-only template view for ORBAT workflows
+- ORBAT-only users can view and use templates, but cannot create/edit/delete templates
+
 ### Assigning Permissions
 
 Admins with `user:manage_permissions` can assign permissions through the admin panel:
@@ -73,7 +84,7 @@ Admins with `user:manage_permissions` can assign permissions through the admin p
 4. Use quick buttons: **None (0)**, **Standard (100)**, **Full (255)**
 5. Click **Save Permissions**
 
-**Note:** Users cannot modify their own permissions (system enforced).
+**Note:** Users cannot modify their own permissions (system enforced in UI and backend).
 
 ### Developer Guide
 
@@ -121,6 +132,11 @@ export default async function RanksPage() {
 ```
 
 See [PERMISSION_AUDIT.md](./PERMISSION_AUDIT.md) for detailed implementation documentation.
+
+### Verification
+
+- Run permission guard tests: `npm run test:permissions`
+- Build validation: `npm run build`
 
 ## Planned Features
 

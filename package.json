@@ -11,7 +11,7 @@
     "seed:dev": "tsx prisma/seed.dev.ts",
     "seed:prod": "tsx prisma/seed.prod.ts",
     "seed:migrate": "tsx prisma/seed.migrate.ts",
-    "test:permissions": "tsx --test tests/user-permission-guards.test.ts",
+    "test:permissions": "tsx --test tests/*permissions*.test.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
