@@ -11,10 +11,12 @@ export default async function RankConfigPage() {
   }
   
   // Check if user has any rank permission
-  const hasPermission = session.user.isAdmin || 
-    await checkPermission(session.user.id, 'rank:create') ||
-    await checkPermission(session.user.id, 'rank:edit') ||
-    await checkPermission(session.user.id, 'rank:delete');
+  const [canCreateRank, canEditRank, canDeleteRank] = await Promise.all([
+    checkPermission(session.user.id, 'rank:create'),
+    checkPermission(session.user.id, 'rank:edit'),
+    checkPermission(session.user.id, 'rank:delete'),
+  ]);
+  const hasPermission = session.user.isAdmin || canCreateRank || canEditRank || canDeleteRank;
   
   if (!hasPermission) {
     redirect('/admin');

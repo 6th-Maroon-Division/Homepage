@@ -7,6 +7,12 @@ import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
 import { usePermission } from '@/app/hooks/usePermissions';
 
+const logClientError = (...args: unknown[]) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.error(...args);
+  }
+};
+
 type Rank = {
   id: number;
   name: string;
@@ -136,7 +142,7 @@ export default function TrainingManagementClient({
         setCategories(data.sort((a: Category, b: Category) => a.orderIndex - b.orderIndex));
       }
     } catch (error) {
-      console.error('Error fetching categories:', error);
+      logClientError('Error fetching categories:', error);
     }
   };
 
@@ -150,7 +156,7 @@ export default function TrainingManagementClient({
         setTrainings(data);
       }
     } catch (error) {
-      console.error('Error refreshing trainings:', error);
+      logClientError('Error refreshing trainings:', error);
     }
   };
 
@@ -163,7 +169,7 @@ export default function TrainingManagementClient({
         setAllRequests(data);
       }
     } catch (error) {
-      console.error('Error refreshing requests:', error);
+      logClientError('Error refreshing requests:', error);
     }
   };
 
@@ -237,7 +243,7 @@ export default function TrainingManagementClient({
         }
       }
     } catch (error) {
-      console.error('Error saving training:', error);
+      logClientError('Error saving training:', error);
       showError('Error saving training');
     } finally {
       setIsSaving(false);
@@ -274,7 +280,7 @@ export default function TrainingManagementClient({
         showError('Failed to delete training');
       }
     } catch (error) {
-      console.error('Error deleting training:', error);
+      logClientError('Error deleting training:', error);
       showError('Error deleting training');
     } finally {
       setIsSaving(false);
@@ -315,7 +321,7 @@ export default function TrainingManagementClient({
         showError(data.error || 'Failed to set rank requirement');
       }
     } catch (error) {
-      console.error('Error setting rank requirement:', error);
+      logClientError('Error setting rank requirement:', error);
       showError('Error setting rank requirement');
     } finally {
       setIsSaving(false);
@@ -336,7 +342,7 @@ export default function TrainingManagementClient({
         showError('Failed to remove rank requirement');
       }
     } catch (error) {
-      console.error('Error removing rank requirement:', error);
+      logClientError('Error removing rank requirement:', error);
       showError('Error removing rank requirement');
     } finally {
       setIsSaving(false);
@@ -367,7 +373,7 @@ export default function TrainingManagementClient({
         showError(data.error || 'Failed to add prerequisite');
       }
     } catch (error) {
-      console.error('Error adding prerequisite:', error);
+      logClientError('Error adding prerequisite:', error);
       showError('Error adding prerequisite');
     } finally {
       setIsSaving(false);
@@ -388,7 +394,7 @@ export default function TrainingManagementClient({
         showError('Failed to remove prerequisite');
       }
     } catch (error) {
-      console.error('Error removing prerequisite:', error);
+      logClientError('Error removing prerequisite:', error);
       showError('Error removing prerequisite');
     } finally {
       setIsSaving(false);
@@ -415,7 +421,7 @@ export default function TrainingManagementClient({
         showError(`Failed to ${status} request`);
       }
     } catch (error) {
-      console.error('Error updating request:', error);
+      logClientError('Error updating request:', error);
       showError('Error updating request');
     } finally {
       setIsSaving(false);
@@ -446,7 +452,7 @@ export default function TrainingManagementClient({
         showError(error.error || 'Failed to add category');
       }
     } catch (error) {
-      console.error('Error adding category:', error);
+      logClientError('Error adding category:', error);
       showError('Error adding category');
     } finally {
       setIsSaving(false);
@@ -471,7 +477,7 @@ export default function TrainingManagementClient({
         showError('Failed to delete category');
       }
     } catch (error) {
-      console.error('Error deleting category:', error);
+      logClientError('Error deleting category:', error);
       showError('Error deleting category');
     } finally {
       setIsSaving(false);
@@ -501,7 +507,7 @@ export default function TrainingManagementClient({
         showError(error.error || 'Failed to update category');
       }
     } catch (error) {
-      console.error('Error updating category:', error);
+      logClientError('Error updating category:', error);
       showError('Error updating category');
     } finally {
       setIsSaving(false);
@@ -540,7 +546,7 @@ export default function TrainingManagementClient({
         await fetchCategories(); // Revert on error
       }
     } catch (error) {
-      console.error('Error moving category:', error);
+      logClientError('Error moving category:', error);
       showError('Error moving category');
       await fetchCategories(); // Revert on error
     } finally {

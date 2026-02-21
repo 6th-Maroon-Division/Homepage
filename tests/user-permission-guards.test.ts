@@ -11,7 +11,7 @@ test('prevents users from modifying their own permissions', () => {
   assert.equal(result, false);
 });
 
-test('allows users to modify another user permissions', () => {
+test("allows users to modify another user's permissions", () => {
   const actorUserId = 42;
   const targetUserId = 99;
 

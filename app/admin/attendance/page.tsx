@@ -13,9 +13,11 @@ export default async function AdminAttendancePage() {
   }
   
   // Check if user has attendance view or edit permission
-  const hasPermission = session.user.isAdmin || 
-    await checkPermission(session.user.id, 'attendance:view') ||
-    await checkPermission(session.user.id, 'attendance:edit');
+  const [canViewAttendance, canEditAttendance] = await Promise.all([
+    checkPermission(session.user.id, 'attendance:view'),
+    checkPermission(session.user.id, 'attendance:edit'),
+  ]);
+  const hasPermission = session.user.isAdmin || canViewAttendance || canEditAttendance;
   
   if (!hasPermission) {
     redirect('/admin');

@@ -60,17 +60,17 @@ export async function canPerformAction(
   targetId: number,
   permissionKey: PermissionKey
 ): Promise<boolean> {
+  // If same user, allow
+  if (actorId === targetId) {
+    return true;
+  }
+
   // Get actor's permission value
   const actorValue = await getUserPermissionValue(actorId, permissionKey);
 
   // If actor has no permission, deny
   if (actorValue === 0) {
     return false;
-  }
-
-  // If same user, allow
-  if (actorId === targetId) {
-    return true;
   }
 
   // Get target's permission value for hierarchy comparison

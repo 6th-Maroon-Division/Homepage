@@ -45,36 +45,49 @@ export async function checkHierarchyPermission(
   targetId: number,
   permission: PermissionKey
 ): Promise<boolean> {
-  // Same user gets automatic access
-  if (actorId === targetId) {
-    return true;
-  }
-
   // Try to get actor permissions from session first (cached in JWT)
   const session = await getServerSession(authOptions);
-  let actorValue = 0;
-  
-  if (session?.user?.id === actorId && session.user.permissions) {
-    actorValue = session.user.permissions[permission] ?? 0;
-  } else {
-    // Fall back to database query for actor
-    const actorPerm = await prisma.userPermission.findFirst({
-      where: {
-        userId: actorId,
-        permission: { key: permission },
-      },
-    });
-    actorValue = actorPerm?.value ?? 0;
-  }
-
-  // Always query database for target user's permission
-  const targetPerm = await prisma.userPermission.findFirst({
+  const targetPermPromise = prisma.userPermission.findFirst({
     where: {
       userId: targetId,
       permission: { key: permission },
     },
   });
+
+  let actorValue = 0;
+
+  if (session?.user?.id === actorId && session.user.permissions) {
+    actorValue = session.user.permissions[permission] ?? 0;
+  } else {
+    const [actorPerm, targetPerm] = await Promise.all([
+      prisma.userPermission.findFirst({
+        where: {
+          userId: actorId,
+          permission: { key: permission },
+        },
+      }),
+      targetPermPromise,
+    ]);
+
+    actorValue = actorPerm?.value ?? 0;
+    const targetValue = targetPerm?.value ?? 0;
+
+    // Same-user actions still require non-zero permission
+    if (actorId === targetId) {
+      return actorValue > 0;
+    }
+
+    // Actor must have higher value than target
+    return actorValue > targetValue;
+  }
+
+  const targetPerm = await targetPermPromise;
   const targetValue = targetPerm?.value ?? 0;
+
+  // Same-user actions still require non-zero permission
+  if (actorId === targetId) {
+    return actorValue > 0;
+  }
 
   // Actor must have higher value than target
   return actorValue > targetValue;

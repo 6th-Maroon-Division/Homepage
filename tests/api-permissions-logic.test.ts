@@ -147,3 +147,17 @@ test('validatePermissionUpdateEntries rejects out-of-range values', () => {
     error: 'Permission value must be between 0 and 255',
   });
 });
+
+test('validatePermissionUpdateEntries rejects non-integer and NaN values', () => {
+  const decimal = validatePermissionUpdateEntries([{ permissionId: 1, value: 0.5 }]);
+  const nanValue = validatePermissionUpdateEntries([{ permissionId: 1, value: Number.NaN }]);
+
+  assert.deepEqual(decimal, {
+    valid: false,
+    error: 'Permission value must be between 0 and 255',
+  });
+  assert.deepEqual(nanValue, {
+    valid: false,
+    error: 'Permission value must be between 0 and 255',
+  });
+});

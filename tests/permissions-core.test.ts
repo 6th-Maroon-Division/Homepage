@@ -52,6 +52,7 @@ test('isValidPermissionValue enforces numeric range and type', () => {
   assert.equal(isValidPermissionValue(1), true);
   assert.equal(isValidPermissionValue(255), true);
 
+  assert.equal(isValidPermissionValue(0.5), false);
   assert.equal(isValidPermissionValue(-1), false);
   assert.equal(isValidPermissionValue(256), false);
   assert.equal(isValidPermissionValue('255'), false);

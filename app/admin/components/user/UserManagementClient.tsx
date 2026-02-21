@@ -7,6 +7,12 @@ import { useToast } from '@/app/components/ui/ToastContainer';
 import { usePermission } from '@/app/hooks/usePermissions';
 import PermissionAuditLog from './PermissionAuditLog';
 
+const logClientError = (...args: unknown[]) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.error(...args);
+  }
+};
+
 type User = {
   id: number;
   username: string | null;
@@ -81,10 +87,8 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
         throw new Error(errorData.error || 'Failed to fetch permissions');
       }
       const data = await res.json();
-      console.log('Fetched permissions:', data); // Debug log
       setUserPermissions(data.permissions || []);
     } catch (e) {
-      console.error('Permission fetch error:', e); // Debug log
       showError(e instanceof Error ? e.message : 'Failed to load permissions');
       setUserPermissions([]);
     } finally {
@@ -163,7 +167,7 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
       const data = await res.json();
       setRanks(data.ranks || []);
     } catch (e) {
-      console.error(e);
+      logClientError(e);
     }
   };
 
@@ -272,7 +276,7 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
       ));
       showSuccess(`User ${currentIsAdmin ? 'demoted from' : 'promoted to'} admin`);
     } catch (error) {
-      console.error('Error updating user:', error);
+      logClientError('Error updating user:', error);
       showError('Error updating user');
     } finally {
       setIsLoading(false);
@@ -310,7 +314,7 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
       setUsers(users.filter(u => u.id !== userId));
       showSuccess('User deleted successfully');
     } catch (error) {
-      console.error('Error deleting user:', error);
+      logClientError('Error deleting user:', error);
       showError('Error deleting user');
     } finally {
       setIsLoading(false);
@@ -363,7 +367,7 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
       showSuccess('Training assigned successfully');
       setTrainingModalData(null);
     } catch (error) {
-      console.error('Error assigning training:', error);
+      logClientError('Error assigning training:', error);
       showError('Error assigning training');
     } finally {
       setIsLoading(false);
@@ -380,7 +384,7 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
         setAvailableTrainings(data);
       }
     } catch (error) {
-      console.error('Error fetching trainings:', error);
+      logClientError('Error fetching trainings:', error);
     } finally {
       setLoadingTrainings(false);
     }
@@ -723,7 +727,7 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                                                 showError('Failed to remove training');
                                               }
                                             } catch (error) {
-                                              console.error('Error:', error);
+                                              logClientError('Error:', error);
                                               showError('Error removing training');
                                             } finally {
                                               setIsLoading(false);
@@ -796,7 +800,7 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                                     showError(data.error || 'Failed to assign training');
                                   }
                                 } catch (error) {
-                                  console.error('Error assigning training:', error);
+                                  logClientError('Error assigning training:', error);
                                   showError('Error assigning training');
                                 } finally {
                                   setIsLoading(false);
@@ -1044,7 +1048,7 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                         showError('Failed to update training');
                       }
                     } catch (error) {
-                      console.error('Error:', error);
+                      logClientError('Error:', error);
                       showError('Error updating training');
                     } finally {
                       setIsLoading(false);

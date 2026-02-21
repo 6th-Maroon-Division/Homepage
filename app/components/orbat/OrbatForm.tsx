@@ -5,6 +5,12 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '../ui/ToastContainer';
 import LoadingSpinner from '../ui/LoadingSpinner';
 
+const logClientError = (...args: unknown[]) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.error(...args);
+  }
+};
+
 type Subslot = {
   id?: number;
   name: string;
@@ -140,7 +146,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
           setTemplates(data);
         }
       } catch (error) {
-        console.error('Error fetching templates:', error);
+        logClientError('Error fetching templates:', error);
       }
     };
 
@@ -153,7 +159,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
           setRecentOrbats(data);
         }
       } catch (error) {
-        console.error('Error fetching recent orbats:', error);
+        logClientError('Error fetching recent orbats:', error);
       }
     };
 
@@ -218,7 +224,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         setSelectedTemplate('');
       }
     } catch (error) {
-      console.error('Error loading template:', error);
+      logClientError('Error loading template:', error);
       showError(`Failed to load ${templateType}`);
     }
   };
@@ -267,7 +273,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
               showSuccess('Template loaded successfully');
             }
           } catch (error) {
-            console.error('Error loading template:', error);
+            logClientError('Error loading template:', error);
             showError('Failed to load template');
           }
         }
@@ -286,7 +292,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
           setRadioFrequencies(data);
         }
       } catch (error) {
-        console.error('Error fetching radio frequencies:', error);
+        logClientError('Error fetching radio frequencies:', error);
       }
     };
 
@@ -315,7 +321,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
             }
           }
         } catch (error) {
-          console.error('Error fetching orbat frequencies:', error);
+          logClientError('Error fetching orbat frequencies:', error);
         }
       };
       fetchOrbatFrequencies();
@@ -512,7 +518,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
       router.push(`/orbats/${result.id}`);
       router.refresh();
     } catch (err) {
-      console.error('Error saving OrbAT:', err);
+      logClientError('Error saving OrbAT:', err);
       const errorMsg = 'Network error occurred';
       setError(errorMsg);
       showError(errorMsg);

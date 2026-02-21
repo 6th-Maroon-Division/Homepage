@@ -13,10 +13,13 @@ export default async function AdminTrainingsPage() {
   }
   
   // Check if user has any training permission
-  const hasPermission = session.user.isAdmin || 
-    await checkPermission(session.user.id, 'training:create') ||
-    await checkPermission(session.user.id, 'training:edit') ||
-    await checkPermission(session.user.id, 'training:delete');
+  const [canCreateTraining, canEditTraining, canDeleteTraining] = await Promise.all([
+    checkPermission(session.user.id, 'training:create'),
+    checkPermission(session.user.id, 'training:edit'),
+    checkPermission(session.user.id, 'training:delete'),
+  ]);
+  const hasPermission =
+    session.user.isAdmin || canCreateTraining || canEditTraining || canDeleteTraining;
   
   if (!hasPermission) {
     redirect('/admin');

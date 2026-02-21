@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 import { canModifyUserPermissions } from '@/lib/user-permission-guards';
 import { validatePermissionUpdateEntries } from '@/lib/permission-api-logic';
+import type { PermissionUpdateEntry } from '@/lib/permission-api-logic';
 
 /**
  * GET /api/users/[id]/permissions
@@ -116,6 +117,27 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
+  const permissionUpdates = permissions as PermissionUpdateEntry[];
+
+  // Validate all permission IDs exist to avoid FK constraint errors during transaction
+  const requestedPermissionIds = [...new Set(permissionUpdates.map((perm) => perm.permissionId))];
+  const existingPermissions = await prisma.permission.findMany({
+    where: { id: { in: requestedPermissionIds } },
+    select: { id: true },
+  });
+  const existingPermissionIds = new Set(existingPermissions.map((perm) => perm.id));
+  const invalidPermissionIds = requestedPermissionIds.filter((permissionId) => !existingPermissionIds.has(permissionId));
+
+  if (invalidPermissionIds.length > 0) {
+    return NextResponse.json(
+      {
+        error: 'Invalid permission ID(s)',
+        invalidPermissionIds,
+      },
+      { status: 400 }
+    );
+  }
+
   // Verify target user exists
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -143,7 +165,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       userAgent: req.headers.get('user-agent') || 'unknown',
     };
 
-    for (const perm of permissions) {
+    for (const perm of permissionUpdates) {
       const oldValue = currentPermissionMap.get(perm.permissionId);
       const newValue = perm.value;
 

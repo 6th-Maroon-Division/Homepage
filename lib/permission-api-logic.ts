@@ -1,3 +1,5 @@
+import { isValidPermissionValue } from '@/lib/permissions';
+
 export interface TemplateReadAccessContext {
   isAdmin: boolean;
   canCreateTemplate: boolean;
@@ -40,7 +42,7 @@ export function validatePermissionUpdateEntries(
       return { valid: false, error: 'Invalid permission data' };
     }
 
-    if (entry.value < 0 || entry.value > 255) {
+    if (!isValidPermissionValue(entry.value)) {
       return { valid: false, error: 'Permission value must be between 0 and 255' };
     }
   }
