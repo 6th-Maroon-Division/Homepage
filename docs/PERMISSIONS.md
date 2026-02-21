@@ -2,23 +2,21 @@
 
 ## Overview
 
-The platform uses a granular permission model with **22 permissions** across **7 domains**.
+The app uses a granular permission model with **22 permissions** in **7 domains**.
 
 - Permission values are integers from `0` to `255`
 - `0` means no access
-- Any value `> 0` grants access
-- Higher values support hierarchy-based logic where needed
-- Only non-zero values are stored (sparse storage)
-
----
+- Any value `> 0` grants access for standard checks
+- Some user-targeted operations also use hierarchy checks (`actorValue > targetValue`)
+- Only non-zero values are stored in `UserPermission` (sparse storage)
 
 ## Permission Domains
 
 ### User Management (4)
-- `user:edit` — Edit user details
-- `user:promote` — Promote users
-- `user:manage` — Manage users/admin user operations
-- `user:manage_permissions` — Grant/revoke user permissions
+- `user:edit`
+- `user:promote`
+- `user:manage`
+- `user:manage_permissions`
 
 ### Training (5)
 - `training:create`
@@ -50,66 +48,67 @@ The platform uses a granular permission model with **22 permissions** across **7
 ### System (1)
 - `admin:system`
 
----
+## Enforcement Model
 
-## Enforcement Layers
+Permissions are enforced at multiple layers:
 
-Permissions are enforced in multiple layers:
-
-1. **API Routes (authoritative)**
-   - Every protected route validates session + permission before action
-2. **Server Page Guards**
+1. **API routes (authoritative)**
+   - `checkPermission()` and related guards in server code
+2. **Server page guards**
    - Admin pages redirect unauthorized users
-3. **Client UI Visibility**
-   - Action buttons and controls are hidden/disabled for unauthorized users
-4. **Session Permission Cache**
-   - Permissions are loaded into session/JWT for efficient checks
+3. **Client UI visibility**
+   - Buttons/actions hidden when permission is missing
+4. **Session/JWT permission cache**
+   - Permission map loaded into session to reduce DB reads
 
-> API checks are the source of truth. UI checks improve UX but are not relied on for security.
+API checks remain the source of truth.
 
----
+## Current Permission APIs
+
+### User Permission Management
+- `GET /api/users/[id]/permissions` — list all permission keys + current values for user
+- `PUT /api/users/[id]/permissions` — update values (`0` deletes record, `>0` upserts)
+
+Requirements:
+- Caller must have `user:manage_permissions`
+- Caller cannot modify their own permissions
+
+### Permission Audit Log
+- `GET /api/users/[id]/permissions/audit`
+  - supports `limit`, `offset`, `action=GRANT|REVOKE|MODIFY`
+
+Audit captures actor/target/permission/action/value changes and metadata (IP/user-agent when available).
 
 ## Template Access Model
 
-Templates use a split access model:
+Template UI uses split access:
 
-- `template:create/edit/delete` (or admin) → **full management**
-- `orbat:create` or `orbat:edit` only → **read-only template access**
+- `template:create/edit/delete` (or admin) → full management
+- `orbat:create` or `orbat:edit` without template perms → read-only template access
 
-This allows ORBAT editors/creators to browse and use templates without managing template definitions.
-
----
-
-## Permission Management Rules
-
-- Managing user permissions requires `user:manage_permissions`
-- Users cannot modify their own permissions (enforced server-side)
-- Permission changes are audit logged
-
----
+This enables ORBAT builders to use templates without editing template definitions.
 
 ## Developer Usage
 
-### Server/API checks
+### Server-side
+- Use `checkPermission(userId, permission)` from `lib/auth-middleware.ts`
+- For user-vs-user operations, use hierarchy-aware helpers where needed
+- Return `401` for unauthenticated and `403` for unauthorized
 
-- Use `checkPermission(userId, permissionKey)` from auth middleware utilities
-- Always return `401` for unauthenticated and `403` for unauthorized
+### Client-side
+- Use hooks from `app/hooks/usePermissions.ts`
+  - `usePermission`
+  - `usePermissionValue`
+  - `useAllPermissions`
+  - `useAnyPermission`
+  - `useCanPerformAction`
 
-### Client checks
-
-- Use hooks from the permissions hooks module (`usePermission`, `useAnyPermission`, etc.)
-- Treat hooks as UI helpers only; keep server/API checks in place
-
----
+Client checks are UX-only and do not replace server authorization.
 
 ## Verification
 
-Run these before merging permission-related changes:
-
 - `npm run test:permissions`
 - `npm run build`
-
----
 
 ## Related Docs
 

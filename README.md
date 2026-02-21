@@ -1,256 +1,188 @@
 # 6MD Management Platform
 
-A comprehensive web-based management platform for the 6th Maroon Division Arma 3 milsim unit. This system handles operation planning, player signups, user management, and will expand to include Discord bot integration, attendance tracking, and training management.
+Web application for managing Arma 3 unit operations, signups, attendance, ranks, training progression, and admin workflows.
 
-## Current Features
+## Current Feature Set (Code-Verified)
 
-- **Operations Management**: Create and manage Arma 3 operations with slots and subslots (ORBAT system)
-- **User Signups**: Players can sign up for available positions in upcoming operations
-- **Authentication**: Discord and Steam OAuth integration for easy community access
-- **Admin Panel**: Comprehensive admin tools for managing operations, users, and signups
-- **Calendar View**: Visual calendar interface for browsing and creating operations
-- **Responsive Design**: Mobile-friendly interface with a modern dark theme
-- **Granular Permission System**: 22 fine-grained permissions for role-based access control
+### Authentication & Accounts
+- Discord OAuth via NextAuth
+- Steam OpenID login/link flow (custom callback routes)
+- Multi-provider account linking to one user account (`Discord + Steam`)
+- Session includes cached permission map and admin flag
 
-## Permission System
+### Operations (ORBAT)
+- Calendar-based operations browsing (`/orbats`)
+- Detailed operation pages with slot/subslot hierarchy
+- Signup/unsignup flows and signup movement endpoints
+- Operation metadata: factions, intel fields, start/end time
+- Radio frequency assignment (including temporary frequencies)
+- Admin ORBAT create/edit/delete workflows with permission checks
 
-The platform uses a comprehensive permission system with 22 granular permissions organized into 7 domains:
+### Templates
+- ORBAT template CRUD and usage tracking
+- Template structure includes slots/subslots, frequencies, and intel defaults
+- Read-only template access for ORBAT creators/editors without template-manage permissions
 
-### Permission Domains
+### Trainings
+- Training CRUD (with active/inactive state)
+- Training categories CRUD + ordering
+- User training assignments and completion tracking
+- Training request workflow (`pending`, `approved`, `rejected`, `completed`)
+- Training gating by:
+  - minimum rank requirement
+  - prerequisite trainings
+  - circular dependency prevention logic
 
-**User Management (4 permissions)**
-- `user:edit` - Edit user profile details
-- `user:promote` - Promote users to higher ranks
-- `user:manage` - Full user management (admin actions, retire, interview status)
-- `user:manage_permissions` - Grant/revoke permissions (special permission)
+### Attendance
+- Operation attendance records with rich statuses:
+  `present`, `absent`, `late`, `gone_early`, `partial`, `no_show`
+- Session-based check-in/check-out tracking with minute calculations
+- Automated attendance ingestion endpoint using SteamID mapping
+- Attendance logs/audit trail (`manual` and `automated_system` sources)
+- Admin attendance overview + per-operation attendance management
+- Legacy attendance data import/mapping tools
 
-**Training System (5 permissions)**
-- `training:create` - Create new training programs
-- `training:edit` - Edit existing trainings
-- `training:delete` - Delete trainings
-- `training:mark` - Mark users as trained/assign trainings
-- `training:approve_request` - Approve/reject training requests
+### Rank System
+- Rank CRUD + drag/drop ordering
+- Auto-rankup eligibility checks
+- Manual promotion proposal workflow (approve/decline)
+- User rank state (`retired`, interview flag, attendance since last rank)
+- Rank history timeline exposed to users in settings
+- Rank transition requirements (required trainings per target rank)
+- Rank migration preview/apply workflow
+- Legacy user rank data CSV import pipeline
 
-**Operations (ORBATs) (3 permissions)**
-- `orbat:create` - Create new operations
-- `orbat:edit` - Edit operations
-- `orbat:delete` - Delete operations
+### Messaging & Notifications
+- Admin message broadcast UI
+- Message types: `general`, `orbat`, `training`, `rankup`, `alert`
+- Audience targeting: all users or admins
+- In-app inbox with unread badge, filters, and mark-read APIs
+- Auto message creation on rankup approval flows
 
-**Templates (3 permissions)**
-- `template:create` - Create ORBAT templates
-- `template:edit` - Edit ORBAT templates
-- `template:delete` - Delete ORBAT templates
+### Permissions & Access Control
+- 22 granular permissions across 7 domains
+- Integer permission values (`0-255`) with sparse storage
+- Enforcement layers:
+  - API route authorization (authoritative)
+  - server page guards
+  - client-side UI visibility helpers
+- Permission audit logging and user-level permission management APIs
 
-**Attendance (2 permissions)**
-- `attendance:view` - View detailed attendance records
-- `attendance:edit` - Modify attendance data
-
-**Rank System (4 permissions)**
-- `rank:create` - Create new ranks
-- `rank:edit` - Edit rank definitions and requirements
-- `rank:delete` - Delete ranks
-- `rank:manage_promotions` - Propose/approve rank promotions
-
-**System Administration (1 permission)**
-- `admin:system` - Full system access (messaging, imports, system settings)
-
-### How Permissions Work
-
-1. **Hierarchy System**: Permissions use 0-255 integer values for future role-based comparisons
-2. **Sparse Storage**: Only non-zero permission values are stored in the database
-3. **Session-Based**: Permissions loaded into user session on login (minimal DB queries)
-4. **Multi-Layer Protection**:
-   - API endpoints check permissions before operations
-   - Admin pages redirect unauthorized users
-   - UI buttons/actions hidden from users without permissions
-   - Navigation adapts dynamically to user capabilities
-
-### Template Access Rules
-
-- `template:create/edit/delete` (or admin) = full template management UI
-- `orbat:create` or `orbat:edit` = read-only template view for ORBAT workflows
-- ORBAT-only users can view and use templates, but cannot create/edit/delete templates
-
-### Assigning Permissions
-
-Admins with `user:manage_permissions` can assign permissions through the admin panel:
-
-1. Navigate to **Admin Panel → Users**
-2. Click **Permissions** next to any user
-3. Set permission values using sliders (0-255)
-   - **0** = No access
-   - **100** = Standard access
-   - **255** = Full access
-4. Use quick buttons: **None (0)**, **Standard (100)**, **Full (255)**
-5. Click **Save Permissions**
-
-**Note:** Users cannot modify their own permissions (system enforced in UI and backend).
-
-### Developer Guide
-
-**Using Permission Hooks in Client Components:**
-```tsx
-import { usePermission } from '@/app/hooks/usePermissions';
-
-function DeleteButton() {
-  const canDelete = usePermission('orbat:delete');
-  
-  if (!canDelete) return null; // Hide button without permission
-  
-  return <button>Delete ORBAT</button>;
-}
-```
-
-**Checking Permissions in API Routes:**
-```tsx
-import { checkPermission } from '@/lib/auth-middleware';
-
-export async function DELETE(req: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  
-  const hasPermission = await checkPermission(session.user.id, 'orbat:delete');
-  if (!hasPermission) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  
-  // Proceed with deletion...
-}
-```
-
-**Protecting Server-Side Pages:**
-```tsx
-import { checkPermission } from '@/lib/auth-middleware';
-
-export default async function RanksPage() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) redirect('/');
-  
-  const hasPermission = session.user.isAdmin || await checkPermission(session.user.id, 'rank:edit');
-  if (!hasPermission) redirect('/admin');
-  
-  return <RankManagement />;
-}
-```
-
-See [PERMISSION_AUDIT.md](./PERMISSION_AUDIT.md) for detailed implementation documentation.
-
-### Verification
-
-- Run permission guard tests: `npm run test:permissions`
-- Build validation: `npm run build`
-
-## Planned Features
-
-- **Discord Bot Integration**: 
-  - Automated operation announcements
-  - User management and role synchronization
-  - Operation reminders and notifications
-- **Attendance System**:
-  - Arma 3 server integration for automatic attendance tracking
-  - TeamSpeak presence detection
-  - Attendance reports and statistics
-- **Training Management**:
-  - Schedule and track training sessions
-  - Training requirements and completion tracking
-  - Certification system for specialized roles
-  - **Role-based signups**: Users can only sign up for slots they are certified/trained for
-  - Automatic slot restrictions based on completed training and qualifications
+### Admin Areas
+- Dashboard (`/admin`) with module access by role/permission
+- ORBAT management
+- Template management
+- User management
+- Radio frequencies
+- Training management + request handling
+- Attendance management
+- Rank configuration
+- Pending promotions
+- System messaging
+- Legacy user data import
+- Theme page currently indicates theme system removal (static light/dark behavior)
 
 ## Tech Stack
 
-- **Framework**: Next.js 16 with App Router
-- **Database**: PostgreSQL with Prisma ORM
-- **Authentication**: NextAuth.js with Discord and Steam providers
-- **Styling**: Tailwind CSS v4
-- **TypeScript**: Full type safety
+- Next.js 16 (App Router) + React 19
+- TypeScript
+- Prisma ORM + PostgreSQL
+- NextAuth.js
+- Tailwind CSS v4
 
-## Prerequisites
+## Environment Variables
 
-- Node.js 18+ or Bun
-- PostgreSQL database
-- Discord OAuth application
-- Steam API key
+Copy `.env.example` to `.env`.
 
-## Getting Started
+Required:
+- `DATABASE_URL`
+- `NEXTAUTH_URL`
+- `NEXTAUTH_SECRET`
+- `DISCORD_CLIENT_ID`
+- `DISCORD_CLIENT_SECRET`
+- `STEAM_API_KEY`
 
-### 1. Clone the repository
+Optional / integration-specific:
+- `BOT_API_TOKEN` (for bot rank promotion endpoints)
 
-```bash
-git clone <repository-url>
-cd orbat-web
-```
+## Prisma Notes
 
-### 2. Install dependencies
+This project uses a custom Prisma client output path: `generated/prisma/`.
+
+- Import Prisma via `@/lib/prisma`
+- Do not import directly from generated files
+
+## Local Development
+
+1) Install dependencies
 
 ```bash
 npm install
 ```
 
-### 3. Set up environment variables
-
-Copy `.env.example` to `.env` and fill in your values:
+2) Configure environment
 
 ```bash
 cp .env.example .env
 ```
 
-Required environment variables:
-- `DATABASE_URL`: PostgreSQL connection string
-- `NEXTAUTH_URL`: Your app URL (http://localhost:3000 for dev)
-- `NEXTAUTH_SECRET`: Generate with `openssl rand -base64 32`
-- `DISCORD_CLIENT_ID` & `DISCORD_CLIENT_SECRET`: From Discord Developer Portal
-- `DISCORD_OAUTH_URL`: Discord OAuth URL with your client ID
-- `STEAM_API_KEY`: From https://steamcommunity.com/dev/apikey
-
-### 4. Set up the database
+3) Run migrations + generate client
 
 ```bash
-# Run Prisma migrations
-npx prisma migrate dev
-
-# Generate Prisma Client
-npx prisma generate
-
-# (Optional) Seed the database
-npx prisma db seed
+npm run prisma:migrate
+npm run prisma:generate
 ```
 
-### 5. Run the development server
+4) Seed data (choose one)
+
+```bash
+npm run seed:dev
+# or
+npm run seed:prod
+```
+
+5) Start app
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Default URL: `http://localhost:3000`
 
-## Project Structure
+## Scripts
 
+- `npm run dev` - Start dev server
+- `npm run build` - Build production bundle
+- `npm run start` - Start production server
+- `npm run lint` - Run ESLint
+- `npm run test:permissions` - Run permission-focused tests
+- `npm run prisma:migrate` - Run Prisma migrate dev
+- `npm run prisma:generate` - Generate Prisma client
+- `npm run prisma:studio` - Open Prisma Studio
+- `npm run db:push` - Push schema without migration
+- `npm run seed` - Generic seed entry
+- `npm run seed:dev` - Development seed data
+- `npm run seed:prod` - Production seed data
+- `npm run seed:migrate` - Migration-time seed script
+
+## Key Paths
+
+- `app/` - App Router pages and API routes
+- `app/api/` - REST-style route handlers
+- `app/admin/` - Admin UI modules
+- `lib/` - Shared server/business logic
+- `prisma/schema.prisma` - Full data model
+- `docs/PERMISSIONS.md` - Permission model details
+- `docs/RANK_SYSTEM.md` - Rank subsystem documentation
+
+## Validation
+
+Before shipping permission/auth/rank changes:
+
+```bash
+npm run test:permissions
+npm run build
 ```
-orbat-web/
-├── app/                    # Next.js app directory
-│   ├── api/               # API routes
-│   ├── admin/             # Admin panel pages
-│   ├── orbats/            # Operations pages
-│   ├── settings/          # User settings
-│   └── components/        # Shared components
-├── lib/                   # Utility functions
-├── prisma/                # Database schema and migrations
-│   ├── schema.prisma     # Prisma schema definition
-│   └── migrations/       # Database migrations
-└── public/               # Static assets
-```
-
-## Available Scripts
-
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm start` - Start production server
-- `npx prisma studio` - Open Prisma Studio (database GUI)
-- `npx prisma migrate dev` - Run database migrations
-- `npx prisma generate` - Generate Prisma Client
-
-## Admin Access
-
-The first user to sign up will need to be manually promoted to admin in the database. After that, admins can promote other users through the admin panel.
 
 ## License
 
