@@ -4,6 +4,14 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
 import { useToast } from '@/app/components/ui/ToastContainer';
+import { usePermission } from '@/app/hooks/usePermissions';
+import PermissionAuditLog from './PermissionAuditLog';
+
+const logClientError = (...args: unknown[]) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.error(...args);
+  }
+};
 
 type User = {
   id: number;
@@ -46,6 +54,15 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
   const [availableTrainings, setAvailableTrainings] = useState<Array<{ id: number; name: string; category: string | null; duration: number | null }>>([]);
   const [loadingTrainings, setLoadingTrainings] = useState(false);
   
+  // Permissions management state
+  const [permissionsModalData, setPermissionsModalData] = useState<{ userId: number; username: string | null } | null>(null);
+  const [userPermissions, setUserPermissions] = useState<Array<{ id: number; key: string; description: string; currentValue: number; maxValue: number }>>([]);
+  const [loadingPermissions, setLoadingPermissions] = useState(false);
+  const [savingPermissions, setSavingPermissions] = useState(false);
+  
+  // Permission audit log state
+  const [auditLogModalData, setAuditLogModalData] = useState<{ userId: number; username: string | null } | null>(null);
+  
   // Unranked users state
   const [unrankedUsers, setUnrankedUsers] = useState<any[]>([]);
   const [unrankedLoading, setUnrankedLoading] = useState(false);
@@ -54,6 +71,66 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
   const [ranks, setRanks] = useState<Array<{ id: number; name: string; abbreviation: string }>>([]);
   
   const { showSuccess, showError } = useToast();
+
+  // Permission checks
+  const canManageUsers = usePermission('user:manage');
+  const canManagePermissions = usePermission('user:manage_permissions');
+  const canMarkTrainings = usePermission('training:mark');
+
+  // Fetch user permissions
+  const fetchUserPermissions = async (userId: number) => {
+    setLoadingPermissions(true);
+    try {
+      const res = await fetch(`/api/users/${userId}/permissions`);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to fetch permissions');
+      }
+      const data = await res.json();
+      setUserPermissions(data.permissions || []);
+    } catch (e) {
+      showError(e instanceof Error ? e.message : 'Failed to load permissions');
+      setUserPermissions([]);
+    } finally {
+      setLoadingPermissions(false);
+    }
+  };
+
+  // Save user permissions
+  const saveUserPermissions = async () => {
+    if (!permissionsModalData) return;
+    
+    setSavingPermissions(true);
+    try {
+      const permissions = userPermissions.map(p => ({
+        permissionId: p.id,
+        value: p.currentValue,
+      }));
+      
+      const res = await fetch(`/api/users/${permissionsModalData.userId}/permissions`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ permissions }),
+      });
+      
+      if (!res.ok) {
+        throw new Error('Failed to save permissions');
+      }
+      
+      showSuccess(`Permissions updated for ${permissionsModalData.username}`);
+      setPermissionsModalData(null);
+    } catch (e) {
+      showError('Failed to save permissions');
+    } finally {
+      setSavingPermissions(false);
+    }
+  };
+
+  // Open permissions modal
+  const openPermissionsModal = async (userId: number, username: string | null) => {
+    setPermissionsModalData({ userId, username });
+    await fetchUserPermissions(userId);
+  };
 
   // Fetch unranked users
   const fetchUnrankedUsers = async () => {
@@ -90,7 +167,7 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
       const data = await res.json();
       setRanks(data.ranks || []);
     } catch (e) {
-      console.error(e);
+      logClientError(e);
     }
   };
 
@@ -199,7 +276,7 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
       ));
       showSuccess(`User ${currentIsAdmin ? 'demoted from' : 'promoted to'} admin`);
     } catch (error) {
-      console.error('Error updating user:', error);
+      logClientError('Error updating user:', error);
       showError('Error updating user');
     } finally {
       setIsLoading(false);
@@ -237,7 +314,7 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
       setUsers(users.filter(u => u.id !== userId));
       showSuccess('User deleted successfully');
     } catch (error) {
-      console.error('Error deleting user:', error);
+      logClientError('Error deleting user:', error);
       showError('Error deleting user');
     } finally {
       setIsLoading(false);
@@ -290,7 +367,7 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
       showSuccess('Training assigned successfully');
       setTrainingModalData(null);
     } catch (error) {
-      console.error('Error assigning training:', error);
+      logClientError('Error assigning training:', error);
       showError('Error assigning training');
     } finally {
       setIsLoading(false);
@@ -307,7 +384,7 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
         setAvailableTrainings(data);
       }
     } catch (error) {
-      console.error('Error fetching trainings:', error);
+      logClientError('Error fetching trainings:', error);
     } finally {
       setLoadingTrainings(false);
     }
@@ -520,7 +597,26 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                       >
                         {expandedUserId === user.id ? 'Hide' : 'View'} Trainings
                       </button>
-                      {user.id !== currentUserId && (
+                      {canManagePermissions && (
+                        <>
+                          <span style={{ color: 'var(--border)' }}>|</span>
+                          <button
+                            onClick={() => openPermissionsModal(user.id, user.username)}
+                            className="text-purple-400 hover:text-purple-300 font-medium"
+                          >
+                            Permissions {user.id === currentUserId && '(Read-only)'}
+                          </button>
+                          <span style={{ color: 'var(--border)' }}>|</span>
+                          <button
+                            onClick={() => setAuditLogModalData({ userId: user.id, username: user.username })}
+                            className="text-cyan-400 hover:text-cyan-300 font-medium"
+                            title="View permission change history"
+                          >
+                            History
+                          </button>
+                        </>
+                      )}
+                      {canManageUsers && user.id !== currentUserId && (
                         <>
                           <span style={{ color: 'var(--border)' }}>|</span>
                           <button
@@ -591,61 +687,63 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                                         Completed: {new Date(training.completedAt).toLocaleDateString('en-GB')}
                                       </p>
                                     </div>
-                                    <div className="flex gap-2 ml-2">
-                                      <button
-                                        onClick={() => {
-                                          const updatedTraining = { ...training };
-                                          setTrainingModalData({
-                                            userId: user.id,
-                                            trainingId: training.trainingId.toString(),
-                                            notes: training.notes || '',
-                                            needsRetraining: training.needsRetraining,
-                                            isHidden: training.isHidden,
-                                          });
-                                        }}
-                                        className="px-2 py-1 text-xs rounded"
-                                        style={{
-                                          backgroundColor: 'var(--primary)',
-                                          color: 'var(--primary-foreground)',
-                                        }}
-                                      >
-                                        Edit
-                                      </button>
-                                      <button
-                                        onClick={async () => {
-                                          if (!confirm('Remove this training from the user?')) return;
-                                          setIsLoading(true);
-                                          try {
-                                            const res = await fetch(`/api/user-trainings/${training.id}`, {
-                                              method: 'DELETE',
+                                    {canMarkTrainings && (
+                                      <div className="flex gap-2 ml-2">
+                                        <button
+                                          onClick={() => {
+                                            const updatedTraining = { ...training };
+                                            setTrainingModalData({
+                                              userId: user.id,
+                                              trainingId: training.trainingId.toString(),
+                                              notes: training.notes || '',
+                                              needsRetraining: training.needsRetraining,
+                                              isHidden: training.isHidden,
                                             });
-                                            if (res.ok) {
-                                              setUsers(users.map(u => 
-                                                u.id === user.id 
-                                                  ? { ...u, trainings: u.trainings.filter(t => t.id !== training.id), trainingCount: u.trainingCount - 1 }
-                                                  : u
-                                              ));
-                                              showSuccess('Training removed');
-                                            } else {
-                                              showError('Failed to remove training');
+                                          }}
+                                          className="px-2 py-1 text-xs rounded"
+                                          style={{
+                                            backgroundColor: 'var(--primary)',
+                                            color: 'var(--primary-foreground)',
+                                          }}
+                                        >
+                                          Edit
+                                        </button>
+                                        <button
+                                          onClick={async () => {
+                                            if (!confirm('Remove this training from the user?')) return;
+                                            setIsLoading(true);
+                                            try {
+                                              const res = await fetch(`/api/user-trainings/${training.id}`, {
+                                                method: 'DELETE',
+                                              });
+                                              if (res.ok) {
+                                                setUsers(users.map(u => 
+                                                  u.id === user.id 
+                                                    ? { ...u, trainings: u.trainings.filter(t => t.id !== training.id), trainingCount: u.trainingCount - 1 }
+                                                    : u
+                                                ));
+                                                showSuccess('Training removed');
+                                              } else {
+                                                showError('Failed to remove training');
+                                              }
+                                            } catch (error) {
+                                              logClientError('Error:', error);
+                                              showError('Error removing training');
+                                            } finally {
+                                              setIsLoading(false);
                                             }
-                                          } catch (error) {
-                                            console.error('Error:', error);
-                                            showError('Error removing training');
-                                          } finally {
-                                            setIsLoading(false);
-                                          }
-                                        }}
-                                        disabled={isLoading}
-                                        className="px-2 py-1 text-xs rounded"
-                                        style={{
-                                          backgroundColor: 'var(--destructive)',
-                                          color: 'var(--destructive-foreground)',
-                                        }}
-                                      >
-                                        Remove
-                                      </button>
-                                    </div>
+                                          }}
+                                          disabled={isLoading}
+                                          className="px-2 py-1 text-xs rounded"
+                                          style={{
+                                            backgroundColor: 'var(--destructive)',
+                                            color: 'var(--destructive-foreground)',
+                                          }}
+                                        >
+                                          Remove
+                                        </button>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               ))}
@@ -702,7 +800,7 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                                     showError(data.error || 'Failed to assign training');
                                   }
                                 } catch (error) {
-                                  console.error('Error assigning training:', error);
+                                  logClientError('Error assigning training:', error);
                                   showError('Error assigning training');
                                 } finally {
                                   setIsLoading(false);
@@ -950,7 +1048,7 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                         showError('Failed to update training');
                       }
                     } catch (error) {
-                      console.error('Error:', error);
+                      logClientError('Error:', error);
                       showError('Error updating training');
                     } finally {
                       setIsLoading(false);
@@ -980,6 +1078,213 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Permissions Management Modal */}
+      {permissionsModalData && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+          onClick={() => setPermissionsModalData(null)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-lg max-w-2xl w-full p-6 max-h-[80vh] overflow-y-auto"
+            style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold mb-4" style={{ color: 'var(--foreground)' }}>
+              {permissionsModalData.userId === currentUserId ? 'Your Permissions' : `Manage Permissions - ${permissionsModalData.username}`}
+            </h2>
+
+            {loadingPermissions ? (
+              <div className="flex justify-center items-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: 'var(--primary)' }}></div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {permissionsModalData.userId === currentUserId && (
+                  <div className="px-3 py-2 rounded border" style={{ backgroundColor: 'var(--muted)', borderColor: 'var(--border)' }}>
+                    <p className="text-sm" style={{ color: 'var(--foreground)' }}>
+                      ℹ️ You cannot modify your own permissions. This is a read-only view.
+                    </p>
+                  </div>
+                )}
+                <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
+                  Set permission values (0-255). Higher values grant more authority in hierarchical checks. 0 = no permission.
+                </p>
+
+                {userPermissions.length === 0 ? (
+                  <div className="py-8 text-center" style={{ color: 'var(--muted-foreground)' }}>
+                    <p>No permissions available</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {userPermissions.map((perm) => (
+                    <div
+                      key={perm.id}
+                      className="p-3 rounded border"
+                      style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium" style={{ color: 'var(--foreground)' }}>
+                            {perm.key}
+                          </label>
+                          <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                            {perm.description}
+                          </p>
+                        </div>
+                        <div className="ml-4 flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="0"
+                            max={perm.maxValue}
+                            value={perm.currentValue}
+                            onChange={(e) => {
+                              if (permissionsModalData.userId === currentUserId) return;
+                              const value = Math.max(0, Math.min(perm.maxValue, parseInt(e.target.value) || 0));
+                              setUserPermissions(
+                                userPermissions.map((p) =>
+                                  p.id === perm.id ? { ...p, currentValue: value } : p
+                                )
+                              );
+                            }}
+                            disabled={permissionsModalData.userId === currentUserId}
+                            className="w-20 px-2 py-1 rounded border text-center"
+                            style={{
+                              backgroundColor: 'var(--background)',
+                              borderColor: 'var(--border)',
+                              color: 'var(--foreground)',
+                              opacity: permissionsModalData.userId === currentUserId ? 0.6 : 1,
+                            }}
+                          />
+                          <span className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                            / {perm.maxValue}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Quick action buttons */}
+                      {permissionsModalData.userId !== currentUserId && (
+                        <div className="flex gap-2 mt-2">
+                          <button
+                            onClick={() => {
+                              setUserPermissions(
+                                userPermissions.map((p) =>
+                                  p.id === perm.id ? { ...p, currentValue: 0 } : p
+                                )
+                              );
+                            }}
+                            className="px-2 py-1 text-xs rounded"
+                            style={{
+                              backgroundColor: 'var(--muted)',
+                              color: 'var(--foreground)',
+                            }}
+                          >
+                            None (0)
+                          </button>
+                          <button
+                            onClick={() => {
+                              setUserPermissions(
+                                userPermissions.map((p) =>
+                                  p.id === perm.id ? { ...p, currentValue: 100 } : p
+                                )
+                              );
+                            }}
+                            className="px-2 py-1 text-xs rounded"
+                            style={{
+                              backgroundColor: 'var(--muted)',
+                              color: 'var(--foreground)',
+                            }}
+                          >
+                            Standard (100)
+                          </button>
+                          <button
+                            onClick={() => {
+                              setUserPermissions(
+                                userPermissions.map((p) =>
+                                  p.id === perm.id ? { ...p, currentValue: 255 } : p
+                                )
+                              );
+                            }}
+                            className="px-2 py-1 text-xs rounded"
+                            style={{
+                              backgroundColor: 'var(--muted)',
+                              color: 'var(--foreground)',
+                            }}
+                          >
+                            Full (255)
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-4">
+                  {permissionsModalData.userId !== currentUserId && (
+                    <button
+                      onClick={saveUserPermissions}
+                      disabled={savingPermissions}
+                      className="flex-1 px-4 py-2 rounded font-medium transition-colors disabled:opacity-50"
+                      style={{
+                        backgroundColor: 'var(--primary)',
+                        color: 'var(--primary-foreground)',
+                      }}
+                    >
+                      {savingPermissions ? 'Saving...' : 'Save Permissions'}
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => setPermissionsModalData(null)}
+                    disabled={savingPermissions}
+                    className="flex-1 px-4 py-2 rounded font-medium transition-colors disabled:opacity-50"
+                    style={{
+                      backgroundColor: 'var(--secondary)',
+                      color: 'var(--foreground)',
+                      border: '1px solid var(--border)',
+                    }}
+                  >
+                    {permissionsModalData.userId === currentUserId ? 'Close' : 'Cancel'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Permission Audit Log Modal */}
+      {auditLogModalData && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+          onClick={() => setAuditLogModalData(null)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-lg max-w-4xl w-full p-6 max-h-[80vh] overflow-y-auto"
+            style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold" style={{ color: 'var(--foreground)' }}>
+                Permission Change History
+              </h2>
+              <button
+                onClick={() => setAuditLogModalData(null)}
+                className="text-2xl font-bold"
+                style={{ color: 'var(--muted-foreground)' }}
+              >
+                ×
+              </button>
+            </div>
+            
+            <PermissionAuditLog 
+              userId={auditLogModalData.userId} 
+              username={auditLogModalData.username}
+            />
           </div>
         </div>
       )}

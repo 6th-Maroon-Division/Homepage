@@ -87,7 +87,7 @@ export default function UserMenu() {
           >
             Settings
           </Link>
-          {session.user?.isAdmin && (
+          {(session.user?.isAdmin || (session.user?.permissions && Object.keys(session.user.permissions).length > 0)) && (
             <Link
               href="/admin"
               className="block px-4 py-2 transition-colors"

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
+import { usePermission } from '@/app/hooks/usePermissions';
 
 type RadioFrequency = {
   id: number;
@@ -19,6 +20,8 @@ export default function RadioFrequenciesManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+
+  const canEditOrbat = usePermission('orbat:edit');
 
   const [formData, setFormData] = useState<{
     frequency: string;
@@ -173,10 +176,11 @@ export default function RadioFrequenciesManagement() {
       </div>
 
       {/* Add/Edit Form */}
-      <div className="border rounded-lg p-6 space-y-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
-        <h2 className="text-xl font-semibold" style={{ color: 'var(--foreground)' }}>
-          {editingId ? 'Edit Frequency' : 'Add New Frequency'}
-        </h2>
+      {canEditOrbat && (
+        <div className="border rounded-lg p-6 space-y-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+          <h2 className="text-xl font-semibold" style={{ color: 'var(--foreground)' }}>
+            {editingId ? 'Edit Frequency' : 'Add New Frequency'}
+          </h2>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
           <div>
@@ -272,6 +276,7 @@ export default function RadioFrequenciesManagement() {
           </div>
         </form>
       </div>
+      )}
 
       {/* Frequencies List */}
       <div className="border rounded-lg p-6 space-y-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
@@ -327,20 +332,24 @@ export default function RadioFrequenciesManagement() {
                       {freq.callsign || '-'}
                     </td>
                     <td className="px-4 py-3 space-x-2">
-                      <button
-                        onClick={() => handleEdit(freq)}
-                        className="text-sm font-medium px-3 py-1 rounded transition-colors"
-                        style={{ color: 'var(--primary)' }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(freq.id)}
-                        className="text-sm font-medium px-3 py-1 rounded transition-colors"
-                        style={{ color: '#ef4444' }}
-                      >
-                        Delete
-                      </button>
+                      {canEditOrbat && (
+                        <>
+                          <button
+                            onClick={() => handleEdit(freq)}
+                            className="text-sm font-medium px-3 py-1 rounded transition-colors"
+                            style={{ color: 'var(--primary)' }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(freq.id)}
+                            className="text-sm font-medium px-3 py-1 rounded transition-colors"
+                            style={{ color: '#ef4444' }}
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}

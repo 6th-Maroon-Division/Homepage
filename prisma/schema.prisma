@@ -42,6 +42,10 @@ model User {
   userRank          UserRank?
   rankHistory       RankHistory[]
   promotionProposals PromotionProposal[]
+  // Permissions system
+  userPermissions   UserPermission[]
+  permissionChangesActor  PermissionAuditLog[] @relation("PermissionActor")
+  permissionChangesTarget PermissionAuditLog[] @relation("PermissionTarget")
 }
 
 enum MessageType {
@@ -107,6 +111,63 @@ model AuthAccount {
   providerUserId String
 
   @@unique([provider, providerUserId])
+}
+
+model Permission {
+  id              Int                @id @default(autoincrement())
+  key             String             @unique // e.g., "user:edit", "training:mark", "orbat:delete"
+  description     String?
+  defaultValue    Int                @default(0) // Default value for new users (0-255)
+  maxValue        Int                @default(255)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  userPermissions UserPermission[]
+  auditLogs       PermissionAuditLog[]
+
+  @@index([key])
+}
+
+model UserPermission {
+  id              Int         @id @default(autoincrement())
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          Int
+  permission      Permission  @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  permissionId    Int
+  value           Int         // 0-255, where higher value = more permissions
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([userId, permissionId])
+  @@index([userId])
+  @@index([permissionId])
+}
+
+enum PermissionAction {
+  GRANT    // New permission granted (0 -> X)
+  REVOKE   // Permission removed (X -> 0)
+  MODIFY   // Permission value changed (X -> Y)
+}
+
+model PermissionAuditLog {
+  id              Int               @id @default(autoincrement())
+  actor           User              @relation("PermissionActor", fields: [actorId], references: [id], onDelete: Cascade)
+  actorId         Int               // Who made the change
+  targetUser      User              @relation("PermissionTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  targetUserId    Int               // Whose permissions changed
+  permission      Permission        @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  permissionId    Int               // Which permission was modified
+  action          PermissionAction  // Type of change
+  oldValue        Int?              // Previous value (null if newly granted)
+  newValue        Int?              // New value (null if revoked)
+  reason          String?           // Optional reason for the change
+  metadata        Json?             // Additional context (IP address, user agent, etc.)
+  createdAt       DateTime          @default(now())
+
+  @@index([actorId])
+  @@index([targetUserId])
+  @@index([permissionId])
+  @@index([createdAt])
+  @@index([action])
 }
 
 model Orbat {

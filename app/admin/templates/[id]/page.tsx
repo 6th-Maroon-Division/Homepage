@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
+import { usePermission, usePermissionLoading } from '@/app/hooks/usePermissions';
 
 type Subslot = {
   name: string;
@@ -49,6 +50,10 @@ export default function TemplateEditor() {
   const [isLoading, setIsLoading] = useState(!isNewTemplate);
   const [isSaving, setIsSaving] = useState(false);
   const { showError, showSuccess } = useToast();
+  const canCreateTemplate = usePermission('template:create');
+  const canEditTemplate = usePermission('template:edit');
+  const isPermissionLoading = usePermissionLoading();
+  const isReadOnly = !isNewTemplate && !canEditTemplate;
 
   const [template, setTemplate] = useState<OrbatTemplate>({
     name: '',
@@ -99,7 +104,23 @@ export default function TemplateEditor() {
     }
   }, [isNewTemplate, params.id, router, showError]);
 
+  useEffect(() => {
+    if (isPermissionLoading) {
+      return;
+    }
+
+    if (isNewTemplate && !canCreateTemplate) {
+      showError('You do not have permission to create templates');
+      router.push('/admin/templates');
+    }
+  }, [isPermissionLoading, isNewTemplate, canCreateTemplate, router, showError]);
+
   const handleSave = async () => {
+    if (isReadOnly) {
+      showError('Read-only mode: you cannot modify this template');
+      return;
+    }
+
     if (!template.name.trim()) {
       showError('Template name is required');
       return;
@@ -209,15 +230,19 @@ export default function TemplateEditor() {
           style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
         >
           <h1 className="text-3xl font-bold" style={{ color: 'var(--foreground)' }}>
-            {isNewTemplate ? 'Create Template' : `Edit "${template.name}"`}
+            {isNewTemplate ? 'Create Template' : isReadOnly ? `View "${template.name}"` : `Edit "${template.name}"`}
           </h1>
           <p style={{ color: 'var(--muted-foreground)' }} className="mt-2">
-            {isNewTemplate ? 'Create a new ORBAT template' : 'Modify template details and structure'}
+            {isNewTemplate
+              ? 'Create a new ORBAT template'
+              : isReadOnly
+                ? 'Read-only template view'
+                : 'Modify template details and structure'}
           </p>
         </div>
 
         {/* Form */}
-        <div className="space-y-6">
+        <fieldset className="space-y-6" disabled={isReadOnly}>
           {/* Basic Info */}
           <div
             className="border rounded-lg p-6"
@@ -697,6 +722,7 @@ export default function TemplateEditor() {
               </div>
             </div>
           </div>
+        </fieldset>
 
           {/* Actions */}
           <div className="flex justify-end gap-3">
@@ -709,21 +735,22 @@ export default function TemplateEditor() {
                 color: 'var(--foreground)',
               }}
             >
-              Cancel
+              {isReadOnly ? 'Back' : 'Cancel'}
             </button>
-            <button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="px-6 py-2 rounded-md font-medium transition-colors disabled:opacity-50"
-              style={{
-                backgroundColor: 'var(--primary)',
-                color: 'var(--primary-foreground)',
-              }}
-            >
-              {isSaving ? 'Saving...' : 'Save Template'}
-            </button>
+            {!isReadOnly && (
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="px-6 py-2 rounded-md font-medium transition-colors disabled:opacity-50"
+                style={{
+                  backgroundColor: 'var(--primary)',
+                  color: 'var(--primary-foreground)',
+                }}
+              >
+                {isSaving ? 'Saving...' : 'Save Template'}
+              </button>
+            )}
           </div>
-        </div>
       </div>
     </main>
   );

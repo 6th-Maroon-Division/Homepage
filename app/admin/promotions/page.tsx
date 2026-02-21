@@ -2,12 +2,20 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { redirect } from 'next/navigation';
 import PendingPromotionsClient from '@/app/admin/components/promotions/PendingPromotionsClient';
+import { checkPermission } from '@/lib/auth-middleware';
 
 export default async function PendingPromotionsPage() {
   const session = await getServerSession(authOptions);
 
-  if (!session || !session.user?.isAdmin) {
+  if (!session?.user?.id) {
     redirect('/');
+  }
+  
+  // Check if user has promotion management permission
+  const hasPermission = session.user.isAdmin || await checkPermission(session.user.id, 'rank:manage_promotions');
+  
+  if (!hasPermission) {
+    redirect('/admin');
   }
 
   return (

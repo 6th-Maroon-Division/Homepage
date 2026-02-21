@@ -1,8 +1,46 @@
 import { prisma } from '@/lib/prisma';
-import { getServerSession } from 'next-auth';import { authOptions } from '@/app/api/auth/[...nextauth]/route';import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { NextResponse } from 'next/server';
+import { checkPermission } from '@/lib/auth-middleware';
+import { canAccessTemplateReadApi } from '@/lib/permission-api-logic';
+import type { NextRequest } from 'next/server';
 
 export async function GET() {
   try {
+    const session = await getServerSession(authOptions);
+    
+    // Require authentication for template access
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+    
+    // Allow access if user has any template or ORBAT permission
+    const [canCreateTemplate, canEditTemplate, canDeleteTemplate, canCreateOrbat, canEditOrbat] = await Promise.all([
+      checkPermission(session.user.id, 'template:create'),
+      checkPermission(session.user.id, 'template:edit'),
+      checkPermission(session.user.id, 'template:delete'),
+      checkPermission(session.user.id, 'orbat:create'),
+      checkPermission(session.user.id, 'orbat:edit'),
+    ]);
+
+    if (!canAccessTemplateReadApi({
+      isAdmin: Boolean(session.user.isAdmin),
+      canCreateTemplate,
+      canEditTemplate,
+      canDeleteTemplate,
+      canCreateOrbat,
+      canEditOrbat,
+    })) {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403 }
+      );
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const templates = await (prisma as any).orbatTemplate.findMany({
       where: { isActive: true },
@@ -24,13 +62,21 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user?.isAdmin) {
+    if (!session?.user?.id) {
       return NextResponse.json(
-        { error: 'Unauthorized - admin access required' },
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+    
+    const hasPermission = await checkPermission(session.user.id, 'template:create');
+    if (!hasPermission) {
+      return NextResponse.json(
+        { error: 'Forbidden' },
         { status: 403 }
       );
     }

@@ -1,7 +1,8 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
+import { checkPermission } from '@/lib/auth-middleware';
 
 // GET /api/training-categories - List all categories
 export async function GET() {
@@ -21,12 +22,20 @@ export async function GET() {
 }
 
 // POST /api/training-categories - Create a new category (admin only)
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
 
-  if (!session?.user?.isAdmin) {
+  if (!session?.user?.id) {
     return NextResponse.json(
-      { error: 'Unauthorized - Admin access required' },
+      { error: 'Unauthorized' },
+      { status: 401 }
+    );
+  }
+  
+  const hasPermission = await checkPermission(session.user.id, 'training:create');
+  if (!hasPermission) {
+    return NextResponse.json(
+      { error: 'Forbidden' },
       { status: 403 }
     );
   }

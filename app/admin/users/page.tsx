@@ -4,12 +4,20 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import UserManagementClient from '../components/user/UserManagementClient';
+import { checkPermission } from '@/lib/auth-middleware';
 
 export default async function UsersManagementPage() {
   const session = await getServerSession(authOptions);
 
-  if (!session || !session.user?.isAdmin) {
+  if (!session?.user?.id) {
     redirect('/');
+  }
+  
+  // Check if user has user management permission
+  const hasPermission = session.user.isAdmin || await checkPermission(session.user.id, 'user:manage');
+  
+  if (!hasPermission) {
+    redirect('/admin');
   }
 
   const users = await prisma.user.findMany({

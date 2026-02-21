@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { canRequestTraining, getUnmetRequirements } from '@/lib/training-gating';
+import { checkPermission } from '@/lib/auth-middleware';
 
 // GET /api/training-requests - Get training requests (user sees their own, admin sees all)
 export async function GET(request: NextRequest) {
@@ -22,8 +23,9 @@ export async function GET(request: NextRequest) {
 
     const where: WhereClause = {};
     
-    // Non-admin users only see their own requests
-    if (!session.user.isAdmin) {
+    // Non-admins can only see their own requests, or if they have training:approve_request permission
+    const canApproveRequests = await checkPermission(session.user.id, 'training:approve_request');
+    if (!canApproveRequests) {
       where.userId = session.user.id;
     }
 

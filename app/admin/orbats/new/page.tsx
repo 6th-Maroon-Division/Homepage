@@ -3,12 +3,20 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { redirect } from 'next/navigation';
 import OrbatForm from '@/app/components/orbat/OrbatForm';
+import { checkPermission } from '@/lib/auth-middleware';
 
 export default async function NewOrbatPage() {
   const session = await getServerSession(authOptions);
 
-  if (!session || !session.user?.isAdmin) {
+  if (!session?.user?.id) {
     redirect('/');
+  }
+  
+  // Check if user has ORBAT create permission
+  const hasPermission = session.user.isAdmin || await checkPermission(session.user.id, 'orbat:create');
+  
+  if (!hasPermission) {
+    redirect('/admin');
   }
 
   return (

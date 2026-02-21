@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
+import { checkPermission } from '@/lib/auth-middleware';
 
 // GET /api/user-trainings - Get user trainings (for current user or specific user if admin)
 export async function GET(request: NextRequest) {
@@ -17,14 +18,15 @@ export async function GET(request: NextRequest) {
 
     // Determine which user's trainings to fetch
     let userId: number;
-    if (userIdParam && session.user.isAdmin) {
+    const canViewAllTrainings = await checkPermission(session.user.id, 'training:mark');
+    if (userIdParam && canViewAllTrainings) {
       userId = parseInt(userIdParam);
     } else {
       userId = session.user.id;
     }
 
     const where: { userId: number; isHidden?: boolean } = { userId };
-    if (!includeHidden && !session.user.isAdmin) {
+    if (!includeHidden && !canViewAllTrainings) {
       where.isHidden = false;
     }
 
@@ -65,8 +67,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.isAdmin) {
-      return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 403 });
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    const hasPermission = await checkPermission(session.user.id, 'training:mark');
+    if (!hasPermission) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const body = await request.json();

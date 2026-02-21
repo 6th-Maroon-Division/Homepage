@@ -4,6 +4,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { redirect, notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import OrbatForm from '@/app/components/orbat/OrbatForm';
+import { checkPermission } from '@/lib/auth-middleware';
 
 interface EditOrbatPageProps {
   params: Promise<{ id: string }>;
@@ -12,8 +13,15 @@ interface EditOrbatPageProps {
 export default async function EditOrbatPage({ params }: EditOrbatPageProps) {
   const session = await getServerSession(authOptions);
 
-  if (!session || !session.user?.isAdmin) {
+  if (!session?.user?.id) {
     redirect('/');
+  }
+  
+  // Check if user has ORBAT edit permission
+  const hasPermission = session.user.isAdmin || await checkPermission(session.user.id, 'orbat:edit');
+  
+  if (!hasPermission) {
+    redirect('/admin');
   }
 
   const { id } = await params;

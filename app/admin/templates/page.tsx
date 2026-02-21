@@ -3,12 +3,30 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import TemplateManagementClient from '@/app/admin/components/templates/TemplateManagementClient';
+import { checkPermission } from '@/lib/auth-middleware';
 
 export default async function AdminTemplatesPage() {
   const session = await getServerSession(authOptions);
 
-  if (!session?.user?.isAdmin) {
+  if (!session?.user?.id) {
     redirect('/');
+  }
+  
+  // Allow access to templates for template managers and ORBAT creators/editors.
+  // ORBAT-only access is rendered in read-only mode.
+  const [canEditTemplates, canCreateTemplates, canDeleteTemplates, canCreateOrbat, canEditOrbat] = await Promise.all([
+    checkPermission(session.user.id, 'template:edit'),
+    checkPermission(session.user.id, 'template:create'),
+    checkPermission(session.user.id, 'template:delete'),
+    checkPermission(session.user.id, 'orbat:create'),
+    checkPermission(session.user.id, 'orbat:edit'),
+  ]);
+  const canManageTemplates = session.user.isAdmin || canEditTemplates || canCreateTemplates || canDeleteTemplates;
+  const hasPermission = canManageTemplates || canCreateOrbat || canEditOrbat;
+  const isReadOnly = !canManageTemplates && (canCreateOrbat || canEditOrbat);
+  
+  if (!hasPermission) {
+    redirect('/admin');
   }
 
   const templates = await prisma.orbatTemplate.findMany({
@@ -45,7 +63,7 @@ export default async function AdminTemplatesPage() {
   return (
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        <TemplateManagementClient templates={serializedTemplates} />
+        <TemplateManagementClient templates={serializedTemplates} isReadOnly={isReadOnly} />
       </div>
     </main>
   );

@@ -5,6 +5,12 @@ import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
 
+const logClientError = (...args: unknown[]) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.error(...args);
+  }
+};
+
 interface AttendanceRecord {
   id: number;
   status: 'present' | 'absent' | 'late' | 'gone_early' | 'partial' | 'no_show';
@@ -81,7 +87,7 @@ function AttendanceForm({
             setNotes(data.notes || '');
           }
         } catch (error) {
-          console.error('Error fetching attendance:', error);
+          logClientError('Error fetching attendance:', error);
         } finally {
           setIsLoadingSignups(false);
         }
@@ -105,7 +111,7 @@ function AttendanceForm({
             setAllUsers(data);
           }
         } catch (error) {
-          console.error('Error fetching data:', error);
+          logClientError('Error fetching data:', error);
         } finally {
           setIsLoadingSignups(false);
         }
@@ -161,7 +167,7 @@ function AttendanceForm({
       onSave();
       onClose();
     } catch (error) {
-      console.error('Error saving attendance:', error);
+      logClientError('Error saving attendance:', error);
       showToast('Failed to save attendance', 'error');
     } finally {
       setIsSaving(false);
@@ -407,7 +413,7 @@ export default function AttendanceManagement({ orbatId }: { orbatId: number }) {
       const data = await response.json();
       setAttendances(data);
     } catch (error) {
-      console.error('Error fetching attendance:', error);
+      logClientError('Error fetching attendance:', error);
       showToast('Failed to load attendance', 'error');
     } finally {
       setIsLoading(false);
@@ -433,7 +439,7 @@ export default function AttendanceManagement({ orbatId }: { orbatId: number }) {
       setDeleteId(undefined);
       fetchAttendances();
     } catch (error) {
-      console.error('Error deleting attendance:', error);
+      logClientError('Error deleting attendance:', error);
       showToast('Failed to delete attendance', 'error');
     }
   };

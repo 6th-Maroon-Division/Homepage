@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
+import { checkPermission } from '@/lib/auth-middleware';
 
 type RouteParams = {
   params: Promise<{ id: string }>;
@@ -184,8 +185,7 @@ export async function DELETE(req: NextRequest, context: RouteParams) {
   }
 
   const currentUserId = Number(session.user.id);
-  const isAdmin = session.user.isAdmin || false;
-
+  
   // Load subslot to check if the operation is in the past
   const subslot = await prisma.subslot.findUnique({
     where: { id: subslotId },
@@ -203,8 +203,11 @@ export async function DELETE(req: NextRequest, context: RouteParams) {
   const orbat = subslot.slot.orbat;
   const now = new Date();
 
-  // Past ops cannot be modified (unless admin)
-  if (!isAdmin && orbat.eventDate && orbat.eventDate < now) {
+  // Check if user has permission to modify signups
+  const hasOrbatEditPermission = await checkPermission(currentUserId, 'orbat:edit');
+  
+  // Past ops cannot be modified (unless has orbat:edit permission)
+  if (!hasOrbatEditPermission && orbat.eventDate && orbat.eventDate < now) {
     return NextResponse.json(
       { error: 'Operation is in the past. Signups cannot be modified.' },
       { status: 400 },
@@ -217,8 +220,8 @@ export async function DELETE(req: NextRequest, context: RouteParams) {
 
   let signup;
 
-  if (isAdmin && signupIdToDelete) {
-    // Admin removing a specific signup
+  if (hasOrbatEditPermission && signupIdToDelete) {
+    // User with orbat:edit can remove a specific signup
     signup = await prisma.signup.findFirst({
       where: {
         id: Number(signupIdToDelete),

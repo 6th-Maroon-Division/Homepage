@@ -3,12 +3,24 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { AttendanceAdminRootTabs } from '../components/AttendanceAdminRootTabs';
+import { checkPermission } from '@/lib/auth-middleware';
 
 export default async function AdminAttendancePage() {
   const session = await getServerSession(authOptions);
 
-  if (!session || !session.user?.isAdmin) {
+  if (!session?.user?.id) {
     redirect('/');
+  }
+  
+  // Check if user has attendance view or edit permission
+  const [canViewAttendance, canEditAttendance] = await Promise.all([
+    checkPermission(session.user.id, 'attendance:view'),
+    checkPermission(session.user.id, 'attendance:edit'),
+  ]);
+  const hasPermission = session.user.isAdmin || canViewAttendance || canEditAttendance;
+  
+  if (!hasPermission) {
+    redirect('/admin');
   }
 
   // Get recent orbats with attendance data

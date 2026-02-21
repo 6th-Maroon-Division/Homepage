@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
+import { checkPermission } from '@/lib/auth-middleware';
 
 // PUT /api/user-trainings/[id] - Update user training (admin only)
 export async function PUT(
@@ -10,8 +11,13 @@ export async function PUT(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.isAdmin) {
-      return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 403 });
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    const hasPermission = await checkPermission(session.user.id, 'training:mark');
+    if (!hasPermission) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const { id } = await context.params;
@@ -61,8 +67,13 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.isAdmin) {
-      return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 403 });
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    const hasPermission = await checkPermission(session.user.id, 'training:mark');
+    if (!hasPermission) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const { id } = await context.params;

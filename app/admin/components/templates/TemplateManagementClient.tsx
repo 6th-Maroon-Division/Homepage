@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
+import { usePermission } from '@/app/hooks/usePermissions';
 
 interface OrbatTemplate {
   id: number;
@@ -23,9 +24,10 @@ interface OrbatTemplate {
 
 interface TemplateManagementClientProps {
   templates: OrbatTemplate[];
+  isReadOnly?: boolean;
 }
 
-export default function TemplateManagementClient({ templates: initialTemplates }: TemplateManagementClientProps) {
+export default function TemplateManagementClient({ templates: initialTemplates, isReadOnly = false }: TemplateManagementClientProps) {
   const [templates, setTemplates] = useState<OrbatTemplate[]>(initialTemplates);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<OrbatTemplate | null>(null);
@@ -33,6 +35,10 @@ export default function TemplateManagementClient({ templates: initialTemplates }
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const { showError, showSuccess } = useToast();
+
+  const canCreateTemplate = usePermission('template:create');
+  const canEditTemplate = usePermission('template:edit');
+  const canDeleteTemplate = usePermission('template:delete');
 
   // Get unique categories
   const categories: string[] = ['all', ...Array.from(new Set(templates.map(t => t.category).filter((c): c is string => Boolean(c))))];
@@ -89,28 +95,35 @@ export default function TemplateManagementClient({ templates: initialTemplates }
           <div>
             <h2 className="text-xl font-semibold" style={{ color: 'var(--foreground)' }}>Templates List</h2>
             <p className="text-sm mt-1" style={{ color: 'var(--muted-foreground)' }}>
-              Manage ORBAT templates
+              {isReadOnly ? 'View ORBAT templates' : 'Manage ORBAT templates'}
             </p>
           </div>
-          <Link
-            href="/admin/templates/new"
-            className="px-4 py-2 rounded-md transition-colors font-medium"
-            style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--button-hover)';
-              e.currentTarget.style.color = 'var(--button-hover-foreground)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--primary)';
-              e.currentTarget.style.color = 'var(--primary-foreground)';
-            }}
-          >
-            Create New Template
-          </Link>
+          {!isReadOnly && canCreateTemplate && (
+            <Link
+              href="/admin/templates/new"
+              className="px-4 py-2 rounded-md transition-colors font-medium"
+              style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--button-hover)';
+                e.currentTarget.style.color = 'var(--button-hover-foreground)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--primary)';
+                e.currentTarget.style.color = 'var(--primary-foreground)';
+              }}
+            >
+              Create New Template
+            </Link>
+          )}
         </div>
 
         {/* Filters */}
         <div className="px-6 py-4 flex flex-col sm:flex-row gap-4" style={{ borderBottomWidth: '1px', borderColor: 'var(--border)' }}>
+          {isReadOnly && (
+            <div className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
+              You have read-only template access via ORBAT permissions.
+            </div>
+          )}
           <div className="flex gap-2">
             {categories.map((cat) => (
               <button
@@ -222,30 +235,46 @@ export default function TemplateManagementClient({ templates: initialTemplates }
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
-                        <Link
-                          href={`/admin/templates/${template.id}`}
-                          className="px-3 py-1 rounded text-sm font-medium transition-colors"
-                          style={{
-                            backgroundColor: 'var(--primary)',
-                            color: 'var(--primary-foreground)'
-                          }}
-                        >
-                          Edit
-                        </Link>
-                        <button
-                          onClick={() => {
-                            setTemplateToDelete(template);
-                            setShowDeleteConfirm(true);
-                          }}
-                          disabled={isDeleting}
-                          className="px-3 py-1 rounded text-sm font-medium transition-colors disabled:opacity-50"
-                          style={{
-                            backgroundColor: '#dc2626',
-                            color: 'white'
-                          }}
-                        >
+                        {!isReadOnly && canEditTemplate && (
+                          <Link
+                            href={`/admin/templates/${template.id}`}
+                            className="px-3 py-1 rounded text-sm font-medium transition-colors"
+                            style={{
+                              backgroundColor: 'var(--primary)',
+                              color: 'var(--primary-foreground)'
+                            }}
+                          >
+                            Edit
+                          </Link>
+                        )}
+                        {!isReadOnly && canDeleteTemplate && (
+                          <button
+                            onClick={() => {
+                              setTemplateToDelete(template);
+                              setShowDeleteConfirm(true);
+                            }}
+                            disabled={isDeleting}
+                            className="px-3 py-1 rounded text-sm font-medium transition-colors disabled:opacity-50"
+                            style={{
+                              backgroundColor: '#dc2626',
+                              color: 'white'
+                            }}
+                          >
                           Delete
                         </button>
+                        )}
+                        {isReadOnly && (
+                          <Link
+                            href={`/admin/templates/${template.id}`}
+                            className="px-3 py-1 rounded text-sm font-medium transition-colors"
+                            style={{
+                              backgroundColor: 'var(--muted)',
+                              color: 'var(--foreground)'
+                            }}
+                          >
+                            View
+                          </Link>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -256,18 +285,20 @@ export default function TemplateManagementClient({ templates: initialTemplates }
         )}
       </div>
 
-      <ConfirmModal
-        isOpen={showDeleteConfirm}
-        title="Delete Template"
-        message={`Are you sure you want to delete "${templateToDelete?.name}"? This action cannot be undone.`}
-        onConfirm={handleDelete}
-        onCancel={() => {
-          setShowDeleteConfirm(false);
-          setTemplateToDelete(null);
-        }}
-        confirmLabel="Delete"
-        isDestructive={true}
-      />
+      {!isReadOnly && (
+        <ConfirmModal
+          isOpen={showDeleteConfirm}
+          title="Delete Template"
+          message={`Are you sure you want to delete "${templateToDelete?.name}"? This action cannot be undone.`}
+          onConfirm={handleDelete}
+          onCancel={() => {
+            setShowDeleteConfirm(false);
+            setTemplateToDelete(null);
+          }}
+          confirmLabel="Delete"
+          isDestructive={true}
+        />
+      )}
     </>
   );
 }

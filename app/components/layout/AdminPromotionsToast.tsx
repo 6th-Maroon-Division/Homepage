@@ -3,14 +3,16 @@
 import { useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useToast } from '@/app/components/ui/ToastContainer';
+import { usePermission } from '@/app/hooks/usePermissions';
 
 export default function AdminPromotionsToast() {
   const { data: session } = useSession();
   const { showToast } = useToast();
   const hasShownRef = useRef(false);
+  const hasManagePromotions = usePermission('rank:manage_promotions');
 
   useEffect(() => {
-    if (!session?.user?.isAdmin) return;
+    if (!session?.user?.id || !hasManagePromotions) return;
     if (hasShownRef.current) return;
 
     const sessionKey = `promotionsToastShown:${session.user.id}:${session.expires}`;

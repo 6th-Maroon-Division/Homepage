@@ -2,22 +2,31 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { checkPermission } from '@/lib/auth-middleware';
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getServerSession(authOptions);
-  const { id } = await params;
-
-  if (!session?.user?.isAdmin) {
+  
+  if (!session?.user?.id) {
     return NextResponse.json(
       { error: 'Unauthorized' },
+      { status: 401 }
+    );
+  }
+
+  const hasPermission = await checkPermission(session.user.id, 'training:mark');
+  if (!hasPermission) {
+    return NextResponse.json(
+      { error: 'Forbidden' },
       { status: 403 }
     );
   }
 
   try {
+    const { id } = await params;
     const userTrainings = await prisma.userTraining.findMany({
       where: { userId: parseInt(id) },
       include: { training: true },

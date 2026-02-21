@@ -4,6 +4,7 @@ import { notFound, redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import AdminOrbatView from '@/app/components/orbat/AdminOrbatView';
+import { checkPermission } from '@/lib/auth-middleware';
 
 interface AdminOrbatPageProps {
   params: Promise<{ id: string }>;
@@ -12,8 +13,15 @@ interface AdminOrbatPageProps {
 export default async function AdminOrbatPage({ params }: AdminOrbatPageProps) {
   const session = await getServerSession(authOptions);
 
-  if (!session || !session.user?.isAdmin) {
+  if (!session?.user?.id) {
     redirect('/');
+  }
+  
+  // Check if user has ORBAT edit permission (viewing admin-side requires edit)
+  const hasPermission = session.user.isAdmin || await checkPermission(session.user.id, 'orbat:edit');
+  
+  if (!hasPermission) {
+    redirect('/admin');
   }
 
   const { id } = await params;

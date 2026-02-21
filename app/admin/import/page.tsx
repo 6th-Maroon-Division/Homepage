@@ -3,12 +3,20 @@ import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import LegacyImportClient from '@/app/admin/components/import/LegacyImportClient';
+import { checkPermission } from '@/lib/auth-middleware';
 
 export default async function LegacyImportPage() {
   const session = await getServerSession(authOptions);
 
-  if (!session?.user?.isAdmin) {
+  if (!session?.user?.id) {
     redirect('/');
+  }
+  
+  // Check if user has system admin permission (legacy import requires high-level access)
+  const hasPermission = session.user.isAdmin || await checkPermission(session.user.id, 'admin:system');
+  
+  if (!hasPermission) {
+    redirect('/admin');
   }
 
   return (
