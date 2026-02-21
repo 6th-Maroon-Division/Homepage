@@ -2,337 +2,143 @@
 
 ## Overview
 
-The rank system manages user progression through military ranks based on attendance, training completion, and manual review. It includes automatic rankups, manual promotion proposals, training prerequisites, and legacy data import capabilities.
+The rank system tracks user progression based on attendance, eligibility checks, and admin review workflows.
 
-## Core Components
+Implemented capabilities include:
+- rank configuration and ordering
+- automatic rankups for fully eligible users
+- manual promotion proposals for review-required cases
+- rank history/audit entries
+- rank transition training requirements
+- migration preview/apply tooling
+- legacy user rank data import
 
-### 1. Rank Management (`/app/admin/ranks`)
+## Core Data Model
 
-**Features:**
-- Create, update, delete, and reorder ranks
-- Set attendance requirements for each rank
-- Enable/disable auto-rankup per rank
-- View user distribution across ranks
+### Primary Models
+- `Rank`
+- `UserRank`
+- `RankHistory`
+- `PromotionProposal`
 
-**Key Fields:**
-- `name`: Full rank name (e.g., "Corporal")
-- `abbreviation`: Short form (e.g., "Cpl")
-- `orderIndex`: Hierarchy order (higher = higher rank)
-- `attendanceRequiredSinceLastRank`: Attendance needed to be eligible
-- `autoRankupEnabled`: Whether this rank allows automatic promotion
+### Related Requirement Models
+- `RankTransitionRequirement`
+- `TrainingRankRequirement`
+- `TrainingTrainingRequirement`
 
-### 2. User Ranks (`UserRank` model)
+### Legacy Import Models
+- `LegacyUserData`
+- `LegacyAttendanceData`
 
-**Purpose:** Tracks each user's current rank and progression
+## Rank Eligibility
 
-**Key Fields:**
-- `currentRankId`: User's current rank
-- `attendanceSinceLastRank`: Attendance count since last promotion
-- `lastRankedUpAt`: Date of last rank change
-- `retired`: Whether user is retired (prevents rankups)
-- `interviewDone`: Interview completion flag for manual review ranks
+Eligibility logic is centralized in `lib/rank-eligibility.ts`.
 
-### 3. Rank Eligibility System
+Common outcomes:
+- `eligible_auto`
+- `eligible_manual`
+- `ineligible_no_rank`
+- `ineligible_attendance`
+- `ineligible_retired`
+- `ineligible_interview`
+- `ineligible_training`
+- `ineligible_max_rank`
 
-**Eligibility Check:** `lib/rank-eligibility.ts`
+Notes:
+- auto-rankup paths update `UserRank` and write `RankHistory`
+- manual-required outcomes create/maintain `PromotionProposal` records
 
-Returns one of these codes:
-- `eligible_auto`: User meets all requirements for automatic promotion
-- `eligible_manual`: User needs manual review (interview, training, etc.)
-- `ineligible_no_rank`: User has no rank assigned
-- `ineligible_attendance`: Insufficient attendance for next rank
-- `ineligible_retired`: User is retired
-- `ineligible_interview`: Interview not completed
-- `ineligible_training`: Missing required training
-- `ineligible_max_rank`: Already at highest rank
+## Current API Endpoints
 
-### 4. Promotion Proposals
+### Rank CRUD and Ordering
+- `GET /api/ranks`
+- `POST /api/ranks`
+- `PUT /api/ranks/[id]`
+- `DELETE /api/ranks/[id]`
+- `PUT /api/ranks/reorder`
 
-**Purpose:** Manual rankup workflow for ranks requiring review
+### Promotions and Eligibility Flow
+- `POST /api/ranks/promotions/propose`
+  - creates pending proposal for manual flow
+  - or performs immediate auto-rankup when `eligible_auto`
+- `GET /api/ranks/promotions/pending`
+- `POST /api/ranks/promotions/[id]/approve`
+- `POST /api/ranks/promotions/[id]/decline`
+- `POST /api/ranks/auto-rankup`
 
-**States:**
-- `pending`: Awaiting admin approval
-- `approved`: Approved and applied
-- `declined`: Rejected with reason
+### Rank Migration
+- `POST /api/ranks/migrate/preview`
+- `POST /api/ranks/migrate/apply`
 
-**Admin Actions:**
-- Bulk approve selected proposals
-- Individual approve/decline with notes
-- Auto-rankup button for eligible users
+### Rank Transition Training Requirements
+- `GET /api/ranks/[id]/transitions`
+- `POST /api/ranks/[id]/transitions`
+- `DELETE /api/ranks/[id]/transitions/[trainingId]`
 
-### 5. Training Prerequisites & Gating
+### User-Facing Rank Data
+- `GET /api/users/[id]/rank`
+- `GET /api/users/[id]/rank-history?page=...`
+- `PUT /api/users/[id]/rank/assign`
+- `PUT /api/users/[id]/rank/demote`
 
-**Features:**
-- Set minimum rank requirement for trainings
-- Define prerequisite trainings (e.g., Leadership 1 requires BCT)
-- Circular dependency detection
-- Visual lock indicators for users
+### Bot Integration Endpoints
+- `GET /api/ranks/bot/promotions`
+- `POST /api/ranks/bot/promotions` (approve by `proposalId` in body)
+- `POST /api/ranks/bot/promotions/[id]/decline`
 
-**Gating Functions:** `lib/training-gating.ts`
-- `getTrainingRequirements(trainingId)`: Fetch all requirements
-- `canRequestTraining(userId, trainingId)`: Check eligibility
-- `getUnmetRequirements(userId, trainingId)`: Get missing prerequisites
+Bot endpoints use Bearer token auth with `BOT_API_TOKEN`.
 
-### 6. Rank History
+## Admin UI Areas
 
-**Purpose:** Audit log of all rank changes
-
-**Records:**
-- Previous and new rank names
-- Attendance at time of change
-- Who triggered the change (admin, bot, auto, import)
-- Outcome (approved/declined) and reason
-- Timestamps
-
-### 7. Legacy Data Import
-
-**Workflow:**
-1. Upload CSV with legacy user data (rank, attendance, join date)
-2. Preview parsed records
-3. Map legacy users to current system users (auto-match by Discord username)
-4. Apply to create UserRank and RankHistory entries
-
-**CSV Format:**
-```
-ID,NAME,Rank,Date Joined,TIG Since Last Promo,TOTAL TIG,Old Data
-001,Username,Cpl,01/01/2025,15,0,20
-```
-
-### 8. Rank System Migration
-
-**Purpose:** Restructure ranks or recalculate user ranks
-
-**Strategies:**
-- **Recalculate**: Recompute all ranks based on current attendance
-- **Grandfather**: Keep existing ranks (no changes)
-- **Map**: Map old rank names to new ranks for restructuring
-
-**Workflow:**
-1. Review backup warning
-2. Select strategy
-3. Configure mappings (for 'map' strategy)
-4. Preview impact (promotions/demotions count)
-5. Apply migration with full history logging
-
-## API Endpoints
-
-### Rank Management
-- `GET /api/ranks` - List all ranks
-- `POST /api/ranks` - Create rank
-- `PUT /api/ranks/[id]` - Update rank
-- `DELETE /api/ranks/[id]` - Delete rank
-- `PUT /api/ranks/reorder` - Update rank order
-
-### Eligibility & Proposals
-- `POST /api/ranks/check-eligibility` - Check user eligibility
-- `GET /api/ranks/proposals` - List pending proposals
-- `POST /api/ranks/proposals` - Create proposal
-- `POST /api/ranks/proposals/[id]/approve` - Approve proposal
-- `POST /api/ranks/proposals/[id]/decline` - Decline proposal
-
-### Auto Rankup
-- `POST /api/ranks/auto-rankup` - Process automatic rankups (admin only)
-
-### Bot Integration
-- `GET /api/ranks/bot/promotions` - List pending proposals for bot
-- `POST /api/ranks/bot/promotions/[id]/approve` - Bot approve
-- `POST /api/ranks/bot/promotions/[id]/decline` - Bot decline
-
-### Training Prerequisites
-- `GET /api/trainings/[id]/requirements` - Get training requirements
-- `POST /api/trainings/[id]/requirements` - Set rank requirement
-- `POST /api/trainings/[id]/prerequisites` - Add prerequisite training
-- `DELETE /api/trainings/[id]/prerequisites/[prerequisiteId]` - Remove prerequisite
-
-### Rank Transitions
-- `GET /api/ranks/[id]/transitions` - Get required trainings for rank
-- `POST /api/ranks/[id]/transitions` - Add training requirement
-- `DELETE /api/ranks/[id]/transitions/[trainingId]` - Remove requirement
-
-### User Features
-- `GET /api/users/[id]/rank` - Get user's current rank
-- `GET /api/users/[id]/rank-history` - Get rank history (paginated)
-
-### Legacy Import
-- `POST /api/admin/import/legacy-user-data` - Upload CSV
-- `GET /api/admin/import/legacy-user-data` - List records
-- `POST /api/admin/import/legacy-user-data/map` - Map users
-- `POST /api/admin/import/legacy-user-data/apply` - Apply data
-
-### Migration
-- `POST /api/ranks/migrate/preview` - Preview migration
-- `POST /api/ranks/migrate/apply` - Apply migration
-
-## Database Schema
-
-### Core Models
-- `Rank`: Rank definitions
-- `UserRank`: User's current rank state
-- `RankHistory`: Audit log of changes
-- `PromotionProposal`: Pending manual rankups
-
-### Relationship Models
-- `TrainingRankRequirement`: Minimum rank for training
-- `TrainingTrainingRequirement`: Training prerequisites
-- `RankTransitionRequirement`: Required trainings for rank
-
-### Import Models
-- `LegacyUserData`: Imported legacy rank data
-- `LegacyAttendanceData`: Imported legacy attendance records
-
-## User-Facing Features
-
-### Rank Display
-- ORBAT slots show rank abbreviation: `[Cpl] Username`
-- User profile shows current rank badge
-- Attendance counter since last rank
-- Link to full rank history
-
-### Rank History Page
-- Timeline of all rank changes
-- Shows promotions and demotions
-- Displays trigger source (admin, bot, auto, import)
-- Includes attendance and outcome details
-- Paginated view (20 per page)
-
-### Training Gating
-- Locked trainings show requirements
-- Visual indicators for missing prerequisites
-- Rank badges show minimum rank needed
-- Request button disabled if ineligible
-
-## Admin Features
+### Rank Configuration (`/admin/ranks`)
+- create/edit/delete ranks
+- drag-and-drop ordering + save order
+- attendance requirement and auto-rankup settings
+- training transition requirement assignment
 
 ### Pending Promotions (`/admin/promotions`)
-- View all pending promotion proposals
-- Bulk approve selected proposals
-- Individual approve/decline with reasons
-- Auto rankup button for eligible users
-- Real-time polling (30s intervals)
-- Toast notification on admin login
+- list pending proposals
+- approve/decline with notes
+- trigger auto-rankup process
 
-### Rank Management (`/admin/ranks`)
-- CRUD operations for ranks
-- Drag-and-drop reordering
-- User count per rank
-- Attendance requirement configuration
-- Auto-rankup toggle per rank
-
-### Unranked Users (`/admin/ranks/unranked`)
-- List users without ranks
-- Bulk assign default rank
-- Individual rank assignment
-- Filter and search capabilities
-
-### Training Management
-- Set minimum rank for each training
-- Add/remove prerequisite trainings
-- View current requirements
-- Circular dependency prevention
+### Rank Migration (`/admin/ranks/migrate`)
+- strategies: `recalculate`, `grandfather`, `map`
+- preview impact before apply
+- applies updates with rank history entries
 
 ### Legacy Import (`/admin/import`)
-- 4-step wizard: Upload → Preview → Map → Apply
-- CSV parsing and validation
-- Auto-mapping by Discord username
-- Manual user mapping interface
-- Preview impact before applying
+- CSV upload
+- preview records
+- map legacy users to current users
+- apply imported data to rank state/history
 
-### Migration Wizard (`/admin/ranks/migrate`)
-- 5-step wizard with backup warnings
-- Three migration strategies
-- Detailed preview with user-level changes
-- Rollback instructions
-- Full audit trail
+## User-Facing Rank Features
 
-## Security
+### Settings Rank Summary (`/settings`)
+- current rank badge
+- attendance since last rank
+- link to rank history
 
-### Authentication
-- All admin endpoints require `isAdmin = true`
-- Bot endpoints use Bearer token authentication (`BOT_API_TOKEN` env var)
-- User endpoints check session ownership
+### Rank History Page (`/settings/rank-history`)
+- paginated timeline
+- promotion/decline outcomes
+- trigger source and attendance context
 
-### Authorization Checks
-- Admin-only operations gated by session check
-- Bot endpoints validate token before processing
-- User data endpoints check ownership or admin status
+## Security and Authorization
 
-### Data Integrity
-- Cascade deletes prevent orphaned records
-- Transactions ensure atomic operations
-- Unique constraints prevent duplicates
-- Foreign key relationships enforced
+- Admin pages are protected by session checks and/or permission checks.
+- Rank APIs commonly require:
+  - `rank:create`, `rank:edit`, `rank:delete`, or `rank:manage_promotions`
+- Some pages additionally enforce `isAdmin` for high-impact workflows.
+- User rank history access allows self-access; cross-user access requires `user:manage`.
 
-## Performance Considerations
+## Operational Notes
 
-### Indexes
-- All foreign keys indexed
-- User lookups indexed (userId, currentRankId)
-- History queries indexed (createdAt, triggeredBy)
-- Legacy data indexed (discordUsername, isMapped)
+- Attendance counts used for rank logic are based on present attendance in main operations.
+- Rank changes write `RankHistory` for auditability.
+- Migration `grandfather` strategy keeps current ranks unchanged.
 
-### Query Optimization
-- Includes used to prevent N+1 queries
-- Pagination on large lists (20-50 items per page)
-- Select only needed fields in relations
-- Batch operations where possible
+## Related Docs
 
-### Caching Opportunities
-- Rank list (changes infrequently)
-- Training requirements (static between updates)
-- User rank for display (with revalidation)
-
-## Future Enhancements
-
-### Testing (Phase 11)
-- Unit tests for eligibility logic
-- Integration tests for rankup flows
-- UI tests for admin workflows
-
-### Discord Bot Integration
-- Automatic announcement of rankups
-- Discord role synchronization
-- Admin approval via Discord reactions
-
-### Analytics Dashboard
-- Rank progression charts
-- Average time per rank
-- Training completion rates
-- Promotion approval rates
-
-### Notifications
-- User notifications for rank changes
-- Admin notifications for new proposals
-- Training completion reminders
-
-## Troubleshooting
-
-### User not eligible for rankup
-1. Check attendance count vs requirement
-2. Verify training requirements met
-3. Check retired status
-4. Verify interview completion (if required)
-
-### Training request fails
-1. Check rank requirement
-2. Verify prerequisite trainings completed
-3. Check for needsRetraining flag
-
-### Legacy import issues
-1. Validate CSV format matches expected headers
-2. Check rank names match current system
-3. Verify Discord usernames match exactly
-4. Review mapping before applying
-
-### Migration errors
-1. Always backup database first
-2. Test with 'grandfather' strategy first
-3. Preview before applying
-4. Check rank history for audit trail
-
-## Support
-
-For questions or issues:
-- Check rank history for audit trail
-- Review error messages in browser console
-- Check server logs for detailed errors
-- Verify database migration status
+- [Permissions Guide](./PERMISSIONS.md)
+- [Project README](../README.md)
