@@ -61,6 +61,83 @@ export async function PATCH(
       return NextResponse.json({ error: 'Target subslot not found' }, { status: 404 });
     }
 
+    const requiredTrainingIds = targetSubslot.requiredTrainingIds?.length
+      ? targetSubslot.requiredTrainingIds
+      : targetSubslot.requiredTrainingId
+        ? [targetSubslot.requiredTrainingId]
+        : [];
+
+    if (requiredTrainingIds.length > 0) {
+      const completedTrainings = await prisma.userTraining.findMany({
+        where: {
+          userId: signup.userId,
+          trainingId: { in: requiredTrainingIds },
+          needsRetraining: false,
+        },
+        select: { trainingId: true },
+      });
+
+      const completedIds = new Set(completedTrainings.map((training) => training.trainingId));
+      const missingTrainingIds = requiredTrainingIds.filter((trainingId) => !completedIds.has(trainingId));
+
+      if (missingTrainingIds.length > 0) {
+        const missingTrainings = await prisma.training.findMany({
+          where: { id: { in: missingTrainingIds } },
+          select: { name: true },
+          orderBy: { name: 'asc' },
+        });
+
+        return NextResponse.json(
+          { error: `User is missing required trainings: ${missingTrainings.map((training) => training.name).join(', ')}` },
+          { status: 400 }
+        );
+      }
+    }
+
+    const requiredRankIds = targetSubslot.requiredRankIds?.length
+      ? targetSubslot.requiredRankIds
+      : targetSubslot.requiredRankId
+        ? [targetSubslot.requiredRankId]
+        : [];
+
+    if (requiredRankIds.length > 0) {
+      const [userRank, requiredRanks] = await Promise.all([
+        prisma.userRank.findUnique({
+          where: { userId: signup.userId },
+          include: {
+            currentRank: {
+              select: { id: true, name: true, abbreviation: true, orderIndex: true },
+            },
+          },
+        }),
+        prisma.rank.findMany({
+          where: { id: { in: requiredRankIds } },
+          select: { id: true, name: true, abbreviation: true, orderIndex: true },
+        }),
+      ]);
+
+      if (requiredRanks.length !== requiredRankIds.length) {
+        return NextResponse.json({ error: 'Target subslot rank requirement is invalid' }, { status: 400 });
+      }
+
+      const userOrderIndex = userRank?.currentRank?.orderIndex;
+      const unmetRanks = requiredRanks.filter(
+        (requiredRank) => typeof userOrderIndex !== 'number' || userOrderIndex < requiredRank.orderIndex
+      );
+
+      if (unmetRanks.length > 0) {
+        return NextResponse.json(
+          {
+            error: `User does not meet required ranks: ${unmetRanks
+              .sort((a, b) => a.orderIndex - b.orderIndex)
+              .map((rank) => `[${rank.abbreviation}] ${rank.name}`)
+              .join(', ')} or higher`,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     // Check if target subslot is full
     if (targetSubslot.signups.length >= targetSubslot.maxSignups) {
       return NextResponse.json({ error: 'Target subslot is full' }, { status: 400 });

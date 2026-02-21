@@ -13,9 +13,14 @@ const logClientError = (...args: unknown[]) => {
 
 type Subslot = {
   id?: number;
+  subslotDefinitionId?: number | null;
   name: string;
   orderIndex: number;
   maxSignups: number;
+  requiredTrainingIds?: number[];
+  requiredRankIds?: number[];
+  requiredTrainingId?: number | null;
+  requiredRankId?: number | null;
   _deleted?: boolean;
 };
 
@@ -132,6 +137,19 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
   const [isAddingTempFreq, setIsAddingTempFreq] = useState(false);
   const [templates, setTemplates] = useState<Array<{ id: number; name: string; category: string | null }>>([]);
   const [recentOrbats, setRecentOrbats] = useState<Array<{ id: number; name: string }>>([]);
+  const [subslotDefinitions, setSubslotDefinitions] = useState<Array<{
+    id: number;
+    name: string;
+    maxSignups: number;
+    requiredTrainingIds?: number[];
+    requiredRankIds?: number[];
+    requiredTrainings?: Array<{ id: number; name: string }>;
+    requiredRanks?: Array<{ id: number; name: string; abbreviation: string }>;
+    requiredTraining: { id: number; name: string } | null;
+    requiredRank: { id: number; name: string; abbreviation: string } | null;
+  }>>([]);
+  const [subslotSearchBySlot, setSubslotSearchBySlot] = useState<Record<number, string>>({});
+  const [selectedDefinitionBySlot, setSelectedDefinitionBySlot] = useState<Record<number, string>>({});
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
 
@@ -163,7 +181,19 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
       }
     };
 
-    Promise.all([fetchTemplates(), fetchRecentOrbats()]).finally(() => {
+    const fetchSubslotDefinitions = async () => {
+      try {
+        const response = await fetch('/api/subslot-definitions');
+        if (response.ok) {
+          const data = await response.json();
+          setSubslotDefinitions(data);
+        }
+      } catch (error) {
+        logClientError('Error fetching subslot definitions:', error);
+      }
+    };
+
+    Promise.all([fetchTemplates(), fetchRecentOrbats(), fetchSubslotDefinitions()]).finally(() => {
       setIsLoadingTemplates(false);
     });
   }, []);
@@ -382,16 +412,46 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     setSlots(newSlots);
   };
 
-  const addSubslot = (slotIndex: number) => {
+  const addSubslotFromDefinition = (slotIndex: number, definitionId: number) => {
+    const definition = subslotDefinitions.find((item) => item.id === definitionId);
+    if (!definition) {
+      showError('Selected subslot definition was not found');
+      return;
+    }
+
     const newSlots = [...slots];
     const activeSubslots = newSlots[slotIndex].subslots.filter((s) => !s._deleted);
+
+    const alreadyAdded = activeSubslots.some((subslot) => subslot.subslotDefinitionId === definition.id);
+    if (alreadyAdded) {
+      showError('This subslot is already added to the slot');
+      return;
+    }
+
     const newOrderIndex = activeSubslots.length;
     newSlots[slotIndex].subslots.push({
-      name: '',
+      subslotDefinitionId: definition.id,
+      name: definition.name,
       orderIndex: newOrderIndex,
-      maxSignups: 1,
+      maxSignups: definition.maxSignups,
+      requiredTrainingIds:
+        definition.requiredTrainingIds && definition.requiredTrainingIds.length > 0
+          ? definition.requiredTrainingIds
+          : definition.requiredTraining
+            ? [definition.requiredTraining.id]
+            : [],
+      requiredRankIds:
+        definition.requiredRankIds && definition.requiredRankIds.length > 0
+          ? definition.requiredRankIds
+          : definition.requiredRank
+            ? [definition.requiredRank.id]
+            : [],
+      requiredTrainingId: definition.requiredTraining?.id ?? null,
+      requiredRankId: definition.requiredRank?.id ?? null,
     });
     setSlots(newSlots);
+
+    setSelectedDefinitionBySlot((prev) => ({ ...prev, [slotIndex]: '' }));
   };
 
   const removeSubslot = (slotIndex: number, subslotIndex: number) => {
@@ -403,17 +463,6 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
       // Remove if it's new
       newSlots[slotIndex].subslots.splice(subslotIndex, 1);
     }
-    setSlots(newSlots);
-  };
-
-  const updateSubslot = (
-    slotIndex: number,
-    subslotIndex: number,
-    field: keyof Subslot,
-    value: string | number | null
-  ) => {
-    const newSlots = [...slots];
-    (newSlots[slotIndex].subslots[subslotIndex] as Record<string, unknown>)[field] = value;
     setSlots(newSlots);
   };
 
@@ -975,14 +1024,59 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
                   <div className="ml-4 space-y-2">
                     <div className="flex justify-between items-center">
                       <h4 className="text-sm font-medium" style={{ color: 'var(--muted-foreground)' }}>Subslots</h4>
-                      <button
-                        type="button"
-                        onClick={() => addSubslot(slotIndex)}
-                        className="px-3 py-1 rounded text-xs font-medium"
-                        style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
-                      >
-                        + Add Subslot
-                      </button>
+                    </div>
+
+                    <div className="space-y-2 rounded-md border p-3" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--secondary)' }}>
+                      <label className="block text-xs font-medium" style={{ color: 'var(--muted-foreground)' }}>
+                        Search subslot by name
+                      </label>
+                      <input
+                        type="text"
+                        value={subslotSearchBySlot[slotIndex] || ''}
+                        onChange={(e) =>
+                          setSubslotSearchBySlot((prev) => ({ ...prev, [slotIndex]: e.target.value }))
+                        }
+                        className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2"
+                        style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                        placeholder="Type to filter subslots..."
+                      />
+
+                      <div className="flex gap-2">
+                        <select
+                          value={selectedDefinitionBySlot[slotIndex] || ''}
+                          onChange={(e) =>
+                            setSelectedDefinitionBySlot((prev) => ({ ...prev, [slotIndex]: e.target.value }))
+                          }
+                          className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2"
+                          style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                        >
+                          <option value="">Select subslot...</option>
+                          {subslotDefinitions
+                            .filter((definition) => {
+                              const searchTerm = (subslotSearchBySlot[slotIndex] || '').trim().toLowerCase();
+                              if (!searchTerm) return true;
+                              return definition.name.toLowerCase().includes(searchTerm);
+                            })
+                            .map((definition) => (
+                              <option key={definition.id} value={definition.id}>
+                                {definition.name}
+                              </option>
+                            ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const value = selectedDefinitionBySlot[slotIndex];
+                            if (!value) return;
+                            addSubslotFromDefinition(slotIndex, Number(value));
+                          }}
+                          disabled={!selectedDefinitionBySlot[slotIndex]}
+                          className="px-3 py-2 rounded text-xs font-medium disabled:opacity-50"
+                          style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                        >
+                          Add
+                        </button>
+                      </div>
                     </div>
 
                     {slot.subslots.filter((s) => !s._deleted).length === 0 ? (
@@ -991,37 +1085,20 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
                       slot.subslots.map((subslot, subslotIndex) =>
                         subslot._deleted ? null : (
                           <div key={subslotIndex} className="border border-gray-600 rounded p-2 space-y-2" style={{ backgroundColor: 'var(--background)' }}>
-                            <div className="flex gap-2">
-                              <div className="flex-1">
-                                <input
-                                  type="text"
-                                  value={subslot.name}
-                                  onChange={(e) =>
-                                    updateSubslot(slotIndex, subslotIndex, 'name', e.target.value)
-                                  }
-                                  className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2"
-                                  style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
-                                  placeholder="e.g., Platoon Leader, Squad Leader"
-                                  required
-                                />
-                              </div>
-                              <div className="w-24">
-                                <input
-                                  type="number"
-                                  min="1"
-                                  value={subslot.maxSignups}
-                                  onChange={(e) =>
-                                    updateSubslot(
-                                      slotIndex,
-                                      subslotIndex,
-                                      'maxSignups',
-                                      parseInt(e.target.value) || 1
-                                    )
-                                  }
-                                  className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2"
-                                  style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
-                                  title="Max signups"
-                                />
+                            <div className="flex gap-2 items-start">
+                              <div className="flex-1 text-sm" style={{ color: 'var(--foreground)' }}>
+                                <div className="font-medium">{subslot.name}</div>
+                                <div className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                                  Max signups: {subslot.maxSignups}
+                                </div>
+                                {((subslot.requiredTrainingIds && subslot.requiredTrainingIds.length > 0) ||
+                                  (subslot.requiredRankIds && subslot.requiredRankIds.length > 0) ||
+                                  subslot.requiredTrainingId ||
+                                  subslot.requiredRankId) && (
+                                  <div className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                                    Prerequisites configured on subslot definition
+                                  </div>
+                                )}
                               </div>
                               <button
                                 type="button"

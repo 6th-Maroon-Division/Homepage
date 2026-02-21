@@ -10,6 +10,11 @@ type Subslot = {
   name: string;
   orderIndex: number;
   maxSignups: number;
+  subslotDefinitionId?: number | null;
+  requiredTrainingIds?: number[];
+  requiredRankIds?: number[];
+  requiredTrainingId?: number | null;
+  requiredRankId?: number | null;
 };
 
 type Slot = {
@@ -54,6 +59,19 @@ export default function TemplateEditor() {
   const canEditTemplate = usePermission('template:edit');
   const isPermissionLoading = usePermissionLoading();
   const isReadOnly = !isNewTemplate && !canEditTemplate;
+  const [subslotDefinitions, setSubslotDefinitions] = useState<Array<{
+    id: number;
+    name: string;
+    maxSignups: number;
+    requiredTrainingIds?: number[];
+    requiredRankIds?: number[];
+    requiredTrainings?: Array<{ id: number; name: string }>;
+    requiredRanks?: Array<{ id: number; name: string; abbreviation: string }>;
+    requiredTraining: { id: number; name: string } | null;
+    requiredRank: { id: number; name: string; abbreviation: string } | null;
+  }>>([]);
+  const [subslotSearchBySlot, setSubslotSearchBySlot] = useState<Record<number, string>>({});
+  const [selectedDefinitionBySlot, setSelectedDefinitionBySlot] = useState<Record<number, string>>({});
 
   const [template, setTemplate] = useState<OrbatTemplate>({
     name: '',
@@ -103,6 +121,21 @@ export default function TemplateEditor() {
       fetchTemplate();
     }
   }, [isNewTemplate, params.id, router, showError]);
+
+  useEffect(() => {
+    const fetchSubslotDefinitions = async () => {
+      try {
+        const response = await fetch('/api/subslot-definitions');
+        if (!response.ok) return;
+        const data = await response.json();
+        setSubslotDefinitions(data);
+      } catch (error) {
+        console.error('Error fetching subslot definitions:', error);
+      }
+    };
+
+    fetchSubslotDefinitions();
+  }, []);
 
   useEffect(() => {
     if (isPermissionLoading) {
@@ -185,15 +218,46 @@ export default function TemplateEditor() {
     setTemplate({ ...template, slotsJson: updatedSlots });
   };
 
-  const addSubslot = (slotIndex: number) => {
+  const addSubslotFromDefinition = (slotIndex: number, definitionId: number) => {
+    const definition = subslotDefinitions.find((item) => item.id === definitionId);
+    if (!definition) {
+      showError('Selected subslot definition was not found');
+      return;
+    }
+
+    const alreadyAdded = template.slotsJson[slotIndex].subslots.some(
+      (subslot) => subslot.subslotDefinitionId === definition.id
+    );
+
+    if (alreadyAdded) {
+      showError('This subslot is already added to the slot');
+      return;
+    }
+
     const newSubslot: Subslot = {
-      name: '',
+      name: definition.name,
       orderIndex: template.slotsJson[slotIndex].subslots.length,
-      maxSignups: 1,
+      maxSignups: definition.maxSignups,
+      subslotDefinitionId: definition.id,
+      requiredTrainingIds:
+        definition.requiredTrainingIds && definition.requiredTrainingIds.length > 0
+          ? definition.requiredTrainingIds
+          : definition.requiredTraining
+            ? [definition.requiredTraining.id]
+            : [],
+      requiredRankIds:
+        definition.requiredRankIds && definition.requiredRankIds.length > 0
+          ? definition.requiredRankIds
+          : definition.requiredRank
+            ? [definition.requiredRank.id]
+            : [],
+      requiredTrainingId: definition.requiredTraining?.id ?? null,
+      requiredRankId: definition.requiredRank?.id ?? null,
     };
     const updatedSlots = [...template.slotsJson];
     updatedSlots[slotIndex].subslots.push(newSubslot);
     setTemplate({ ...template, slotsJson: updatedSlots });
+    setSelectedDefinitionBySlot((prev) => ({ ...prev, [slotIndex]: '' }));
   };
 
   const removeSubslot = (slotIndex: number, subslotIndex: number) => {
@@ -201,15 +265,6 @@ export default function TemplateEditor() {
     updatedSlots[slotIndex].subslots = updatedSlots[slotIndex].subslots.filter(
       (_, i) => i !== subslotIndex
     );
-    setTemplate({ ...template, slotsJson: updatedSlots });
-  };
-
-  const updateSubslot = (slotIndex: number, subslotIndex: number, field: keyof Subslot, value: string | number) => {
-    const updatedSlots = [...template.slotsJson];
-    updatedSlots[slotIndex].subslots[subslotIndex] = {
-      ...updatedSlots[slotIndex].subslots[subslotIndex],
-      [field]: value,
-    };
     setTemplate({ ...template, slotsJson: updatedSlots });
   };
 
@@ -394,6 +449,59 @@ export default function TemplateEditor() {
 
                     {/* Subslots */}
                     <div className="ml-4 space-y-2 border-l-2 pl-4" style={{ borderColor: 'var(--border)' }}>
+                      <div className="space-y-2 rounded-md border p-3" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--secondary)' }}>
+                        <label className="block text-xs font-medium" style={{ color: 'var(--muted-foreground)' }}>
+                          Search subslot by name
+                        </label>
+                        <input
+                          type="text"
+                          value={subslotSearchBySlot[slotIndex] || ''}
+                          onChange={(e) =>
+                            setSubslotSearchBySlot((prev) => ({ ...prev, [slotIndex]: e.target.value }))
+                          }
+                          className="w-full px-3 py-2 border rounded-md text-sm"
+                          style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                          placeholder="Type to filter subslots..."
+                        />
+
+                        <div className="flex gap-2">
+                          <select
+                            value={selectedDefinitionBySlot[slotIndex] || ''}
+                            onChange={(e) =>
+                              setSelectedDefinitionBySlot((prev) => ({ ...prev, [slotIndex]: e.target.value }))
+                            }
+                            className="w-full px-3 py-2 border rounded-md text-sm"
+                            style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                          >
+                            <option value="">Select subslot...</option>
+                            {subslotDefinitions
+                              .filter((definition) => {
+                                const searchTerm = (subslotSearchBySlot[slotIndex] || '').trim().toLowerCase();
+                                if (!searchTerm) return true;
+                                return definition.name.toLowerCase().includes(searchTerm);
+                              })
+                              .map((definition) => (
+                                <option key={definition.id} value={definition.id}>
+                                  {definition.name}
+                                </option>
+                              ))}
+                          </select>
+
+                          <button
+                            onClick={() => {
+                              const value = selectedDefinitionBySlot[slotIndex];
+                              if (!value) return;
+                              addSubslotFromDefinition(slotIndex, Number(value));
+                            }}
+                            className="px-3 py-2 rounded text-xs font-medium"
+                            style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                            disabled={!selectedDefinitionBySlot[slotIndex]}
+                          >
+                            Add
+                          </button>
+                        </div>
+                      </div>
+
                       {slot.subslots.length === 0 ? (
                         <p style={{ color: 'var(--muted-foreground)' }} className="text-sm">
                           No subslots. Add one below.
@@ -401,34 +509,19 @@ export default function TemplateEditor() {
                       ) : (
                         slot.subslots.map((subslot, subslotIndex) => (
                           <div key={subslotIndex} className="flex items-end gap-2">
-                            <input
-                              type="text"
-                              value={subslot.name}
-                              onChange={(e) =>
-                                updateSubslot(slotIndex, subslotIndex, 'name', e.target.value)
-                              }
-                              placeholder="Subslot name"
+                            <div
                               className="flex-1 border rounded px-2 py-1 text-sm"
                               style={{
                                 backgroundColor: 'var(--background)',
                                 borderColor: 'var(--border)',
                                 color: 'var(--foreground)',
                               }}
-                            />
-                            <input
-                              type="number"
-                              min="1"
-                              value={subslot.maxSignups}
-                              onChange={(e) =>
-                                updateSubslot(slotIndex, subslotIndex, 'maxSignups', parseInt(e.target.value) || 1)
-                              }
-                              className="w-16 border rounded px-2 py-1 text-sm"
-                              style={{
-                                backgroundColor: 'var(--background)',
-                                borderColor: 'var(--border)',
-                                color: 'var(--foreground)',
-                              }}
-                            />
+                            >
+                              <div className="font-medium">{subslot.name}</div>
+                              <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                                Max signups: {subslot.maxSignups}
+                              </div>
+                            </div>
                             <button
                               onClick={() => removeSubslot(slotIndex, subslotIndex)}
                               className="px-2 py-1 rounded text-xs font-medium"
@@ -442,14 +535,6 @@ export default function TemplateEditor() {
                           </div>
                         ))
                       )}
-
-                      <button
-                        onClick={() => addSubslot(slotIndex)}
-                        className="mt-2 text-sm"
-                        style={{ color: 'var(--primary)' }}
-                      >
-                        + Add Subslot
-                      </button>
                     </div>
                   </div>
                 ))

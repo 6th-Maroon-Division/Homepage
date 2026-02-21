@@ -6,6 +6,23 @@ import { checkPermission } from '@/lib/auth-middleware';
 import { canAccessTemplateReadApi } from '@/lib/permission-api-logic';
 import type { NextRequest } from 'next/server';
 
+type TemplateSubslotInput = {
+  name: string;
+  orderIndex: number;
+  maxSignups: number;
+  subslotDefinitionId?: number | null;
+  requiredTrainingIds?: number[];
+  requiredRankIds?: number[];
+  requiredTrainingId?: number | null;
+  requiredRankId?: number | null;
+};
+
+type TemplateSlotInput = {
+  name: string;
+  orderIndex: number;
+  subslots: TemplateSubslotInput[];
+};
+
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
@@ -121,6 +138,59 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const inputSlots = slotsJson as TemplateSlotInput[];
+    const requestedDefinitionIds = Array.from(
+      new Set(
+        inputSlots
+          .flatMap((slot) => slot.subslots)
+          .map((subslot) => subslot.subslotDefinitionId)
+          .filter((id): id is number => typeof id === 'number')
+      )
+    );
+
+    const definitions = requestedDefinitionIds.length
+      ? await prisma.subslotDefinition.findMany({
+          where: { id: { in: requestedDefinitionIds } },
+          select: {
+            id: true,
+            name: true,
+            maxSignups: true,
+            requiredTrainingIds: true,
+            requiredRankIds: true,
+            requiredTrainingId: true,
+            requiredRankId: true,
+          },
+        })
+      : [];
+
+    if (definitions.length !== requestedDefinitionIds.length) {
+      return NextResponse.json(
+        { error: 'One or more selected subslot definitions do not exist.' },
+        { status: 400 }
+      );
+    }
+
+    const definitionMap = new Map(definitions.map((definition) => [definition.id, definition]));
+    const normalizedSlotsJson = inputSlots.map((slot) => ({
+      ...slot,
+      subslots: slot.subslots.map((subslot) => {
+        const definition =
+          typeof subslot.subslotDefinitionId === 'number'
+            ? definitionMap.get(subslot.subslotDefinitionId)
+            : null;
+
+        return {
+          ...subslot,
+          name: definition?.name ?? subslot.name,
+          maxSignups: definition?.maxSignups ?? subslot.maxSignups,
+          requiredTrainingIds: definition?.requiredTrainingIds ?? [],
+          requiredRankIds: definition?.requiredRankIds ?? [],
+          requiredTrainingId: definition?.requiredTrainingId ?? null,
+          requiredRankId: definition?.requiredRankId ?? null,
+        };
+      }),
+    }));
+
     // Get admin user ID from session
     const userId = session.user?.id;
     if (!userId) {
@@ -137,7 +207,7 @@ export async function POST(request: NextRequest) {
         description: description || null,
         category: category || null,
         tagsJson: tagsJson || null,
-        slotsJson,
+        slotsJson: normalizedSlotsJson,
         frequencyIds: frequencyIds || [],
         bluforCountry: bluforCountry || null,
         bluforRelationship: bluforRelationship || null,

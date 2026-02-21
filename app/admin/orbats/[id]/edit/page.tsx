@@ -77,9 +77,14 @@ export default async function EditOrbatPage({ params }: EditOrbatPageProps) {
       orderIndex: slot.orderIndex,
       subslots: slot.subslots.map((sub) => ({
         id: sub.id,
+        subslotDefinitionId: sub.subslotDefinitionId,
         name: sub.name,
         orderIndex: sub.orderIndex,
         maxSignups: sub.maxSignups,
+        requiredTrainingIds: sub.requiredTrainingIds,
+        requiredRankIds: sub.requiredRankIds,
+        requiredTrainingId: sub.requiredTrainingId,
+        requiredRankId: sub.requiredRankId,
       })),
     })),
   };

@@ -6,10 +6,13 @@ import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 
 type SubslotInput = {
+  id?: number;
+  subslotDefinitionId?: number | null;
   name: string;
   orderIndex: number;
   maxSignups: number;
   radioFrequencyId?: number | null;
+  _deleted?: boolean;
 };
 
 export async function GET(request: NextRequest) {
@@ -108,6 +111,36 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const requestedDefinitionIds = Array.from(
+      new Set(
+        body.slots
+          .flatMap((slot) => slot.subslots)
+          .map((subslot) => subslot.subslotDefinitionId)
+          .filter((id): id is number => typeof id === 'number')
+      )
+    );
+
+    const subslotDefinitions = requestedDefinitionIds.length
+      ? await prisma.subslotDefinition.findMany({
+          where: { id: { in: requestedDefinitionIds } },
+          select: {
+            id: true,
+            name: true,
+            maxSignups: true,
+            requiredTrainingIds: true,
+            requiredRankIds: true,
+            requiredTrainingId: true,
+            requiredRankId: true,
+          },
+        })
+      : [];
+
+    const subslotDefinitionMap = new Map(subslotDefinitions.map((definition) => [definition.id, definition]));
+
+    if (subslotDefinitions.length !== requestedDefinitionIds.length) {
+      return NextResponse.json({ error: 'One or more selected subslot definitions do not exist.' }, { status: 400 });
+    }
+
     // Create the OrbAT with all nested data in a transaction
     const orbat = await prisma.$transaction(async (tx) => {
       // Create the OrbAT
@@ -138,9 +171,27 @@ export async function POST(request: NextRequest) {
               orderIndex: slot.orderIndex,
               subslots: {
                 create: slot.subslots.map((subslot) => ({
-                  name: subslot.name.trim(),
+                  name: (subslot.subslotDefinitionId
+                    ? subslotDefinitionMap.get(subslot.subslotDefinitionId)?.name
+                    : subslot.name
+                  )?.trim() || 'Unnamed Subslot',
                   orderIndex: subslot.orderIndex,
-                  maxSignups: subslot.maxSignups,
+                  maxSignups: subslot.subslotDefinitionId
+                    ? (subslotDefinitionMap.get(subslot.subslotDefinitionId)?.maxSignups ?? 1)
+                    : subslot.maxSignups,
+                  subslotDefinitionId: subslot.subslotDefinitionId ?? null,
+                  requiredTrainingIds: subslot.subslotDefinitionId
+                    ? (subslotDefinitionMap.get(subslot.subslotDefinitionId)?.requiredTrainingIds ?? [])
+                    : [],
+                  requiredRankIds: subslot.subslotDefinitionId
+                    ? (subslotDefinitionMap.get(subslot.subslotDefinitionId)?.requiredRankIds ?? [])
+                    : [],
+                  requiredTrainingId: subslot.subslotDefinitionId
+                    ? (subslotDefinitionMap.get(subslot.subslotDefinitionId)?.requiredTrainingId ?? null)
+                    : null,
+                  requiredRankId: subslot.subslotDefinitionId
+                    ? (subslotDefinitionMap.get(subslot.subslotDefinitionId)?.requiredRankId ?? null)
+                    : null,
                 })),
               },
             })),

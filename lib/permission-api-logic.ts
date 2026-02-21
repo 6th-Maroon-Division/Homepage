@@ -16,6 +16,36 @@ export function canAccessTemplateReadApi(context: TemplateReadAccessContext): bo
   return context.isAdmin || canManageTemplates || context.canCreateOrbat || context.canEditOrbat;
 }
 
+export interface SubslotReadAccessContext {
+  isAdmin: boolean;
+  canViewSubslot: boolean;
+  canCreateSubslot: boolean;
+  canEditSubslot: boolean;
+  canDeleteSubslot: boolean;
+  canCreateTemplate: boolean;
+  canEditTemplate: boolean;
+  canDeleteTemplate: boolean;
+  canCreateOrbat: boolean;
+  canEditOrbat: boolean;
+}
+
+export function canAccessSubslotReadApi(context: SubslotReadAccessContext): boolean {
+  const canManageSubslots =
+    context.canCreateSubslot || context.canEditSubslot || context.canDeleteSubslot;
+
+  const canManageTemplates =
+    context.canCreateTemplate || context.canEditTemplate || context.canDeleteTemplate;
+
+  return (
+    context.isAdmin ||
+    context.canViewSubslot ||
+    canManageSubslots ||
+    canManageTemplates ||
+    context.canCreateOrbat ||
+    context.canEditOrbat
+  );
+}
+
 export interface PermissionUpdateEntry {
   permissionId: number;
   value: number;

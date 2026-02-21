@@ -23,6 +23,12 @@ export async function GET(
             subslots: {
               orderBy: { orderIndex: 'asc' },
               include: {
+                subslotDefinition: {
+                  select: {
+                    requiredTrainingIds: true,
+                    requiredRankIds: true,
+                  },
+                },
                 signups: {
                   include: { user: true },
                 },
@@ -42,6 +48,45 @@ export async function GET(
       return NextResponse.json({ error: 'OrbAT not found' }, { status: 404 });
     }
 
+    const allSubslots = orbat.slots.flatMap((slot) => slot.subslots);
+    const requiredTrainingIds = Array.from(
+      new Set(
+        allSubslots.flatMap((subslot) => {
+          const ownIds = subslot.requiredTrainingIds?.length ? subslot.requiredTrainingIds : [];
+          const definitionIds = subslot.subslotDefinition?.requiredTrainingIds || [];
+          return [...ownIds, ...definitionIds];
+        })
+      )
+    );
+
+    const requiredRankIds = Array.from(
+      new Set(
+        allSubslots.flatMap((subslot) => {
+          const ownIds = subslot.requiredRankIds?.length ? subslot.requiredRankIds : [];
+          const definitionIds = subslot.subslotDefinition?.requiredRankIds || [];
+          return [...ownIds, ...definitionIds];
+        })
+      )
+    );
+
+    const [requiredTrainings, requiredRanks] = await Promise.all([
+      requiredTrainingIds.length
+        ? prisma.training.findMany({
+            where: { id: { in: requiredTrainingIds } },
+            select: { id: true, name: true },
+          })
+        : Promise.resolve([]),
+      requiredRankIds.length
+        ? prisma.rank.findMany({
+            where: { id: { in: requiredRankIds } },
+            select: { id: true, name: true, abbreviation: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const trainingMap = new Map(requiredTrainings.map((training) => [training.id, training]));
+    const rankMap = new Map(requiredRanks.map((rank) => [rank.id, rank]));
+
     // Serialize for client
     const clientOrbat = {
       id: orbat.id,
@@ -54,11 +99,35 @@ export async function GET(
         id: slot.id,
         name: slot.name,
         orderIndex: slot.orderIndex,
-        subslots: slot.subslots.map((sub) => ({
+        subslots: slot.subslots.map((sub) => {
+          // Merge prerequisites from the subslot itself and its definition
+          const definitionTrainingIds = sub.subslotDefinition?.requiredTrainingIds || [];
+          const definitionRankIds = sub.subslotDefinition?.requiredRankIds || [];
+          
+          const combinedTrainingIds = Array.from(
+            new Set([...(sub.requiredTrainingIds || []), ...definitionTrainingIds])
+          );
+          const combinedRankIds = Array.from(
+            new Set([...(sub.requiredRankIds || []), ...definitionRankIds])
+          );
+          
+          const subslotRequiredTrainings = combinedTrainingIds
+            .map((id) => trainingMap.get(id))
+            .filter((item): item is { id: number; name: string } => Boolean(item));
+          const subslotRequiredRanks = combinedRankIds
+            .map((id) => rankMap.get(id))
+            .filter((item): item is { id: number; name: string; abbreviation: string } => Boolean(item));
+
+          return {
           id: sub.id,
           name: sub.name,
           orderIndex: sub.orderIndex,
           maxSignups: sub.maxSignups,
+          subslotDefinitionId: sub.subslotDefinitionId,
+          requiredTrainings: subslotRequiredTrainings,
+          requiredRanks: subslotRequiredRanks,
+          requiredTraining: subslotRequiredTrainings[0] || null,
+          requiredRank: subslotRequiredRanks[0] || null,
           signups: sub.signups.map((s) => ({
             id: s.id,
             user: s.user
@@ -68,7 +137,8 @@ export async function GET(
                 }
               : null,
           })),
-        })),
+        };
+        }),
       })),
       frequencies: orbat.frequencies,
       tempFrequencies: orbat.tempFrequencies,

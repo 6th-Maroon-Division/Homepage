@@ -19,6 +19,11 @@ type ClientSubslot = {
   name: string;
   orderIndex: number;
   maxSignups: number;
+  subslotDefinitionId?: number | null;
+  requiredTrainings?: { id: number; name: string }[];
+  requiredRanks?: { id: number; name: string; abbreviation: string }[];
+  requiredTraining?: { id: number; name: string } | null;
+  requiredRank?: { id: number; name: string; abbreviation: string } | null;
   signups: ClientSignup[];
   radioFrequency?: {
     id: number;
@@ -70,6 +75,11 @@ type ApiSubslot = {
   name: string;
   orderIndex: number;
   maxSignups: number;
+  subslotDefinitionId?: number | null;
+  requiredTrainings?: { id: number; name: string }[];
+  requiredRanks?: { id: number; name: string; abbreviation: string }[];
+  requiredTraining?: { id: number; name: string } | null;
+  requiredRank?: { id: number; name: string; abbreviation: string } | null;
   signups: {
     id: number;
     user: {
@@ -184,6 +194,11 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
         name: updated.name,
         orderIndex: updated.orderIndex,
         maxSignups: updated.maxSignups,
+        subslotDefinitionId: updated.subslotDefinitionId,
+        requiredTrainings: updated.requiredTrainings || [],
+        requiredRanks: updated.requiredRanks || [],
+        requiredTraining: updated.requiredTraining || null,
+        requiredRank: updated.requiredRank || null,
         signups: updated.signups.map((s) => ({
           id: s.id,
           user: s.user
@@ -239,6 +254,11 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
         name: updated.name,
         orderIndex: updated.orderIndex,
         maxSignups: updated.maxSignups,
+        subslotDefinitionId: updated.subslotDefinitionId,
+        requiredTrainings: updated.requiredTrainings || [],
+        requiredRanks: updated.requiredRanks || [],
+        requiredTraining: updated.requiredTraining || null,
+        requiredRank: updated.requiredRank || null,
         signups: updated.signups.map((s) => ({
           id: s.id,
           user: s.user
@@ -271,59 +291,24 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="border rounded-lg overflow-hidden" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-0">
-          {/* Left column: Title and Description */}
-          <div className="p-6 sm:border-r" style={{ borderColor: 'var(--border)' }}>
-            <h1 className="text-2xl sm:text-3xl font-bold pb-4 border-b" style={{ color: 'var(--foreground)', borderColor: 'var(--border)' }}>{orbat.name}</h1>
+      <div className="border rounded-lg p-6" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+        <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: 'var(--foreground)' }}>{orbat.name}</h1>
 
-            {/* Description and Event Date */}
-            {(orbat.description || eventDate) && (
-              <div className="mt-4 space-y-3">
-                {orbat.description && (
-                  <p className="text-sm sm:text-base" style={{ color: 'var(--muted-foreground)' }}>
-                    {orbat.description}
-                  </p>
-                )}
-                {eventDate && (
-                  <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-                    Event date:{' '}
-                    {eventDate.toLocaleString('en-GB', {
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
-                    })}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
+        {orbat.description && (
+          <p className="text-sm sm:text-base mt-2" style={{ color: 'var(--muted-foreground)' }}>
+            {orbat.description}
+          </p>
+        )}
 
-          {/* Right column: Factions */}
-          {(orbat.bluforCountry || orbat.opforCountry || orbat.indepCountry || 
-            orbat.bluforRelationship || orbat.opforRelationship || orbat.indepRelationship) && (
-            <div className="text-xs space-y-1 p-6 border-t sm:border-t-0" style={{ borderColor: 'var(--border)' }}>
-              {orbat.bluforCountry && (
-                <div>
-                  <p className="font-semibold" style={{ color: 'var(--foreground)' }}>BLUFOR: {orbat.bluforCountry}</p>
-                  {orbat.bluforRelationship && <p style={{ color: getRelationshipColor(orbat.bluforRelationship) }}>Support: {orbat.bluforRelationship}</p>}
-                </div>
-              )}
-              {orbat.opforCountry && (
-                <div>
-                  <p className="font-semibold" style={{ color: 'var(--foreground)' }}>OPFOR: {orbat.opforCountry}</p>
-                  {orbat.opforRelationship && <p style={{ color: getRelationshipColor(orbat.opforRelationship) }}>Rel: {orbat.opforRelationship}</p>}
-                </div>
-              )}
-              {orbat.indepCountry && (
-                <div>
-                  <p className="font-semibold" style={{ color: 'var(--foreground)' }}>Indep: {orbat.indepCountry}</p>
-                  {orbat.indepRelationship && <p style={{ color: getRelationshipColor(orbat.indepRelationship) }}>Rel: {orbat.indepRelationship}</p>}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
+        {eventDate && (
+          <p className="text-xs mt-2" style={{ color: 'var(--muted-foreground)' }}>
+            Event date:{' '}
+            {eventDate.toLocaleString('en-GB', {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+            })}
+          </p>
+        )}
 
         {isPast && (
           <p className="text-xs font-semibold mt-2" style={{ color: '#f59e0b' }}>
@@ -358,6 +343,14 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
                 const showSignupButton = !isPast && !userSignedUp && !isFull;
                 const showUnsignButton = !isPast && userSignedUp;
 
+                const trainingNames = (sub.requiredTrainings || [])
+                  .map((training) => training.name)
+                  .join(', ');
+                const rankNames = (sub.requiredRanks || [])
+                  .map((rank) => `[${rank.abbreviation}] ${rank.name}`)
+                  .join(', ');
+                const hasPrerequisites = !!(trainingNames || rankNames);
+
                 return (
                   <li
                     key={sub.id}
@@ -376,6 +369,27 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
                               return rankAbbr ? `[${rankAbbr}] ${username}` : username;
                             })
                             .join(', ')}
+                        </div>
+                      )}
+
+                      {/* Show prerequisites if any */}
+                      {hasPrerequisites && (
+                        <div className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                          Requires: {trainingNames && `Trainings (${trainingNames})`}
+                          {trainingNames && rankNames ? ' · ' : ''}
+                          {rankNames && `Ranks (${rankNames})`}
+                        </div>
+                      )}
+
+                      {/* Show full/unfull status */}
+                      {isFull && (
+                        <div className="text-xs mt-1 font-semibold" style={{ color: '#f59e0b' }}>
+                          Full ({sub.signups.length}/{sub.maxSignups})
+                        </div>
+                      )}
+                      {!isFull && hasSignup && (
+                        <div className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                          {sub.signups.length}/{sub.maxSignups}
                         </div>
                       )}
                     </div>

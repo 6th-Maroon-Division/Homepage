@@ -27,6 +27,7 @@ async function main() {
   await prisma.training.deleteMany();
   await prisma.signup.deleteMany();
   await prisma.subslot.deleteMany();
+  await prisma.subslotDefinition.deleteMany();
   await prisma.slot.deleteMany();
   await prisma.orbat.deleteMany();
   await prisma.orbatTemplate.deleteMany();
@@ -117,6 +118,90 @@ async function main() {
   const diana = await prisma.user.create({
     data: { username: 'Diana' },
   });
+
+  // --- Reusable Subslot Definitions ---
+  const seededSubslotDefinitionNames = [
+    'Squad Leader',
+    'Rifleman',
+    'Medic',
+    'Marksman',
+    'Grenadier',
+    'Auto Rifleman',
+    'Light AT',
+    'Machinegunner',
+    'Team Lead',
+    'Scout',
+    'Platoon Leader',
+    'Sergeant',
+  ];
+
+  await prisma.subslotDefinition.createMany({
+    data: seededSubslotDefinitionNames.map((name) => ({
+      name,
+      maxSignups: 1,
+      requiredTrainingIds: [],
+      requiredRankIds: [],
+      requiredTrainingId: null,
+      requiredRankId: null,
+    })),
+    skipDuplicates: true,
+  });
+
+  const seededSubslotDefinitions = await prisma.subslotDefinition.findMany({
+    where: {
+      name: {
+        in: seededSubslotDefinitionNames,
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+      maxSignups: true,
+      requiredTrainingIds: true,
+      requiredRankIds: true,
+      requiredTrainingId: true,
+      requiredRankId: true,
+    },
+  });
+
+  const subslotDefinitionByName = Object.fromEntries(
+    seededSubslotDefinitions.map((definition) => [definition.name, definition])
+  );
+
+  const buildTemplateSubslot = (
+    definitionName: string,
+    orderIndex: number,
+    options: { maxSignups?: number } = {}
+  ) => {
+    const definition = subslotDefinitionByName[definitionName];
+
+    if (!definition) {
+      return {
+        name: definitionName,
+        orderIndex,
+        maxSignups: options.maxSignups ?? 1,
+        subslotDefinitionId: null,
+        requiredTrainingIds: [],
+        requiredRankIds: [],
+        requiredTrainingId: null,
+        requiredRankId: null,
+      };
+    }
+
+    const requiredTrainingIds = definition.requiredTrainingIds || [];
+    const requiredRankIds = definition.requiredRankIds || [];
+
+    return {
+      name: definition.name,
+      orderIndex,
+      maxSignups: options.maxSignups ?? definition.maxSignups,
+      subslotDefinitionId: definition.id,
+      requiredTrainingIds,
+      requiredRankIds,
+      requiredTrainingId: requiredTrainingIds[0] ?? definition.requiredTrainingId ?? null,
+      requiredRankId: requiredRankIds[0] ?? definition.requiredRankId ?? null,
+    };
+  };
 
   // Common dates
   const pastDate = daysFromNow(-7);   // 7 days ago
@@ -361,6 +446,7 @@ async function main() {
       name: 'Squad Leader',
       orderIndex: 1,
       maxSignups: 1,
+      subslotDefinitionId: subslotDefinitionByName['Squad Leader']?.id ?? null,
     },
   });
 
@@ -370,6 +456,7 @@ async function main() {
       name: 'Medic',
       orderIndex: 2,
       maxSignups: 1,
+      subslotDefinitionId: subslotDefinitionByName['Medic']?.id ?? null,
     },
   });
 
@@ -379,6 +466,7 @@ async function main() {
       name: 'Rifleman',
       orderIndex: 3,
       maxSignups: 1,
+      subslotDefinitionId: subslotDefinitionByName['Rifleman']?.id ?? null,
     },
   });
 
@@ -388,6 +476,7 @@ async function main() {
       name: 'Squad Leader',
       orderIndex: 1,
       maxSignups: 1,
+      subslotDefinitionId: subslotDefinitionByName['Squad Leader']?.id ?? null,
     },
   });
 
@@ -397,6 +486,7 @@ async function main() {
       name: 'Marksman',
       orderIndex: 2,
       maxSignups: 1,
+      subslotDefinitionId: subslotDefinitionByName['Marksman']?.id ?? null,
     },
   });
 
@@ -471,6 +561,7 @@ async function main() {
       name: 'Squad Leader',
       orderIndex: 1,
       maxSignups: 1,
+      subslotDefinitionId: subslotDefinitionByName['Squad Leader']?.id ?? null,
     },
   });
 
@@ -480,6 +571,7 @@ async function main() {
       name: 'Grenadier',
       orderIndex: 2,
       maxSignups: 1,
+      subslotDefinitionId: subslotDefinitionByName['Grenadier']?.id ?? null,
     },
   });
 
@@ -489,6 +581,7 @@ async function main() {
       name: 'Rifleman',
       orderIndex: 3,
       maxSignups: 1,
+      subslotDefinitionId: subslotDefinitionByName['Rifleman']?.id ?? null,
     },
   });
 
@@ -498,6 +591,7 @@ async function main() {
       name: 'Squad Leader',
       orderIndex: 1,
       maxSignups: 1,
+      subslotDefinitionId: subslotDefinitionByName['Squad Leader']?.id ?? null,
     },
   });
 
@@ -507,6 +601,7 @@ async function main() {
       name: 'Auto Rifleman',
       orderIndex: 2,
       maxSignups: 1,
+      subslotDefinitionId: subslotDefinitionByName['Auto Rifleman']?.id ?? null,
     },
   });
 
@@ -516,6 +611,7 @@ async function main() {
       name: 'Squad Leader',
       orderIndex: 1,
       maxSignups: 1,
+      subslotDefinitionId: subslotDefinitionByName['Squad Leader']?.id ?? null,
     },
   });
 
@@ -525,6 +621,7 @@ async function main() {
       name: 'Light AT',
       orderIndex: 2,
       maxSignups: 1,
+      subslotDefinitionId: subslotDefinitionByName['Light AT']?.id ?? null,
     },
   });
 
@@ -590,6 +687,7 @@ async function main() {
       name: 'Squad Leader',
       orderIndex: 1,
       maxSignups: 1,
+      subslotDefinitionId: subslotDefinitionByName['Squad Leader']?.id ?? null,
     },
   });
 
@@ -599,6 +697,7 @@ async function main() {
       name: 'Rifleman',
       orderIndex: 2,
       maxSignups: 1,
+      subslotDefinitionId: subslotDefinitionByName['Rifleman']?.id ?? null,
     },
   });
 
@@ -608,6 +707,7 @@ async function main() {
       name: 'Squad Leader',
       orderIndex: 1,
       maxSignups: 1,
+      subslotDefinitionId: subslotDefinitionByName['Squad Leader']?.id ?? null,
     },
   });
 
@@ -617,6 +717,7 @@ async function main() {
       name: 'Machinegunner',
       orderIndex: 2,
       maxSignups: 1,
+      subslotDefinitionId: subslotDefinitionByName['Machinegunner']?.id ?? null,
     },
   });
 
@@ -649,18 +750,18 @@ async function main() {
           name: 'Alpha Squad',
           orderIndex: 1,
           subslots: [
-            { name: 'Squad Leader', orderIndex: 1, maxSignups: 1 },
-            { name: 'Rifleman', orderIndex: 2, maxSignups: 2 },
-            { name: 'Medic', orderIndex: 3, maxSignups: 1 },
+            buildTemplateSubslot('Squad Leader', 1),
+            buildTemplateSubslot('Rifleman', 2, { maxSignups: 2 }),
+            buildTemplateSubslot('Medic', 3),
           ],
         },
         {
           name: 'Bravo Squad',
           orderIndex: 2,
           subslots: [
-            { name: 'Squad Leader', orderIndex: 1, maxSignups: 1 },
-            { name: 'Auto Rifleman', orderIndex: 2, maxSignups: 1 },
-            { name: 'Rifleman', orderIndex: 3, maxSignups: 1 },
+            buildTemplateSubslot('Squad Leader', 1),
+            buildTemplateSubslot('Auto Rifleman', 2),
+            buildTemplateSubslot('Rifleman', 3),
           ],
         },
       ]),
@@ -687,9 +788,9 @@ async function main() {
           name: 'Recon Team',
           orderIndex: 1,
           subslots: [
-            { name: 'Team Lead', orderIndex: 1, maxSignups: 1 },
-            { name: 'Scout', orderIndex: 2, maxSignups: 1 },
-            { name: 'Marksman', orderIndex: 3, maxSignups: 1 },
+            buildTemplateSubslot('Team Lead', 1),
+            buildTemplateSubslot('Scout', 2),
+            buildTemplateSubslot('Marksman', 3),
           ],
         },
       ]),
@@ -719,35 +820,35 @@ async function main() {
           name: 'Platoon Command',
           orderIndex: 1,
           subslots: [
-            { name: 'Platoon Leader', orderIndex: 1, maxSignups: 1 },
-            { name: 'Sergeant', orderIndex: 2, maxSignups: 1 },
+            buildTemplateSubslot('Platoon Leader', 1),
+            buildTemplateSubslot('Sergeant', 2),
           ],
         },
         {
           name: 'Alpha Squad',
           orderIndex: 2,
           subslots: [
-            { name: 'Squad Leader', orderIndex: 1, maxSignups: 1 },
-            { name: 'Rifleman', orderIndex: 2, maxSignups: 2 },
-            { name: 'Grenadier', orderIndex: 3, maxSignups: 1 },
+            buildTemplateSubslot('Squad Leader', 1),
+            buildTemplateSubslot('Rifleman', 2, { maxSignups: 2 }),
+            buildTemplateSubslot('Grenadier', 3),
           ],
         },
         {
           name: 'Bravo Squad',
           orderIndex: 3,
           subslots: [
-            { name: 'Squad Leader', orderIndex: 1, maxSignups: 1 },
-            { name: 'Auto Rifleman', orderIndex: 2, maxSignups: 1 },
-            { name: 'Rifleman', orderIndex: 3, maxSignups: 1 },
+            buildTemplateSubslot('Squad Leader', 1),
+            buildTemplateSubslot('Auto Rifleman', 2),
+            buildTemplateSubslot('Rifleman', 3),
           ],
         },
         {
           name: 'Charlie Squad',
           orderIndex: 4,
           subslots: [
-            { name: 'Squad Leader', orderIndex: 1, maxSignups: 1 },
-            { name: 'Medic', orderIndex: 2, maxSignups: 1 },
-            { name: 'Rifleman', orderIndex: 3, maxSignups: 1 },
+            buildTemplateSubslot('Squad Leader', 1),
+            buildTemplateSubslot('Medic', 2),
+            buildTemplateSubslot('Rifleman', 3),
           ],
         },
       ]),
@@ -1095,6 +1196,98 @@ async function main() {
       updatedAt: new Date('2026-01-04'),
     },
   });
+
+  // --- Update Subslot Definitions with Training & Rank Requirements ---
+  const sergeantRank = ranks.find((r) => r.abbreviation === 'Sgt');
+  const lCplRank = ranks.find((r) => r.abbreviation === 'LCpl');
+
+  // Medic: requires Combat Medic Certification
+  await prisma.subslotDefinition.update({
+    where: { name: 'Medic' },
+    data: {
+      requiredTrainingIds: [medicalTraining.id],
+      requiredTrainingId: medicalTraining.id,
+    },
+  });
+
+  // Squad Leader & Platoon Leader: require Squad Leadership Course
+  await prisma.subslotDefinition.update({
+    where: { name: 'Squad Leader' },
+    data: {
+      requiredTrainingIds: [leadershipTraining.id],
+      requiredTrainingId: leadershipTraining.id,
+      requiredRankIds: lCplRank ? [lCplRank.id] : [],
+      requiredRankId: lCplRank?.id ?? null,
+    },
+  });
+
+  await prisma.subslotDefinition.update({
+    where: { name: 'Platoon Leader' },
+    data: {
+      requiredTrainingIds: [leadershipTraining.id],
+      requiredTrainingId: leadershipTraining.id,
+      requiredRankIds: sergeantRank ? [sergeantRank.id] : [],
+      requiredRankId: sergeantRank?.id ?? null,
+    },
+  });
+
+  // Sergeant: requires Sergeant rank
+  await prisma.subslotDefinition.update({
+    where: { name: 'Sergeant' },
+    data: {
+      requiredRankIds: sergeantRank ? [sergeantRank.id] : [],
+      requiredRankId: sergeantRank?.id ?? null,
+    },
+  });
+
+  // Team Lead: requires Squad Leadership Course
+  await prisma.subslotDefinition.update({
+    where: { name: 'Team Lead' },
+    data: {
+      requiredTrainingIds: [leadershipTraining.id],
+      requiredTrainingId: leadershipTraining.id,
+    },
+  });
+
+  // Marksman: requires Sniper School
+  await prisma.subslotDefinition.update({
+    where: { name: 'Marksman' },
+    data: {
+      requiredTrainingIds: [sniperTraining.id],
+      requiredTrainingId: sniperTraining.id,
+    },
+  });
+
+  // Grenadier: requires Explosives & Demolition
+  await prisma.subslotDefinition.update({
+    where: { name: 'Grenadier' },
+    data: {
+      requiredTrainingIds: [explosivesTraining.id],
+      requiredTrainingId: explosivesTraining.id,
+    },
+  });
+
+  // --- Link Existing Subslots to Definitions ---
+  // Update all subslots to link to their matching definitions by name
+  const allSubslots = await prisma.subslot.findMany({
+    select: { id: true, name: true, subslotDefinitionId: true },
+  });
+
+  const definitionsByName = Object.fromEntries(
+    seededSubslotDefinitions.map((def) => [def.name, def])
+  );
+
+  for (const subslot of allSubslots) {
+    if (!subslot.subslotDefinitionId) {
+      const definition = definitionsByName[subslot.name];
+      if (definition) {
+        await prisma.subslot.update({
+          where: { id: subslot.id },
+          data: { subslotDefinitionId: definition.id },
+        });
+      }
+    }
+  }
 
   // --- Sample Messages for Inbox Testing ---
   // Message 1: ORBAT announcement to all users

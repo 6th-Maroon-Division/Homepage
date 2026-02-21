@@ -14,6 +14,10 @@ type SubslotWithSignupsAndUser = {
   name: string;
   orderIndex: number;
   maxSignups: number;
+  requiredTrainings: { id: number; name: string }[];
+  requiredRanks: { id: number; name: string; abbreviation: string }[];
+  requiredTraining: { id: number; name: string } | null;
+  requiredRank: { id: number; name: string; abbreviation: string } | null;
   signups: {
     id: number;
     user: {
@@ -110,6 +114,85 @@ export async function POST(_req: NextRequest, context: RouteParams) {
     );
   }
 
+  const requiredTrainingIds = subslot.requiredTrainingIds?.length
+    ? subslot.requiredTrainingIds
+    : subslot.requiredTrainingId
+      ? [subslot.requiredTrainingId]
+      : [];
+
+  if (requiredTrainingIds.length > 0) {
+    const completedTrainings = await prisma.userTraining.findMany({
+      where: {
+        userId: currentUserId,
+        trainingId: { in: requiredTrainingIds },
+        needsRetraining: false,
+      },
+      select: { trainingId: true },
+    });
+
+    const completedIds = new Set(completedTrainings.map((training) => training.trainingId));
+    const missingTrainingIds = requiredTrainingIds.filter((trainingId) => !completedIds.has(trainingId));
+
+    if (missingTrainingIds.length > 0) {
+      const missingTrainings = await prisma.training.findMany({
+        where: { id: { in: missingTrainingIds } },
+        select: { name: true },
+        orderBy: { name: 'asc' },
+      });
+
+      return NextResponse.json(
+        {
+          error: `This subslot requires all trainings: ${missingTrainings.map((training) => training.name).join(', ')}.`,
+        },
+        { status: 400 },
+      );
+    }
+  }
+
+  const requiredRankIds = subslot.requiredRankIds?.length
+    ? subslot.requiredRankIds
+    : subslot.requiredRankId
+      ? [subslot.requiredRankId]
+      : [];
+
+  if (requiredRankIds.length > 0) {
+    const [userRank, requiredRanks] = await Promise.all([
+      prisma.userRank.findUnique({
+        where: { userId: currentUserId },
+        include: {
+          currentRank: {
+            select: { id: true, name: true, abbreviation: true, orderIndex: true },
+          },
+        },
+      }),
+      prisma.rank.findMany({
+        where: { id: { in: requiredRankIds } },
+        select: { id: true, name: true, abbreviation: true, orderIndex: true },
+      }),
+    ]);
+
+    if (requiredRanks.length !== requiredRankIds.length) {
+      return NextResponse.json({ error: 'Subslot rank prerequisite is invalid.' }, { status: 400 });
+    }
+
+    const userOrderIndex = userRank?.currentRank?.orderIndex;
+    const unmetRanks = requiredRanks.filter(
+      (requiredRank) => typeof userOrderIndex !== 'number' || userOrderIndex < requiredRank.orderIndex
+    );
+
+    if (unmetRanks.length > 0) {
+      return NextResponse.json(
+        {
+          error: `This subslot requires all selected ranks: ${unmetRanks
+            .sort((a, b) => a.orderIndex - b.orderIndex)
+            .map((rank) => `[${rank.abbreviation}] ${rank.name}`)
+            .join(', ')} or higher.`,
+        },
+        { status: 400 },
+      );
+    }
+  }
+
   // Check if slot is full
   const currentCount = await prisma.signup.count({
     where: { subslotId },
@@ -147,11 +230,53 @@ export async function POST(_req: NextRequest, context: RouteParams) {
     );
   }
 
+  const responseTrainingIds = updatedSubslot.requiredTrainingIds?.length
+    ? updatedSubslot.requiredTrainingIds
+    : updatedSubslot.requiredTrainingId
+      ? [updatedSubslot.requiredTrainingId]
+      : [];
+  const responseRankIds = updatedSubslot.requiredRankIds?.length
+    ? updatedSubslot.requiredRankIds
+    : updatedSubslot.requiredRankId
+      ? [updatedSubslot.requiredRankId]
+      : [];
+
+  const [responseTrainings, responseRanks] = await Promise.all([
+    responseTrainingIds.length
+      ? prisma.training.findMany({
+          where: { id: { in: responseTrainingIds } },
+          select: { id: true, name: true },
+          orderBy: { name: 'asc' },
+        })
+      : Promise.resolve([]),
+    responseRankIds.length
+      ? prisma.rank.findMany({
+          where: { id: { in: responseRankIds } },
+          select: { id: true, name: true, abbreviation: true },
+          orderBy: { name: 'asc' },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const responseTrainingMap = new Map(responseTrainings.map((training) => [training.id, training]));
+  const responseRankMap = new Map(responseRanks.map((rank) => [rank.id, rank]));
+
+  const orderedTrainings = responseTrainingIds
+    .map((id) => responseTrainingMap.get(id))
+    .filter((item): item is { id: number; name: string } => Boolean(item));
+  const orderedRanks = responseRankIds
+    .map((id) => responseRankMap.get(id))
+    .filter((item): item is { id: number; name: string; abbreviation: string } => Boolean(item));
+
   const responseBody: SubslotWithSignupsAndUser = {
     id: updatedSubslot.id,
     name: updatedSubslot.name,
     orderIndex: updatedSubslot.orderIndex,
     maxSignups: updatedSubslot.maxSignups,
+    requiredTrainings: orderedTrainings,
+    requiredRanks: orderedRanks,
+    requiredTraining: orderedTrainings[0] || null,
+    requiredRank: orderedRanks[0] || null,
     signups: updatedSubslot.signups.map((s) => ({
       id: s.id,
       user: s.user
@@ -267,11 +392,53 @@ export async function DELETE(req: NextRequest, context: RouteParams) {
     );
   }
 
+  const responseTrainingIds = updatedSubslot.requiredTrainingIds?.length
+    ? updatedSubslot.requiredTrainingIds
+    : updatedSubslot.requiredTrainingId
+      ? [updatedSubslot.requiredTrainingId]
+      : [];
+  const responseRankIds = updatedSubslot.requiredRankIds?.length
+    ? updatedSubslot.requiredRankIds
+    : updatedSubslot.requiredRankId
+      ? [updatedSubslot.requiredRankId]
+      : [];
+
+  const [responseTrainings, responseRanks] = await Promise.all([
+    responseTrainingIds.length
+      ? prisma.training.findMany({
+          where: { id: { in: responseTrainingIds } },
+          select: { id: true, name: true },
+          orderBy: { name: 'asc' },
+        })
+      : Promise.resolve([]),
+    responseRankIds.length
+      ? prisma.rank.findMany({
+          where: { id: { in: responseRankIds } },
+          select: { id: true, name: true, abbreviation: true },
+          orderBy: { name: 'asc' },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const responseTrainingMap = new Map(responseTrainings.map((training) => [training.id, training]));
+  const responseRankMap = new Map(responseRanks.map((rank) => [rank.id, rank]));
+
+  const orderedTrainings = responseTrainingIds
+    .map((id) => responseTrainingMap.get(id))
+    .filter((item): item is { id: number; name: string } => Boolean(item));
+  const orderedRanks = responseRankIds
+    .map((id) => responseRankMap.get(id))
+    .filter((item): item is { id: number; name: string; abbreviation: string } => Boolean(item));
+
   const responseBody: SubslotWithSignupsAndUser = {
     id: updatedSubslot.id,
     name: updatedSubslot.name,
     orderIndex: updatedSubslot.orderIndex,
     maxSignups: updatedSubslot.maxSignups,
+    requiredTrainings: orderedTrainings,
+    requiredRanks: orderedRanks,
+    requiredTraining: orderedTrainings[0] || null,
+    requiredRank: orderedRanks[0] || null,
     signups: updatedSubslot.signups.map((s) => ({
       id: s.id,
       user: s.user

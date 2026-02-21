@@ -24,6 +24,16 @@ export default async function OrbatPage({ params }: OrbatPageProps) {
           subslots: {
             orderBy: { orderIndex: 'asc' },
             include: {
+              subslotDefinition: {
+                include: {
+                  requiredTraining: {
+                    select: { id: true, name: true },
+                  },
+                  requiredRank: {
+                    select: { id: true, name: true, abbreviation: true },
+                  },
+                },
+              },
               signups: {
                 include: {
                   user: {
@@ -56,6 +66,49 @@ export default async function OrbatPage({ params }: OrbatPageProps) {
     notFound();
   }
 
+  const allSubslots = orbat.slots.flatMap((slot) => slot.subslots);
+  const requiredTrainingIds = Array.from(
+    new Set(
+      allSubslots.flatMap((subslot) =>
+        subslot.requiredTrainingIds?.length
+          ? subslot.requiredTrainingIds
+          : subslot.requiredTrainingId
+            ? [subslot.requiredTrainingId]
+            : []
+      )
+    )
+  );
+
+  const requiredRankIds = Array.from(
+    new Set(
+      allSubslots.flatMap((subslot) =>
+        subslot.requiredRankIds?.length
+          ? subslot.requiredRankIds
+          : subslot.requiredRankId
+            ? [subslot.requiredRankId]
+            : []
+      )
+    )
+  );
+
+  const [requiredTrainings, requiredRanks] = await Promise.all([
+    requiredTrainingIds.length
+      ? prisma.training.findMany({
+          where: { id: { in: requiredTrainingIds } },
+          select: { id: true, name: true },
+        })
+      : Promise.resolve([]),
+    requiredRankIds.length
+      ? prisma.rank.findMany({
+          where: { id: { in: requiredRankIds } },
+          select: { id: true, name: true, abbreviation: true },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const trainingMap = new Map(requiredTrainings.map((training) => [training.id, training]));
+  const rankMap = new Map(requiredRanks.map((rank) => [rank.id, rank]));
+
   // Serialize for client component
   const clientOrbat = {
     id: orbat.id,
@@ -80,11 +133,34 @@ export default async function OrbatPage({ params }: OrbatPageProps) {
       id: slot.id,
       name: slot.name,
       orderIndex: slot.orderIndex,
-      subslots: slot.subslots.map((sub) => ({
+      subslots: slot.subslots.map((sub) => {
+        const subslotTrainingIds = sub.requiredTrainingIds?.length
+          ? sub.requiredTrainingIds
+          : sub.requiredTrainingId
+            ? [sub.requiredTrainingId]
+            : [];
+        const subslotRankIds = sub.requiredRankIds?.length
+          ? sub.requiredRankIds
+          : sub.requiredRankId
+            ? [sub.requiredRankId]
+            : [];
+        const subslotRequiredTrainings = subslotTrainingIds
+          .map((id) => trainingMap.get(id))
+          .filter((item): item is { id: number; name: string } => Boolean(item));
+        const subslotRequiredRanks = subslotRankIds
+          .map((id) => rankMap.get(id))
+          .filter((item): item is { id: number; name: string; abbreviation: string } => Boolean(item));
+
+        return {
         id: sub.id,
         name: sub.name,
         orderIndex: sub.orderIndex,
         maxSignups: sub.maxSignups,
+        subslotDefinitionId: sub.subslotDefinitionId,
+        requiredTrainings: subslotRequiredTrainings,
+        requiredRanks: subslotRequiredRanks,
+        requiredTraining: subslotRequiredTrainings[0] || null,
+        requiredRank: subslotRequiredRanks[0] || null,
         signups: sub.signups.map((s) => ({
           id: s.id,
           user: s.user
@@ -101,7 +177,8 @@ export default async function OrbatPage({ params }: OrbatPageProps) {
                 rankName: null,
               },
         })),
-      })),
+      };
+      }),
     })),
     frequencies: orbat.frequencies,
     tempFrequencies: orbat.tempFrequencies,

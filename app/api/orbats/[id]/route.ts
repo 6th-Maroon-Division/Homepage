@@ -7,6 +7,7 @@ import { checkPermission } from '@/lib/auth-middleware';
 
 type SubslotInput = {
   id?: number;
+  subslotDefinitionId?: number | null;
   name: string;
   orderIndex: number;
   maxSignups: number;
@@ -130,6 +131,37 @@ export async function PATCH(
     }
 
     const activeSlots = body.slots.filter((s) => !s._deleted);
+        const requestedDefinitionIds = Array.from(
+          new Set(
+            body.slots
+              .filter((slot) => !slot._deleted)
+              .flatMap((slot) => slot.subslots.filter((subslot) => !subslot._deleted))
+              .map((subslot) => subslot.subslotDefinitionId)
+              .filter((id): id is number => typeof id === 'number')
+          )
+        );
+
+        const subslotDefinitions = requestedDefinitionIds.length
+          ? await prisma.subslotDefinition.findMany({
+              where: { id: { in: requestedDefinitionIds } },
+              select: {
+                id: true,
+                name: true,
+                maxSignups: true,
+                requiredTrainingIds: true,
+                requiredRankIds: true,
+                requiredTrainingId: true,
+                requiredRankId: true,
+              },
+            })
+          : [];
+
+        const subslotDefinitionMap = new Map(subslotDefinitions.map((definition) => [definition.id, definition]));
+
+        if (subslotDefinitions.length !== requestedDefinitionIds.length) {
+          return NextResponse.json({ error: 'One or more selected subslot definitions do not exist.' }, { status: 400 });
+        }
+
     if (activeSlots.length === 0) {
       return NextResponse.json({ error: 'At least one slot is required' }, { status: 400 });
     }
@@ -239,14 +271,24 @@ export async function PATCH(
 
           // Process subslots for this slot
           for (const subslotInput of slotInput.subslots.filter((s) => !s._deleted)) {
+            const definition =
+              typeof subslotInput.subslotDefinitionId === 'number'
+                ? subslotDefinitionMap.get(subslotInput.subslotDefinitionId)
+                : null;
+
             if (subslotInput.id) {
               // Update existing subslot
               await tx.subslot.update({
                 where: { id: subslotInput.id },
                 data: {
-                  name: subslotInput.name.trim(),
+                  name: (definition?.name ?? subslotInput.name).trim(),
                   orderIndex: subslotInput.orderIndex,
-                  maxSignups: subslotInput.maxSignups,
+                  maxSignups: definition?.maxSignups ?? subslotInput.maxSignups,
+                  subslotDefinitionId: subslotInput.subslotDefinitionId ?? null,
+                  requiredTrainingIds: definition?.requiredTrainingIds ?? [],
+                  requiredRankIds: definition?.requiredRankIds ?? [],
+                  requiredTrainingId: definition?.requiredTrainingId ?? null,
+                  requiredRankId: definition?.requiredRankId ?? null,
                 },
               });
             } else {
@@ -254,9 +296,14 @@ export async function PATCH(
               await tx.subslot.create({
                 data: {
                   slotId: slotInput.id,
-                  name: subslotInput.name.trim(),
+                  name: (definition?.name ?? subslotInput.name).trim(),
                   orderIndex: subslotInput.orderIndex,
-                  maxSignups: subslotInput.maxSignups,
+                  maxSignups: definition?.maxSignups ?? subslotInput.maxSignups,
+                  subslotDefinitionId: subslotInput.subslotDefinitionId ?? null,
+                  requiredTrainingIds: definition?.requiredTrainingIds ?? [],
+                  requiredRankIds: definition?.requiredRankIds ?? [],
+                  requiredTrainingId: definition?.requiredTrainingId ?? null,
+                  requiredRankId: definition?.requiredRankId ?? null,
                 },
               });
             }
@@ -272,9 +319,31 @@ export async function PATCH(
                 create: slotInput.subslots
                   .filter((s) => !s._deleted)
                   .map((subslot) => ({
-                    name: subslot.name.trim(),
+                    name: ((typeof subslot.subslotDefinitionId === 'number'
+                      ? subslotDefinitionMap.get(subslot.subslotDefinitionId)?.name
+                      : subslot.name) || subslot.name).trim(),
                     orderIndex: subslot.orderIndex,
-                    maxSignups: subslot.maxSignups,
+                    maxSignups:
+                      typeof subslot.subslotDefinitionId === 'number'
+                        ? (subslotDefinitionMap.get(subslot.subslotDefinitionId)?.maxSignups ?? subslot.maxSignups)
+                        : subslot.maxSignups,
+                    subslotDefinitionId: subslot.subslotDefinitionId ?? null,
+                    requiredTrainingIds:
+                      typeof subslot.subslotDefinitionId === 'number'
+                        ? (subslotDefinitionMap.get(subslot.subslotDefinitionId)?.requiredTrainingIds ?? [])
+                        : [],
+                    requiredRankIds:
+                      typeof subslot.subslotDefinitionId === 'number'
+                        ? (subslotDefinitionMap.get(subslot.subslotDefinitionId)?.requiredRankIds ?? [])
+                        : [],
+                    requiredTrainingId:
+                      typeof subslot.subslotDefinitionId === 'number'
+                        ? (subslotDefinitionMap.get(subslot.subslotDefinitionId)?.requiredTrainingId ?? null)
+                        : null,
+                    requiredRankId:
+                      typeof subslot.subslotDefinitionId === 'number'
+                        ? (subslotDefinitionMap.get(subslot.subslotDefinitionId)?.requiredRankId ?? null)
+                        : null,
                   })),
               },
             },

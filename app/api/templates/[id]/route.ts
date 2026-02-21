@@ -5,6 +5,23 @@ import { NextResponse } from 'next/server';
 import { checkPermission } from '@/lib/auth-middleware';
 import { canAccessTemplateReadApi } from '@/lib/permission-api-logic';
 
+type TemplateSubslotInput = {
+  name: string;
+  orderIndex: number;
+  maxSignups: number;
+  subslotDefinitionId?: number | null;
+  requiredTrainingIds?: number[];
+  requiredRankIds?: number[];
+  requiredTrainingId?: number | null;
+  requiredRankId?: number | null;
+};
+
+type TemplateSlotInput = {
+  name: string;
+  orderIndex: number;
+  subslots: TemplateSubslotInput[];
+};
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -124,6 +141,62 @@ export async function PUT(
       isActive,
     } = data;
 
+    let normalizedSlotsJson = slotsJson;
+    if (slotsJson) {
+      const inputSlots = slotsJson as TemplateSlotInput[];
+      const requestedDefinitionIds = Array.from(
+        new Set(
+          inputSlots
+            .flatMap((slot) => slot.subslots)
+            .map((subslot) => subslot.subslotDefinitionId)
+            .filter((id): id is number => typeof id === 'number')
+        )
+      );
+
+      const definitions = requestedDefinitionIds.length
+        ? await prisma.subslotDefinition.findMany({
+            where: { id: { in: requestedDefinitionIds } },
+            select: {
+              id: true,
+              name: true,
+              maxSignups: true,
+              requiredTrainingIds: true,
+              requiredRankIds: true,
+              requiredTrainingId: true,
+              requiredRankId: true,
+            },
+          })
+        : [];
+
+      if (definitions.length !== requestedDefinitionIds.length) {
+        return NextResponse.json(
+          { error: 'One or more selected subslot definitions do not exist.' },
+          { status: 400 }
+        );
+      }
+
+      const definitionMap = new Map(definitions.map((definition) => [definition.id, definition]));
+      normalizedSlotsJson = inputSlots.map((slot) => ({
+        ...slot,
+        subslots: slot.subslots.map((subslot) => {
+          const definition =
+            typeof subslot.subslotDefinitionId === 'number'
+              ? definitionMap.get(subslot.subslotDefinitionId)
+              : null;
+
+          return {
+            ...subslot,
+            name: definition?.name ?? subslot.name,
+            maxSignups: definition?.maxSignups ?? subslot.maxSignups,
+            requiredTrainingIds: definition?.requiredTrainingIds ?? [],
+            requiredRankIds: definition?.requiredRankIds ?? [],
+            requiredTrainingId: definition?.requiredTrainingId ?? null,
+            requiredRankId: definition?.requiredRankId ?? null,
+          };
+        }),
+      }));
+    }
+
     // Verify template exists
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const existingTemplate = await (prisma as any).orbatTemplate.findUnique({
@@ -145,7 +218,7 @@ export async function PUT(
         ...(description !== undefined && { description }),
         ...(category !== undefined && { category }),
         ...(tagsJson !== undefined && { tagsJson }),
-        ...(slotsJson && { slotsJson }),
+        ...(normalizedSlotsJson && { slotsJson: normalizedSlotsJson }),
         ...(frequencyIds && { frequencyIds }),
         ...(bluforCountry !== undefined && { bluforCountry }),
         ...(bluforRelationship !== undefined && { bluforRelationship }),

@@ -40,6 +40,16 @@ export default async function AdminOrbatPage({ params }: AdminOrbatPageProps) {
           subslots: {
             orderBy: { orderIndex: 'asc' },
             include: {
+              subslotDefinition: {
+                include: {
+                  requiredTraining: {
+                    select: { id: true, name: true },
+                  },
+                  requiredRank: {
+                    select: { id: true, name: true, abbreviation: true },
+                  },
+                },
+              },
               signups: {
                 include: {
                   user: {
@@ -99,6 +109,20 @@ export default async function AdminOrbatPage({ params }: AdminOrbatPageProps) {
         name: sub.name,
         orderIndex: sub.orderIndex,
         maxSignups: sub.maxSignups,
+        subslotDefinitionId: sub.subslotDefinitionId,
+        requiredTraining: sub.subslotDefinition?.requiredTraining
+          ? {
+              id: sub.subslotDefinition.requiredTraining.id,
+              name: sub.subslotDefinition.requiredTraining.name,
+            }
+          : null,
+        requiredRank: sub.subslotDefinition?.requiredRank
+          ? {
+              id: sub.subslotDefinition.requiredRank.id,
+              name: sub.subslotDefinition.requiredRank.name,
+              abbreviation: sub.subslotDefinition.requiredRank.abbreviation,
+            }
+          : null,
         signups: sub.signups.map((s) => ({
           id: s.id,
           user: s.user

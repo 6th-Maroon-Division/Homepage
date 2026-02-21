@@ -219,7 +219,35 @@ model Subslot {
   name       String
   orderIndex Int
   maxSignups Int       @default(1)
+  subslotDefinition   SubslotDefinition? @relation(fields: [subslotDefinitionId], references: [id], onDelete: SetNull)
+  subslotDefinitionId Int?
+  requiredTrainingIds Int[]     @default([])
+  requiredRankIds     Int[]     @default([])
+  requiredTrainingId  Int?
+  requiredRankId      Int?
   signups    Signup[]
+
+  @@index([subslotDefinitionId])
+  @@index([requiredTrainingId])
+  @@index([requiredRankId])
+}
+
+model SubslotDefinition {
+  id                 Int       @id @default(autoincrement())
+  name               String    @unique
+  maxSignups         Int       @default(1)
+  requiredTrainingIds Int[]    @default([])
+  requiredRankIds     Int[]    @default([])
+  requiredTraining   Training? @relation("SubslotDefinitionRequiredTraining", fields: [requiredTrainingId], references: [id], onDelete: SetNull)
+  requiredTrainingId Int?
+  requiredRank       Rank?     @relation("SubslotDefinitionRequiredRank", fields: [requiredRankId], references: [id], onDelete: SetNull)
+  requiredRankId     Int?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  subslots           Subslot[]
+
+  @@index([requiredTrainingId])
+  @@index([requiredRankId])
 }
 
 model RadioFrequency {
@@ -392,6 +420,7 @@ model Training {
   requiresTrainings TrainingTrainingRequirement[] @relation("RequiresTutorial")
   requiredByTrainings TrainingTrainingRequirement[] @relation("RequiredBy")
   rankTransitions   RankTransitionRequirement[] @relation("RankTransitionRequirement")
+  requiredBySubslotDefinitions SubslotDefinition[] @relation("SubslotDefinitionRequiredTraining")
 }
 
 model TrainingCategory {
@@ -482,6 +511,7 @@ model Rank {
   userRanks                       UserRank[]
   trainingRequirementsMin         TrainingRankRequirement[]
   transitionRequirementsTarget    RankTransitionRequirement[]
+  requiredBySubslotDefinitions    SubslotDefinition[] @relation("SubslotDefinitionRequiredRank")
 
   createdAt                       DateTime  @default(now())
   updatedAt                       DateTime  @updatedAt
