@@ -45,7 +45,7 @@ export default async function AdminSubslotDefinitionsPage() {
   const canManage = Boolean(session.user.isAdmin) || canCreateSubslot || canEditSubslot || canDeleteSubslot;
 
   const [definitions, trainings, ranks] = await Promise.all([
-    prisma.subslotDefinition.findMany({
+    prisma.squadRole.findMany({
       orderBy: { name: 'asc' },
     }),
     prisma.training.findMany({
@@ -72,6 +72,8 @@ export default async function AdminSubslotDefinitionsPage() {
 
     return {
       ...definition,
+      requiredTrainingId: requiredTrainings[0]?.id ?? null,
+      requiredRankId: requiredRanks[0]?.id ?? null,
       requiredTrainings,
       requiredRanks,
       requiredTraining: requiredTrainings[0] || null,

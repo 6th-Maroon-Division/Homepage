@@ -10,11 +10,11 @@ type RouteParams = {
 
 type UpdateSubslotDefinitionBody = {
   name?: string;
-  maxSignups?: number;
   requiredTrainingIds?: number[];
   requiredRankIds?: number[];
   requiredTrainingId?: number | null;
   requiredRankId?: number | null;
+  isRetired?: boolean;
 };
 
 function parseNumericIdArray(value: unknown): number[] {
@@ -47,7 +47,7 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
     const { id } = await context.params;
     const definitionId = Number(id);
     if (Number.isNaN(definitionId)) {
-      return NextResponse.json({ error: 'Invalid subslot definition id' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid role definition id' }, { status: 400 });
     }
 
     const body: UpdateSubslotDefinitionBody = await request.json();
@@ -55,12 +55,6 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
     const name = typeof body.name === 'string' ? body.name.trim() : undefined;
     if (typeof body.name === 'string' && !name) {
       return NextResponse.json({ error: 'Name cannot be empty' }, { status: 400 });
-    }
-
-    const maxSignups =
-      typeof body.maxSignups === 'number' ? Number(body.maxSignups) : undefined;
-    if (typeof maxSignups === 'number' && (Number.isNaN(maxSignups) || maxSignups < 1)) {
-      return NextResponse.json({ error: 'Max signups must be at least 1' }, { status: 400 });
     }
 
     const hasTrainingArrayUpdate = body.requiredTrainingIds !== undefined || body.requiredTrainingId !== undefined;
@@ -102,35 +96,21 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
     }
 
     const updated = await prisma.$transaction(async (tx) => {
-      const definition = await tx.subslotDefinition.update({
+      const definition = await tx.squadRole.update({
         where: { id: definitionId },
         data: {
           ...(name !== undefined ? { name } : {}),
-          ...(maxSignups !== undefined ? { maxSignups } : {}),
           ...(hasTrainingArrayUpdate
             ? {
                 requiredTrainingIds: requiredTrainingIds ?? [],
-                requiredTrainingId: (requiredTrainingIds ?? [])[0] ?? null,
               }
             : {}),
           ...(hasRankArrayUpdate
             ? {
                 requiredRankIds: requiredRankIds ?? [],
-                requiredRankId: (requiredRankIds ?? [])[0] ?? null,
               }
             : {}),
-        },
-      });
-
-      await tx.subslot.updateMany({
-        where: { subslotDefinitionId: definitionId },
-        data: {
-          name: definition.name,
-          maxSignups: definition.maxSignups,
-          requiredTrainingIds: definition.requiredTrainingIds,
-          requiredRankIds: definition.requiredRankIds,
-          requiredTrainingId: definition.requiredTrainingId,
-          requiredRankId: definition.requiredRankId,
+          ...(typeof body.isRetired === 'boolean' ? { isRetired: body.isRetired } : {}),
         },
       });
 
@@ -160,8 +140,8 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
 
     return NextResponse.json(updated);
   } catch (error) {
-    console.error('Error updating subslot definition:', error);
-    return NextResponse.json({ error: 'Failed to update subslot definition' }, { status: 500 });
+    console.error('Error updating role definition:', error);
+    return NextResponse.json({ error: 'Failed to update role definition' }, { status: 500 });
   }
 }
 
@@ -181,27 +161,27 @@ export async function DELETE(_request: NextRequest, context: RouteParams) {
     const { id } = await context.params;
     const definitionId = Number(id);
     if (Number.isNaN(definitionId)) {
-      return NextResponse.json({ error: 'Invalid subslot definition id' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid role definition id' }, { status: 400 });
     }
 
-    const linkedCount = await prisma.subslot.count({
-      where: { subslotDefinitionId: definitionId },
+    const linkedCount = await prisma.slot.count({
+      where: { squadRoleId: definitionId },
     });
 
     if (linkedCount > 0) {
       return NextResponse.json(
-        { error: 'Cannot delete a subslot definition that is used by existing ORBAT slots.' },
+        { error: 'Cannot delete a role definition that is used by existing ORBAT slots.' },
         { status: 400 }
       );
     }
 
-    await prisma.subslotDefinition.delete({
+    await prisma.squadRole.delete({
       where: { id: definitionId },
     });
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting subslot definition:', error);
-    return NextResponse.json({ error: 'Failed to delete subslot definition' }, { status: 500 });
+    console.error('Error deleting role definition:', error);
+    return NextResponse.json({ error: 'Failed to delete role definition' }, { status: 500 });
   }
 }

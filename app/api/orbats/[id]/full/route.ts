@@ -1,30 +1,31 @@
-// app/api/orbats/[id]/full/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    const orbatId = parseInt(id);
+    const orbatId = Number.parseInt(id, 10);
 
-    if (isNaN(orbatId)) {
+    if (Number.isNaN(orbatId)) {
       return NextResponse.json({ error: 'Invalid OrbAT ID' }, { status: 400 });
     }
 
     const orbat = await prisma.orbat.findUnique({
       where: { id: orbatId },
       include: {
-        slots: {
+        squads: {
           orderBy: { orderIndex: 'asc' },
           include: {
-            subslots: {
+            slots: {
               orderBy: { orderIndex: 'asc' },
               include: {
-                subslotDefinition: {
+                squadRole: {
                   select: {
+                    id: true,
+                    name: true,
                     requiredTrainingIds: true,
                     requiredRankIds: true,
                   },
@@ -48,37 +49,31 @@ export async function GET(
       return NextResponse.json({ error: 'OrbAT not found' }, { status: 404 });
     }
 
-    const allSubslots = orbat.slots.flatMap((slot) => slot.subslots);
-    const requiredTrainingIds = Array.from(
+    const allTrainingIds = Array.from(
       new Set(
-        allSubslots.flatMap((subslot) => {
-          const ownIds = subslot.requiredTrainingIds?.length ? subslot.requiredTrainingIds : [];
-          const definitionIds = subslot.subslotDefinition?.requiredTrainingIds || [];
-          return [...ownIds, ...definitionIds];
-        })
+        orbat.squads.flatMap((squad) =>
+          squad.slots.flatMap((slot) => slot.squadRole?.requiredTrainingIds || [])
+        )
       )
     );
-
-    const requiredRankIds = Array.from(
+    const allRankIds = Array.from(
       new Set(
-        allSubslots.flatMap((subslot) => {
-          const ownIds = subslot.requiredRankIds?.length ? subslot.requiredRankIds : [];
-          const definitionIds = subslot.subslotDefinition?.requiredRankIds || [];
-          return [...ownIds, ...definitionIds];
-        })
+        orbat.squads.flatMap((squad) =>
+          squad.slots.flatMap((slot) => slot.squadRole?.requiredRankIds || [])
+        )
       )
     );
 
     const [requiredTrainings, requiredRanks] = await Promise.all([
-      requiredTrainingIds.length
+      allTrainingIds.length
         ? prisma.training.findMany({
-            where: { id: { in: requiredTrainingIds } },
+            where: { id: { in: allTrainingIds } },
             select: { id: true, name: true },
           })
         : Promise.resolve([]),
-      requiredRankIds.length
+      allRankIds.length
         ? prisma.rank.findMany({
-            where: { id: { in: requiredRankIds } },
+            where: { id: { in: allRankIds } },
             select: { id: true, name: true, abbreviation: true },
           })
         : Promise.resolve([]),
@@ -87,7 +82,6 @@ export async function GET(
     const trainingMap = new Map(requiredTrainings.map((training) => [training.id, training]));
     const rankMap = new Map(requiredRanks.map((rank) => [rank.id, rank]));
 
-    // Serialize for client
     const clientOrbat = {
       id: orbat.id,
       name: orbat.name,
@@ -95,49 +89,54 @@ export async function GET(
       eventDate: orbat.eventDate ? orbat.eventDate.toISOString() : null,
       startTime: orbat.startTime || null,
       endTime: orbat.endTime || null,
-      slots: orbat.slots.map((slot) => ({
-        id: slot.id,
-        name: slot.name,
-        orderIndex: slot.orderIndex,
-        subslots: slot.subslots.map((sub) => {
-          // Merge prerequisites from the subslot itself and its definition
-          const definitionTrainingIds = sub.subslotDefinition?.requiredTrainingIds || [];
-          const definitionRankIds = sub.subslotDefinition?.requiredRankIds || [];
-          
-          const combinedTrainingIds = Array.from(
-            new Set([...(sub.requiredTrainingIds || []), ...definitionTrainingIds])
-          );
-          const combinedRankIds = Array.from(
-            new Set([...(sub.requiredRankIds || []), ...definitionRankIds])
-          );
-          
-          const subslotRequiredTrainings = combinedTrainingIds
-            .map((id) => trainingMap.get(id))
+      bluforCountry: orbat.bluforCountry || null,
+      bluforRelationship: orbat.bluforRelationship || null,
+      opforCountry: orbat.opforCountry || null,
+      opforRelationship: orbat.opforRelationship || null,
+      indepCountry: orbat.indepCountry || null,
+      indepRelationship: orbat.indepRelationship || null,
+      iedThreat: orbat.iedThreat || null,
+      civilianRelationship: orbat.civilianRelationship || null,
+      rulesOfEngagement: orbat.rulesOfEngagement || null,
+      airspace: orbat.airspace || null,
+      inGameTimezone: orbat.inGameTimezone || null,
+      operationDay: orbat.operationDay || null,
+      squads: orbat.squads.map((squad) => ({
+        id: squad.id,
+        name: squad.name,
+        orderIndex: squad.orderIndex,
+        slots: squad.slots.map((slot) => {
+          const requiredTrainingIds = slot.squadRole?.requiredTrainingIds || [];
+          const requiredRankIds = slot.squadRole?.requiredRankIds || [];
+
+          const subslotRequiredTrainings = requiredTrainingIds
+            .map((trainingId) => trainingMap.get(trainingId))
             .filter((item): item is { id: number; name: string } => Boolean(item));
-          const subslotRequiredRanks = combinedRankIds
-            .map((id) => rankMap.get(id))
+
+          const subslotRequiredRanks = requiredRankIds
+            .map((rankId) => rankMap.get(rankId))
             .filter((item): item is { id: number; name: string; abbreviation: string } => Boolean(item));
 
           return {
-          id: sub.id,
-          name: sub.name,
-          orderIndex: sub.orderIndex,
-          maxSignups: sub.maxSignups,
-          subslotDefinitionId: sub.subslotDefinitionId,
-          requiredTrainings: subslotRequiredTrainings,
-          requiredRanks: subslotRequiredRanks,
-          requiredTraining: subslotRequiredTrainings[0] || null,
-          requiredRank: subslotRequiredRanks[0] || null,
-          signups: sub.signups.map((s) => ({
-            id: s.id,
-            user: s.user
-              ? {
-                  id: s.user.id,
-                  username: s.user.username ?? 'Unknown',
-                }
-              : null,
-          })),
-        };
+            id: slot.id,
+            name: slot.squadRole?.name || 'Unassigned Role',
+            orderIndex: slot.orderIndex,
+            maxSignups: slot.maxSignups ?? 9999,
+            squadRoleId: slot.squadRoleId,
+            requiredTrainings: subslotRequiredTrainings,
+            requiredRanks: subslotRequiredRanks,
+            requiredTraining: subslotRequiredTrainings[0] || null,
+            requiredRank: subslotRequiredRanks[0] || null,
+            signups: slot.signups.map((signup) => ({
+              id: signup.id,
+              user: signup.user
+                ? {
+                    id: signup.user.id,
+                    username: signup.user.username ?? 'Unknown',
+                  }
+                : null,
+            })),
+          };
         }),
       })),
       frequencies: orbat.frequencies,

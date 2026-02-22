@@ -84,7 +84,7 @@ export default function OrbatManagementClient({ orbats: initialOrbats }: OrbatMa
               className="px-4 py-2 rounded-md transition-colors font-medium"
               style={{ backgroundColor: 'var(--muted)', color: 'var(--foreground)' }}
             >
-              Manage Subslots
+              Manage Roles
             </Link>
             {canCreateOrbat && (
               <Link

@@ -7,9 +7,12 @@ import { seedPermissions, grantAdminPermissions } from './seed-permissions';
 async function main() {
   // Clear existing data in the right order (avoid FK issues)
   await prisma.userPermission.deleteMany();
+  await prisma.squadRoleAuditLog.deleteMany();
   await prisma.signup.deleteMany();
-  await prisma.subslot.deleteMany();
   await prisma.slot.deleteMany();
+  await prisma.squad.deleteMany();
+  await prisma.squadRole.deleteMany();
+  await prisma.orbatRadioFrequency.deleteMany();
   await prisma.orbat.deleteMany();
   await prisma.radioFrequency.deleteMany();
   await prisma.authAccount.deleteMany();

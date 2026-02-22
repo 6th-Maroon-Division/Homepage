@@ -7,7 +7,6 @@ import { canAccessSubslotReadApi } from '@/lib/permission-api-logic';
 
 type CreateSubslotDefinitionBody = {
   name?: string;
-  maxSignups?: number;
   requiredTrainingIds?: number[];
   requiredRankIds?: number[];
   requiredTrainingId?: number | null;
@@ -65,7 +64,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const definitions = await prisma.subslotDefinition.findMany({
+    const definitions = await prisma.squadRole.findMany({
       orderBy: { name: 'asc' },
     });
 
@@ -121,8 +120,8 @@ export async function GET() {
 
     return NextResponse.json(enrichedDefinitions);
   } catch (error) {
-    console.error('Error fetching subslot definitions:', error);
-    return NextResponse.json({ error: 'Failed to fetch subslot definitions' }, { status: 500 });
+    console.error('Error fetching role definitions:', error);
+    return NextResponse.json({ error: 'Failed to fetch role definitions' }, { status: 500 });
   }
 }
 
@@ -141,7 +140,6 @@ export async function POST(request: NextRequest) {
 
     const body: CreateSubslotDefinitionBody = await request.json();
     const name = body.name?.trim();
-    const maxSignups = Number(body.maxSignups ?? 1);
     const requiredTrainingIds = parseNumericIdArray(body.requiredTrainingIds);
     const requiredRankIds = parseNumericIdArray(body.requiredRankIds);
 
@@ -155,10 +153,6 @@ export async function POST(request: NextRequest) {
 
     if (!name) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
-    }
-
-    if (Number.isNaN(maxSignups) || maxSignups < 1) {
-      return NextResponse.json({ error: 'Max signups must be at least 1' }, { status: 400 });
     }
 
     const [validTrainingCount, validRankCount] = await Promise.all([
@@ -178,14 +172,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'One or more selected rank prerequisites are invalid' }, { status: 400 });
     }
 
-    const created = await prisma.subslotDefinition.create({
+    const created = await prisma.squadRole.create({
       data: {
         name,
-        maxSignups,
         requiredTrainingIds,
         requiredRankIds,
-        requiredTrainingId: requiredTrainingIds[0] ?? null,
-        requiredRankId: requiredRankIds[0] ?? null,
       },
     });
 
@@ -214,7 +205,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(createdResponse, { status: 201 });
   } catch (error) {
-    console.error('Error creating subslot definition:', error);
-    return NextResponse.json({ error: 'Failed to create subslot definition' }, { status: 500 });
+    console.error('Error creating role definition:', error);
+    return NextResponse.json({ error: 'Failed to create role definition' }, { status: 500 });
   }
 }

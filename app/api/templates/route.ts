@@ -6,21 +6,21 @@ import { checkPermission } from '@/lib/auth-middleware';
 import { canAccessTemplateReadApi } from '@/lib/permission-api-logic';
 import type { NextRequest } from 'next/server';
 
-type TemplateSubslotInput = {
+type TemplateRoleSlotInput = {
   name: string;
   orderIndex: number;
   maxSignups: number;
-  subslotDefinitionId?: number | null;
+  squadRoleId?: number | null;
   requiredTrainingIds?: number[];
   requiredRankIds?: number[];
   requiredTrainingId?: number | null;
   requiredRankId?: number | null;
 };
 
-type TemplateSlotInput = {
+type TemplateSquadInput = {
   name: string;
   orderIndex: number;
-  subslots: TemplateSubslotInput[];
+  slots: TemplateRoleSlotInput[];
 };
 
 export async function GET() {
@@ -138,55 +138,60 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const inputSlots = slotsJson as TemplateSlotInput[];
+    const inputSlots = slotsJson as TemplateSquadInput[];
     const requestedDefinitionIds = Array.from(
       new Set(
         inputSlots
-          .flatMap((slot) => slot.subslots)
-          .map((subslot) => subslot.subslotDefinitionId)
+          .flatMap((squad) => squad.slots)
+          .map((slot) => slot.squadRoleId)
           .filter((id): id is number => typeof id === 'number')
       )
     );
 
     const definitions = requestedDefinitionIds.length
-      ? await prisma.subslotDefinition.findMany({
+      ? await prisma.squadRole.findMany({
           where: { id: { in: requestedDefinitionIds } },
           select: {
             id: true,
             name: true,
-            maxSignups: true,
             requiredTrainingIds: true,
             requiredRankIds: true,
-            requiredTrainingId: true,
-            requiredRankId: true,
+            isRetired: true,
           },
         })
       : [];
 
     if (definitions.length !== requestedDefinitionIds.length) {
       return NextResponse.json(
-        { error: 'One or more selected subslot definitions do not exist.' },
+        { error: 'One or more selected role definitions do not exist.' },
+        { status: 400 }
+      );
+    }
+
+    const retiredRoleNames = definitions.filter((role) => role.isRetired).map((role) => role.name);
+    if (retiredRoleNames.length > 0) {
+      return NextResponse.json(
+        { error: `Cannot use retired role definitions: ${retiredRoleNames.join(', ')}. Restore them or choose active roles.` },
         { status: 400 }
       );
     }
 
     const definitionMap = new Map(definitions.map((definition) => [definition.id, definition]));
-    const normalizedSlotsJson = inputSlots.map((slot) => ({
-      ...slot,
-      subslots: slot.subslots.map((subslot) => {
+    const normalizedSlotsJson = inputSlots.map((squad) => ({
+      ...squad,
+      slots: squad.slots.map((slot) => {
         const definition =
-          typeof subslot.subslotDefinitionId === 'number'
-            ? definitionMap.get(subslot.subslotDefinitionId)
+          typeof slot.squadRoleId === 'number'
+            ? definitionMap.get(slot.squadRoleId)
             : null;
 
         return {
-          ...subslot,
-          name: definition?.name ?? subslot.name,
-          maxSignups: definition?.maxSignups ?? subslot.maxSignups,
+          ...slot,
+          name: definition?.name ?? slot.name,
           requiredTrainingIds: definition?.requiredTrainingIds ?? [],
           requiredRankIds: definition?.requiredRankIds ?? [],
-          requiredTrainingId: definition?.requiredTrainingId ?? null,
-          requiredRankId: definition?.requiredRankId ?? null,
+          requiredTrainingId: (definition?.requiredTrainingIds ?? [])[0] ?? null,
+          requiredRankId: (definition?.requiredRankIds ?? [])[0] ?? null,
         };
       }),
     }));

@@ -25,12 +25,10 @@ interface AttendanceRecord {
   totalMinutesMissed: number;
   createdAt: string;
   signup: {
-    subslot: {
-      slot: {
-        orbat: {
-          name: string;
-          eventDate: string;
-        };
+    slot: {
+      orbat: {
+        name: string;
+        eventDate: string;
       };
     };
   };
@@ -177,11 +175,11 @@ export default function UserAttendanceProfile({ userId }: { userId: number }) {
                 {records.map((record) => (
                   <tr key={record.id} className="border-t hover:bg-gray-50">
                     <td className="px-4 py-2">
-                      {record.signup.subslot.slot.orbat.name}
+                      {record.signup.slot.orbat.name}
                     </td>
                     <td className="px-4 py-2">
                       {new Date(
-                        record.signup.subslot.slot.orbat.eventDate
+                        record.signup.slot.orbat.eventDate
                       ).toLocaleDateString()}
                     </td>
                     <td className="px-4 py-2">

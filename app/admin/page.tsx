@@ -80,8 +80,8 @@ export default async function AdminPage() {
               className="border rounded-lg p-8 transition-colors"
               style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
             >
-              <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>Subslots</h2>
-              <p style={{ color: 'var(--muted-foreground)' }}>Create and manage reusable ORBAT subslots</p>
+              <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>Role Definitions</h2>
+              <p style={{ color: 'var(--muted-foreground)' }}>Create and manage reusable ORBAT roles</p>
             </Link>
           )}
           

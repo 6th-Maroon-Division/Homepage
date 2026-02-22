@@ -102,13 +102,11 @@ export async function POST(request: NextRequest) {
         const signup = await prisma.signup.findFirst({
           where: {
             userId: user.id,
-            subslot: {
-              slot: {
-                orbat: {
-                  eventDate: {
-                    gte: new Date(eventDate.toDateString()),
-                    lt: new Date(new Date(eventDate).setDate(eventDate.getDate() + 1)),
-                  },
+            slot: {
+              orbat: {
+                eventDate: {
+                  gte: new Date(eventDate.toDateString()),
+                  lt: new Date(new Date(eventDate).setDate(eventDate.getDate() + 1)),
                 },
               },
             },

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '../ui/ToastContainer';
 import LoadingSpinner from '../ui/LoadingSpinner';
@@ -13,7 +13,7 @@ const logClientError = (...args: unknown[]) => {
 
 type Subslot = {
   id?: number;
-  subslotDefinitionId?: number | null;
+  squadRoleId?: number | null;
   name: string;
   orderIndex: number;
   maxSignups: number;
@@ -147,9 +147,15 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     requiredRanks?: Array<{ id: number; name: string; abbreviation: string }>;
     requiredTraining: { id: number; name: string } | null;
     requiredRank: { id: number; name: string; abbreviation: string } | null;
+    isRetired?: boolean;
   }>>([]);
   const [subslotSearchBySlot, setSubslotSearchBySlot] = useState<Record<number, string>>({});
   const [selectedDefinitionBySlot, setSelectedDefinitionBySlot] = useState<Record<number, string>>({});
+  const [draggedRole, setDraggedRole] = useState<{ slotIndex: number; subslotIndex: number } | null>(null);
+  const draggedRoleRef = useRef<{ slotIndex: number; subslotIndex: number } | null>(null);
+  const [dragOverTarget, setDragOverTarget] = useState<{ slotIndex: number; subslotIndex: number | null } | null>(null);
+  const [draggedSquadIndex, setDraggedSquadIndex] = useState<number | null>(null);
+  const [dragOverSquadIndex, setDragOverSquadIndex] = useState<number | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
 
@@ -189,7 +195,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
           setSubslotDefinitions(data);
         }
       } catch (error) {
-        logClientError('Error fetching subslot definitions:', error);
+        logClientError('Error fetching role definitions:', error);
       }
     };
 
@@ -223,13 +229,35 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         if (data.name) setName(`${data.name} - Copy`);
         if (data.description) setDescription(data.description);
         
-        // Handle slots - for templates use slotsJson, for orbats use slots
+        // Handle slots - templates use slotsJson as squads with nested slots, orbats use squads
         let slots = null;
         if (data.slotsJson) {
-          slots = data.slotsJson;
-          if (typeof slots === 'string') {
-            slots = JSON.parse(slots);
-          }
+          const parsedSlotsJson = typeof data.slotsJson === 'string' ? JSON.parse(data.slotsJson) : data.slotsJson;
+          slots = (parsedSlotsJson as any[]).map((squad: any) => ({
+            id: squad.id,
+            name: squad.name,
+            orderIndex: squad.orderIndex,
+            subslots: (squad.slots || []).map((slot: any) => ({
+              id: slot.id,
+              squadRoleId: slot.squadRoleId ?? null,
+              name: slot.name,
+              orderIndex: slot.orderIndex,
+              maxSignups: slot.maxSignups ?? 1,
+            })),
+          }));
+        } else if (data.squads) {
+          slots = data.squads.map((squad: any) => ({
+            id: squad.id,
+            name: squad.name,
+            orderIndex: squad.orderIndex,
+            subslots: (squad.slots || []).map((slot: any) => ({
+              id: slot.id,
+              squadRoleId: slot.squadRoleId ?? null,
+              name: slot.name,
+              orderIndex: slot.orderIndex,
+              maxSignups: slot.maxSignups ?? 1,
+            })),
+          }));
         } else if (data.slots) {
           slots = data.slots;
         }
@@ -278,12 +306,22 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
               if (template.name) setName(`${template.name} - Copy`);
               if (template.description) setDescription(template.description);
               if (template.slotsJson) {
-                // Parse slots if needed
-                let parsedSlots = template.slotsJson;
-                if (typeof parsedSlots === 'string') {
-                  parsedSlots = JSON.parse(parsedSlots);
-                }
-                setSlots(parsedSlots);
+                const parsedSlotsJson = typeof template.slotsJson === 'string'
+                  ? JSON.parse(template.slotsJson)
+                  : template.slotsJson;
+                const mappedSlots = (parsedSlotsJson as any[]).map((squad: any) => ({
+                  id: squad.id,
+                  name: squad.name,
+                  orderIndex: squad.orderIndex,
+                  subslots: (squad.slots || []).map((slot: any) => ({
+                    id: slot.id,
+                    squadRoleId: slot.squadRoleId ?? null,
+                    name: slot.name,
+                    orderIndex: slot.orderIndex,
+                    maxSignups: slot.maxSignups ?? 1,
+                  })),
+                }));
+                setSlots(mappedSlots);
               }
               if (template.bluforCountry) setBluforCountry(template.bluforCountry);
               if (template.bluforRelationship) setBluforRelationship(template.bluforRelationship);
@@ -406,31 +444,180 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     setSlots(newSlots);
   };
 
+  const normalizeOrderIndexes = (inputSlots: Slot[]) => {
+    let slotOrder = 0;
+    return inputSlots.map((slot) => {
+      if (slot._deleted) {
+        return slot;
+      }
+
+      let roleOrder = 0;
+      const normalizedSubslots = slot.subslots.map((subslot) => {
+        if (subslot._deleted) {
+          return subslot;
+        }
+
+        return {
+          ...subslot,
+          orderIndex: roleOrder++,
+        };
+      });
+
+      return {
+        ...slot,
+        orderIndex: slotOrder++,
+        subslots: normalizedSubslots,
+      };
+    });
+  };
+
   const updateSlot = (slotIndex: number, field: keyof Slot, value: string) => {
     const newSlots = [...slots];
     (newSlots[slotIndex] as Record<string, unknown>)[field] = value;
     setSlots(newSlots);
   };
 
+  const updateSubslotMaxSignups = (slotIndex: number, subslotIndex: number, value: number) => {
+    const newSlots = [...slots];
+    const safeValue = Number.isFinite(value) ? Math.max(1, Math.floor(value)) : 1;
+    newSlots[slotIndex].subslots[subslotIndex].maxSignups = safeValue;
+    setSlots(newSlots);
+  };
+
+  const moveSquadByDrag = (fromSlotIndex: number, toSlotIndex: number | null) => {
+    if (toSlotIndex === null) {
+      return;
+    }
+
+    if (fromSlotIndex === toSlotIndex) {
+      return;
+    }
+
+    const nextSlots = [...slots];
+    const [movingSlot] = nextSlots.splice(fromSlotIndex, 1);
+
+    if (!movingSlot) {
+      return;
+    }
+
+    let insertIndex = toSlotIndex;
+    if (fromSlotIndex < toSlotIndex) {
+      insertIndex -= 1;
+    }
+
+    nextSlots.splice(Math.max(0, insertIndex), 0, movingSlot);
+    setSlots(normalizeOrderIndexes(nextSlots));
+  };
+
+  const handleSquadDragStart = (slotIndex: number) => {
+    setDraggedSquadIndex(slotIndex);
+  };
+
+  const handleSquadDragEnd = () => {
+    setDraggedSquadIndex(null);
+    setDragOverSquadIndex(null);
+  };
+
+  const handleSquadDrop = (slotIndex: number | null) => {
+    if (draggedSquadIndex === null) {
+      return;
+    }
+
+    moveSquadByDrag(draggedSquadIndex, slotIndex);
+    handleSquadDragEnd();
+  };
+
+  const moveSubslotByDrag = (
+    fromSlotIndex: number,
+    fromSubslotIndex: number,
+    toSlotIndex: number,
+    toSubslotIndex: number | null
+  ) => {
+    const newSlots = [...slots];
+    const fromSubslots = [...newSlots[fromSlotIndex].subslots];
+    const [movedSubslot] = fromSubslots.splice(fromSubslotIndex, 1);
+
+    if (!movedSubslot) return;
+
+    newSlots[fromSlotIndex] = {
+      ...newSlots[fromSlotIndex],
+      subslots: fromSubslots,
+    };
+
+    const toSubslots = [...newSlots[toSlotIndex].subslots];
+
+    if (toSubslotIndex === null || toSubslotIndex >= toSubslots.length) {
+      toSubslots.push(movedSubslot);
+    } else {
+      let adjustedTargetIndex = toSubslotIndex;
+      if (fromSlotIndex === toSlotIndex && fromSubslotIndex < toSubslotIndex) {
+        adjustedTargetIndex -= 1;
+      }
+      toSubslots.splice(Math.max(0, adjustedTargetIndex), 0, movedSubslot);
+    }
+
+    newSlots[toSlotIndex] = {
+      ...newSlots[toSlotIndex],
+      subslots: toSubslots,
+    };
+
+    setSlots(normalizeOrderIndexes(newSlots));
+  };
+
+  const handleRoleDragStart = (slotIndex: number, subslotIndex: number) => {
+    const nextDraggedRole = { slotIndex, subslotIndex };
+    draggedRoleRef.current = nextDraggedRole;
+    setDraggedRole(nextDraggedRole);
+  };
+
+  const handleRoleDragEnd = () => {
+    draggedRoleRef.current = null;
+    setDraggedRole(null);
+    setDragOverTarget(null);
+  };
+
+  const handleRoleDrop = (slotIndex: number, subslotIndex: number | null) => {
+    const activeDraggedRole = draggedRoleRef.current ?? draggedRole;
+    if (!activeDraggedRole) return;
+
+    if (
+      activeDraggedRole.slotIndex === slotIndex &&
+      subslotIndex !== null &&
+      activeDraggedRole.subslotIndex === subslotIndex
+    ) {
+      handleRoleDragEnd();
+      return;
+    }
+
+    moveSubslotByDrag(
+      activeDraggedRole.slotIndex,
+      activeDraggedRole.subslotIndex,
+      slotIndex,
+      subslotIndex
+    );
+
+    handleRoleDragEnd();
+  };
+
   const addSubslotFromDefinition = (slotIndex: number, definitionId: number) => {
     const definition = subslotDefinitions.find((item) => item.id === definitionId);
     if (!definition) {
-      showError('Selected subslot definition was not found');
+      showError('Selected role definition was not found');
       return;
     }
 
     const newSlots = [...slots];
     const activeSubslots = newSlots[slotIndex].subslots.filter((s) => !s._deleted);
 
-    const alreadyAdded = activeSubslots.some((subslot) => subslot.subslotDefinitionId === definition.id);
+    const alreadyAdded = activeSubslots.some((subslot) => subslot.squadRoleId === definition.id);
     if (alreadyAdded) {
-      showError('This subslot is already added to the slot');
+      showError('This role is already added to the slot');
       return;
     }
 
     const newOrderIndex = activeSubslots.length;
     newSlots[slotIndex].subslots.push({
-      subslotDefinitionId: definition.id,
+      squadRoleId: definition.id,
       name: definition.name,
       orderIndex: newOrderIndex,
       maxSignups: definition.maxSignups,
@@ -449,7 +636,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
       requiredTrainingId: definition.requiredTraining?.id ?? null,
       requiredRankId: definition.requiredRank?.id ?? null,
     });
-    setSlots(newSlots);
+    setSlots(normalizeOrderIndexes(newSlots));
 
     setSelectedDefinitionBySlot((prev) => ({ ...prev, [slotIndex]: '' }));
   };
@@ -463,7 +650,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
       // Remove if it's new
       newSlots[slotIndex].subslots.splice(subslotIndex, 1);
     }
-    setSlots(newSlots);
+    setSlots(normalizeOrderIndexes(newSlots));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -507,13 +694,19 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
       }
       const activeSubslots = slot.subslots.filter((s) => !s._deleted);
       if (activeSubslots.length === 0) {
-        setError(`Slot "${slot.name}" must have at least one subslot`);
+        setError(`Slot "${slot.name}" must have at least one role`);
         setIsSaving(false);
         return;
       }
       for (const subslot of activeSubslots) {
         if (!subslot.name.trim()) {
-          setError('All subslots must have a name');
+          setError('All roles must have a name');
+          setIsSaving(false);
+          return;
+        }
+
+        if (!Number.isInteger(subslot.maxSignups) || subslot.maxSignups < 1) {
+          setError('Max signups must be at least 1 for each role');
           setIsSaving(false);
           return;
         }
@@ -521,13 +714,29 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     }
 
     try {
+      // Clean up slots/squads for API: remove _deleted flags and filter out deleted items
+      const cleanSquads = slots
+        .filter((s) => !s._deleted)
+        .map((slot) => ({
+          name: slot.name,
+          orderIndex: slot.orderIndex,
+          slots: slot.subslots
+            .filter((sub) => !sub._deleted)
+            .map((subslot) => ({
+              squadRoleId: subslot.squadRoleId ?? null,
+              name: subslot.name,
+              orderIndex: subslot.orderIndex,
+              maxSignups: subslot.maxSignups,
+            })),
+        }));
+
       const payload = {
         name,
         description,
         eventDate: eventDate || null,
         startTime: startTime || null,
         endTime: endTime || null,
-        slots,
+        squads: cleanSquads,
         frequencyIds: selectedFrequencyIds,
         tempFrequencies,
         bluforCountry: bluforCountry || null,
@@ -584,8 +793,8 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         </h1>
         <p className="text-sm sm:text-base mt-2" style={{ color: 'var(--muted-foreground)' }}>
           {mode === 'create' 
-            ? 'Set up a new operation with slots and subslots' 
-            : 'Modify operation details, slots, and subslots'}
+            ? 'Set up a new operation with slots and roles' 
+            : 'Modify operation details, slots, and roles'}
         </p>
       </div>
 
@@ -976,7 +1185,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
       {/* Slots */}
       <div className="border rounded-lg p-6 space-y-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
         <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold" style={{ color: 'var(--foreground)' }}>Slots & Subslots</h2>
+          <h2 className="text-xl font-semibold" style={{ color: 'var(--foreground)' }}>Slots & Roles</h2>
           <button
             type="button"
             onClick={addSlot}
@@ -993,7 +1202,34 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {slots.map((slot, slotIndex) =>
               slot._deleted ? null : (
-                <div key={slotIndex} className="border rounded-lg p-4 space-y-3 flex flex-col" style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}>
+                <div
+                  key={slotIndex}
+                  draggable={draggedRole === null}
+                  onDragStart={() => {
+                    if (draggedRole) return;
+                    handleSquadDragStart(slotIndex);
+                  }}
+                  onDragEnd={handleSquadDragEnd}
+                  onDragOver={(e) => {
+                    if (draggedSquadIndex === null) return;
+                    e.preventDefault();
+                  }}
+                  onDragEnter={() => {
+                    if (draggedSquadIndex === null) return;
+                    setDragOverSquadIndex(slotIndex);
+                  }}
+                  onDrop={(e) => {
+                    if (draggedSquadIndex === null) return;
+                    e.preventDefault();
+                    handleSquadDrop(slotIndex);
+                  }}
+                  className="border rounded-lg p-4 space-y-3 flex flex-col"
+                  style={{
+                    backgroundColor: 'var(--background)',
+                    borderColor: dragOverSquadIndex === slotIndex ? 'var(--primary)' : 'var(--border)',
+                    opacity: draggedSquadIndex === slotIndex ? 0.6 : 1,
+                  }}
+                >
                   <div className="flex gap-3 items-start">
                     <div className="flex-1">
                       <label className="block text-sm font-medium mb-2" style={{ color: 'var(--muted-foreground)' }}>
@@ -1023,12 +1259,12 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
                   {/* Subslots */}
                   <div className="ml-4 space-y-2">
                     <div className="flex justify-between items-center">
-                      <h4 className="text-sm font-medium" style={{ color: 'var(--muted-foreground)' }}>Subslots</h4>
+                      <h4 className="text-sm font-medium" style={{ color: 'var(--muted-foreground)' }}>Roles</h4>
                     </div>
 
                     <div className="space-y-2 rounded-md border p-3" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--secondary)' }}>
                       <label className="block text-xs font-medium" style={{ color: 'var(--muted-foreground)' }}>
-                        Search subslot by name
+                        Search role by name
                       </label>
                       <input
                         type="text"
@@ -1038,7 +1274,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
                         }
                         className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2"
                         style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
-                        placeholder="Type to filter subslots..."
+                        placeholder="Type to filter roles..."
                       />
 
                       <div className="flex gap-2">
@@ -1050,9 +1286,11 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
                           className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2"
                           style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
                         >
-                          <option value="">Select subslot...</option>
+                          <option value="">Select role...</option>
                           {subslotDefinitions
                             .filter((definition) => {
+                              // Filter out retired roles
+                              if (definition.isRetired) return false;
                               const searchTerm = (subslotSearchBySlot[slotIndex] || '').trim().toLowerCase();
                               if (!searchTerm) return true;
                               return definition.name.toLowerCase().includes(searchTerm);
@@ -1080,23 +1318,100 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
                     </div>
 
                     {slot.subslots.filter((s) => !s._deleted).length === 0 ? (
-                      <p className="text-sm py-2" style={{ color: 'var(--muted-foreground)' }}>No subslots</p>
+                      <div
+                        className="text-sm py-2 rounded-md border border-dashed px-2"
+                        style={{
+                          color: 'var(--muted-foreground)',
+                          borderColor:
+                            dragOverTarget?.slotIndex === slotIndex && dragOverTarget?.subslotIndex === null
+                              ? 'var(--primary)'
+                              : 'var(--border)',
+                        }}
+                        onDragOver={(e) => {
+                          if (!draggedRoleRef.current) return;
+                          e.preventDefault();
+                        }}
+                        onDragEnter={() => {
+                          if (!draggedRoleRef.current) return;
+                          setDragOverTarget({ slotIndex, subslotIndex: null });
+                        }}
+                        onDrop={(e) => {
+                          if (!draggedRoleRef.current) return;
+                          e.preventDefault();
+                          handleRoleDrop(slotIndex, null);
+                        }}
+                      >
+                        No roles
+                      </div>
                     ) : (
-                      slot.subslots.map((subslot, subslotIndex) =>
-                        subslot._deleted ? null : (
-                          <div key={subslotIndex} className="border border-gray-600 rounded p-2 space-y-2" style={{ backgroundColor: 'var(--background)' }}>
+                      <>
+                        {slot.subslots.map((subslot, subslotIndex) =>
+                          subslot._deleted ? null : (
+                          <div
+                            key={subslotIndex}
+                            draggable
+                            onDragStart={(e) => {
+                              e.stopPropagation();
+                              handleRoleDragStart(slotIndex, subslotIndex);
+                            }}
+                            onDragEnd={(e) => {
+                              e.stopPropagation();
+                              handleRoleDragEnd();
+                            }}
+                            onDragOver={(e) => {
+                              if (!draggedRoleRef.current) return;
+                              e.preventDefault();
+                            }}
+                            onDragEnter={() => {
+                              if (!draggedRoleRef.current) return;
+                              setDragOverTarget({ slotIndex, subslotIndex });
+                            }}
+                            onDrop={(e) => {
+                              if (!draggedRoleRef.current) return;
+                              e.preventDefault();
+                              handleRoleDrop(slotIndex, subslotIndex);
+                            }}
+                            className="border border-gray-600 rounded p-2 space-y-2 cursor-move"
+                            style={{
+                              backgroundColor: 'var(--background)',
+                              borderColor:
+                                dragOverTarget?.slotIndex === slotIndex && dragOverTarget?.subslotIndex === subslotIndex
+                                  ? 'var(--primary)'
+                                  : 'var(--border)',
+                              opacity:
+                                draggedRole?.slotIndex === slotIndex && draggedRole?.subslotIndex === subslotIndex
+                                  ? 0.6
+                                  : 1,
+                            }}
+                          >
                             <div className="flex gap-2 items-start">
                               <div className="flex-1 text-sm" style={{ color: 'var(--foreground)' }}>
                                 <div className="font-medium">{subslot.name}</div>
-                                <div className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
-                                  Max signups: {subslot.maxSignups}
+                                <div className="mt-2 flex items-center gap-2">
+                                  <label className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                                    Max signups
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    value={subslot.maxSignups}
+                                    onChange={(e) =>
+                                      updateSubslotMaxSignups(
+                                        slotIndex,
+                                        subslotIndex,
+                                        Number(e.target.value || 1)
+                                      )
+                                    }
+                                    className="w-20 px-2 py-1 border rounded text-xs"
+                                    style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                                  />
                                 </div>
                                 {((subslot.requiredTrainingIds && subslot.requiredTrainingIds.length > 0) ||
                                   (subslot.requiredRankIds && subslot.requiredRankIds.length > 0) ||
                                   subslot.requiredTrainingId ||
                                   subslot.requiredRankId) && (
                                   <div className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
-                                    Prerequisites configured on subslot definition
+                                    Prerequisites configured on role definition
                                   </div>
                                 )}
                               </div>
@@ -1105,19 +1420,69 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
                                 onClick={() => removeSubslot(slotIndex, subslotIndex)}
                                 className="px-3 py-2 text-sm"
                                 style={{ color: '#ef4444' }}
-                                title="Remove subslot"
+                                title="Remove role"
                               >
                                 ×
                               </button>
                             </div>
                           </div>
-                        )
-                      )
+                          )
+                        )}
+
+                        <div
+                          className="rounded-md border border-dashed px-2 py-2 text-xs"
+                          style={{
+                            color: 'var(--muted-foreground)',
+                            borderColor:
+                              dragOverTarget?.slotIndex === slotIndex && dragOverTarget?.subslotIndex === null
+                                ? 'var(--primary)'
+                                : 'var(--border)',
+                          }}
+                          onDragOver={(e) => {
+                            if (!draggedRoleRef.current) return;
+                            e.preventDefault();
+                          }}
+                          onDragEnter={() => {
+                            if (!draggedRoleRef.current) return;
+                            setDragOverTarget({ slotIndex, subslotIndex: null });
+                          }}
+                          onDrop={(e) => {
+                            if (!draggedRoleRef.current) return;
+                            e.preventDefault();
+                            handleRoleDrop(slotIndex, null);
+                          }}
+                        >
+                          Drag here to move role to end of this squad
+                        </div>
+                      </>
                     )}
                   </div>
                 </div>
               )
             )}
+
+            <div
+              className="rounded-lg border border-dashed px-3 py-6 text-sm"
+              style={{
+                color: 'var(--muted-foreground)',
+                borderColor: dragOverSquadIndex === slots.length ? 'var(--primary)' : 'var(--border)',
+              }}
+              onDragOver={(e) => {
+                if (draggedSquadIndex === null) return;
+                e.preventDefault();
+              }}
+              onDragEnter={() => {
+                if (draggedSquadIndex === null) return;
+                setDragOverSquadIndex(slots.length);
+              }}
+              onDrop={(e) => {
+                if (draggedSquadIndex === null) return;
+                e.preventDefault();
+                handleSquadDrop(slots.length);
+              }}
+            >
+              Drag here to move squad to end
+            </div>
           </div>
         )}
       </div>

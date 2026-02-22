@@ -15,7 +15,7 @@ type ClientSignup = {
   } | null;
 };
 
-type ClientSubslot = {
+type ClientSlot = {
   id: number;
   name: string;
   orderIndex: number;
@@ -23,11 +23,11 @@ type ClientSubslot = {
   signups: ClientSignup[];
 };
 
-type ClientSlot = {
+type ClientSquad = {
   id: number;
   name: string;
   orderIndex: number;
-  subslots: ClientSubslot[];
+  slots: ClientSlot[];
 };
 
 type ClientOrbat = {
@@ -37,7 +37,7 @@ type ClientOrbat = {
   eventDate: string | null;
   startTime?: string | null;
   endTime?: string | null;
-  slots: ClientSlot[];
+  squads?: ClientSquad[];
   frequencies?: any[];
   tempFrequencies?: any;
   // Faction fields
@@ -121,7 +121,7 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
   } | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<{ signupId: number; subslotId: number; userName: string } | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError, showWarning } = useToast();
 
   const eventDate = orbat.eventDate ? new Date(orbat.eventDate) : null;
 
@@ -148,12 +148,21 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ targetSubslotId }),
+      body: JSON.stringify({ targetSlotId: targetSubslotId }),
     });
 
     if (!res.ok) {
       const data = await res.json();
       throw new Error(data.error || 'Failed to move signup');
+    }
+
+    const data = await res.json();
+
+    // Show warnings if any
+    if (data.warnings && Array.isArray(data.warnings)) {
+      for (const warning of data.warnings) {
+        showWarning(warning, 8000);
+      }
     }
 
     // Refresh the orbat data
@@ -206,7 +215,7 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
 
   // Get all available subslots for moving (excluding the current one)
   const getAvailableSubslots = () => {
-    if (!selectedSignup) return [];
+    if (!selectedSignup || !orbat.squads) return [];
 
     const available: Array<{
       id: number;
@@ -216,15 +225,15 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
       maxSignups: number;
     }> = [];
 
-    orbat.slots.forEach((slot) => {
-      slot.subslots.forEach((subslot) => {
-        if (subslot.id !== selectedSignup.currentSubslotId) {
+    orbat.squads.forEach((squad) => {
+      squad.slots.forEach((slot) => {
+        if (slot.id !== selectedSignup.currentSubslotId) {
           available.push({
-            id: subslot.id,
-            name: subslot.name,
-            slotName: slot.name,
-            currentSignups: subslot.signups.length,
-            maxSignups: subslot.maxSignups,
+            id: slot.id,
+            name: slot.name,
+            slotName: `${squad.name} - ${slot.name}`,
+            currentSignups: slot.signups.length,
+            maxSignups: slot.maxSignups,
           });
         }
       });
@@ -290,40 +299,46 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
         </div>
       </div>
 
-      {/* Slots grid */}
+      {/* Squads grid */}
       <section className={`grid gap-4 md:gap-6 ${
-        orbat.slots.length === 1 ? 'grid-cols-1' :
-        orbat.slots.length === 2 ? 'grid-cols-1 md:grid-cols-2' :
+        !orbat.squads || orbat.squads.length === 0 ? 'grid-cols-1' :
+        orbat.squads.length === 1 ? 'grid-cols-1' :
+        orbat.squads.length === 2 ? 'grid-cols-1 md:grid-cols-2' :
         'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'
       }`}>
-        {orbat.slots.map((slot) => (
+        {!orbat.squads || orbat.squads.length === 0 ? (
+          <div className="col-span-full text-center py-8" style={{ color: 'var(--muted-foreground)' }}>
+            No squads found
+          </div>
+        ) : (
+          orbat.squads.map((squad) => (
           <article
-            key={slot.id}
+            key={squad.id}
             className="rounded-lg border p-4 flex flex-col gap-3"
             style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
           >
             <h2 className="text-lg font-semibold pb-2" style={{ color: 'var(--foreground)', borderBottom: '1px solid var(--border)' }}>
-              {slot.name}
+              {squad.name}
             </h2>
 
             <ul className="space-y-3">
-              {slot.subslots.map((sub) => {
-                const hasSignup = sub.signups.length > 0;
-                const isFull = sub.signups.length >= sub.maxSignups;
+              {squad.slots.map((slot) => {
+                const hasSignup = slot.signups.length > 0;
+                const isFull = slot.signups.length >= slot.maxSignups;
 
                 return (
-                  <li key={sub.id} className="flex flex-col gap-2">
+                  <li key={slot.id} className="flex flex-col gap-2">
                     <div className="flex justify-between items-start">
-                      <div className="font-medium" style={{ color: 'var(--foreground)' }}>{sub.name}</div>
+                      <div className="font-medium" style={{ color: 'var(--foreground)' }}>{slot.name}</div>
                       <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-                        {sub.signups.length}/{sub.maxSignups}
+                        {slot.signups.length}/{slot.maxSignups}
                         {isFull && <span className="ml-1" style={{ color: '#f59e0b' }}>(Full)</span>}
                       </div>
                     </div>
 
                     {hasSignup ? (
                       <div className="space-y-1 pl-2" style={{ borderLeft: '2px solid var(--primary)' }}>
-                        {sub.signups.map((signup) => {
+                        {slot.signups.map((signup) => {
                           const username = signup.user?.username ?? 'Unknown';
                           const rankAbbr = signup.user?.rankAbbreviation;
                           const displayName = rankAbbr ? `[${rankAbbr}] ${username}` : username;
@@ -342,9 +357,9 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
                                   handleMoveClick(
                                     signup.id,
                                     signup.user?.username ?? 'Unknown',
-                                    sub.id,
-                                    sub.name,
-                                    slot.name
+                                    slot.id,
+                                    slot.name,
+                                    squad.name
                                   )
                                 }
                                 className="px-2 py-0.5 text-xs"
@@ -354,7 +369,7 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
                                 Move
                               </button>
                               <button
-                                onClick={() => handleRemoveSignup(signup.id, sub.id, signup.user?.username || 'Unknown')}
+                                onClick={() => handleRemoveSignup(signup.id, slot.id, signup.user?.username || 'Unknown')}
                                 className="px-2 py-0.5 text-xs"
                                 style={{ color: '#ef4444' }}
                                 title="Remove signup"
@@ -374,7 +389,7 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
               })}
             </ul>
           </article>
-        ))}
+        )))}
       </section>
 
       {/* Radio Frequencies and Extra Intel Section - at bottom */}

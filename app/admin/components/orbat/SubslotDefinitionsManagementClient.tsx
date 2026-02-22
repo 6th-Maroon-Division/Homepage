@@ -2,6 +2,7 @@
 
 import { type ChangeEvent, useState } from 'react';
 import { useToast } from '@/app/components/ui/ToastContainer';
+import ConfirmModal from '@/app/components/ui/ConfirmModal';
 import { createPortal } from 'react-dom';
 
 type TrainingOption = {
@@ -19,7 +20,6 @@ type RankOption = {
 type SubslotDefinition = {
   id: number;
   name: string;
-  maxSignups: number;
   requiredTrainingIds: number[];
   requiredRankIds: number[];
   requiredTrainingId: number | null;
@@ -28,6 +28,7 @@ type SubslotDefinition = {
   requiredRanks: { id: number; name: string; abbreviation: string; orderIndex?: number }[];
   requiredTraining: { id: number; name: string } | null;
   requiredRank: { id: number; name: string; abbreviation: string } | null;
+  isRetired?: boolean;
 };
 
 type Props = {
@@ -53,16 +54,16 @@ export default function SubslotDefinitionsManagementClient({
   const [isSaving, setIsSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; name: string } | null>(null);
+  const [retireConfirm, setRetireConfirm] = useState<{ id: number; name: string; isRetired: boolean } | null>(null);
   const { showSuccess, showError } = useToast();
 
   const [form, setForm] = useState<{
     name: string;
-    maxSignups: number;
     requiredTrainingIds: number[];
     requiredRankIds: number[];
   }>({
     name: '',
-    maxSignups: 1,
     requiredTrainingIds: [],
     requiredRankIds: [],
   });
@@ -72,7 +73,6 @@ export default function SubslotDefinitionsManagementClient({
   const resetForm = () => {
     setForm({
       name: '',
-      maxSignups: 1,
       requiredTrainingIds: [],
       requiredRankIds: [],
     });
@@ -88,7 +88,6 @@ export default function SubslotDefinitionsManagementClient({
     setEditingId(definition.id);
     setForm({
       name: definition.name,
-      maxSignups: definition.maxSignups,
       requiredTrainingIds: definition.requiredTrainingIds || [],
       requiredRankIds: definition.requiredRankIds || [],
     });
@@ -122,15 +121,14 @@ export default function SubslotDefinitionsManagementClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: form.name.trim(),
-          maxSignups: form.maxSignups,
           requiredTrainingIds: form.requiredTrainingIds,
           requiredRankIds: form.requiredRankIds,
         }),
       });
 
       if (!response.ok) {
-        const body = await response.json().catch(() => ({ error: 'Failed to save subslot definition' }));
-        showError(body.error || 'Failed to save subslot definition');
+        const body = await response.json().catch(() => ({ error: 'Failed to save role definition' }));
+        showError(body.error || 'Failed to save role definition');
         return;
       }
 
@@ -145,9 +143,9 @@ export default function SubslotDefinitionsManagementClient({
       });
 
       closeModal();
-      showSuccess(isEditMode ? 'Subslot definition updated' : 'Subslot definition created');
+      showSuccess(isEditMode ? 'Role definition updated' : 'Role definition created');
     } catch {
-      showError('Network error while saving subslot definition');
+      showError('Network error while saving role definition');
     } finally {
       setIsSaving(false);
     }
@@ -161,35 +159,78 @@ export default function SubslotDefinitionsManagementClient({
       });
 
       if (!response.ok) {
-        const body = await response.json().catch(() => ({ error: 'Failed to delete subslot definition' }));
-        showError(body.error || 'Failed to delete subslot definition');
+        const body = await response.json().catch(() => ({ error: 'Failed to delete role definition' }));
+        showError(body.error || 'Failed to delete role definition');
         return;
       }
 
       setDefinitions((prev) => prev.filter((definition) => definition.id !== definitionId));
       if (editingId === definitionId) closeModal();
-      showSuccess('Subslot definition deleted');
+      showSuccess('Role definition deleted');
     } catch {
-      showError('Network error while deleting subslot definition');
+      showError('Network error while deleting role definition');
     } finally {
       setIsSaving(false);
+      setDeleteConfirm(null);
     }
+  };
+
+  const openDeleteConfirmation = (definition: SubslotDefinition) => {
+    setDeleteConfirm({ id: definition.id, name: definition.name });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm) return;
+    await deleteDefinition(deleteConfirm.id);
+  };
+
+  const retireDefinition = async (definitionId: number, retire: boolean) => {
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/subslot-definitions/${definitionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isRetired: retire }),
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({ error: 'Failed to update role definition' }));
+        showError(body.error || 'Failed to update role definition');
+        return;
+      }
+
+      const updated: SubslotDefinition = await response.json();
+      setDefinitions((prev) =>
+        prev.map((definition) => (definition.id === updated.id ? updated : definition))
+      );
+      showSuccess(retire ? 'Role definition retired' : 'Role definition restored');
+    } catch {
+      showError('Network error while updating role definition');
+    } finally {
+      setIsSaving(false);
+      setRetireConfirm(null);
+    }
+  };
+
+  const confirmRetire = async () => {
+    if (!retireConfirm) return;
+    await retireDefinition(retireConfirm.id, retireConfirm.isRetired);
   };
 
   return (
     <div className="space-y-6">
       <div className="border rounded-lg p-6" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
-        <h1 className="text-2xl font-bold" style={{ color: 'var(--foreground)' }}>Subslot Definitions</h1>
+        <h1 className="text-2xl font-bold" style={{ color: 'var(--foreground)' }}>Role Definitions</h1>
         <p className="text-sm mt-2" style={{ color: 'var(--muted-foreground)' }}>
           {isReadOnly
-            ? 'Read-only view of reusable subslots.'
-            : 'Create and manage reusable subslots with optional training/rank prerequisites.'}
+            ? 'Read-only view of reusable role definitions.'
+            : 'Create and manage reusable role definitions with optional training/rank prerequisites.'}
         </p>
       </div>
 
       {!isReadOnly && canCreate && (
       <div className="border rounded-lg p-6 space-y-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
-        <h2 className="text-lg font-semibold" style={{ color: 'var(--foreground)' }}>Create Subslot Definition</h2>
+        <h2 className="text-lg font-semibold" style={{ color: 'var(--foreground)' }}>Create Role Definition</h2>
         <button
           type="button"
           onClick={openCreateModal}
@@ -208,7 +249,7 @@ export default function SubslotDefinitionsManagementClient({
 
         {definitions.length === 0 ? (
           <div className="px-6 py-8 text-sm" style={{ color: 'var(--muted-foreground)' }}>
-            No subslot definitions yet.
+            No role definitions yet.
           </div>
         ) : (
           <div className="space-y-0">
@@ -221,9 +262,13 @@ export default function SubslotDefinitionsManagementClient({
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <div className="font-medium" style={{ color: 'var(--foreground)' }}>{definition.name}</div>
-                      <div className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
-                        Max signups: {definition.maxSignups}
+                      <div className="flex items-center gap-2">
+                        <div className="font-medium" style={{ color: 'var(--foreground)' }}>{definition.name}</div>
+                        {definition.isRetired && (
+                          <span className="text-xs px-2 py-1 rounded" style={{ backgroundColor: 'var(--muted)', color: 'var(--muted-foreground)' }}>
+                            Retired
+                          </span>
+                        )}
                       </div>
                       <div className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
                         Trainings: {definition.requiredTrainings.length > 0 ? definition.requiredTrainings.map((training) => training.name).join(', ') : 'None'}
@@ -244,10 +289,21 @@ export default function SubslotDefinitionsManagementClient({
                         Edit
                       </button>
                       )}
+                      {canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => setRetireConfirm({ id: definition.id, name: definition.name, isRetired: !definition.isRetired })}
+                        disabled={isSaving}
+                        className="px-3 py-2 text-xs rounded-md disabled:opacity-50"
+                        style={{ backgroundColor: definition.isRetired ? 'var(--primary)' : 'var(--muted)', color: 'var(--foreground)' }}
+                      >
+                        {definition.isRetired ? 'Restore' : 'Retire'}
+                      </button>
+                      )}
                       {canDelete && (
                       <button
                         type="button"
-                        onClick={() => deleteDefinition(definition.id)}
+                        onClick={() => openDeleteConfirmation(definition)}
                         disabled={isSaving}
                         className="px-3 py-2 text-xs rounded-md disabled:opacity-50"
                         style={{ backgroundColor: 'var(--muted)', color: 'var(--foreground)' }}
@@ -268,7 +324,7 @@ export default function SubslotDefinitionsManagementClient({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
           <div className="w-full max-w-2xl border rounded-lg p-6 space-y-4" style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}>
             <h2 className="text-xl font-semibold" style={{ color: 'var(--foreground)' }}>
-              {isEditMode ? 'Edit Subslot Definition' : 'Create Subslot Definition'}
+              {isEditMode ? 'Edit Role Definition' : 'Create Role Definition'}
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -278,23 +334,6 @@ export default function SubslotDefinitionsManagementClient({
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-3 py-2 border rounded-md text-sm"
-                  style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm mb-1" style={{ color: 'var(--foreground)' }}>Max signups</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={form.maxSignups}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      maxSignups: Math.max(1, Number(e.target.value) || 1),
-                    }))
-                  }
                   className="w-full px-3 py-2 border rounded-md text-sm"
                   style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
                 />
@@ -368,6 +407,30 @@ export default function SubslotDefinitionsManagementClient({
         </div>,
         document.body
       )}
+
+      <ConfirmModal
+        isOpen={deleteConfirm !== null}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirm(null)}
+        title="Delete Role Definition"
+        message={`Are you sure you want to delete the role definition "${deleteConfirm?.name}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        isDestructive
+        isLoading={isSaving}
+      />
+
+      <ConfirmModal
+        isOpen={retireConfirm !== null}
+        onConfirm={confirmRetire}
+        onCancel={() => setRetireConfirm(null)}
+        title={retireConfirm?.isRetired ? 'Retire Role Definition' : 'Restore Role Definition'}
+        message={retireConfirm?.isRetired 
+          ? `Retire "${retireConfirm?.name}"? It will no longer be available for new assignments, but existing OrbATs will continue to use it.`
+          : `Restore "${retireConfirm?.name}" to active status? It will be available for new assignments.`
+        }
+        confirmLabel={retireConfirm?.isRetired ? 'Retire' : 'Restore'}
+        isLoading={isSaving}
+      />
     </div>
   );
 }

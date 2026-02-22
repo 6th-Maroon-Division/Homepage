@@ -1,13 +1,12 @@
-// app/api/orbats/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 
-type SubslotInput = {
+type SlotInput = {
   id?: number;
-  subslotDefinitionId?: number | null;
+  squadRoleId?: number | null;
   name: string;
   orderIndex: number;
   maxSignups: number;
@@ -15,35 +14,10 @@ type SubslotInput = {
   _deleted?: boolean;
 };
 
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit') || '5', 10);
-    const maxLimit = Math.min(limit, 50); // Cap at 50 to prevent excessive queries
-
-    const orbats = await prisma.orbat.findMany({
-      take: maxLimit,
-      orderBy: {
-        createdAt: 'desc',
-      },
-      select: {
-        id: true,
-        name: true,
-      },
-    });
-
-    return NextResponse.json(orbats);
-  } catch (error) {
-    console.error('Error fetching OrbATs:', error);
-    return NextResponse.json({ error: 'Failed to fetch OrbATs' }, { status: 500 });
-  }
-}
-
-
-type SlotInput = {
+type SquadInput = {
   name: string;
   orderIndex: number;
-  subslots: SubslotInput[];
+  slots: SlotInput[];
 };
 
 type OrbatInput = {
@@ -52,7 +26,7 @@ type OrbatInput = {
   eventDate?: string | null;
   startTime?: string | null;
   endTime?: string | null;
-  slots: SlotInput[];
+  squads: SquadInput[];
   frequencyIds?: number[];
   tempFrequencies?: Array<{
     frequency: string;
@@ -75,6 +49,28 @@ type OrbatInput = {
   operationDay?: string | null;
 };
 
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const limit = Number.parseInt(searchParams.get('limit') || '5', 10);
+    const maxLimit = Math.min(limit, 50);
+
+    const orbats = await prisma.orbat.findMany({
+      take: maxLimit,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    return NextResponse.json(orbats);
+  } catch (error) {
+    console.error('Error fetching OrbATs:', error);
+    return NextResponse.json({ error: 'Failed to fetch OrbATs' }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -82,30 +78,42 @@ export async function POST(request: NextRequest) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    
-    const hasPermission = await checkPermission(session.user.id, 'orbat:create');
+
+    const userId = Number(session.user.id);
+
+    // Verify user exists in database (should be created during auth)
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User profile not found. Please sign out and sign in again.' },
+        { status: 401 }
+      );
+    }
+
+    const hasPermission = await checkPermission(userId, 'orbat:create');
     if (!hasPermission) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const body: OrbatInput = await request.json();
 
-    // Validate input
     if (!body.name || !body.name.trim()) {
       return NextResponse.json({ error: 'OrbAT name is required' }, { status: 400 });
     }
 
-    if (!body.slots || body.slots.length === 0) {
+    if (!body.squads || body.squads.length === 0) {
       return NextResponse.json({ error: 'At least one slot is required' }, { status: 400 });
     }
 
-    // Prevent creating operations in the past
     if (body.eventDate) {
       const eventDate = new Date(body.eventDate);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       eventDate.setHours(0, 0, 0, 0);
-      
+
       if (eventDate < today) {
         return NextResponse.json({ error: 'Cannot create operations with past dates' }, { status: 400 });
       }
@@ -113,37 +121,35 @@ export async function POST(request: NextRequest) {
 
     const requestedDefinitionIds = Array.from(
       new Set(
-        body.slots
-          .flatMap((slot) => slot.subslots)
-          .map((subslot) => subslot.subslotDefinitionId)
+        body.squads
+          .flatMap((squad) => squad.slots)
+          .map((slot) => slot.squadRoleId)
           .filter((id): id is number => typeof id === 'number')
       )
     );
 
-    const subslotDefinitions = requestedDefinitionIds.length
-      ? await prisma.subslotDefinition.findMany({
+    const squadRoles = requestedDefinitionIds.length
+      ? await prisma.squadRole.findMany({
           where: { id: { in: requestedDefinitionIds } },
-          select: {
-            id: true,
-            name: true,
-            maxSignups: true,
-            requiredTrainingIds: true,
-            requiredRankIds: true,
-            requiredTrainingId: true,
-            requiredRankId: true,
-          },
+          select: { id: true, name: true, requiredTrainingIds: true, requiredRankIds: true, isRetired: true },
         })
       : [];
 
-    const subslotDefinitionMap = new Map(subslotDefinitions.map((definition) => [definition.id, definition]));
-
-    if (subslotDefinitions.length !== requestedDefinitionIds.length) {
-      return NextResponse.json({ error: 'One or more selected subslot definitions do not exist.' }, { status: 400 });
+    if (squadRoles.length !== requestedDefinitionIds.length) {
+      return NextResponse.json({ error: 'One or more selected role definitions do not exist.' }, { status: 400 });
     }
 
-    // Create the OrbAT with all nested data in a transaction
+    const retiredRoleNames = squadRoles.filter((role) => role.isRetired).map((role) => role.name);
+    if (retiredRoleNames.length > 0) {
+      return NextResponse.json(
+        { error: `Cannot use retired role definitions: ${retiredRoleNames.join(', ')}. Restore them or choose active roles.` },
+        { status: 400 }
+      );
+    }
+
+    const squadRoleMap = new Map(squadRoles.map((role) => [role.id, role]));
+
     const orbat = await prisma.$transaction(async (tx) => {
-      // Create the OrbAT
       const newOrbat = await tx.orbat.create({
         data: {
           name: body.name.trim(),
@@ -163,49 +169,57 @@ export async function POST(request: NextRequest) {
           airspace: body.airspace || null,
           inGameTimezone: body.inGameTimezone || null,
           operationDay: body.operationDay || null,
-          createdById: session.user.id,
+          createdById: userId,
           tempFrequencies: body.tempFrequencies || [],
-          slots: {
-            create: body.slots.map((slot) => ({
-              name: slot.name.trim(),
-              orderIndex: slot.orderIndex,
-              subslots: {
-                create: slot.subslots.map((subslot) => ({
-                  name: (subslot.subslotDefinitionId
-                    ? subslotDefinitionMap.get(subslot.subslotDefinitionId)?.name
-                    : subslot.name
-                  )?.trim() || 'Unnamed Subslot',
-                  orderIndex: subslot.orderIndex,
-                  maxSignups: subslot.subslotDefinitionId
-                    ? (subslotDefinitionMap.get(subslot.subslotDefinitionId)?.maxSignups ?? 1)
-                    : subslot.maxSignups,
-                  subslotDefinitionId: subslot.subslotDefinitionId ?? null,
-                  requiredTrainingIds: subslot.subslotDefinitionId
-                    ? (subslotDefinitionMap.get(subslot.subslotDefinitionId)?.requiredTrainingIds ?? [])
-                    : [],
-                  requiredRankIds: subslot.subslotDefinitionId
-                    ? (subslotDefinitionMap.get(subslot.subslotDefinitionId)?.requiredRankIds ?? [])
-                    : [],
-                  requiredTrainingId: subslot.subslotDefinitionId
-                    ? (subslotDefinitionMap.get(subslot.subslotDefinitionId)?.requiredTrainingId ?? null)
-                    : null,
-                  requiredRankId: subslot.subslotDefinitionId
-                    ? (subslotDefinitionMap.get(subslot.subslotDefinitionId)?.requiredRankId ?? null)
-                    : null,
-                })),
-              },
-            })),
-          },
-          frequencies: {
-            create: (body.frequencyIds || []).map((freqId) => ({
-              radioFrequencyId: freqId,
-            })),
-          },
         },
+      });
+
+      for (const squadInput of body.squads) {
+        const squad = await tx.squad.create({
+          data: {
+            orbatId: newOrbat.id,
+            name: squadInput.name.trim(),
+            orderIndex: squadInput.orderIndex,
+          },
+        });
+
+        for (const slotInput of squadInput.slots) {
+          const role = typeof slotInput.squadRoleId === 'number'
+            ? squadRoleMap.get(slotInput.squadRoleId)
+            : null;
+
+          await tx.slot.create({
+            data: {
+              orbatId: newOrbat.id,
+              squadId: squad.id,
+              squadRoleId: role?.id ?? null,
+              orderIndex: slotInput.orderIndex,
+              maxSignups: slotInput.maxSignups,
+            },
+          });
+        }
+      }
+
+      if (body.frequencyIds && body.frequencyIds.length > 0) {
+        await tx.orbatRadioFrequency.createMany({
+          data: body.frequencyIds.map((frequencyId) => ({
+            orbatId: newOrbat.id,
+            radioFrequencyId: frequencyId,
+          })),
+          skipDuplicates: true,
+        });
+      }
+
+      return tx.orbat.findUnique({
+        where: { id: newOrbat.id },
         include: {
-          slots: {
+          squads: {
+            orderBy: { orderIndex: 'asc' },
             include: {
-              subslots: true,
+              slots: {
+                orderBy: { orderIndex: 'asc' },
+                include: { squadRole: true },
+              },
             },
           },
           frequencies: {
@@ -215,8 +229,6 @@ export async function POST(request: NextRequest) {
           },
         },
       });
-
-      return newOrbat;
     });
 
     return NextResponse.json(orbat, { status: 201 });

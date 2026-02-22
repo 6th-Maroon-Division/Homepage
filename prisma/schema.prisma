@@ -215,6 +215,7 @@ model SquadRole {
   tags                String?                     // Comma-separated filter tags
   requiredTrainingIds Int[]  @default([])
   requiredRankIds     Int[]  @default([])
+  isRetired           Boolean @default(false)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   

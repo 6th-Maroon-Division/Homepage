@@ -1,25 +1,23 @@
-// app/api/orbats/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 
-type SubslotInput = {
+type SlotInput = {
   id?: number;
-  subslotDefinitionId?: number | null;
+  squadRoleId?: number | null;
   name: string;
   orderIndex: number;
   maxSignups: number;
-  radioFrequencyId?: number | null;
   _deleted?: boolean;
 };
 
-type SlotInput = {
+type SquadInput = {
   id?: number;
   name: string;
   orderIndex: number;
-  subslots: SubslotInput[];
+  slots: SlotInput[];
   _deleted?: boolean;
 };
 
@@ -29,7 +27,7 @@ type OrbatUpdateInput = {
   eventDate?: string | null;
   startTime?: string | null;
   endTime?: string | null;
-  slots: SlotInput[];
+  squads: SquadInput[];
   frequencyIds?: number[];
   tempFrequencies?: Array<{
     frequency: string;
@@ -62,28 +60,29 @@ export async function GET(
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    
+
     const hasPermission = await checkPermission(session.user.id, 'orbat:edit');
     if (!hasPermission) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const { id } = await params;
-    const orbatId = parseInt(id, 10);
+    const orbatId = Number.parseInt(id, 10);
 
-    if (isNaN(orbatId)) {
+    if (Number.isNaN(orbatId)) {
       return NextResponse.json({ error: 'Invalid OrbAT ID' }, { status: 400 });
     }
 
     const orbat = await prisma.orbat.findUnique({
       where: { id: orbatId },
       include: {
-        slots: {
+        squads: {
+          orderBy: { orderIndex: 'asc' },
           include: {
-            subslots: true,
-          },
-          orderBy: {
-            orderIndex: 'asc',
+            slots: {
+              orderBy: { orderIndex: 'asc' },
+              include: { squadRole: true },
+            },
           },
         },
       },
@@ -110,114 +109,64 @@ export async function PATCH(
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    
+
     const hasPermission = await checkPermission(session.user.id, 'orbat:edit');
     if (!hasPermission) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const { id } = await params;
-    const orbatId = parseInt(id);
+    const orbatId = Number.parseInt(id, 10);
 
-    if (isNaN(orbatId)) {
+    if (Number.isNaN(orbatId)) {
       return NextResponse.json({ error: 'Invalid OrbAT ID' }, { status: 400 });
     }
 
     const body: OrbatUpdateInput = await request.json();
 
-    // Validate input
     if (!body.name || !body.name.trim()) {
       return NextResponse.json({ error: 'OrbAT name is required' }, { status: 400 });
     }
 
-    const activeSlots = body.slots.filter((s) => !s._deleted);
-        const requestedDefinitionIds = Array.from(
-          new Set(
-            body.slots
-              .filter((slot) => !slot._deleted)
-              .flatMap((slot) => slot.subslots.filter((subslot) => !subslot._deleted))
-              .map((subslot) => subslot.subslotDefinitionId)
-              .filter((id): id is number => typeof id === 'number')
-          )
-        );
-
-        const subslotDefinitions = requestedDefinitionIds.length
-          ? await prisma.subslotDefinition.findMany({
-              where: { id: { in: requestedDefinitionIds } },
-              select: {
-                id: true,
-                name: true,
-                maxSignups: true,
-                requiredTrainingIds: true,
-                requiredRankIds: true,
-                requiredTrainingId: true,
-                requiredRankId: true,
-              },
-            })
-          : [];
-
-        const subslotDefinitionMap = new Map(subslotDefinitions.map((definition) => [definition.id, definition]));
-
-        if (subslotDefinitions.length !== requestedDefinitionIds.length) {
-          return NextResponse.json({ error: 'One or more selected subslot definitions do not exist.' }, { status: 400 });
-        }
-
-    if (activeSlots.length === 0) {
+    const activeSquads = body.squads.filter((squad) => !squad._deleted);
+    if (activeSquads.length === 0) {
       return NextResponse.json({ error: 'At least one slot is required' }, { status: 400 });
     }
 
-    // Check if OrbAT exists
-    const existingOrbat = await prisma.orbat.findUnique({
-      where: { id: orbatId },
-      include: {
-        slots: {
-          include: {
-            subslots: true,
-          },
-        },
-      },
-    });
+    const requestedDefinitionIds = Array.from(
+      new Set(
+        activeSquads
+          .flatMap((squad) => squad.slots.filter((slot) => !slot._deleted))
+          .map((slot) => slot.squadRoleId)
+          .filter((id): id is number => typeof id === 'number')
+      )
+    );
 
-    if (!existingOrbat) {
-      return NextResponse.json({ error: 'OrbAT not found' }, { status: 404 });
+    const squadRoles = requestedDefinitionIds.length
+      ? await prisma.squadRole.findMany({
+          where: { id: { in: requestedDefinitionIds } },
+          select: { id: true, name: true, isRetired: true },
+        })
+      : [];
+
+    if (squadRoles.length !== requestedDefinitionIds.length) {
+      return NextResponse.json({ error: 'One or more selected role definitions do not exist.' }, { status: 400 });
     }
 
-    // Process the update
-    // 1. Update basic OrbAT info
-    // 2. Handle slot deletions
-    // 3. Handle slot updates/creates
-    // 4. Handle subslot deletions
-    // 5. Handle subslot updates/creates
+    const retiredRoleNames = squadRoles.filter((role) => role.isRetired).map((role) => role.name);
+    if (retiredRoleNames.length > 0) {
+      return NextResponse.json(
+        { error: `Cannot use retired role definitions: ${retiredRoleNames.join(', ')}. Restore them or choose active roles.` },
+        { status: 400 }
+      );
+    }
 
-    // Collect IDs to delete
-    const slotsToDelete = body.slots.filter((s) => s._deleted && s.id).map((s) => s.id!);
-    const subslotIdsToDelete: number[] = [];
-
-    body.slots.forEach((slot) => {
-      if (!slot._deleted) {
-        slot.subslots
-          .filter((sub) => sub._deleted && sub.id)
-          .forEach((sub) => subslotIdsToDelete.push(sub.id!));
-      }
-    });
-
-    // Perform update in transaction
-    const updatedOrbat = await prisma.$transaction(async (tx) => {
-      // Delete marked subslots
-      if (subslotIdsToDelete.length > 0) {
-        await tx.subslot.deleteMany({
-          where: { id: { in: subslotIdsToDelete } },
-        });
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.orbat.findUnique({ where: { id: orbatId }, select: { id: true } });
+      if (!existing) {
+        throw new Error('ORBAT_NOT_FOUND');
       }
 
-      // Delete marked slots
-      if (slotsToDelete.length > 0) {
-        await tx.slot.deleteMany({
-          where: { id: { in: slotsToDelete } },
-        });
-      }
-
-      // Update OrbAT and process slots
       await tx.orbat.update({
         where: { id: orbatId },
         data: {
@@ -242,145 +191,76 @@ export async function PATCH(
         },
       });
 
-      // Delete all existing frequency associations and recreate them
-      await tx.orbatRadioFrequency.deleteMany({
-        where: { orbatId: orbatId },
-      });
+      await tx.signup.deleteMany({ where: { slot: { orbatId } } });
+      await tx.slot.deleteMany({ where: { orbatId } });
+      await tx.squad.deleteMany({ where: { orbatId } });
 
-      // Create new frequency associations
-      if (body.frequencyIds && body.frequencyIds.length > 0) {
-        await tx.orbatRadioFrequency.createMany({
-          data: body.frequencyIds.map((freqId) => ({
-            orbatId: orbatId,
-            radioFrequencyId: freqId,
-          })),
+      for (const squadInput of activeSquads) {
+        const squad = await tx.squad.create({
+          data: {
+            orbatId,
+            name: squadInput.name.trim(),
+            orderIndex: squadInput.orderIndex,
+          },
         });
-      }
 
-      // Process each slot
-      for (const slotInput of body.slots.filter((s) => !s._deleted)) {
-        if (slotInput.id) {
-          // Update existing slot
-          await tx.slot.update({
-            where: { id: slotInput.id },
-            data: {
-              name: slotInput.name.trim(),
-              orderIndex: slotInput.orderIndex,
-            },
-          });
-
-          // Process subslots for this slot
-          for (const subslotInput of slotInput.subslots.filter((s) => !s._deleted)) {
-            const definition =
-              typeof subslotInput.subslotDefinitionId === 'number'
-                ? subslotDefinitionMap.get(subslotInput.subslotDefinitionId)
-                : null;
-
-            if (subslotInput.id) {
-              // Update existing subslot
-              await tx.subslot.update({
-                where: { id: subslotInput.id },
-                data: {
-                  name: (definition?.name ?? subslotInput.name).trim(),
-                  orderIndex: subslotInput.orderIndex,
-                  maxSignups: definition?.maxSignups ?? subslotInput.maxSignups,
-                  subslotDefinitionId: subslotInput.subslotDefinitionId ?? null,
-                  requiredTrainingIds: definition?.requiredTrainingIds ?? [],
-                  requiredRankIds: definition?.requiredRankIds ?? [],
-                  requiredTrainingId: definition?.requiredTrainingId ?? null,
-                  requiredRankId: definition?.requiredRankId ?? null,
-                },
-              });
-            } else {
-              // Create new subslot
-              await tx.subslot.create({
-                data: {
-                  slotId: slotInput.id,
-                  name: (definition?.name ?? subslotInput.name).trim(),
-                  orderIndex: subslotInput.orderIndex,
-                  maxSignups: definition?.maxSignups ?? subslotInput.maxSignups,
-                  subslotDefinitionId: subslotInput.subslotDefinitionId ?? null,
-                  requiredTrainingIds: definition?.requiredTrainingIds ?? [],
-                  requiredRankIds: definition?.requiredRankIds ?? [],
-                  requiredTrainingId: definition?.requiredTrainingId ?? null,
-                  requiredRankId: definition?.requiredRankId ?? null,
-                },
-              });
-            }
-          }
-        } else {
-          // Create new slot with subslots
+        for (const slotInput of squadInput.slots.filter((slot) => !slot._deleted)) {
           await tx.slot.create({
             data: {
-              orbatId: orbatId,
-              name: slotInput.name.trim(),
+              orbatId,
+              squadId: squad.id,
+              squadRoleId: slotInput.squadRoleId ?? null,
               orderIndex: slotInput.orderIndex,
-              subslots: {
-                create: slotInput.subslots
-                  .filter((s) => !s._deleted)
-                  .map((subslot) => ({
-                    name: ((typeof subslot.subslotDefinitionId === 'number'
-                      ? subslotDefinitionMap.get(subslot.subslotDefinitionId)?.name
-                      : subslot.name) || subslot.name).trim(),
-                    orderIndex: subslot.orderIndex,
-                    maxSignups:
-                      typeof subslot.subslotDefinitionId === 'number'
-                        ? (subslotDefinitionMap.get(subslot.subslotDefinitionId)?.maxSignups ?? subslot.maxSignups)
-                        : subslot.maxSignups,
-                    subslotDefinitionId: subslot.subslotDefinitionId ?? null,
-                    requiredTrainingIds:
-                      typeof subslot.subslotDefinitionId === 'number'
-                        ? (subslotDefinitionMap.get(subslot.subslotDefinitionId)?.requiredTrainingIds ?? [])
-                        : [],
-                    requiredRankIds:
-                      typeof subslot.subslotDefinitionId === 'number'
-                        ? (subslotDefinitionMap.get(subslot.subslotDefinitionId)?.requiredRankIds ?? [])
-                        : [],
-                    requiredTrainingId:
-                      typeof subslot.subslotDefinitionId === 'number'
-                        ? (subslotDefinitionMap.get(subslot.subslotDefinitionId)?.requiredTrainingId ?? null)
-                        : null,
-                    requiredRankId:
-                      typeof subslot.subslotDefinitionId === 'number'
-                        ? (subslotDefinitionMap.get(subslot.subslotDefinitionId)?.requiredRankId ?? null)
-                        : null,
-                  })),
-              },
+              maxSignups: slotInput.maxSignups,
             },
           });
         }
       }
 
-      // Return updated OrbAT with relations
-      return tx.orbat.findUnique({
-        where: { id: orbatId },
-        include: {
-          slots: {
-            orderBy: { orderIndex: 'asc' },
-            include: {
-              subslots: {
-                orderBy: { orderIndex: 'asc' },
-              },
-            },
-          },
-          frequencies: {
-            include: {
-              radioFrequency: true,
+      await tx.orbatRadioFrequency.deleteMany({ where: { orbatId } });
+      if (body.frequencyIds && body.frequencyIds.length > 0) {
+        await tx.orbatRadioFrequency.createMany({
+          data: body.frequencyIds.map((frequencyId) => ({ orbatId, radioFrequencyId: frequencyId })),
+          skipDuplicates: true,
+        });
+      }
+    });
+
+    const updatedOrbat = await prisma.orbat.findUnique({
+      where: { id: orbatId },
+      include: {
+        squads: {
+          orderBy: { orderIndex: 'asc' },
+          include: {
+            slots: {
+              orderBy: { orderIndex: 'asc' },
+              include: { squadRole: true },
             },
           },
         },
-      });
+        frequencies: {
+          include: { radioFrequency: true },
+        },
+      },
     });
+
+    if (!updatedOrbat) {
+      return NextResponse.json({ error: 'OrbAT not found' }, { status: 404 });
+    }
 
     return NextResponse.json(updatedOrbat);
   } catch (error) {
+    if (error instanceof Error && error.message === 'ORBAT_NOT_FOUND') {
+      return NextResponse.json({ error: 'OrbAT not found' }, { status: 404 });
+    }
+
     console.error('Error updating OrbAT:', error);
     return NextResponse.json({ error: 'Failed to update OrbAT' }, { status: 500 });
   }
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -389,33 +269,25 @@ export async function DELETE(
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    
+
     const hasPermission = await checkPermission(session.user.id, 'orbat:delete');
     if (!hasPermission) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const { id } = await params;
-    const orbatId = parseInt(id);
+    const orbatId = Number.parseInt(id, 10);
 
-    if (isNaN(orbatId)) {
+    if (Number.isNaN(orbatId)) {
       return NextResponse.json({ error: 'Invalid OrbAT ID' }, { status: 400 });
     }
 
-    // Check if OrbAT exists
-    const existingOrbat = await prisma.orbat.findUnique({
-      where: { id: orbatId },
-    });
-
+    const existingOrbat = await prisma.orbat.findUnique({ where: { id: orbatId } });
     if (!existingOrbat) {
       return NextResponse.json({ error: 'OrbAT not found' }, { status: 404 });
     }
 
-    // Delete OrbAT (cascades to slots, subslots, and signups)
-    await prisma.orbat.delete({
-      where: { id: orbatId },
-    });
-
+    await prisma.orbat.delete({ where: { id: orbatId } });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting OrbAT:', error);

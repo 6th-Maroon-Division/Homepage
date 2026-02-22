@@ -18,20 +18,18 @@ export default async function OrbatPage({ params }: OrbatPageProps) {
   const orbat = await prisma.orbat.findUnique({
     where: { id: orbatId },
     include: {
-      slots: {
+      squads: {
         orderBy: { orderIndex: 'asc' },
         include: {
-          subslots: {
+          slots: {
             orderBy: { orderIndex: 'asc' },
             include: {
-              subslotDefinition: {
-                include: {
-                  requiredTraining: {
-                    select: { id: true, name: true },
-                  },
-                  requiredRank: {
-                    select: { id: true, name: true, abbreviation: true },
-                  },
+              squadRole: {
+                select: {
+                  id: true,
+                  name: true,
+                  requiredTrainingIds: true,
+                  requiredRankIds: true,
                 },
               },
               signups: {
@@ -66,27 +64,23 @@ export default async function OrbatPage({ params }: OrbatPageProps) {
     notFound();
   }
 
-  const allSubslots = orbat.slots.flatMap((slot) => slot.subslots);
+  const allSlots = orbat.squads.flatMap((squad) => squad.slots);
   const requiredTrainingIds = Array.from(
     new Set(
-      allSubslots.flatMap((subslot) =>
-        subslot.requiredTrainingIds?.length
-          ? subslot.requiredTrainingIds
-          : subslot.requiredTrainingId
-            ? [subslot.requiredTrainingId]
-            : []
+      allSlots.flatMap((slot) =>
+        slot.squadRole?.requiredTrainingIds?.length
+          ? slot.squadRole.requiredTrainingIds
+          : []
       )
     )
   );
 
   const requiredRankIds = Array.from(
     new Set(
-      allSubslots.flatMap((subslot) =>
-        subslot.requiredRankIds?.length
-          ? subslot.requiredRankIds
-          : subslot.requiredRankId
-            ? [subslot.requiredRankId]
-            : []
+      allSlots.flatMap((slot) =>
+        slot.squadRole?.requiredRankIds?.length
+          ? slot.squadRole.requiredRankIds
+          : []
       )
     )
   );
@@ -129,39 +123,31 @@ export default async function OrbatPage({ params }: OrbatPageProps) {
     airspace: orbat.airspace || null,
     inGameTimezone: orbat.inGameTimezone || null,
     operationDay: orbat.operationDay || null,
-    slots: orbat.slots.map((slot) => ({
-      id: slot.id,
-      name: slot.name,
-      orderIndex: slot.orderIndex,
-      subslots: slot.subslots.map((sub) => {
-        const subslotTrainingIds = sub.requiredTrainingIds?.length
-          ? sub.requiredTrainingIds
-          : sub.requiredTrainingId
-            ? [sub.requiredTrainingId]
-            : [];
-        const subslotRankIds = sub.requiredRankIds?.length
-          ? sub.requiredRankIds
-          : sub.requiredRankId
-            ? [sub.requiredRankId]
-            : [];
-        const subslotRequiredTrainings = subslotTrainingIds
+    squads: orbat.squads.map((squad) => ({
+      id: squad.id,
+      name: squad.name,
+      orderIndex: squad.orderIndex,
+      slots: squad.slots.map((slot) => {
+        const slotTrainingIds = slot.squadRole?.requiredTrainingIds || [];
+        const slotRankIds = slot.squadRole?.requiredRankIds || [];
+        const slotRequiredTrainings = slotTrainingIds
           .map((id) => trainingMap.get(id))
           .filter((item): item is { id: number; name: string } => Boolean(item));
-        const subslotRequiredRanks = subslotRankIds
+        const slotRequiredRanks = slotRankIds
           .map((id) => rankMap.get(id))
           .filter((item): item is { id: number; name: string; abbreviation: string } => Boolean(item));
 
         return {
-        id: sub.id,
-        name: sub.name,
-        orderIndex: sub.orderIndex,
-        maxSignups: sub.maxSignups,
-        subslotDefinitionId: sub.subslotDefinitionId,
-        requiredTrainings: subslotRequiredTrainings,
-        requiredRanks: subslotRequiredRanks,
-        requiredTraining: subslotRequiredTrainings[0] || null,
-        requiredRank: subslotRequiredRanks[0] || null,
-        signups: sub.signups.map((s) => ({
+        id: slot.id,
+        name: slot.squadRole?.name || 'Unassigned Role',
+        orderIndex: slot.orderIndex,
+        maxSignups: slot.maxSignups ?? 9999,
+        squadRoleId: slot.squadRoleId,
+        requiredTrainings: slotRequiredTrainings,
+        requiredRanks: slotRequiredRanks,
+        requiredTraining: slotRequiredTrainings[0] || null,
+        requiredRank: slotRequiredRanks[0] || null,
+        signups: slot.signups.map((s) => ({
           id: s.id,
           user: s.user
             ? {
