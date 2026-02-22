@@ -709,7 +709,7 @@ export default function TemplateEditor() {
                               e.preventDefault();
                               handleSlotDrop(squadIndex, slotIndex);
                             }}
-                            className="flex items-end gap-2 cursor-move rounded"
+                            className="cursor-move rounded"
                             style={{
                               outline:
                                 dragOverTarget?.squadIndex === squadIndex && dragOverTarget?.slotIndex === slotIndex
@@ -721,45 +721,45 @@ export default function TemplateEditor() {
                                   : 1,
                             }}
                           >
-                            <div className="flex-1 space-y-1">
-                              <div
-                                className="border rounded px-2 py-1 text-sm font-medium"
-                                style={{
-                                  backgroundColor: 'var(--background)',
-                                  borderColor: 'var(--border)',
-                                  color: 'var(--foreground)',
-                                }}
-                              >
-                                {slot.name}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <label className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-                                  Max signups:
-                                </label>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  value={slot.maxSignups}
-                                  onChange={(e) => updateSlotMaxSignups(squadIndex, slotIndex, parseInt(e.target.value) || 1)}
-                                  className="w-20 border rounded px-2 py-1 text-xs"
-                                  style={{
-                                    backgroundColor: 'var(--background)',
-                                    borderColor: 'var(--border)',
-                                    color: 'var(--foreground)',
-                                  }}
-                                />
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => removeSlot(squadIndex, slotIndex)}
-                              className="px-2 py-1 rounded text-xs font-medium"
+                            <div
+                              className="border rounded px-3 py-2 space-y-2"
                               style={{
-                                backgroundColor: '#dc2626',
-                                color: 'white',
+                                backgroundColor: 'var(--background)',
+                                borderColor: 'var(--border)',
+                                color: 'var(--foreground)',
                               }}
                             >
-                              Delete
-                            </button>
+                              <div className="font-medium text-sm">{slot.name}</div>
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  <label className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                                    Max signups:
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={slot.maxSignups}
+                                    onChange={(e) => updateSlotMaxSignups(squadIndex, slotIndex, parseInt(e.target.value) || 1)}
+                                    className="w-20 border rounded px-2 py-1 text-xs"
+                                    style={{
+                                      backgroundColor: 'var(--background)',
+                                      borderColor: 'var(--border)',
+                                      color: 'var(--foreground)',
+                                    }}
+                                  />
+                                </div>
+                                <button
+                                  onClick={() => removeSlot(squadIndex, slotIndex)}
+                                  className="px-2 py-1 rounded text-xs font-medium"
+                                  style={{
+                                    backgroundColor: '#dc2626',
+                                    color: 'white',
+                                  }}
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
                           </div>
                           ))}
 
