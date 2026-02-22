@@ -69,6 +69,7 @@ export default function TemplateEditor() {
     requiredRanks?: Array<{ id: number; name: string; abbreviation: string }>;
     requiredTraining: { id: number; name: string } | null;
     requiredRank: { id: number; name: string; abbreviation: string } | null;
+    isRetired?: boolean;
   }>>([]);
   const [slotSearchBySquad, setSlotSearchBySquad] = useState<Record<number, string>>({});
   const [selectedDefinitionBySquad, setSelectedDefinitionBySquad] = useState<Record<number, string>>({});
@@ -272,6 +273,15 @@ export default function TemplateEditor() {
     updatedSlots[squadIndex].slots.push(newSlot);
     setTemplate({ ...template, slotsJson: normalizeOrderIndexes(updatedSlots) });
     setSelectedDefinitionBySquad((prev) => ({ ...prev, [squadIndex]: '' }));
+  };
+
+  const updateSlotMaxSignups = (squadIndex: number, slotIndex: number, maxSignups: number) => {
+    const updatedSlots = [...template.slotsJson];
+    updatedSlots[squadIndex].slots[slotIndex] = {
+      ...updatedSlots[squadIndex].slots[slotIndex],
+      maxSignups,
+    };
+    setTemplate({ ...template, slotsJson: updatedSlots });
   };
 
   const removeSlot = (squadIndex: number, slotIndex: number) => {
@@ -618,6 +628,8 @@ export default function TemplateEditor() {
                             <option value="">Select slot...</option>
                             {subslotDefinitions
                               .filter((definition) => {
+                                // Filter out retired roles
+                                if (definition.isRetired) return false;
                                 const searchTerm = (slotSearchBySquad[squadIndex] || '').trim().toLowerCase();
                                 if (!searchTerm) return true;
                                 return definition.name.toLowerCase().includes(searchTerm);
@@ -709,17 +721,33 @@ export default function TemplateEditor() {
                                   : 1,
                             }}
                           >
-                            <div
-                              className="flex-1 border rounded px-2 py-1 text-sm"
-                              style={{
-                                backgroundColor: 'var(--background)',
-                                borderColor: 'var(--border)',
-                                color: 'var(--foreground)',
-                              }}
-                            >
-                              <div className="font-medium">{slot.name}</div>
-                              <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-                                Max signups: {slot.maxSignups}
+                            <div className="flex-1 space-y-1">
+                              <div
+                                className="border rounded px-2 py-1 text-sm font-medium"
+                                style={{
+                                  backgroundColor: 'var(--background)',
+                                  borderColor: 'var(--border)',
+                                  color: 'var(--foreground)',
+                                }}
+                              >
+                                {slot.name}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <label className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                                  Max signups:
+                                </label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={slot.maxSignups}
+                                  onChange={(e) => updateSlotMaxSignups(squadIndex, slotIndex, parseInt(e.target.value) || 1)}
+                                  className="w-20 border rounded px-2 py-1 text-xs"
+                                  style={{
+                                    backgroundColor: 'var(--background)',
+                                    borderColor: 'var(--border)',
+                                    color: 'var(--foreground)',
+                                  }}
+                                />
                               </div>
                             </div>
                             <button
