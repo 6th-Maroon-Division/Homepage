@@ -73,10 +73,8 @@ export async function POST(
     const signup = await prisma.signup.findFirst({
       where: {
         userId,
-        subslot: {
-          slot: {
-            orbatId,
-          },
+        slot: {
+          orbatId,
         },
       },
     });
@@ -239,11 +237,7 @@ export async function POST(
           signup: {
             include: {
               user: true,
-              subslot: {
-                include: {
-                  slot: true,
-                },
-              },
+              slot: true,
             },
           },
           sessions: {

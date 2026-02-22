@@ -88,6 +88,28 @@ export const PERMISSIONS = {
     maxValue: 255,
   },
 
+  // Subslot definition permissions
+  "subslot:view": {
+    description: "View reusable ORBAT subslot definitions",
+    defaultValue: 0,
+    maxValue: 255,
+  },
+  "subslot:create": {
+    description: "Create reusable ORBAT subslot definitions",
+    defaultValue: 0,
+    maxValue: 255,
+  },
+  "subslot:edit": {
+    description: "Edit reusable ORBAT subslot definitions",
+    defaultValue: 0,
+    maxValue: 255,
+  },
+  "subslot:delete": {
+    description: "Delete reusable ORBAT subslot definitions",
+    defaultValue: 0,
+    maxValue: 255,
+  },
+
   // Attendance permissions
   "attendance:edit": {
     description: "Edit attendance records",

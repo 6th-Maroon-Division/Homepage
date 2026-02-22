@@ -139,27 +139,21 @@ export async function POST(request: NextRequest) {
       const orbatSignups = await tx.signup.findMany({
         where: {
           userId,
-          subslot: {
-            slot: {
-              orbat: {
-                eventDate: {
-                  gte: sessionDateOnly,
-                  lt: new Date(
-                    sessionDateOnly.getTime() + 24 * 60 * 60 * 1000
-                  ),
-                },
+          slot: {
+            orbat: {
+              eventDate: {
+                gte: sessionDateOnly,
+                lt: new Date(
+                  sessionDateOnly.getTime() + 24 * 60 * 60 * 1000
+                ),
               },
             },
           },
         },
         include: {
-          subslot: {
+          slot: {
             include: {
-              slot: {
-                include: {
-                  orbat: true,
-                },
-              },
+              orbat: true,
             },
           },
         },
@@ -167,7 +161,7 @@ export async function POST(request: NextRequest) {
 
       // For each orbat signup, create/update attendance record
       for (const signup of orbatSignups) {
-        const orbat = signup.subslot.slot.orbat;
+        const orbat = signup.slot.orbat;
 
         // Find or create attendance record
         let attendance = await tx.attendance.findUnique({

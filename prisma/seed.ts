@@ -2,19 +2,27 @@
 // @ts-nocheck
 // prisma/seed.prod.ts - Production seed with admin user and operational radio frequencies
 import { prisma } from '../lib/prisma';
+import { seedPermissions, grantAdminPermissions } from './seed-permissions';
 
 async function main() {
   // Clear existing data in the right order (avoid FK issues)
+  await prisma.userPermission.deleteMany();
+  await prisma.squadRoleAuditLog.deleteMany();
   await prisma.signup.deleteMany();
-  await prisma.subslot.deleteMany();
   await prisma.slot.deleteMany();
+  await prisma.squad.deleteMany();
+  await prisma.squadRole.deleteMany();
+  await prisma.orbatRadioFrequency.deleteMany();
   await prisma.orbat.deleteMany();
   await prisma.radioFrequency.deleteMany();
   await prisma.authAccount.deleteMany();
   await prisma.user.deleteMany();
 
+  // --- Permissions System ---
+  await seedPermissions();
+
   // --- Create Admin User ---
-  await prisma.user.create({
+  const admin = await prisma.user.create({
     data: {
       username: 'chilla55',
       isAdmin: true,
@@ -26,6 +34,9 @@ async function main() {
       },
     },
   });
+
+  // Grant admin full permissions
+  await grantAdminPermissions(admin.id);
 
   // --- Create Operational Radio Frequencies ---
   // LR (Long Range) Nets

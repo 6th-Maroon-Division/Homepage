@@ -6,6 +6,23 @@ import { checkPermission } from '@/lib/auth-middleware';
 import { canAccessTemplateReadApi } from '@/lib/permission-api-logic';
 import type { NextRequest } from 'next/server';
 
+type TemplateRoleSlotInput = {
+  name: string;
+  orderIndex: number;
+  maxSignups: number;
+  squadRoleId?: number | null;
+  requiredTrainingIds?: number[];
+  requiredRankIds?: number[];
+  requiredTrainingId?: number | null;
+  requiredRankId?: number | null;
+};
+
+type TemplateSquadInput = {
+  name: string;
+  orderIndex: number;
+  slots: TemplateRoleSlotInput[];
+};
+
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
@@ -121,6 +138,64 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const inputSlots = slotsJson as TemplateSquadInput[];
+    const requestedDefinitionIds = Array.from(
+      new Set(
+        inputSlots
+          .flatMap((squad) => squad.slots)
+          .map((slot) => slot.squadRoleId)
+          .filter((id): id is number => typeof id === 'number')
+      )
+    );
+
+    const definitions = requestedDefinitionIds.length
+      ? await prisma.squadRole.findMany({
+          where: { id: { in: requestedDefinitionIds } },
+          select: {
+            id: true,
+            name: true,
+            requiredTrainingIds: true,
+            requiredRankIds: true,
+            isRetired: true,
+          },
+        })
+      : [];
+
+    if (definitions.length !== requestedDefinitionIds.length) {
+      return NextResponse.json(
+        { error: 'One or more selected role definitions do not exist.' },
+        { status: 400 }
+      );
+    }
+
+    const retiredRoleNames = definitions.filter((role) => role.isRetired).map((role) => role.name);
+    if (retiredRoleNames.length > 0) {
+      return NextResponse.json(
+        { error: `Cannot use retired role definitions: ${retiredRoleNames.join(', ')}. Restore them or choose active roles.` },
+        { status: 400 }
+      );
+    }
+
+    const definitionMap = new Map(definitions.map((definition) => [definition.id, definition]));
+    const normalizedSlotsJson = inputSlots.map((squad) => ({
+      ...squad,
+      slots: squad.slots.map((slot) => {
+        const definition =
+          typeof slot.squadRoleId === 'number'
+            ? definitionMap.get(slot.squadRoleId)
+            : null;
+
+        return {
+          ...slot,
+          name: definition?.name ?? slot.name,
+          requiredTrainingIds: definition?.requiredTrainingIds ?? [],
+          requiredRankIds: definition?.requiredRankIds ?? [],
+          requiredTrainingId: (definition?.requiredTrainingIds ?? [])[0] ?? null,
+          requiredRankId: (definition?.requiredRankIds ?? [])[0] ?? null,
+        };
+      }),
+    }));
+
     // Get admin user ID from session
     const userId = session.user?.id;
     if (!userId) {
@@ -137,7 +212,7 @@ export async function POST(request: NextRequest) {
         description: description || null,
         category: category || null,
         tagsJson: tagsJson || null,
-        slotsJson,
+        slotsJson: normalizedSlotsJson,
         frequencyIds: frequencyIds || [],
         bluforCountry: bluforCountry || null,
         bluforRelationship: bluforRelationship || null,

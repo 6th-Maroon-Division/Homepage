@@ -5,6 +5,23 @@ import { NextResponse } from 'next/server';
 import { checkPermission } from '@/lib/auth-middleware';
 import { canAccessTemplateReadApi } from '@/lib/permission-api-logic';
 
+type TemplateRoleSlotInput = {
+  name: string;
+  orderIndex: number;
+  maxSignups: number;
+  squadRoleId?: number | null;
+  requiredTrainingIds?: number[];
+  requiredRankIds?: number[];
+  requiredTrainingId?: number | null;
+  requiredRankId?: number | null;
+};
+
+type TemplateSquadInput = {
+  name: string;
+  orderIndex: number;
+  slots: TemplateRoleSlotInput[];
+};
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -63,7 +80,60 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(template);
+    // Enrich slotsJson with current role names from squadRole table
+    let enrichedTemplate = template;
+    if (template.slotsJson) {
+      const slotsJson = typeof template.slotsJson === 'string' 
+        ? JSON.parse(template.slotsJson) 
+        : template.slotsJson;
+      
+      const inputSlots = slotsJson as TemplateSquadInput[];
+      const requestedDefinitionIds = Array.from(
+        new Set(
+          inputSlots
+            .flatMap((squad) => squad.slots)
+            .map((slot) => slot.squadRoleId)
+            .filter((id): id is number => typeof id === 'number')
+        )
+      );
+
+      if (requestedDefinitionIds.length > 0) {
+        const definitions = await prisma.squadRole.findMany({
+          where: { id: { in: requestedDefinitionIds } },
+          select: {
+            id: true,
+            name: true,
+            requiredTrainingIds: true,
+            requiredRankIds: true,
+          },
+        });
+
+        const definitionMap = new Map(definitions.map((definition) => [definition.id, definition]));
+        const enrichedSlotsJson = inputSlots.map((squad) => ({
+          ...squad,
+          slots: squad.slots.map((slot) => {
+            const definition =
+              typeof slot.squadRoleId === 'number'
+                ? definitionMap.get(slot.squadRoleId)
+                : null;
+
+            return {
+              ...slot,
+              name: definition?.name ?? slot.name ?? 'Unknown Role',
+              requiredTrainingIds: definition?.requiredTrainingIds ?? slot.requiredTrainingIds ?? [],
+              requiredRankIds: definition?.requiredRankIds ?? slot.requiredRankIds ?? [],
+            };
+          }),
+        }));
+
+        enrichedTemplate = {
+          ...template,
+          slotsJson: enrichedSlotsJson,
+        };
+      }
+    }
+
+    return NextResponse.json(enrichedTemplate);
   } catch (error) {
     console.error('Error fetching template:', error);
     return NextResponse.json(
@@ -124,6 +194,67 @@ export async function PUT(
       isActive,
     } = data;
 
+    let normalizedSlotsJson = slotsJson;
+    if (slotsJson) {
+      const inputSlots = slotsJson as TemplateSquadInput[];
+      const requestedDefinitionIds = Array.from(
+        new Set(
+          inputSlots
+            .flatMap((squad) => squad.slots)
+            .map((slot) => slot.squadRoleId)
+            .filter((id): id is number => typeof id === 'number')
+        )
+      );
+
+      const definitions = requestedDefinitionIds.length
+        ? await prisma.squadRole.findMany({
+            where: { id: { in: requestedDefinitionIds } },
+            select: {
+              id: true,
+              name: true,
+              requiredTrainingIds: true,
+              requiredRankIds: true,
+              isRetired: true,
+            },
+          })
+        : [];
+
+      if (definitions.length !== requestedDefinitionIds.length) {
+        return NextResponse.json(
+          { error: 'One or more selected role definitions do not exist.' },
+          { status: 400 }
+        );
+      }
+
+      const retiredRoleNames = definitions.filter((role) => role.isRetired).map((role) => role.name);
+      if (retiredRoleNames.length > 0) {
+        return NextResponse.json(
+          { error: `Cannot use retired role definitions: ${retiredRoleNames.join(', ')}. Restore them or choose active roles.` },
+          { status: 400 }
+        );
+      }
+
+      const definitionMap = new Map(definitions.map((definition) => [definition.id, definition]));
+      normalizedSlotsJson = inputSlots.map((squad) => ({
+        ...squad,
+        slots: squad.slots.map((slot) => {
+          const definition =
+            typeof slot.squadRoleId === 'number'
+              ? definitionMap.get(slot.squadRoleId)
+              : null;
+
+          return {
+            ...slot,
+            name: definition?.name ?? slot.name,
+            requiredTrainingIds: definition?.requiredTrainingIds ?? [],
+            requiredRankIds: definition?.requiredRankIds ?? [],
+            requiredTrainingId: (definition?.requiredTrainingIds ?? [])[0] ?? null,
+            requiredRankId: (definition?.requiredRankIds ?? [])[0] ?? null,
+          };
+        }),
+      }));
+    }
+
     // Verify template exists
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const existingTemplate = await (prisma as any).orbatTemplate.findUnique({
@@ -145,7 +276,7 @@ export async function PUT(
         ...(description !== undefined && { description }),
         ...(category !== undefined && { category }),
         ...(tagsJson !== undefined && { tagsJson }),
-        ...(slotsJson && { slotsJson }),
+        ...(normalizedSlotsJson && { slotsJson: normalizedSlotsJson }),
         ...(frequencyIds && { frequencyIds }),
         ...(bluforCountry !== undefined && { bluforCountry }),
         ...(bluforRelationship !== undefined && { bluforRelationship }),

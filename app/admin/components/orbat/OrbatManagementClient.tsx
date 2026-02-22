@@ -78,23 +78,32 @@ export default function OrbatManagementClient({ orbats: initialOrbats }: OrbatMa
               {filter === 'all' ? 'All OrbATs' : filter === 'upcoming' ? 'Upcoming Operations' : 'Past Operations'}
             </p>
           </div>
-          {canCreateOrbat && (
+          <div className="flex gap-2">
             <Link
-              href="/admin/orbats/new"
+              href="/admin/orbats/subslots"
               className="px-4 py-2 rounded-md transition-colors font-medium"
-              style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--button-hover)';
-                e.currentTarget.style.color = 'var(--button-hover-foreground)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--primary)';
-                e.currentTarget.style.color = 'var(--primary-foreground)';
-              }}
+              style={{ backgroundColor: 'var(--muted)', color: 'var(--foreground)' }}
             >
-              Create New OrbAT
+              Manage Roles
             </Link>
-          )}
+            {canCreateOrbat && (
+              <Link
+                href="/admin/orbats/new"
+                className="px-4 py-2 rounded-md transition-colors font-medium"
+                style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--button-hover)';
+                  e.currentTarget.style.color = 'var(--button-hover-foreground)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--primary)';
+                  e.currentTarget.style.color = 'var(--primary-foreground)';
+                }}
+              >
+                Create New OrbAT
+              </Link>
+            )}
+          </div>
         </div>
 
         {/* Filters */}

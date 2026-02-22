@@ -60,11 +60,7 @@ export async function GET(
         signup: {
           include: {
             user: true,
-            subslot: {
-              include: {
-                slot: true,
-              },
-            },
+            slot: true,
           },
         },
         sessions: {
@@ -160,10 +156,8 @@ export async function POST(
       signup = await prisma.signup.findFirst({
         where: {
           id: signupId,
-          subslot: {
-            slot: {
-              orbatId,
-            },
+          slot: {
+            orbatId,
           },
         },
         include: {
@@ -277,11 +271,7 @@ export async function POST(
           signup: {
             include: {
               user: true,
-              subslot: {
-                include: {
-                  slot: true,
-                },
-              },
+              slot: true,
             },
           },
           sessions: true,

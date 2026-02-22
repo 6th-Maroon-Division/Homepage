@@ -8,7 +8,6 @@ async function main() {
   // Clear existing data in the right order (avoid FK issues)
   await prisma.userPermission.deleteMany();
   await prisma.signup.deleteMany();
-  await prisma.subslot.deleteMany();
   await prisma.slot.deleteMany();
   await prisma.orbat.deleteMany();
   await prisma.radioFrequency.deleteMany();

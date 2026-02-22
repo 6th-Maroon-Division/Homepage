@@ -60,7 +60,7 @@ Web application for managing Arma 3 unit operations, signups, attendance, ranks,
 - Auto message creation on rankup approval flows
 
 ### Permissions & Access Control
-- 22 granular permissions across 7 domains
+- 26 granular permissions across 8 domains
 - Integer permission values (`0-255`) with sparse storage
 - Enforcement layers:
   - API route authorization (authoritative)

@@ -171,7 +171,7 @@ export default function RadioFrequenciesManagement() {
           Radio Frequencies
         </h1>
         <p className="text-sm mt-2" style={{ color: 'var(--muted-foreground)' }}>
-          Manage radio frequencies that can be assigned to slots and subslots
+          Manage radio frequencies that can be assigned to squads and slots
         </p>
       </div>
 

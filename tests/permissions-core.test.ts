@@ -8,10 +8,10 @@ import {
   isValidPermissionValue,
 } from '@/lib/permissions';
 
-test('registers exactly 22 permissions', () => {
+test('registers exactly 26 permissions', () => {
   const keys = getAllPermissionKeys();
-  assert.equal(keys.length, 22);
-  assert.equal(new Set(keys).size, 22);
+  assert.equal(keys.length, 26);
+  assert.equal(new Set(keys).size, 26);
 });
 
 test('includes all expected template permissions', () => {
@@ -19,6 +19,14 @@ test('includes all expected template permissions', () => {
   assert.equal(keys.includes('template:create'), true);
   assert.equal(keys.includes('template:edit'), true);
   assert.equal(keys.includes('template:delete'), true);
+});
+
+test('includes all expected subslot permissions', () => {
+  const keys = getAllPermissionKeys();
+  assert.equal(keys.includes('subslot:view'), true);
+  assert.equal(keys.includes('subslot:create'), true);
+  assert.equal(keys.includes('subslot:edit'), true);
+  assert.equal(keys.includes('subslot:delete'), true);
 });
 
 test('permission metadata is available for known keys', () => {

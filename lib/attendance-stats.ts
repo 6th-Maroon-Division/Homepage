@@ -89,13 +89,9 @@ export async function getUserAttendanceRecords(
     include: {
       signup: {
         include: {
-          subslot: {
+          slot: {
             include: {
-              slot: {
-                include: {
-                  orbat: true,
-                },
-              },
+              orbat: true,
             },
           },
         },
@@ -132,11 +128,7 @@ export async function getOrbatAttendance(
       signup: {
         include: {
           user: true,
-          subslot: {
-            include: {
-              slot: true,
-            },
-          },
+          slot: true,
         },
       },
       logs: {
