@@ -80,7 +80,60 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(template);
+    // Enrich slotsJson with current role names from squadRole table
+    let enrichedTemplate = template;
+    if (template.slotsJson) {
+      const slotsJson = typeof template.slotsJson === 'string' 
+        ? JSON.parse(template.slotsJson) 
+        : template.slotsJson;
+      
+      const inputSlots = slotsJson as TemplateSquadInput[];
+      const requestedDefinitionIds = Array.from(
+        new Set(
+          inputSlots
+            .flatMap((squad) => squad.slots)
+            .map((slot) => slot.squadRoleId)
+            .filter((id): id is number => typeof id === 'number')
+        )
+      );
+
+      if (requestedDefinitionIds.length > 0) {
+        const definitions = await prisma.squadRole.findMany({
+          where: { id: { in: requestedDefinitionIds } },
+          select: {
+            id: true,
+            name: true,
+            requiredTrainingIds: true,
+            requiredRankIds: true,
+          },
+        });
+
+        const definitionMap = new Map(definitions.map((definition) => [definition.id, definition]));
+        const enrichedSlotsJson = inputSlots.map((squad) => ({
+          ...squad,
+          slots: squad.slots.map((slot) => {
+            const definition =
+              typeof slot.squadRoleId === 'number'
+                ? definitionMap.get(slot.squadRoleId)
+                : null;
+
+            return {
+              ...slot,
+              name: definition?.name ?? slot.name ?? 'Unknown Role',
+              requiredTrainingIds: definition?.requiredTrainingIds ?? slot.requiredTrainingIds ?? [],
+              requiredRankIds: definition?.requiredRankIds ?? slot.requiredRankIds ?? [],
+            };
+          }),
+        }));
+
+        enrichedTemplate = {
+          ...template,
+          slotsJson: enrichedSlotsJson,
+        };
+      }
+    }
+
+    return NextResponse.json(enrichedTemplate);
   } catch (error) {
     console.error('Error fetching template:', error);
     return NextResponse.json(
