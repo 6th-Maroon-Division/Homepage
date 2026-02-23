@@ -114,6 +114,8 @@ This project uses a custom Prisma client output path: `generated/prisma/`.
 
 ## Local Development
 
+Node.js requirement: `^20.19 || ^22.12 || >=24.0`.
+
 1) Install dependencies
 
 ```bash
