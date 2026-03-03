@@ -14,7 +14,9 @@ export default async function UsersManagementPage() {
   }
   
   // Check if user has user management permission
-  const hasPermission = session.user.isAdmin || await checkPermission(session.user.id, 'user:manage');
+  const hasPermission =
+    (session.user.permissions?.['system:super_admin'] ?? 0) > 0 ||
+    await checkPermission(session.user.id, 'user:manage');
   
   if (!hasPermission) {
     redirect('/admin');
@@ -22,11 +24,19 @@ export default async function UsersManagementPage() {
 
   const users = await prisma.user.findMany({
     orderBy: [
-      { isAdmin: 'desc' },
       { createdAt: 'desc' },
     ],
     include: {
       accounts: true,
+      userPermissions: {
+        where: {
+          value: { gt: 0 },
+          permission: { key: 'system:super_admin' },
+        },
+        select: {
+          id: true,
+        },
+      },
       userTrainings: {
         include: {
           training: true,
@@ -48,7 +58,7 @@ export default async function UsersManagementPage() {
     username: user.username,
     email: user.email,
     avatarUrl: user.avatarUrl,
-    isAdmin: user.isAdmin,
+    isSuperAdmin: user.userPermissions.length > 0,
     createdAt: user.createdAt.toISOString(),
     providers: user.accounts.map((acc) => acc.provider),
     signupCount: user._count.signups,
@@ -69,7 +79,11 @@ export default async function UsersManagementPage() {
   return (
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        <UserManagementClient users={serializedUsers} currentUserId={session.user.id} />
+        <UserManagementClient
+          users={serializedUsers}
+          currentUserId={session.user.id}
+          initialTab="all"
+        />
       </div>
     </main>
   );

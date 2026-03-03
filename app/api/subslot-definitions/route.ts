@@ -48,7 +48,7 @@ export async function GET() {
     ]);
 
     const canRead = canAccessSubslotReadApi({
-      isAdmin: Boolean(session.user.isAdmin),
+      hasSuperAdmin: (session.user.permissions?.['system:super_admin'] ?? 0) > 0,
       canViewSubslot,
       canCreateSubslot,
       canEditSubslot,

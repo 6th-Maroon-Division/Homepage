@@ -17,7 +17,6 @@ interface ExtendedJWT extends JWT {
   username?: string | null;
   email?: string | null;
   avatarUrl?: string | null;
-  isAdmin?: boolean;
   createdAt?: Date;
   permissions?: Record<string, number>;
 }
@@ -159,7 +158,6 @@ export const authOptions: AuthOptions = {
           extendedToken.username = authAccount.user.username;
           extendedToken.email = authAccount.user.email ?? null;
           extendedToken.avatarUrl = authAccount.user.avatarUrl;
-          extendedToken.isAdmin = authAccount.user.isAdmin;
           extendedToken.createdAt = authAccount.user.createdAt;
           
           // Fetch user permissions
@@ -184,7 +182,6 @@ export const authOptions: AuthOptions = {
         session.user.username = extendedToken.username ?? null;
         session.user.email = extendedToken.email ?? null;
         session.user.avatarUrl = extendedToken.avatarUrl ?? null;
-        session.user.isAdmin = extendedToken.isAdmin as boolean;
         session.user.createdAt = extendedToken.createdAt as Date;
         session.user.permissions = extendedToken.permissions ?? {};
       }

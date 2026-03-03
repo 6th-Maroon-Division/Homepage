@@ -52,7 +52,7 @@ The app uses a granular permission model with **26 permissions** in **8 domains*
 - `rank:manage_promotions`
 
 ### System (1)
-- `admin:system`
+- `system:super_admin`
 
 ## Enforcement Model
 

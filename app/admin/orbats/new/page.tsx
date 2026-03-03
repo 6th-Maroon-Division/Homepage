@@ -13,7 +13,9 @@ export default async function NewOrbatPage() {
   }
   
   // Check if user has ORBAT create permission
-  const hasPermission = session.user.isAdmin || await checkPermission(session.user.id, 'orbat:create');
+  const hasPermission =
+    (session.user.permissions?.['system:super_admin'] ?? 0) > 0 ||
+    await checkPermission(session.user.id, 'orbat:create');
   
   if (!hasPermission) {
     redirect('/admin');

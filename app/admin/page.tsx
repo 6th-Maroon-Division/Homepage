@@ -7,18 +7,18 @@ import { canAccessSubslotReadApi } from '@/lib/permission-api-logic';
 
 export default async function AdminPage() {
   const session = await getServerSession(authOptions);
+  const userPermissions = session?.user?.permissions || {};
+  const hasSuperAdmin = (userPermissions['system:super_admin'] ?? 0) > 0;
 
-  // Allow access if user is admin OR has any permissions (at least one with a positive value)
+  // Allow access if user has super-admin OR has any permissions (at least one with a positive value)
   const hasAnyPermissions =
-    session?.user?.permissions &&
-    Object.values(session.user.permissions).some((value) => value > 0);
-  if (!session || (!session.user?.isAdmin && !hasAnyPermissions)) {
+    Object.values(userPermissions).some((value) => value > 0);
+  if (!session || (!hasSuperAdmin && !hasAnyPermissions)) {
     redirect('/');
   }
 
-  const userPermissions = session.user?.permissions || {};
   const canAccessSubslots = canAccessSubslotReadApi({
-    isAdmin: Boolean(session.user?.isAdmin),
+    hasSuperAdmin,
     canViewSubslot: (userPermissions['subslot:view'] ?? 0) > 0,
     canCreateSubslot: (userPermissions['subslot:create'] ?? 0) > 0,
     canEditSubslot: (userPermissions['subslot:edit'] ?? 0) > 0,
@@ -30,33 +30,32 @@ export default async function AdminPage() {
     canEditOrbat: (userPermissions['orbat:edit'] ?? 0) > 0,
   });
 
-  const isAdmin = Boolean(session.user?.isAdmin);
-  const canAccessOrbats = isAdmin;
+  const canAccessOrbats = hasSuperAdmin;
   const canAccessTemplates =
-    isAdmin ||
+    hasSuperAdmin ||
     (userPermissions['template:create'] ?? 0) > 0 ||
     (userPermissions['template:edit'] ?? 0) > 0 ||
     (userPermissions['template:delete'] ?? 0) > 0 ||
     (userPermissions['orbat:create'] ?? 0) > 0 ||
     (userPermissions['orbat:edit'] ?? 0) > 0;
-  const canAccessUsers = isAdmin || (userPermissions['user:manage'] ?? 0) > 0;
-  const canAccessRadioFrequencies = isAdmin || (userPermissions['orbat:edit'] ?? 0) > 0;
+  const canAccessUsers = hasSuperAdmin || (userPermissions['user:manage'] ?? 0) > 0;
+  const canAccessRadioFrequencies = hasSuperAdmin || (userPermissions['orbat:edit'] ?? 0) > 0;
   const canAccessTrainings =
-    isAdmin ||
+    hasSuperAdmin ||
     (userPermissions['training:create'] ?? 0) > 0 ||
     (userPermissions['training:edit'] ?? 0) > 0 ||
     (userPermissions['training:delete'] ?? 0) > 0;
   const canAccessAttendance =
-    isAdmin ||
+    hasSuperAdmin ||
     (userPermissions['attendance:view'] ?? 0) > 0 ||
     (userPermissions['attendance:edit'] ?? 0) > 0;
   const canAccessRanks =
-    isAdmin ||
+    hasSuperAdmin ||
     (userPermissions['rank:create'] ?? 0) > 0 ||
     (userPermissions['rank:edit'] ?? 0) > 0 ||
     (userPermissions['rank:delete'] ?? 0) > 0;
-  const canAccessPromotions = isAdmin || (userPermissions['rank:manage_promotions'] ?? 0) > 0;
-  const canAccessMessaging = isAdmin || (userPermissions['admin:system'] ?? 0) > 0;
+  const canAccessPromotions = hasSuperAdmin || (userPermissions['rank:manage_promotions'] ?? 0) > 0;
+  const canAccessMessaging = hasSuperAdmin;
 
   return (
     <main className="min-h-screen">

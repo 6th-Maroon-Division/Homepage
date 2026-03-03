@@ -22,13 +22,13 @@ model User {
   username          String?
   email             String?
   avatarUrl         String?
-  isAdmin           Boolean            @default(false)
   createdAt         DateTime           @default(now())
   accounts          AuthAccount[]
   orbats            Orbat[]            @relation("OrbatCreator")
   signups           Signup[]
   orbatTemplates    OrbatTemplate[]
   userTrainings     UserTraining[]
+  trainingsGiven    UserTraining[]   @relation("UserTrainingTrainer")
   trainingRequests  TrainingRequest[]
   handledRequests   TrainingRequest[]  @relation("TrainingRequestHandledBy")
   attendances       Attendance[]
@@ -459,6 +459,8 @@ model UserTraining {
   id              Int       @id @default(autoincrement())
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId          Int
+  trainer         User?     @relation("UserTrainingTrainer", fields: [trainerId], references: [id], onDelete: SetNull)
+  trainerId       Int?
   training        Training  @relation(fields: [trainingId], references: [id], onDelete: Cascade)
   trainingId      Int
   completedAt     DateTime  @default(now())
@@ -470,6 +472,7 @@ model UserTraining {
   @@unique([userId, trainingId])
   @@index([userId])
   @@index([trainingId])
+  @@index([trainerId])
 }
 
 model TrainingRequest {

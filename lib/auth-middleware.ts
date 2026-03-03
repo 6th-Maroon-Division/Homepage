@@ -185,10 +185,10 @@ export function withHierarchyPermission(permission: PermissionKey) {
 }
 
 /**
- * Simple wrapper for routes that require admin (full admin:system permission)
+ * Simple wrapper for routes that require super admin (full system:super_admin permission)
  */
 export function withAdminPermission() {
-  return withPermission('admin:system');
+  return withPermission('system:super_admin');
 }
 
 /**

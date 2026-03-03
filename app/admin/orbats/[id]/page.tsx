@@ -16,7 +16,9 @@ export default async function AdminOrbatPage({ params }: AdminOrbatPageProps) {
     redirect('/');
   }
 
-  const hasPermission = session.user.isAdmin || await checkPermission(session.user.id, 'orbat:edit');
+  const hasPermission =
+    (session.user.permissions?.['system:super_admin'] ?? 0) > 0 ||
+    await checkPermission(session.user.id, 'orbat:edit');
   if (!hasPermission) {
     redirect('/admin');
   }

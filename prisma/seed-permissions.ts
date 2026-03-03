@@ -37,6 +37,7 @@ export async function seedPermissions() {
  */
 export async function grantAdminPermissions(userId: number) {
   const adminPermKeys: string[] = [
+    "system:super_admin",
     "user:edit",
     "user:promote",
     "user:manage",
@@ -62,7 +63,6 @@ export async function grantAdminPermissions(userId: number) {
     "rank:edit",
     "rank:delete",
     "rank:manage_promotions",
-    "admin:system",
   ];
 
   await prisma.$transaction(async (tx) => {

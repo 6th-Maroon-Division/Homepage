@@ -35,7 +35,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   // Verify target user exists
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, username: true, isAdmin: true },
+    select: { id: true, username: true },
   });
 
   if (!user) {
@@ -73,7 +73,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     user: {
       id: user.id,
       username: user.username,
-      isAdmin: user.isAdmin,
     },
     permissions,
   });

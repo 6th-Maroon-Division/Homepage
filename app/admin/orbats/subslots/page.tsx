@@ -26,7 +26,7 @@ export default async function AdminSubslotDefinitionsPage() {
   ]);
 
   const canRead = canAccessSubslotReadApi({
-    isAdmin: Boolean(session.user.isAdmin),
+    hasSuperAdmin: (session.user.permissions?.['system:super_admin'] ?? 0) > 0,
     canViewSubslot,
     canCreateSubslot,
     canEditSubslot,
@@ -42,7 +42,11 @@ export default async function AdminSubslotDefinitionsPage() {
     redirect('/admin');
   }
 
-  const canManage = Boolean(session.user.isAdmin) || canCreateSubslot || canEditSubslot || canDeleteSubslot;
+  const canManage =
+    (session.user.permissions?.['system:super_admin'] ?? 0) > 0 ||
+    canCreateSubslot ||
+    canEditSubslot ||
+    canDeleteSubslot;
 
   const [definitions, trainings, ranks] = await Promise.all([
     prisma.squadRole.findMany({
@@ -89,9 +93,9 @@ export default async function AdminSubslotDefinitionsPage() {
           trainings={trainings}
           ranks={ranks}
           isReadOnly={!canManage}
-          canCreate={Boolean(session.user.isAdmin) || canCreateSubslot}
-          canEdit={Boolean(session.user.isAdmin) || canEditSubslot}
-          canDelete={Boolean(session.user.isAdmin) || canDeleteSubslot}
+          canCreate={(session.user.permissions?.['system:super_admin'] ?? 0) > 0 || canCreateSubslot}
+          canEdit={(session.user.permissions?.['system:super_admin'] ?? 0) > 0 || canEditSubslot}
+          canDelete={(session.user.permissions?.['system:super_admin'] ?? 0) > 0 || canDeleteSubslot}
         />
       </div>
     </main>

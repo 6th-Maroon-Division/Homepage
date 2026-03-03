@@ -45,7 +45,7 @@ export async function GET() {
     ]);
 
     if (!canAccessTemplateReadApi({
-      isAdmin: Boolean(session.user.isAdmin),
+      hasSuperAdmin: (session.user.permissions?.['system:super_admin'] ?? 0) > 0,
       canCreateTemplate,
       canEditTemplate,
       canDeleteTemplate,

@@ -214,7 +214,7 @@ function SettingsContent() {
             </div>
             <div className="flex justify-between">
               <span className="font-medium">Admin Status:</span>
-              <span>{session?.user?.isAdmin ? 'Yes' : 'No'}</span>
+              <span>{(session?.user?.permissions?.['system:super_admin'] ?? 0) > 0 ? 'Yes' : 'No'}</span>
             </div>
           </div>
         </div>

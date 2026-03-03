@@ -77,9 +77,12 @@ export async function PUT(
           create: {
             userId: trainingRequest.userId,
             trainingId: trainingRequest.trainingId,
+            trainerId: session.user.id,
             notes: `Approved from request: ${adminResponse || 'No notes'}`,
           },
-          update: {},
+          update: {
+            trainerId: session.user.id,
+          },
         }),
       ]);
 

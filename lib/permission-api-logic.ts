@@ -1,7 +1,7 @@
 import { isValidPermissionValue } from '@/lib/permissions';
 
 export interface TemplateReadAccessContext {
-  isAdmin: boolean;
+  hasSuperAdmin: boolean;
   canCreateTemplate: boolean;
   canEditTemplate: boolean;
   canDeleteTemplate: boolean;
@@ -13,11 +13,11 @@ export function canAccessTemplateReadApi(context: TemplateReadAccessContext): bo
   const canManageTemplates =
     context.canCreateTemplate || context.canEditTemplate || context.canDeleteTemplate;
 
-  return context.isAdmin || canManageTemplates || context.canCreateOrbat || context.canEditOrbat;
+  return context.hasSuperAdmin || canManageTemplates || context.canCreateOrbat || context.canEditOrbat;
 }
 
 export interface SubslotReadAccessContext {
-  isAdmin: boolean;
+  hasSuperAdmin: boolean;
   canViewSubslot: boolean;
   canCreateSubslot: boolean;
   canEditSubslot: boolean;
@@ -37,7 +37,7 @@ export function canAccessSubslotReadApi(context: SubslotReadAccessContext): bool
     context.canCreateTemplate || context.canEditTemplate || context.canDeleteTemplate;
 
   return (
-    context.isAdmin ||
+    context.hasSuperAdmin ||
     context.canViewSubslot ||
     canManageSubslots ||
     canManageTemplates ||

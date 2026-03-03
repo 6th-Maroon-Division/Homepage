@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
+import { getSuperAdminUserIds } from '@/lib/permission-utils';
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -12,7 +13,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   
-  const hasPermission = await checkPermission(session.user.id, 'admin:system');
+  const hasPermission = await checkPermission(session.user.id, 'system:super_admin');
   if (!hasPermission) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -49,12 +50,8 @@ export async function POST(request: NextRequest) {
       recipientUserIds = users.map(u => u.id);
       audienceType = 'all';
     } else if (audience === 'admin') {
-      // Admin-only alerts (requires admin:system permission, which is already verified above)
-      const admins = await prisma.user.findMany({
-        where: { isAdmin: true },
-        select: { id: true },
-      });
-      recipientUserIds = admins.map(u => u.id);
+      // Admin-only alerts (requires system:super_admin permission, which is already verified above)
+      recipientUserIds = await getSuperAdminUserIds();
       audienceType = 'admin';
     } else if (Array.isArray(audience.userIds)) {
       // Specific user IDs

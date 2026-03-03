@@ -56,10 +56,10 @@ export function useCanPerformAction(
 }
 
 /**
- * Hook to check if user is admin (has system:admin permission = 255)
+ * Hook to check if user is super admin (has system:super_admin permission = 255)
  */
 export function useIsAdmin(): boolean {
-  const adminValue = usePermissionValue('admin:system');
+  const adminValue = usePermissionValue('system:super_admin');
   return adminValue >= 255;
 }
 

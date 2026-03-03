@@ -18,8 +18,9 @@ export default async function AdminTrainingsPage() {
     checkPermission(session.user.id, 'training:edit'),
     checkPermission(session.user.id, 'training:delete'),
   ]);
+  const hasSuperAdmin = (session.user.permissions?.['system:super_admin'] ?? 0) > 0;
   const hasPermission =
-    session.user.isAdmin || canCreateTraining || canEditTraining || canDeleteTraining;
+    hasSuperAdmin || canCreateTraining || canEditTraining || canDeleteTraining;
   
   if (!hasPermission) {
     redirect('/admin');

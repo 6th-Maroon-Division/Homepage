@@ -10,7 +10,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   
-  const hasPermission = await checkPermission(session.user.id, 'user:manage');
+  const hasPermission =
+    await checkPermission(session.user.id, 'system:super_admin') ||
+    await checkPermission(session.user.id, 'user:manage');
   if (!hasPermission) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }

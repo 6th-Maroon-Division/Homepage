@@ -145,8 +145,8 @@ export const PERMISSIONS = {
   },
 
   // Admin permissions
-  "admin:system": {
-    description: "Full system admin access (overrides all)",
+  "system:super_admin": {
+    description: "Global super admin override across all admin features",
     defaultValue: 0,
     maxValue: 255,
   },

@@ -18,7 +18,9 @@ export default async function OrbatAttendancePage({
   }
   
   // Check if user has attendance edit permission
-  const hasPermission = session.user.isAdmin || await checkPermission(session.user.id, 'attendance:edit');
+  const hasPermission =
+    (session.user.permissions?.['system:super_admin'] ?? 0) > 0 ||
+    await checkPermission(session.user.id, 'attendance:edit');
   
   if (!hasPermission) {
     redirect('/admin');

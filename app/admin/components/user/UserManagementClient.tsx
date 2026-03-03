@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import { usePermission } from '@/app/hooks/usePermissions';
@@ -18,7 +19,7 @@ type User = {
   username: string | null;
   email: string | null;
   avatarUrl: string | null;
-  isAdmin: boolean;
+  isSuperAdmin: boolean;
   createdAt: string;
   providers: string[];
   signupCount: number;
@@ -39,14 +40,22 @@ type User = {
 type UserManagementClientProps = {
   users: User[];
   currentUserId: number;
+  initialTab?: 'all' | 'unranked';
+  showAllUsersTab?: boolean;
+  showUnrankedTab?: boolean;
 };
 
-export default function UserManagementClient({ users: initialUsers, currentUserId }: UserManagementClientProps) {
+export default function UserManagementClient({
+  users: initialUsers,
+  currentUserId,
+  initialTab = 'all',
+  showAllUsersTab = true,
+  showUnrankedTab = true,
+}: UserManagementClientProps) {
   const [users, setUsers] = useState<User[]>(initialUsers);
-  const [activeTab, setActiveTab] = useState<'all' | 'unranked'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'unranked'>(initialTab);
   const [filter, setFilter] = useState<'all' | 'admin' | 'regular'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [confirmAdmin, setConfirmAdmin] = useState<{ userId: number; currentIsAdmin: boolean; username: string | null } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ userId: number; username: string | null } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [expandedUserId, setExpandedUserId] = useState<number | null>(null);
@@ -239,51 +248,6 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
     }
   };
 
-  const handleToggleAdmin = async (userId: number, currentIsAdmin: boolean) => {
-    if (userId === currentUserId) {
-      showError("You cannot modify your own admin status");
-      return;
-    }
-
-    const user = users.find(u => u.id === userId);
-    setConfirmAdmin({ userId, currentIsAdmin, username: user?.username || null });
-  };
-
-  const confirmToggleAdmin = async () => {
-    if (!confirmAdmin) return;
-    
-    setIsLoading(true);
-    const { userId, currentIsAdmin } = confirmAdmin;
-
-    try {
-      const res = await fetch(`/api/users/${userId}/admin`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ isAdmin: !currentIsAdmin }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        showError(data.error || 'Failed to update user');
-        return;
-      }
-
-      // Update local state
-      setUsers(users.map(u => 
-        u.id === userId ? { ...u, isAdmin: !currentIsAdmin } : u
-      ));
-      showSuccess(`User ${currentIsAdmin ? 'demoted from' : 'promoted to'} admin`);
-    } catch (error) {
-      logClientError('Error updating user:', error);
-      showError('Error updating user');
-    } finally {
-      setIsLoading(false);
-      setConfirmAdmin(null);
-    }
-  };
-
   const handleDeleteUser = async (userId: number, username: string | null) => {
     if (userId === currentUserId) {
       showError("You cannot delete your own account");
@@ -393,8 +357,8 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
   // Filter users
   const filteredUsers = users.filter(user => {
     // Apply role filter
-    if (filter === 'admin' && !user.isAdmin) return false;
-    if (filter === 'regular' && user.isAdmin) return false;
+    if (filter === 'admin' && !user.isSuperAdmin) return false;
+    if (filter === 'regular' && user.isSuperAdmin) return false;
 
     // Apply search filter
     if (searchQuery) {
@@ -412,30 +376,34 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
     <div>
       {/* Tabs */}
       <div className="flex gap-2 mb-4">
-        <button
-          onClick={() => setActiveTab('all')}
-          className="px-6 py-3 rounded-lg font-medium transition-colors"
-          style={{
-            backgroundColor: activeTab === 'all' ? 'var(--primary)' : 'var(--secondary)',
-            color: activeTab === 'all' ? 'var(--primary-foreground)' : 'var(--foreground)',
-            borderWidth: '1px',
-            borderColor: activeTab === 'all' ? 'var(--primary)' : 'var(--border)'
-          }}
-        >
-          All Users
-        </button>
-        <button
-          onClick={() => setActiveTab('unranked')}
-          className="px-6 py-3 rounded-lg font-medium transition-colors"
-          style={{
-            backgroundColor: activeTab === 'unranked' ? 'var(--primary)' : 'var(--secondary)',
-            color: activeTab === 'unranked' ? 'var(--primary-foreground)' : 'var(--foreground)',
-            borderWidth: '1px',
-            borderColor: activeTab === 'unranked' ? 'var(--primary)' : 'var(--border)'
-          }}
-        >
-          Unranked Users
-        </button>
+        {showAllUsersTab && (
+          <button
+            onClick={() => setActiveTab('all')}
+            className="px-6 py-3 rounded-lg font-medium transition-colors"
+            style={{
+              backgroundColor: activeTab === 'all' ? 'var(--primary)' : 'var(--secondary)',
+              color: activeTab === 'all' ? 'var(--primary-foreground)' : 'var(--foreground)',
+              borderWidth: '1px',
+              borderColor: activeTab === 'all' ? 'var(--primary)' : 'var(--border)'
+            }}
+          >
+            All Users
+          </button>
+        )}
+        {showUnrankedTab && (
+          <button
+            onClick={() => setActiveTab('unranked')}
+            className="px-6 py-3 rounded-lg font-medium transition-colors"
+            style={{
+              backgroundColor: activeTab === 'unranked' ? 'var(--primary)' : 'var(--secondary)',
+              color: activeTab === 'unranked' ? 'var(--primary-foreground)' : 'var(--foreground)',
+              borderWidth: '1px',
+              borderColor: activeTab === 'unranked' ? 'var(--primary)' : 'var(--border)'
+            }}
+          >
+            Unranked Users
+          </button>
+        )}
       </div>
 
       {/* All Users Tab */}
@@ -469,7 +437,7 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                 color: filter === 'admin' ? 'var(--primary-foreground)' : 'var(--foreground)'
               }}
             >
-              Admins ({users.filter(u => u.isAdmin).length})
+              Super Admins ({users.filter(u => u.isSuperAdmin).length})
             </button>
             <button
               onClick={() => setFilter('regular')}
@@ -479,7 +447,7 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                 color: filter === 'regular' ? 'var(--primary-foreground)' : 'var(--foreground)'
               }}
             >
-              Regular ({users.filter(u => !u.isAdmin).length})
+              Regular ({users.filter(u => !u.isSuperAdmin).length})
             </button>
           </div>
 
@@ -544,9 +512,13 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                           />
                         )}
                         <div>
-                          <div className="font-medium" style={{ color: 'var(--foreground)' }}>
+                          <Link
+                            href={`/admin/users/${user.id}`}
+                            className="font-medium hover:underline"
+                            style={{ color: 'var(--foreground)' }}
+                          >
                             {user.username || 'Unknown'}
-                          </div>
+                          </Link>
                           <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>ID: {user.id}</div>
                         </div>
                       </div>
@@ -577,9 +549,9 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                       {new Date(user.createdAt).toLocaleDateString('en-GB')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {user.isAdmin ? (
+                      {user.isSuperAdmin ? (
                         <span className="px-2 py-1 rounded text-xs font-medium" style={{ backgroundColor: 'var(--accent)', color: 'var(--accent-foreground)' }}>
-                          Admin
+                          Super Admin
                         </span>
                       ) : (
                         <span className="px-2 py-1 rounded text-xs" style={{ backgroundColor: 'var(--muted)', color: 'var(--foreground)' }}>
@@ -590,54 +562,13 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                         <span className="ml-2 text-xs" style={{ color: 'var(--primary)' }}>(You)</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
-                      <button
-                        onClick={() => setExpandedUserId(expandedUserId === user.id ? null : user.id)}
-                        className="text-blue-400 hover:text-blue-300 font-medium"
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <Link
+                        href={`/admin/users/${user.id}`}
+                        className="text-sky-400 hover:text-sky-300 font-medium"
                       >
-                        {expandedUserId === user.id ? 'Hide' : 'View'} Trainings
-                      </button>
-                      {canManagePermissions && (
-                        <>
-                          <span style={{ color: 'var(--border)' }}>|</span>
-                          <button
-                            onClick={() => openPermissionsModal(user.id, user.username)}
-                            className="text-purple-400 hover:text-purple-300 font-medium"
-                          >
-                            Permissions {user.id === currentUserId && '(Read-only)'}
-                          </button>
-                          <span style={{ color: 'var(--border)' }}>|</span>
-                          <button
-                            onClick={() => setAuditLogModalData({ userId: user.id, username: user.username })}
-                            className="text-cyan-400 hover:text-cyan-300 font-medium"
-                            title="View permission change history"
-                          >
-                            History
-                          </button>
-                        </>
-                      )}
-                      {canManageUsers && user.id !== currentUserId && (
-                        <>
-                          <span style={{ color: 'var(--border)' }}>|</span>
-                          <button
-                            onClick={() => handleToggleAdmin(user.id, user.isAdmin)}
-                            className={`font-medium ${
-                              user.isAdmin
-                                ? 'text-orange-400 hover:text-orange-300'
-                                : 'text-green-400 hover:text-green-300'
-                            }`}
-                          >
-                            {user.isAdmin ? 'Demote' : 'Promote'}
-                          </button>
-                          <span style={{ color: 'var(--border)' }}>|</span>
-                          <button
-                            onClick={() => handleDeleteUser(user.id, user.username)}
-                            className="text-red-500 hover:text-red-400 font-medium"
-                          >
-                            Delete
-                          </button>
-                        </>
-                      )}
+                        Open Details
+                      </Link>
                     </td>
                   </tr>
                   {expandedUserId === user.id && (
@@ -899,17 +830,6 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
       )}
 
       {/* Confirm Modals */}
-      <ConfirmModal
-        isOpen={confirmAdmin !== null}
-        title={confirmAdmin?.currentIsAdmin ? 'Demote Admin' : 'Promote to Admin'}
-        message={`Are you sure you want to ${confirmAdmin?.currentIsAdmin ? 'demote' : 'promote'} ${confirmAdmin?.username || 'this user'} ${confirmAdmin?.currentIsAdmin ? 'from' : 'to'} admin?`}
-        confirmLabel={confirmAdmin?.currentIsAdmin ? 'Demote' : 'Promote'}
-        cancelLabel="Cancel"
-        onConfirm={confirmToggleAdmin}
-        onCancel={() => setConfirmAdmin(null)}
-        isDestructive={confirmAdmin?.currentIsAdmin}
-        isLoading={isLoading}
-      />
       <ConfirmModal
         isOpen={confirmDelete !== null}
         title="Delete User"
@@ -1418,6 +1338,9 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
                       Attendance
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
+                      Details
+                    </th>
                   </tr>
                 </thead>
                 <tbody style={{ backgroundColor: 'var(--secondary)' }}>
@@ -1439,7 +1362,13 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                         />
                       </td>
                       <td className="px-6 py-4" style={{ color: 'var(--foreground)' }}>
-                        {user.username}
+                        <Link
+                          href={`/admin/users/${user.id}`}
+                          className="hover:underline"
+                          style={{ color: 'var(--foreground)' }}
+                        >
+                          {user.username}
+                        </Link>
                       </td>
                       <td className="px-6 py-4" style={{ color: 'var(--foreground)' }}>
                         <span className={user.userRank?.interviewDone ? 'text-green-500' : 'text-red-500'}>
@@ -1456,6 +1385,14 @@ export default function UserManagementClient({ users: initialUsers, currentUserI
                       </td>
                       <td className="px-6 py-4" style={{ color: 'var(--foreground)' }}>
                         {user.attendanceTotal}
+                      </td>
+                      <td className="px-6 py-4">
+                        <Link
+                          href={`/admin/users/${user.id}`}
+                          className="text-sky-400 hover:text-sky-300 font-medium"
+                        >
+                          Open Details
+                        </Link>
                       </td>
                     </tr>
                   ))}

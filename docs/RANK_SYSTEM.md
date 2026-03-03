@@ -129,7 +129,7 @@ Bot endpoints use Bearer token auth with `BOT_API_TOKEN`.
 - Admin pages are protected by session checks and/or permission checks.
 - Rank APIs commonly require:
   - `rank:create`, `rank:edit`, `rank:delete`, or `rank:manage_promotions`
-- Some pages additionally enforce `isAdmin` for high-impact workflows.
+- High-impact workflows are permission-gated via system/domain permission checks (including `system:super_admin` where required).
 - User rank history access allows self-access; cross-user access requires `user:manage`.
 
 ## Operational Notes

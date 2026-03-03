@@ -4,11 +4,20 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import CalendarWithOps from '@/app/orbats/components/CalendarWithOps';
 import OrbatManagementClient from '@/app/admin/components/orbat/OrbatManagementClient';
+import { checkPermission } from '@/lib/auth-middleware';
 
 export default async function AdminOrbatsPage() {
   const session = await getServerSession(authOptions);
   
-  if (!session?.user?.isAdmin) {
+  if (!session?.user?.id) {
+    redirect('/');
+  }
+
+  const hasPermission =
+    (session.user.permissions?.['system:super_admin'] ?? 0) > 0 ||
+    await checkPermission(session.user.id, 'orbat:edit');
+
+  if (!hasPermission) {
     redirect('/');
   }
 

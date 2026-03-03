@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   
-  const hasPermission = await checkPermission(session.user.id, 'admin:system');
+  const hasPermission = await checkPermission(session.user.id, 'system:super_admin');
   if (!hasPermission) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -162,7 +162,12 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
 
-  if (!session?.user?.isAdmin) {
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const hasPermission = await checkPermission(session.user.id, 'system:super_admin');
+  if (!hasPermission) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
   }
 

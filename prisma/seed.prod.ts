@@ -21,7 +21,6 @@ async function main() {
   const admin = await prisma.user.create({
     data: {
       username: 'chilla55',
-      isAdmin: true,
       accounts: {
         create: {
           provider: 'discord',

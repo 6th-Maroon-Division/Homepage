@@ -34,6 +34,13 @@ export async function GET(request: NextRequest) {
       where,
       include: {
         training: true,
+        trainer: {
+          select: {
+            id: true,
+            username: true,
+            avatarUrl: true,
+          },
+        },
       },
       orderBy: { assignedAt: 'desc' },
     });
@@ -101,12 +108,20 @@ export async function POST(request: NextRequest) {
       data: {
         userId: parseInt(userId),
         trainingId: parseInt(trainingId),
+        trainerId: session.user.id,
         needsRetraining: needsRetraining ?? false,
         notes,
         isHidden: isHidden ?? false,
       },
       include: {
         training: true,
+        trainer: {
+          select: {
+            id: true,
+            username: true,
+            avatarUrl: true,
+          },
+        },
         user: {
           select: {
             id: true,
