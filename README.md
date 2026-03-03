@@ -8,7 +8,20 @@ Web application for managing Arma 3 unit operations, signups, attendance, ranks,
 - Discord OAuth via NextAuth
 - Steam OpenID login/link flow (custom callback routes)
 - Multi-provider account linking to one user account (`Discord + Steam`)
-- Session includes cached permission map and admin flag
+- Session includes cached permission map
+
+### User Profile
+- Primary user profile page at `/profile`
+- Tabbed self-service profile view:
+  - Overview
+  - Attendance
+  - Trainings (completed + available/request flow)
+  - Rank History
+  - Actions (avatar upload + provider refresh)
+- Legacy routes redirect to `/profile`:
+  - `/settings`
+  - `/settings/rank-history`
+  - `/trainings`
 
 ### Operations (ORBAT)
 - Calendar-based operations browsing (`/orbats`)
@@ -47,7 +60,7 @@ Web application for managing Arma 3 unit operations, signups, attendance, ranks,
 - Auto-rankup eligibility checks
 - Manual promotion proposal workflow (approve/decline)
 - User rank state (`retired`, interview flag, attendance since last rank)
-- Rank history timeline exposed to users in settings
+- Rank history timeline exposed to users in the profile tab view
 - Rank transition requirements (required trainings per target rank)
 - Rank migration preview/apply workflow
 - Legacy user rank data CSV import pipeline

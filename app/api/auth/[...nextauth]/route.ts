@@ -2,6 +2,7 @@ import NextAuth from 'next-auth';
 import type { AuthOptions, Session } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
 import DiscordProvider from 'next-auth/providers/discord';
+import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 
 interface DiscordProfile {
@@ -112,6 +113,25 @@ export const authOptions: AuthOptions = {
                 },
               },
             },
+          });
+        }
+      } else if (provider === 'discord') {
+        const cookieStore = await cookies();
+        const shouldRefreshDiscordProfile = cookieStore.get('discord-avatar-refresh')?.value === '1';
+
+        if (shouldRefreshDiscordProfile) {
+          await prisma.user.update({
+            where: { id: authAccount.user.id },
+            data: {
+              username,
+              email,
+              avatarUrl,
+            },
+          });
+
+          cookieStore.set('discord-avatar-refresh', '', {
+            maxAge: 0,
+            path: '/',
           });
         }
       }

@@ -20,7 +20,6 @@ export default function TopBar() {
   const publicNavLinks = [
     { href: '/', label: 'Home' },
     { href: '/orbats', label: 'Operations' },
-    { href: '/trainings', label: 'Trainings' },
   ];
 
   const adminNavLinks = [
@@ -39,8 +38,7 @@ export default function TopBar() {
   const getPageTitle = () => {
     if (pathname === '/') return null;
     if (pathname === '/orbats') return 'Operations';
-    if (pathname === '/settings') return 'Settings';
-    if (pathname === '/trainings') return 'Training Center';
+    if (pathname === '/settings' || pathname === '/profile') return 'My Profile';
     if (pathname?.startsWith('/admin/ranks')) return 'Rank Management';
     if (pathname?.startsWith('/admin/messaging')) return 'Messaging System';
     if (pathname?.startsWith('/admin/attendance')) return 'Attendance Management';
@@ -275,12 +273,12 @@ export default function TopBar() {
                   Signed in as <span className="font-medium" style={{ color: 'var(--foreground)' }}>{session.user?.username}</span>
                 </div>
                 <Link
-                  href="/settings"
+                  href="/profile"
                   onClick={() => setMobileMenuOpen(false)}
                   className="block px-3 py-2 rounded-md transition-colors"
                   style={{ color: 'var(--foreground)', border: '1px solid var(--border)' }}
                 >
-                  Settings
+                  My Profile
                 </Link>
                 {session.user?.permissions && Object.keys(session.user.permissions).length > 0 && (
                   <Link
