@@ -27,7 +27,9 @@ Web application for managing Arma 3 unit operations, signups, attendance, ranks,
 - Calendar-based operations browsing (`/orbats`)
 - Detailed operation pages with slot/subslot hierarchy
 - Signup/unsignup flows and signup movement endpoints
-- Realtime ORBAT change stream (SSE) at `/api/orbats/[id]/events` for signup/move/edit/delete updates
+- Realtime ORBAT scoped change stream (SSE) at `/api/orbats/[id]/events` for signup/move/edit/delete updates
+- Global public ORBAT stream (SSE) at `/api/orbats/events` for live operation creation broadcasts
+- Calendar feed endpoint at `/api/orbats/calendar` for resilient client-side sync fallback
 - Operation metadata: factions, intel fields, start/end time
 - Radio frequency assignment (including temporary frequencies)
 - Admin ORBAT create/edit/delete workflows with permission checks
@@ -82,6 +84,19 @@ Web application for managing Arma 3 unit operations, signups, attendance, ranks,
   - server page guards
   - client-side UI visibility helpers
 - Permission audit logging and user-level permission management APIs
+- Live permission session sync: users receive realtime permission updates and session cache refresh (no re-login required)
+
+### Realtime & Synchronization (SSE)
+- ORBAT scoped stream: `/api/orbats/[id]/events`
+- ORBAT global stream: `/api/orbats/events`
+- User self profile stream: `/api/user/events`
+- Admin target-user stream: `/api/users/[id]/events`
+- Admin users list stream: `/api/admin/users/events`
+- Messaging inbox stream: `/api/messaging/events`
+- Promotions queue stream: `/api/ranks/promotions/events`
+- Admin catalog stream (templates/role definitions/orbats): `/api/admin/catalog/events`
+- Client behavior is SSE-first with polling fallback where applicable
+- Admin catalog pages use non-destructive live list sync (no full page refresh, preserving in-progress edits)
 
 ### Admin Areas
 - Dashboard (`/admin`) with module access by role/permission
