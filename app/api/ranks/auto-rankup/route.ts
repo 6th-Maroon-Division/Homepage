@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
+import { publishInboxEvent } from '@/lib/realtime/inbox-events';
 
 type PromotionResult = {
   userId: number;
@@ -162,6 +163,8 @@ export async function POST() {
             },
           });
         });
+
+        publishInboxEvent(userRank.userId);
 
         results.promoted.push({
           userId: userRank.userId,

@@ -5,6 +5,8 @@ import { prisma } from '@/lib/prisma';
 import { checkRankupEligibility } from '@/lib/rank-eligibility';
 import { checkPermission } from '@/lib/auth-middleware';
 import { getSuperAdminUserIds } from '@/lib/permission-utils';
+import { publishInboxEvents } from '@/lib/realtime/inbox-events';
+import { publishPromotionEvent } from '@/lib/realtime/promotion-events';
 
 async function notifyAdminsOfProposal(userId: number, nextRankName: string) {
   const adminUserIds = await getSuperAdminUserIds();
@@ -29,6 +31,8 @@ async function notifyAdminsOfProposal(userId: number, nextRankName: string) {
       channel: 'web',
     })),
   });
+
+  publishInboxEvents(adminUserIds);
 }
 
 export async function POST(request: NextRequest) {
@@ -108,6 +112,8 @@ export async function POST(request: NextRequest) {
         status: 'pending',
       },
     });
+
+    publishPromotionEvent({ source: 'proposal.created', proposalId: proposal.id });
 
     await notifyAdminsOfProposal(Number(userId), eligibility.nextRank.name);
 

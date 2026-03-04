@@ -4,6 +4,8 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 import { getCurrentAttendance } from '@/lib/rank-eligibility';
+import { publishInboxEvent } from '@/lib/realtime/inbox-events';
+import { publishPromotionEvent } from '@/lib/realtime/promotion-events';
 
 export async function POST(
   request: NextRequest,
@@ -97,6 +99,9 @@ export async function POST(
       },
     },
   });
+
+  publishPromotionEvent({ source: 'proposal.declined', proposalId: proposal.id });
+  publishInboxEvent(proposal.userId);
 
   return NextResponse.json({ success: true });
 }

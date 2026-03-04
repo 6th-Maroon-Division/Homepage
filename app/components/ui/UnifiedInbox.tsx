@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
@@ -40,6 +40,26 @@ export default function UnifiedInbox() {
   const [isLoading, setIsLoading] = useState(false);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [isStreamConnected, setIsStreamConnected] = useState(false);
+  const streamRef = useRef<EventSource | null>(null);
+
+  const fetchUnreadCount = useCallback(async () => {
+    if (!session?.user) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/messaging/inbox?unread=true&limit=1');
+      if (!response.ok) {
+        return;
+      }
+
+      const data: InboxData = await response.json();
+      setUnreadCount(data.unreadCount);
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+    }
+  }, [session]);
 
   const fetchMessages = useCallback(async () => {
     if (!session?.user) return;
@@ -72,30 +92,54 @@ export default function UnifiedInbox() {
     }
   }, [isOpen, fetchMessages]);
 
-  // Poll for unread count when logged in
+  // Stream-first inbox updates with polling fallback
   useEffect(() => {
     if (!session?.user) return;
 
-    const pollUnreadCount = async () => {
-      try {
-        const response = await fetch('/api/messaging/inbox?unread=true&limit=1');
-        if (response.ok) {
-          const data: InboxData = await response.json();
-          setUnreadCount(data.unreadCount);
-        }
-      } catch (error) {
-        // Silent fail for polling
-        console.error('Error polling unread count:', error);
+    const source = new EventSource('/api/messaging/events');
+    streamRef.current = source;
+
+    source.onopen = () => {
+      setIsStreamConnected(true);
+      void fetchUnreadCount();
+    };
+
+    source.onmessage = () => {
+      setIsStreamConnected(true);
+      void fetchUnreadCount();
+      if (isOpen) {
+        void fetchMessages();
       }
     };
 
-    // Initial fetch
-    pollUnreadCount();
+    source.onerror = () => {
+      setIsStreamConnected(false);
+    };
 
-    // Poll every 30 seconds
-    const interval = setInterval(pollUnreadCount, 30000);
+    return () => {
+      source.close();
+      streamRef.current = null;
+      setIsStreamConnected(false);
+    };
+  }, [session, isOpen, fetchMessages, fetchUnreadCount]);
+
+  useEffect(() => {
+    if (!session?.user) {
+      return;
+    }
+
+    if (isStreamConnected) {
+      return;
+    }
+
+    void fetchUnreadCount();
+
+    const interval = setInterval(() => {
+      void fetchUnreadCount();
+    }, 30000);
+
     return () => clearInterval(interval);
-  }, [session]);
+  }, [session, isStreamConnected, fetchUnreadCount]);
 
   const markAsRead = async (messageId: number) => {
     try {

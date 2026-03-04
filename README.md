@@ -71,6 +71,7 @@ Web application for managing Arma 3 unit operations, signups, attendance, ranks,
 - Message types: `general`, `orbat`, `training`, `rankup`, `alert`
 - Audience targeting: all users or admins
 - In-app inbox with unread badge, filters, and mark-read APIs
+- Realtime inbox stream (SSE) at `/api/messaging/events` with polling fallback
 - Auto message creation on rankup approval flows
 
 ### Permissions & Access Control
@@ -92,6 +93,7 @@ Web application for managing Arma 3 unit operations, signups, attendance, ranks,
 - Attendance management
 - Rank configuration
 - Pending promotions
+- Pending promotions realtime queue stream (SSE) at `/api/ranks/promotions/events`
 - System messaging
 - Legacy user data import
 - Theme page currently indicates theme system removal (static light/dark behavior)

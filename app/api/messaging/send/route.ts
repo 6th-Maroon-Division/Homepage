@@ -5,6 +5,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 import { getSuperAdminUserIds } from '@/lib/permission-utils';
+import { publishInboxEvents } from '@/lib/realtime/inbox-events';
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -107,6 +108,8 @@ export async function POST(request: NextRequest) {
 
       return createdMessage;
     });
+
+    publishInboxEvents(recipientUserIds);
 
     return NextResponse.json(
       {
