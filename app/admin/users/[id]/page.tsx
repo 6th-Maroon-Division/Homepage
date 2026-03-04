@@ -41,14 +41,15 @@ export default async function UserDetailPage({
     redirect('/');
   }
 
-  const [canManageUsers, canManagePermissions, canMarkTrainings] = await Promise.all([
+  const [canManageUsers, canManagePermissions, canMarkTrainings, canManagePromotions] = await Promise.all([
     checkPermission(session.user.id, 'user:manage'),
     checkPermission(session.user.id, 'user:manage_permissions'),
     checkPermission(session.user.id, 'training:mark'),
+    checkPermission(session.user.id, 'rank:manage_promotions'),
   ]);
 
   const hasSuperAdmin = (session.user.permissions?.['system:super_admin'] ?? 0) > 0;
-  const canAccessPage = hasSuperAdmin || canManageUsers || canManagePermissions || canMarkTrainings;
+  const canAccessPage = hasSuperAdmin || canManageUsers || canManagePermissions || canMarkTrainings || canManagePromotions;
 
   if (!canAccessPage) {
     redirect('/admin');
@@ -112,6 +113,7 @@ export default async function UserDetailPage({
     trendRecords,
     allPermissions,
     assignedPermissions,
+    ranks,
   ] =
     await Promise.all([
       prisma.attendance.count({ where: { userId } }),
@@ -147,6 +149,15 @@ export default async function UserDetailPage({
         where: { userId, value: { gt: 0 } },
         include: { permission: true },
         orderBy: { permissionId: 'asc' },
+      }),
+      prisma.rank.findMany({
+        orderBy: { orderIndex: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          abbreviation: true,
+          orderIndex: true,
+        },
       }),
     ]);
 
@@ -205,6 +216,19 @@ export default async function UserDetailPage({
   const canEditPermissions = canManagePermissions;
   const canViewActions = hasSuperAdmin || canManageUsers;
 
+  const currentRankId = targetUser.userRank?.currentRank?.id ?? null;
+  const currentRankIndex = currentRankId
+    ? ranks.findIndex((rank) => rank.id === currentRankId)
+    : -1;
+
+  const promoteRank = currentRankIndex >= 0
+    ? ranks[currentRankIndex + 1] ?? null
+    : ranks[0] ?? null;
+
+  const demoteRank = currentRankIndex > 0
+    ? ranks[currentRankIndex - 1]
+    : null;
+
   const availableTrainings = canMarkTrainings
     ? await prisma.training.findMany({
         where: {
@@ -247,6 +271,9 @@ export default async function UserDetailPage({
           canViewPermissions={canViewPermissions}
           canEditPermissions={canEditPermissions}
           canViewActions={canViewActions}
+          canManagePromotions={hasSuperAdmin || canManagePromotions}
+          promoteRank={promoteRank}
+          demoteRank={demoteRank}
           isSelfUser={session.user.id === targetUser.id}
         />
       </div>

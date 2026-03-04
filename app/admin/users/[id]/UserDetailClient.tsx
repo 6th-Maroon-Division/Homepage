@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/components/ui/ToastContainer';
 
@@ -78,6 +78,9 @@ type UserDetailClientProps = {
   canViewPermissions: boolean;
   canEditPermissions: boolean;
   canViewActions: boolean;
+  canManagePromotions: boolean;
+  promoteRank: { id: number; name: string; abbreviation: string } | null;
+  demoteRank: { id: number; name: string; abbreviation: string } | null;
   isSelfUser: boolean;
 };
 
@@ -93,6 +96,9 @@ export default function UserDetailClient({
   canViewPermissions,
   canEditPermissions,
   canViewActions,
+  canManagePromotions,
+  promoteRank,
+  demoteRank,
   isSelfUser,
 }: UserDetailClientProps) {
   const { showError, showSuccess } = useToast();
@@ -153,6 +159,9 @@ export default function UserDetailClient({
 
   const [activeTab, setActiveTab] = useState<TabKey>(visibleTabs[0]?.key ?? 'overview');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isPromoting, setIsPromoting] = useState(false);
+  const [isDemoting, setIsDemoting] = useState(false);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleDelete = async () => {
     if (!canViewActions || isDeleting) return;
@@ -174,6 +183,29 @@ export default function UserDetailClient({
       setIsDeleting(false);
     }
   };
+
+  useEffect(() => {
+    const source = new EventSource(`/api/users/${user.id}/events`);
+
+    source.onmessage = () => {
+      if (refreshTimerRef.current) {
+        return;
+      }
+
+      refreshTimerRef.current = setTimeout(() => {
+        refreshTimerRef.current = null;
+        router.refresh();
+      }, 250);
+    };
+
+    return () => {
+      source.close();
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
+    };
+  }, [router, user.id]);
 
   return (
     <div className="space-y-6">
@@ -550,6 +582,90 @@ export default function UserDetailClient({
 
       {activeTab === 'actions' && canViewActions && (
         <div className="rounded-lg border p-4" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--secondary)' }}>
+          {canManagePromotions && (
+            <div className="mb-4">
+              <h3 className="font-semibold mb-3" style={{ color: 'var(--foreground)' }}>Rank Actions</h3>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  disabled={isPromoting || !promoteRank}
+                  onClick={async () => {
+                    if (!promoteRank) {
+                      return;
+                    }
+
+                    setIsPromoting(true);
+                    try {
+                      const response = await fetch(`/api/users/${user.id}/rank/assign`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ rankId: promoteRank.id }),
+                      });
+
+                      if (!response.ok) {
+                        const data = await response.json().catch(() => ({}));
+                        throw new Error(data.error || 'Failed to promote user');
+                      }
+
+                      showSuccess(`Promoted to ${promoteRank.abbreviation} - ${promoteRank.name}`);
+                      router.refresh();
+                    } catch (error) {
+                      showError(error instanceof Error ? error.message : 'Failed to promote user');
+                    } finally {
+                      setIsPromoting(false);
+                    }
+                  }}
+                  className="px-4 py-2 rounded text-sm font-medium disabled:opacity-50"
+                  style={{
+                    backgroundColor: 'var(--primary)',
+                    color: 'var(--primary-foreground)',
+                  }}
+                >
+                  {isPromoting ? 'Promoting...' : promoteRank ? `Promote → ${promoteRank.abbreviation}` : 'No Higher Rank'}
+                </button>
+
+                <button
+                  disabled={isDemoting || !demoteRank}
+                  onClick={async () => {
+                    if (!demoteRank) {
+                      return;
+                    }
+
+                    const reason = window.prompt('Demotion reason (optional):') || null;
+
+                    setIsDemoting(true);
+                    try {
+                      const response = await fetch(`/api/users/${user.id}/rank/demote`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ rankId: demoteRank.id, reason }),
+                      });
+
+                      if (!response.ok) {
+                        const data = await response.json().catch(() => ({}));
+                        throw new Error(data.error || 'Failed to demote user');
+                      }
+
+                      showSuccess(`Demoted to ${demoteRank.abbreviation} - ${demoteRank.name}`);
+                      router.refresh();
+                    } catch (error) {
+                      showError(error instanceof Error ? error.message : 'Failed to demote user');
+                    } finally {
+                      setIsDemoting(false);
+                    }
+                  }}
+                  className="px-4 py-2 rounded text-sm font-medium disabled:opacity-50"
+                  style={{
+                    backgroundColor: 'var(--muted)',
+                    color: 'var(--foreground)',
+                    border: '1px solid var(--border)',
+                  }}
+                >
+                  {isDemoting ? 'Demoting...' : demoteRank ? `Demote → ${demoteRank.abbreviation}` : 'No Lower Rank'}
+                </button>
+              </div>
+            </div>
+          )}
+
           <h3 className="font-semibold mb-3" style={{ color: 'var(--foreground)' }}>Danger Zone</h3>
           <button
             onClick={handleDelete}
