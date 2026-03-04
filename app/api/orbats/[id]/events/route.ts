@@ -50,11 +50,7 @@ export async function GET(
         payload: null,
       }));
 
-      const unsubscribe = subscribeOrbatEvents((event) => {
-        if (event.orbatId !== orbatId) {
-          return;
-        }
-
+      const unsubscribe = subscribeOrbatEvents(orbatId, (event) => {
         const publicEvent = toPublicOrbatEvent(event);
         if (!publicEvent) {
           return;

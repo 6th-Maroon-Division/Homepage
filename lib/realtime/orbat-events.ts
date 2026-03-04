@@ -1,3 +1,5 @@
+import { nextEventId, publishToChannel, subscribeToChannel } from '@/lib/realtime/event-hub';
+
 export type OrbatEventType =
   | 'orbat.created'
   | 'orbat.updated'
@@ -26,34 +28,13 @@ type OrbatEventInput = {
   payload?: Record<string, unknown>;
 };
 
+const ORBAT_CHANNEL = 'orbat';
+const ORBAT_ALL_SCOPE = 'all';
 type OrbatEventListener = (event: OrbatEvent) => void;
 
-type RealtimeStore = {
-  listeners: Set<OrbatEventListener>;
-  sequence: number;
-};
-
-declare global {
-  var __orbatRealtimeStore: RealtimeStore | undefined;
-}
-
-function getStore(): RealtimeStore {
-  if (!globalThis.__orbatRealtimeStore) {
-    globalThis.__orbatRealtimeStore = {
-      listeners: new Set(),
-      sequence: 0,
-    };
-  }
-
-  return globalThis.__orbatRealtimeStore;
-}
-
 export function publishOrbatEvent(input: OrbatEventInput): OrbatEvent {
-  const store = getStore();
-  store.sequence += 1;
-
   const event: OrbatEvent = {
-    id: `${Date.now()}-${store.sequence}`,
+    id: nextEventId(ORBAT_CHANNEL),
     type: input.type,
     orbatId: input.orbatId,
     occurredAt: new Date().toISOString(),
@@ -62,20 +43,27 @@ export function publishOrbatEvent(input: OrbatEventInput): OrbatEvent {
     payload: input.payload,
   };
 
-  for (const listener of store.listeners) {
-    listener(event);
-  }
+  publishToChannel(ORBAT_CHANNEL, ORBAT_ALL_SCOPE, event);
+  publishToChannel(ORBAT_CHANNEL, input.orbatId, event);
 
   return event;
 }
 
-export function subscribeOrbatEvents(listener: OrbatEventListener): () => void {
-  const store = getStore();
-  store.listeners.add(listener);
+export function subscribeOrbatEvents(listener: OrbatEventListener): () => void;
+export function subscribeOrbatEvents(orbatId: number, listener: OrbatEventListener): () => void;
+export function subscribeOrbatEvents(
+  orbatIdOrListener: number | OrbatEventListener,
+  listenerArg?: OrbatEventListener
+): () => void {
+  if (typeof orbatIdOrListener === 'function') {
+    return subscribeToChannel(ORBAT_CHANNEL, ORBAT_ALL_SCOPE, orbatIdOrListener);
+  }
 
-  return () => {
-    store.listeners.delete(listener);
-  };
+  if (!listenerArg) {
+    throw new Error('Listener is required when subscribing with an orbatId.');
+  }
+
+  return subscribeToChannel(ORBAT_CHANNEL, orbatIdOrListener, listenerArg);
 }
 
 export function toPublicOrbatEvent(event: OrbatEvent) {
