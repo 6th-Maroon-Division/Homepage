@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   publishUserProfileEvent,
+  subscribeAdminUserProfileEvents,
   subscribeUserProfileEvents,
 } from '@/lib/realtime/user-events';
 
@@ -37,4 +38,19 @@ test('unsubscribe stops receiving user profile events', () => {
   publishUserProfileEvent(300);
 
   assert.equal(callCount, 1);
+});
+
+test('admin subscribers receive profile events for any user', () => {
+  let adminCalls = 0;
+
+  const unsubscribeAdmin = subscribeAdminUserProfileEvents(() => {
+    adminCalls += 1;
+  });
+
+  publishUserProfileEvent(10, { source: 'user-training.updated' });
+  publishUserProfileEvent(20, { source: 'user.rank.updated' });
+
+  unsubscribeAdmin();
+
+  assert.equal(adminCalls, 2);
 });

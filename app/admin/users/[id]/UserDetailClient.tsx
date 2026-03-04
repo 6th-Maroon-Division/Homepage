@@ -120,6 +120,8 @@ export default function UserDetailClient({
     return Object.fromEntries(groups.map((group) => [group, false]));
   });
   const [isAssigningTraining, setIsAssigningTraining] = useState(false);
+  const [isUpdatingTrainingById, setIsUpdatingTrainingById] = useState<Record<number, boolean>>({});
+  const [isRemovingTrainingById, setIsRemovingTrainingById] = useState<Record<number, boolean>>({});
   const [selectedTrainingId, setSelectedTrainingId] = useState<number>(availableTrainings[0]?.id ?? 0);
   const [trainingNotes, setTrainingNotes] = useState('');
 
@@ -148,6 +150,14 @@ export default function UserDetailClient({
       return next;
     });
   }, [groupedPermissions]);
+
+  useEffect(() => {
+    setTrainingRows(user.trainings);
+  }, [user.trainings]);
+
+  useEffect(() => {
+    setAvailableTrainingRows(availableTrainings);
+  }, [availableTrainings]);
 
   const visibleTabs: Array<{ key: TabKey; label: string }> = [
     { key: 'overview', label: 'Overview' },
@@ -438,12 +448,127 @@ export default function UserDetailClient({
               ) : (
                 trainingRows.map((training) => (
                   <div key={training.id} className="rounded border p-3" style={{ borderColor: 'var(--border)' }}>
-                    <div className="font-medium" style={{ color: 'var(--foreground)' }}>{training.trainingName}</div>
-                    <div className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
-                      Completed: {new Date(training.completedAt).toLocaleDateString('en-GB')}
-                    </div>
-                    <div className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
-                      Trainer: {training.trainerUsername || 'Unknown'}
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <div className="font-medium" style={{ color: 'var(--foreground)' }}>{training.trainingName}</div>
+                        <div className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
+                          Completed: {new Date(training.completedAt).toLocaleDateString('en-GB')}
+                        </div>
+                        <div className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
+                          Trainer: {training.trainerUsername || 'Unknown'}
+                        </div>
+                        {training.needsRetraining && (
+                          <span
+                            className="inline-block mt-2 px-2 py-1 rounded text-xs"
+                            style={{ backgroundColor: 'var(--accent)', color: 'var(--accent-foreground)' }}
+                          >
+                            Needs Retraining
+                          </span>
+                        )}
+                      </div>
+
+                      {canAssignTrainings && (
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            disabled={isUpdatingTrainingById[training.id] || isRemovingTrainingById[training.id]}
+                            onClick={async () => {
+                              setIsUpdatingTrainingById((previous) => ({ ...previous, [training.id]: true }));
+                              try {
+                                const response = await fetch(`/api/user-trainings/${training.id}`, {
+                                  method: 'PUT',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    notes: training.notes,
+                                    isHidden: training.isHidden,
+                                    needsRetraining: !training.needsRetraining,
+                                  }),
+                                });
+
+                                if (!response.ok) {
+                                  const data = await response.json().catch(() => ({}));
+                                  throw new Error(data.error || 'Failed to update training');
+                                }
+
+                                setTrainingRows((previous) =>
+                                  previous.map((row) =>
+                                    row.id === training.id
+                                      ? { ...row, needsRetraining: !training.needsRetraining }
+                                      : row
+                                  )
+                                );
+
+                                showSuccess(
+                                  !training.needsRetraining
+                                    ? 'Training marked as needing retraining'
+                                    : 'Retraining requirement cleared'
+                                );
+                                router.refresh();
+                              } catch (error) {
+                                showError(error instanceof Error ? error.message : 'Failed to update training');
+                              } finally {
+                                setIsUpdatingTrainingById((previous) => ({ ...previous, [training.id]: false }));
+                              }
+                            }}
+                            className="px-3 py-1 rounded text-xs font-medium disabled:opacity-50"
+                            style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                          >
+                            {isUpdatingTrainingById[training.id]
+                              ? 'Saving...'
+                              : training.needsRetraining
+                                ? 'Clear Retraining'
+                                : 'Needs Retraining'}
+                          </button>
+
+                          <button
+                            disabled={isUpdatingTrainingById[training.id] || isRemovingTrainingById[training.id]}
+                            onClick={async () => {
+                              const confirmed = window.confirm(`Remove ${training.trainingName} from this user?`);
+                              if (!confirmed) {
+                                return;
+                              }
+
+                              setIsRemovingTrainingById((previous) => ({ ...previous, [training.id]: true }));
+                              try {
+                                const response = await fetch(`/api/user-trainings/${training.id}`, {
+                                  method: 'DELETE',
+                                });
+
+                                if (!response.ok) {
+                                  const data = await response.json().catch(() => ({}));
+                                  throw new Error(data.error || 'Failed to remove training');
+                                }
+
+                                setTrainingRows((previous) => previous.filter((row) => row.id !== training.id));
+                                setAvailableTrainingRows((previous) => {
+                                  if (previous.some((row) => row.id === training.trainingId)) {
+                                    return previous;
+                                  }
+
+                                  return [
+                                    ...previous,
+                                    {
+                                      id: training.trainingId,
+                                      name: training.trainingName,
+                                      categoryId: null,
+                                      duration: null,
+                                    },
+                                  ];
+                                });
+                                showSuccess('Training removed');
+                                router.refresh();
+                              } catch (error) {
+                                showError(error instanceof Error ? error.message : 'Failed to remove training');
+                              } finally {
+                                setIsRemovingTrainingById((previous) => ({ ...previous, [training.id]: false }));
+                              }
+                            }}
+                            className="px-3 py-1 rounded text-xs font-medium disabled:opacity-50"
+                            style={{ backgroundColor: 'var(--destructive)', color: 'var(--destructive-foreground)' }}
+                          >
+                            {isRemovingTrainingById[training.id] ? 'Removing...' : 'Remove'}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))

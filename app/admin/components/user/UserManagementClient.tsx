@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import { usePermission } from '@/app/hooks/usePermissions';
@@ -52,6 +53,7 @@ export default function UserManagementClient({
   showAllUsersTab = true,
   showUnrankedTab = true,
 }: UserManagementClientProps) {
+  const router = useRouter();
   const [users, setUsers] = useState<User[]>(initialUsers);
   const [activeTab, setActiveTab] = useState<'all' | 'unranked'>(initialTab);
   const [filter, setFilter] = useState<'all' | 'admin' | 'regular'>('all');
@@ -80,6 +82,53 @@ export default function UserManagementClient({
   const [ranks, setRanks] = useState<Array<{ id: number; name: string; abbreviation: string }>>([]);
   
   const { showSuccess, showError } = useToast();
+
+  useEffect(() => {
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    let fallbackTimer: ReturnType<typeof setInterval> | null = null;
+
+    const source = new EventSource('/api/admin/users/events');
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) {
+        return;
+      }
+
+      refreshTimer = setTimeout(() => {
+        refreshTimer = null;
+        router.refresh();
+      }, 250);
+    };
+
+    source.onopen = () => {
+      if (fallbackTimer) {
+        clearInterval(fallbackTimer);
+        fallbackTimer = null;
+      }
+    };
+
+    source.onmessage = () => {
+      scheduleRefresh();
+    };
+
+    source.onerror = () => {
+      if (!fallbackTimer) {
+        fallbackTimer = setInterval(() => {
+          router.refresh();
+        }, 30000);
+      }
+    };
+
+    return () => {
+      source.close();
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+      }
+      if (fallbackTimer) {
+        clearInterval(fallbackTimer);
+      }
+    };
+  }, [router]);
 
   // Permission checks
   const canManageUsers = usePermission('user:manage');
