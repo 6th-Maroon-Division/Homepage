@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
+import { publishUserProfileEvent } from '@/lib/realtime/user-events';
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -51,6 +52,13 @@ export async function POST(request: NextRequest) {
       })
     )
   );
+
+  for (const userId of userIds) {
+    publishUserProfileEvent(userId, {
+      source: 'rank.bulk-assigned',
+      rankId: rank.id,
+    });
+  }
 
   return NextResponse.json({ success: true, assignedCount: userIds.length });
 }

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
+import { publishUserProfileEvent } from '@/lib/realtime/user-events';
 
 // PUT /api/user-trainings/[id] - Update user training (admin only)
 export async function PUT(
@@ -44,6 +45,11 @@ export async function PUT(
       },
     });
 
+    publishUserProfileEvent(userTraining.userId, {
+      source: 'user-training.updated',
+      trainingId: userTraining.trainingId,
+    });
+
     return NextResponse.json({
       ...userTraining,
       completedAt: userTraining.completedAt.toISOString(),
@@ -79,8 +85,22 @@ export async function DELETE(
     const { id } = await context.params;
     const userTrainingId = parseInt(id);
 
+    const existingTraining = await prisma.userTraining.findUnique({
+      where: { id: userTrainingId },
+      select: { userId: true, trainingId: true },
+    });
+
+    if (!existingTraining) {
+      return NextResponse.json({ error: 'Training record not found' }, { status: 404 });
+    }
+
     await prisma.userTraining.delete({
       where: { id: userTrainingId },
+    });
+
+    publishUserProfileEvent(existingTraining.userId, {
+      source: 'user-training.removed',
+      trainingId: existingTraining.trainingId,
     });
 
     return NextResponse.json({ message: 'Training removed from user successfully' });

@@ -126,6 +126,7 @@ export default function UserSelfDetailClient({ user, attendance, availableTraini
   const [isLoadingRankHistory, setIsLoadingRankHistory] = useState(false);
   const [rankHistoryError, setRankHistoryError] = useState('');
   const avatarFileInputRef = useRef<HTMLInputElement | null>(null);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
   const { update: updateSession } = useSession();
   const { showError, showSuccess } = useToast();
@@ -157,6 +158,29 @@ export default function UserSelfDetailClient({ user, attendance, availableTraini
       fetchRankHistory(rankHistoryPage);
     }
   }, [activeTab, rankHistoryPage, fetchRankHistory]);
+
+  useEffect(() => {
+    const source = new EventSource('/api/user/events');
+
+    source.onmessage = () => {
+      if (refreshTimerRef.current) {
+        return;
+      }
+
+      refreshTimerRef.current = setTimeout(() => {
+        refreshTimerRef.current = null;
+        router.refresh();
+      }, 250);
+    };
+
+    return () => {
+      source.close();
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
+    };
+  }, [router]);
 
   return (
     <div className="space-y-6">

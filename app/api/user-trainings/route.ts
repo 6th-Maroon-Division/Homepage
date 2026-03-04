@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
+import { publishUserProfileEvent } from '@/lib/realtime/user-events';
 
 // GET /api/user-trainings - Get user trainings (for current user or specific user if admin)
 export async function GET(request: NextRequest) {
@@ -130,6 +131,11 @@ export async function POST(request: NextRequest) {
           },
         },
       },
+    });
+
+    publishUserProfileEvent(userTraining.userId, {
+      source: 'user-training.assigned',
+      trainingId: userTraining.trainingId,
     });
 
     return NextResponse.json({

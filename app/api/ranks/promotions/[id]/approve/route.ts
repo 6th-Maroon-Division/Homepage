@@ -6,6 +6,7 @@ import { checkPermission } from '@/lib/auth-middleware';
 import { getCurrentAttendance } from '@/lib/rank-eligibility';
 import { publishInboxEvent } from '@/lib/realtime/inbox-events';
 import { publishPromotionEvent } from '@/lib/realtime/promotion-events';
+import { publishUserProfileEvent } from '@/lib/realtime/user-events';
 
 export async function POST(
   _req: NextRequest,
@@ -105,6 +106,10 @@ export async function POST(
 
   publishPromotionEvent({ source: 'proposal.approved', proposalId: proposal.id });
   publishInboxEvent(proposal.userId);
+  publishUserProfileEvent(proposal.userId, {
+    source: 'rank.promotion-approved',
+    proposalId: proposal.id,
+  });
 
   return NextResponse.json({ success: true });
 }

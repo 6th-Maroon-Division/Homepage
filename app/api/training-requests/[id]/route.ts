@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
+import { publishUserProfileEvent } from '@/lib/realtime/user-events';
 
 // PUT /api/training-requests/[id] - Update training request status (admin only)
 export async function PUT(
@@ -86,6 +87,12 @@ export async function PUT(
         }),
       ]);
 
+      publishUserProfileEvent(updatedRequest.user.id, {
+        source: 'training-request.updated',
+        status: updatedRequest.status,
+        trainingId: updatedRequest.trainingId,
+      });
+
       return NextResponse.json({
         ...updatedRequest,
         requestedAt: updatedRequest.requestedAt.toISOString(),
@@ -127,6 +134,12 @@ export async function PUT(
             },
           },
         },
+      });
+
+      publishUserProfileEvent(updatedRequest.user.id, {
+        source: 'training-request.updated',
+        status: updatedRequest.status,
+        trainingId: updatedRequest.trainingId,
       });
 
       return NextResponse.json({

@@ -7,6 +7,7 @@ import { checkPermission } from '@/lib/auth-middleware';
 import { canModifyUserPermissions } from '@/lib/user-permission-guards';
 import { validatePermissionUpdateEntries } from '@/lib/permission-api-logic';
 import type { PermissionUpdateEntry } from '@/lib/permission-api-logic';
+import { publishUserProfileEvent } from '@/lib/realtime/user-events';
 
 /**
  * GET /api/users/[id]/permissions
@@ -230,6 +231,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         });
       }
     }
+  });
+
+  publishUserProfileEvent(userId, {
+    source: 'permissions.updated',
   });
 
   return NextResponse.json({
