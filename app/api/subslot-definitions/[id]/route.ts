@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
+import { publishAdminCatalogEvent } from '@/lib/realtime/admin-catalog-events';
 
 type RouteParams = {
   params: Promise<{ id: string }>;
@@ -138,6 +139,15 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
       };
     });
 
+    publishAdminCatalogEvent({
+      type: 'role-definition.changed',
+      actorUserId: session.user.id,
+      payload: {
+        action: 'updated',
+        roleDefinitionId: updated.id,
+      },
+    });
+
     return NextResponse.json(updated);
   } catch (error) {
     console.error('Error updating role definition:', error);
@@ -177,6 +187,15 @@ export async function DELETE(_request: NextRequest, context: RouteParams) {
 
     await prisma.squadRole.delete({
       where: { id: definitionId },
+    });
+
+    publishAdminCatalogEvent({
+      type: 'role-definition.changed',
+      actorUserId: session.user.id,
+      payload: {
+        action: 'deleted',
+        roleDefinitionId: definitionId,
+      },
     });
 
     return NextResponse.json({ success: true });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import DeleteOrbatButton from '../../../components/orbat/DeleteOrbatButton';
 import { usePermission } from '@/app/hooks/usePermissions';
@@ -25,12 +25,60 @@ type OrbatManagementClientProps = {
 };
 
 export default function OrbatManagementClient({ orbats: initialOrbats }: OrbatManagementClientProps) {
-  const [orbats] = useState<Orbat[]>(initialOrbats);
+  const [orbats, setOrbats] = useState<Orbat[]>(initialOrbats);
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const canCreateOrbat = usePermission('orbat:create');
   const canEditOrbat = usePermission('orbat:edit');
+
+  useEffect(() => {
+    const fetchOrbats = async () => {
+      try {
+        const response = await fetch('/api/admin/orbats/list');
+        if (!response.ok) {
+          return;
+        }
+
+        const data = (await response.json()) as Orbat[];
+        setOrbats(data);
+      } catch {
+        // keep current local state if sync fails
+      }
+    };
+
+    const queueSync = () => {
+      if (syncTimerRef.current) {
+        return;
+      }
+
+      syncTimerRef.current = setTimeout(() => {
+        syncTimerRef.current = null;
+        void fetchOrbats();
+      }, 250);
+    };
+
+    const source = new EventSource('/api/admin/catalog/events');
+    source.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data) as { type?: string };
+        if (payload.type === 'orbat.changed') {
+          queueSync();
+        }
+      } catch {
+        // ignore invalid events
+      }
+    };
+
+    return () => {
+      source.close();
+      if (syncTimerRef.current) {
+        clearTimeout(syncTimerRef.current);
+        syncTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const now = new Date();
 

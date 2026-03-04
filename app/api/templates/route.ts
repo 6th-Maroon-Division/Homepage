@@ -4,6 +4,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { NextResponse } from 'next/server';
 import { checkPermission } from '@/lib/auth-middleware';
 import { canAccessTemplateReadApi } from '@/lib/permission-api-logic';
+import { publishAdminCatalogEvent } from '@/lib/realtime/admin-catalog-events';
 import type { NextRequest } from 'next/server';
 
 type TemplateRoleSlotInput = {
@@ -234,6 +235,15 @@ export async function POST(request: NextRequest) {
         createdBy: {
           select: { id: true, username: true, avatarUrl: true },
         },
+      },
+    });
+
+    publishAdminCatalogEvent({
+      type: 'template.changed',
+      actorUserId: session.user.id,
+      payload: {
+        action: 'created',
+        templateId: template.id,
       },
     });
 

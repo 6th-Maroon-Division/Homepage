@@ -1,8 +1,5 @@
-import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { prisma } from '@/lib/prisma';
-import { subscribeUserProfileEvents } from '@/lib/realtime/user-events';
+import { NextRequest } from 'next/server';
+import { subscribeOrbatEvents, toPublicOrbatEvent } from '@/lib/realtime/orbat-events';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,26 +16,7 @@ function formatSseMessage(data: unknown, id?: string) {
   return `${message.join('\n')}\n\n`;
 }
 
-export async function GET(request: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const userId = Number(session.user.id);
-  if (Number.isNaN(userId)) {
-    return NextResponse.json({ error: 'Invalid user ID' }, { status: 400 });
-  }
-
-  const existingUser = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true },
-  });
-
-  if (!existingUser) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 });
-  }
-
+export async function GET(request: NextRequest) {
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream<Uint8Array>({
@@ -49,21 +27,25 @@ export async function GET(request: Request) {
         if (isClosed) {
           return;
         }
+
         controller.enqueue(encoder.encode(chunk));
       };
 
       send('retry: 3000\n\n');
-      send(
-        formatSseMessage({
-          id: `connected-${Date.now()}`,
-          type: 'stream.connected',
-          occurredAt: new Date().toISOString(),
-          payload: null,
-        })
-      );
+      send(formatSseMessage({
+        id: `connected-${Date.now()}`,
+        type: 'stream.connected',
+        occurredAt: new Date().toISOString(),
+        payload: null,
+      }));
 
-      const unsubscribe = subscribeUserProfileEvents(userId, (event) => {
-        send(formatSseMessage(event, event.id));
+      const unsubscribe = subscribeOrbatEvents((event) => {
+        const publicEvent = toPublicOrbatEvent(event);
+        if (!publicEvent) {
+          return;
+        }
+
+        send(formatSseMessage(publicEvent, publicEvent.id));
       });
 
       const heartbeat = setInterval(() => {

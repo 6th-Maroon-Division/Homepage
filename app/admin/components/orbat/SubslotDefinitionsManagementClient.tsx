@@ -1,6 +1,6 @@
 'use client';
 
-import { type ChangeEvent, useState } from 'react';
+import { type ChangeEvent, useEffect, useRef, useState } from 'react';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
 import { createPortal } from 'react-dom';
@@ -56,6 +56,7 @@ export default function SubslotDefinitionsManagementClient({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; name: string } | null>(null);
   const [retireConfirm, setRetireConfirm] = useState<{ id: number; name: string; isRetired: boolean } | null>(null);
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { showSuccess, showError } = useToast();
 
   const [form, setForm] = useState<{
@@ -69,6 +70,53 @@ export default function SubslotDefinitionsManagementClient({
   });
 
   const isEditMode = editingId !== null;
+
+  useEffect(() => {
+    const fetchDefinitions = async () => {
+      try {
+        const response = await fetch('/api/subslot-definitions');
+        if (!response.ok) {
+          return;
+        }
+
+        const data = (await response.json()) as SubslotDefinition[];
+        setDefinitions(data);
+      } catch {
+        // keep local state if sync fails
+      }
+    };
+
+    const queueSync = () => {
+      if (syncTimerRef.current) {
+        return;
+      }
+
+      syncTimerRef.current = setTimeout(() => {
+        syncTimerRef.current = null;
+        void fetchDefinitions();
+      }, 250);
+    };
+
+    const source = new EventSource('/api/admin/catalog/events');
+    source.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data) as { type?: string };
+        if (payload.type === 'role-definition.changed') {
+          queueSync();
+        }
+      } catch {
+        // ignore invalid events
+      }
+    };
+
+    return () => {
+      source.close();
+      if (syncTimerRef.current) {
+        clearTimeout(syncTimerRef.current);
+        syncTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const resetForm = () => {
     setForm({

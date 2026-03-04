@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { checkPermission } from '@/lib/auth-middleware';
-import { prisma } from '@/lib/prisma';
-import { subscribeUserProfileEvents } from '@/lib/realtime/user-events';
+import { subscribeAdminCatalogEvents } from '@/lib/realtime/admin-catalog-events';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,41 +19,39 @@ function formatSseMessage(data: unknown, id?: string) {
   return `${message.join('\n')}\n\n`;
 }
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { id } = await params;
-  const targetUserId = Number.parseInt(id, 10);
-  if (Number.isNaN(targetUserId)) {
-    return NextResponse.json({ error: 'Invalid user ID' }, { status: 400 });
-  }
-
   const hasSuperAdmin = (session.user.permissions?.['system:super_admin'] ?? 0) > 0;
-  const [canManageUsers, canManagePermissions, canMarkTrainings, canManagePromotions] = await Promise.all([
-    checkPermission(session.user.id, 'user:manage'),
-    checkPermission(session.user.id, 'user:manage_permissions'),
-    checkPermission(session.user.id, 'training:mark'),
-    checkPermission(session.user.id, 'rank:manage_promotions'),
+  const [canEditOrbat, canCreateOrbat, canDeleteOrbat, canEditTemplate, canCreateTemplate, canDeleteTemplate, canEditSubslot, canCreateSubslot, canDeleteSubslot] = await Promise.all([
+    checkPermission(session.user.id, 'orbat:edit'),
+    checkPermission(session.user.id, 'orbat:create'),
+    checkPermission(session.user.id, 'orbat:delete'),
+    checkPermission(session.user.id, 'template:edit'),
+    checkPermission(session.user.id, 'template:create'),
+    checkPermission(session.user.id, 'template:delete'),
+    checkPermission(session.user.id, 'subslot:edit'),
+    checkPermission(session.user.id, 'subslot:create'),
+    checkPermission(session.user.id, 'subslot:delete'),
   ]);
 
-  const canAccess = hasSuperAdmin || canManageUsers || canManagePermissions || canMarkTrainings || canManagePromotions;
+  const canAccess =
+    hasSuperAdmin ||
+    canEditOrbat ||
+    canCreateOrbat ||
+    canDeleteOrbat ||
+    canEditTemplate ||
+    canCreateTemplate ||
+    canDeleteTemplate ||
+    canEditSubslot ||
+    canCreateSubslot ||
+    canDeleteSubslot;
+
   if (!canAccess) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  const existingUser = await prisma.user.findUnique({
-    where: { id: targetUserId },
-    select: { id: true },
-  });
-
-  if (!existingUser) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 });
   }
 
   const encoder = new TextEncoder();
@@ -80,7 +77,7 @@ export async function GET(
         })
       );
 
-      const unsubscribe = subscribeUserProfileEvents(targetUserId, (event) => {
+      const unsubscribe = subscribeAdminCatalogEvents((event) => {
         send(formatSseMessage(event, event.id));
       });
 

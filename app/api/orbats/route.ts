@@ -4,6 +4,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 import { publishOrbatEvent } from '@/lib/realtime/orbat-events';
+import { publishAdminCatalogEvent } from '@/lib/realtime/admin-catalog-events';
 
 type SlotInput = {
   id?: number;
@@ -233,10 +234,26 @@ export async function POST(request: NextRequest) {
     });
 
     if (orbat) {
+      const eventDate = orbat.eventDate ?? orbat.createdAt;
       publishOrbatEvent({
         type: 'orbat.created',
         orbatId: orbat.id,
         actorUserId: userId,
+        payload: {
+          id: orbat.id,
+          name: orbat.name,
+          description: orbat.description,
+          eventDate: eventDate.toISOString(),
+        },
+      });
+
+      publishAdminCatalogEvent({
+        type: 'orbat.changed',
+        actorUserId: userId,
+        payload: {
+          action: 'created',
+          orbatId: orbat.id,
+        },
       });
     }
 

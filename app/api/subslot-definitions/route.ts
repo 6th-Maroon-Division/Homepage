@@ -4,6 +4,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 import { canAccessSubslotReadApi } from '@/lib/permission-api-logic';
+import { publishAdminCatalogEvent } from '@/lib/realtime/admin-catalog-events';
 
 type CreateSubslotDefinitionBody = {
   name?: string;
@@ -202,6 +203,15 @@ export async function POST(request: NextRequest) {
       requiredTraining: createdTrainings[0] || null,
       requiredRank: createdRanks[0] || null,
     };
+
+    publishAdminCatalogEvent({
+      type: 'role-definition.changed',
+      actorUserId: session.user.id,
+      payload: {
+        action: 'created',
+        roleDefinitionId: created.id,
+      },
+    });
 
     return NextResponse.json(createdResponse, { status: 201 });
   } catch (error) {

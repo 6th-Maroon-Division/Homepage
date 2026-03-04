@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import TopBar from "./components/layout/TopBar";
 import AuthSessionProvider from "./components/layout/SessionProvider";
+import PermissionSessionSync from './components/layout/PermissionSessionSync';
 import { ToastProvider } from "./components/ui/ToastContainer";
 import LinkAccountPrompt from "./components/auth/LinkAccountPrompt";
 
@@ -33,6 +34,7 @@ export default function RootLayout({
       >
         <AuthSessionProvider>
           <ToastProvider>
+            <PermissionSessionSync />
             <TopBar />
             {children}
             <LinkAccountPrompt />

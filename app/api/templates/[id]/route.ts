@@ -4,6 +4,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { NextResponse } from 'next/server';
 import { checkPermission } from '@/lib/auth-middleware';
 import { canAccessTemplateReadApi } from '@/lib/permission-api-logic';
+import { publishAdminCatalogEvent } from '@/lib/realtime/admin-catalog-events';
 
 type TemplateRoleSlotInput = {
   name: string;
@@ -302,6 +303,15 @@ export async function PUT(
       },
     });
 
+    publishAdminCatalogEvent({
+      type: 'template.changed',
+      actorUserId: session.user.id,
+      payload: {
+        action: 'updated',
+        templateId: template.id,
+      },
+    });
+
     return NextResponse.json(template);
   } catch (error) {
     console.error('Error updating template:', error);
@@ -342,6 +352,15 @@ export async function DELETE(
     await (prisma as any).orbatTemplate.update({
       where: { id: templateId },
       data: { isActive: false },
+    });
+
+    publishAdminCatalogEvent({
+      type: 'template.changed',
+      actorUserId: session.user.id,
+      payload: {
+        action: 'deleted',
+        templateId,
+      },
     });
 
     return NextResponse.json(

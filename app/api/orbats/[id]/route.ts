@@ -4,6 +4,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 import { publishOrbatEvent } from '@/lib/realtime/orbat-events';
+import { publishAdminCatalogEvent } from '@/lib/realtime/admin-catalog-events';
 
 type SlotInput = {
   id?: number;
@@ -255,6 +256,15 @@ export async function PATCH(
       actorUserId: Number(session.user.id),
     });
 
+    publishAdminCatalogEvent({
+      type: 'orbat.changed',
+      actorUserId: Number(session.user.id),
+      payload: {
+        action: 'updated',
+        orbatId,
+      },
+    });
+
     return NextResponse.json(updatedOrbat);
   } catch (error) {
     if (error instanceof Error && error.message === 'ORBAT_NOT_FOUND') {
@@ -300,6 +310,15 @@ export async function DELETE(
       type: 'orbat.deleted',
       orbatId,
       actorUserId: Number(session.user.id),
+    });
+
+    publishAdminCatalogEvent({
+      type: 'orbat.changed',
+      actorUserId: Number(session.user.id),
+      payload: {
+        action: 'deleted',
+        orbatId,
+      },
     });
 
     return NextResponse.json({ success: true });
