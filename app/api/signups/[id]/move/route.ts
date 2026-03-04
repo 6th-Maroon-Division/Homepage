@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
+import { publishOrbatEvent } from '@/lib/realtime/orbat-events';
 
 export async function PATCH(
   request: NextRequest,
@@ -174,6 +175,16 @@ export async function PATCH(
             squadRole: true,
           },
         },
+      },
+    });
+
+    publishOrbatEvent({
+      type: 'signup.moved',
+      orbatId: signup.slot.orbatId,
+      actorUserId: Number(session.user.id),
+      payload: {
+        fromSlotId: signup.slotId,
+        toSlotId: targetId,
       },
     });
 

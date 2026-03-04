@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
+import { publishOrbatEvent } from '@/lib/realtime/orbat-events';
 
 type SlotInput = {
   id?: number;
@@ -248,6 +249,12 @@ export async function PATCH(
       return NextResponse.json({ error: 'OrbAT not found' }, { status: 404 });
     }
 
+    publishOrbatEvent({
+      type: 'orbat.updated',
+      orbatId,
+      actorUserId: Number(session.user.id),
+    });
+
     return NextResponse.json(updatedOrbat);
   } catch (error) {
     if (error instanceof Error && error.message === 'ORBAT_NOT_FOUND') {
@@ -288,6 +295,13 @@ export async function DELETE(
     }
 
     await prisma.orbat.delete({ where: { id: orbatId } });
+
+    publishOrbatEvent({
+      type: 'orbat.deleted',
+      orbatId,
+      actorUserId: Number(session.user.id),
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting OrbAT:', error);

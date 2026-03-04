@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
+import { publishOrbatEvent } from '@/lib/realtime/orbat-events';
 
 type SlotInput = {
   id?: number;
@@ -230,6 +231,14 @@ export async function POST(request: NextRequest) {
         },
       });
     });
+
+    if (orbat) {
+      publishOrbatEvent({
+        type: 'orbat.created',
+        orbatId: orbat.id,
+        actorUserId: userId,
+      });
+    }
 
     return NextResponse.json(orbat, { status: 201 });
   } catch (error) {

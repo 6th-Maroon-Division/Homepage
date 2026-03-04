@@ -27,6 +27,7 @@ Web application for managing Arma 3 unit operations, signups, attendance, ranks,
 - Calendar-based operations browsing (`/orbats`)
 - Detailed operation pages with slot/subslot hierarchy
 - Signup/unsignup flows and signup movement endpoints
+- Realtime ORBAT change stream (SSE) at `/api/orbats/[id]/events` for signup/move/edit/delete updates
 - Operation metadata: factions, intel fields, start/end time
 - Radio frequency assignment (including temporary frequencies)
 - Admin ORBAT create/edit/delete workflows with permission checks

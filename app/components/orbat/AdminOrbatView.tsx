@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import MoveSignupModal from '@/app/components/orbat/MoveSignupModal';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
 import { useToast } from '@/app/components/ui/ToastContainer';
@@ -111,6 +111,7 @@ function getRelationshipColor(relationship: string): string {
 
 export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewProps) {
   const [orbat, setOrbat] = useState<ClientOrbat>(initialOrbat);
+  const [isStreamConnected, setIsStreamConnected] = useState(false);
   const [moveModalOpen, setMoveModalOpen] = useState(false);
   const [selectedSignup, setSelectedSignup] = useState<{
     id: number;
@@ -121,9 +122,73 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
   } | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<{ signupId: number; subslotId: number; userName: string } | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { showSuccess, showError, showWarning } = useToast();
 
   const eventDate = orbat.eventDate ? new Date(orbat.eventDate) : null;
+
+  const refreshOrbat = useCallback(async () => {
+    try {
+      const refreshRes = await fetch(`/api/orbats/${initialOrbat.id}/full`);
+      if (!refreshRes.ok) {
+        return;
+      }
+
+      const updatedOrbat = await refreshRes.json();
+      setOrbat(updatedOrbat);
+    } catch {
+      // fallback interval may recover
+    }
+  }, [initialOrbat.id]);
+
+  const queueRefresh = useCallback(() => {
+    if (refreshTimerRef.current) {
+      return;
+    }
+
+    refreshTimerRef.current = setTimeout(() => {
+      refreshTimerRef.current = null;
+      void refreshOrbat();
+    }, 250);
+  }, [refreshOrbat]);
+
+  useEffect(() => {
+    const source = new EventSource(`/api/orbats/${initialOrbat.id}/events`);
+
+    source.onopen = () => {
+      setIsStreamConnected(true);
+    };
+
+    source.onmessage = () => {
+      setIsStreamConnected(true);
+      queueRefresh();
+    };
+
+    source.onerror = () => {
+      setIsStreamConnected(false);
+    };
+
+    return () => {
+      source.close();
+      setIsStreamConnected(false);
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
+    };
+  }, [initialOrbat.id, queueRefresh]);
+
+  useEffect(() => {
+    if (isStreamConnected) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      void refreshOrbat();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [isStreamConnected, refreshOrbat]);
 
   const handleMoveClick = (
     signupId: number,
@@ -165,12 +230,7 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
       }
     }
 
-    // Refresh the orbat data
-    const refreshRes = await fetch(`/api/orbats/${orbat.id}/full`);
-    if (refreshRes.ok) {
-      const updatedOrbat = await refreshRes.json();
-      setOrbat(updatedOrbat);
-    }
+    await refreshOrbat();
   };
 
   const handleRemoveSignup = async (signupId: number, subslotId: number, userName: string) => {
@@ -197,13 +257,8 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
         return;
       }
 
-      // Refresh the orbat data
-      const refreshRes = await fetch(`/api/orbats/${orbat.id}/full`);
-      if (refreshRes.ok) {
-        const updatedOrbat = await refreshRes.json();
-        setOrbat(updatedOrbat);
-        showSuccess('Signup removed successfully');
-      }
+      await refreshOrbat();
+      showSuccess('Signup removed successfully');
     } catch (error) {
       console.error('Error removing signup:', error);
       showError('Error removing signup');

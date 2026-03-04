@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
+import { publishOrbatEvent } from '@/lib/realtime/orbat-events';
 
 type RouteParams = {
   params: Promise<{ id: string }>;
@@ -249,6 +250,15 @@ export async function POST(_req: NextRequest, context: RouteParams) {
     },
   });
 
+  publishOrbatEvent({
+    type: 'signup.created',
+    orbatId: slot.orbat.id,
+    actorUserId: currentUserId,
+    payload: {
+      slotId,
+    },
+  });
+
   const responseBody = await buildSlotResponse(slotId);
   if (!responseBody) {
     return NextResponse.json({ error: 'Failed to load updated slot.' }, { status: 500 });
@@ -302,6 +312,15 @@ export async function DELETE(req: NextRequest, context: RouteParams) {
   }
 
   await prisma.signup.delete({ where: { id: signup.id } });
+
+  publishOrbatEvent({
+    type: 'signup.deleted',
+    orbatId: slot.orbat.id,
+    actorUserId: currentUserId,
+    payload: {
+      slotId,
+    },
+  });
 
   const responseBody = await buildSlotResponse(slotId);
   if (!responseBody) {

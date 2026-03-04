@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 
@@ -150,6 +150,8 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
   const [orbat, setOrbat] = useState<ClientOrbat>(initialOrbat);
   const [loadingSubslotId, setLoadingSubslotId] = useState<number | null>(null);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [isStreamConnected, setIsStreamConnected] = useState(false);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { showSuccess, showError } = useToast();
 
   const eventDate = orbat.eventDate ? new Date(orbat.eventDate) : null;
@@ -166,6 +168,69 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
         // Ignore error - user might not be logged in
       });
   }, []);
+
+  const refreshOrbat = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/orbats/${initialOrbat.id}/full`);
+      if (!res.ok) {
+        return;
+      }
+
+      const updated = await res.json();
+      setOrbat(updated);
+    } catch {
+      // fallback interval may recover
+    }
+  }, [initialOrbat.id]);
+
+  const queueRefresh = useCallback(() => {
+    if (refreshTimerRef.current) {
+      return;
+    }
+
+    refreshTimerRef.current = setTimeout(() => {
+      refreshTimerRef.current = null;
+      void refreshOrbat();
+    }, 250);
+  }, [refreshOrbat]);
+
+  useEffect(() => {
+    const source = new EventSource(`/api/orbats/${initialOrbat.id}/events`);
+
+    source.onopen = () => {
+      setIsStreamConnected(true);
+    };
+
+    source.onmessage = () => {
+      setIsStreamConnected(true);
+      queueRefresh();
+    };
+
+    source.onerror = () => {
+      setIsStreamConnected(false);
+    };
+
+    return () => {
+      source.close();
+      setIsStreamConnected(false);
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
+    };
+  }, [initialOrbat.id, queueRefresh]);
+
+  useEffect(() => {
+    if (isStreamConnected) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      void refreshOrbat();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [isStreamConnected, refreshOrbat]);
 
   async function handleSignup(slotId: number) {
     setLoadingSubslotId(slotId);
