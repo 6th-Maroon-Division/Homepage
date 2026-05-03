@@ -13,13 +13,18 @@ type UserEventPayload = {
 };
 
 export default function PermissionSessionSync() {
-  const { status, update } = useSession();
+  const { status, data: session, update } = useSession();
   const router = useRouter();
   const { showSuccess } = useToast();
   const handledPermissionEventRef = useRef<string | null>(null);
+  const showSuccessRef = useRef(showSuccess);
 
   useEffect(() => {
-    if (status !== 'authenticated') {
+    showSuccessRef.current = showSuccess;
+  }, [showSuccess]);
+
+  useEffect(() => {
+    if (status !== 'authenticated' || !session?.user?.id) {
       return;
     }
 
@@ -46,13 +51,13 @@ export default function PermissionSessionSync() {
 
       await update();
       router.refresh();
-      showSuccess('Your permissions were updated.');
+      showSuccessRef.current('Your permissions were updated.');
     };
 
     return () => {
       source.close();
     };
-  }, [router, showSuccess, status, update]);
+  }, [router, session?.user?.id, status, update]);
 
   return null;
 }

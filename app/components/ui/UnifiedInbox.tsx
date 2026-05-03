@@ -42,6 +42,13 @@ export default function UnifiedInbox() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [isStreamConnected, setIsStreamConnected] = useState(false);
   const streamRef = useRef<EventSource | null>(null);
+  const isOpenRef = useRef(false);
+  const fetchMessagesRef = useRef<() => Promise<void>>(async () => undefined);
+  const fetchUnreadCountRef = useRef<() => Promise<void>>(async () => undefined);
+
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+  }, [isOpen]);
 
   const fetchUnreadCount = useCallback(async () => {
     if (!session?.user) {
@@ -87,6 +94,14 @@ export default function UnifiedInbox() {
   }, [session, filter, showToast]);
 
   useEffect(() => {
+    fetchMessagesRef.current = fetchMessages;
+  }, [fetchMessages]);
+
+  useEffect(() => {
+    fetchUnreadCountRef.current = fetchUnreadCount;
+  }, [fetchUnreadCount]);
+
+  useEffect(() => {
     if (isOpen) {
       fetchMessages();
     }
@@ -94,21 +109,30 @@ export default function UnifiedInbox() {
 
   // Stream-first inbox updates with polling fallback
   useEffect(() => {
-    if (!session?.user) return;
+    if (!session?.user?.id) return;
 
     const source = new EventSource('/api/messaging/events');
     streamRef.current = source;
 
     source.onopen = () => {
       setIsStreamConnected(true);
-      void fetchUnreadCount();
+      void fetchUnreadCountRef.current();
     };
 
-    source.onmessage = () => {
+    source.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data) as { type?: string };
+        if (payload.type === 'stream.connected') {
+          return;
+        }
+      } catch {
+        // ignore malformed payload
+      }
+
       setIsStreamConnected(true);
-      void fetchUnreadCount();
-      if (isOpen) {
-        void fetchMessages();
+      void fetchUnreadCountRef.current();
+      if (isOpenRef.current) {
+        void fetchMessagesRef.current();
       }
     };
 
@@ -121,7 +145,7 @@ export default function UnifiedInbox() {
       streamRef.current = null;
       setIsStreamConnected(false);
     };
-  }, [session, isOpen, fetchMessages, fetchUnreadCount]);
+  }, [session?.user?.id]);
 
   useEffect(() => {
     if (!session?.user) {

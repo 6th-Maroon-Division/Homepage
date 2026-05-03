@@ -26,6 +26,12 @@ type User = {
   signupCount: number;
   orbatCount: number;
   trainingCount: number;
+  hasActiveLoa: boolean;
+  activeLoaStartDate: string | null;
+  activeLoaUntil: string | null;
+  hasUpcomingLoa: boolean;
+  upcomingLoaStartDate: string | null;
+  upcomingLoaUntil: string | null;
   trainings: Array<{
     id: number;
     trainingId: number;
@@ -535,6 +541,9 @@ export default function UserManagementClient({
                     Activity
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
+                    LOA
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
                     Joined
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
@@ -595,6 +604,58 @@ export default function UserManagementClient({
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: 'var(--foreground)' }}>
+                      {user.hasActiveLoa ? (
+                        <div className="space-y-1 text-xs">
+                          <div>
+                            <span className="px-2 py-1 rounded" style={{ backgroundColor: 'var(--accent)', color: 'var(--accent-foreground)' }}>
+                              Active LOA
+                            </span>
+                          </div>
+                          {user.activeLoaStartDate && (
+                            <div style={{ color: 'var(--muted-foreground)' }}>
+                              {Math.max(
+                                1,
+                                Math.ceil(
+                                  (Date.now() - new Date(user.activeLoaStartDate).getTime()) / (1000 * 60 * 60 * 24)
+                                )
+                              )} day(s)
+                            </div>
+                          )}
+                          {user.activeLoaUntil && (
+                            <div style={{ color: 'var(--muted-foreground)' }}>
+                              Until {new Date(user.activeLoaUntil).toLocaleDateString('en-GB')}
+                            </div>
+                          )}
+                        </div>
+                      ) : user.hasUpcomingLoa && user.upcomingLoaStartDate ? (
+                        <div className="space-y-1 text-xs">
+                          <div>
+                            <span className="px-2 py-1 rounded" style={{ backgroundColor: 'var(--muted)', color: 'var(--foreground)' }}>
+                              Upcoming LOA
+                            </span>
+                          </div>
+                          <div style={{ color: 'var(--muted-foreground)' }}>
+                            Starts {new Date(user.upcomingLoaStartDate).toLocaleDateString('en-GB')}
+                          </div>
+                          <div style={{ color: 'var(--muted-foreground)' }}>
+                            In {Math.max(
+                              1,
+                              Math.ceil(
+                                (new Date(user.upcomingLoaStartDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+                              )
+                            )} day(s)
+                          </div>
+                          {user.upcomingLoaUntil && (
+                            <div style={{ color: 'var(--muted-foreground)' }}>
+                              Until {new Date(user.upcomingLoaUntil).toLocaleDateString('en-GB')}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span style={{ color: 'var(--muted-foreground)' }}>No active LOA</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: 'var(--foreground)' }}>
                       {new Date(user.createdAt).toLocaleDateString('en-GB')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -622,7 +683,7 @@ export default function UserManagementClient({
                   </tr>
                   {expandedUserId === user.id && (
                     <tr style={{ backgroundColor: 'rgba(0,0,0,0.1)', borderBottomWidth: '1px', borderColor: 'var(--border)' }}>
-                      <td colSpan={7} className="px-6 py-4">
+                      <td colSpan={8} className="px-6 py-4">
                         <div className="space-y-4">
                           <h4 className="font-semibold text-sm" style={{ color: 'var(--foreground)' }}>
                             Trainings ({user.trainingCount})

@@ -27,6 +27,24 @@ type SlotResponse = {
   }[];
 };
 
+function getOperationCutoff(eventDate: Date | null, startTime?: string | null, endTime?: string | null): Date | null {
+  if (!eventDate) {
+    return null;
+  }
+
+  const cutoff = new Date(eventDate);
+  const timeValue = endTime || startTime;
+
+  if (timeValue && /^\d{2}:\d{2}$/.test(timeValue)) {
+    const [hour, minute] = timeValue.split(':').map(Number);
+    cutoff.setHours(hour, minute, 0, 0);
+  } else {
+    cutoff.setHours(23, 59, 59, 999);
+  }
+
+  return cutoff;
+}
+
 async function buildSlotResponse(slotId: number): Promise<SlotResponse | null> {
   const slot = await prisma.slot.findUnique({
     where: { id: slotId },
@@ -132,7 +150,8 @@ export async function POST(_req: NextRequest, context: RouteParams) {
     return NextResponse.json({ error: 'Slot not found' }, { status: 404 });
   }
 
-  if (slot.orbat.eventDate && slot.orbat.eventDate < new Date()) {
+  const operationCutoff = getOperationCutoff(slot.orbat.eventDate, slot.orbat.startTime, slot.orbat.endTime);
+  if (operationCutoff && operationCutoff < new Date()) {
     return NextResponse.json({ error: 'Operation is in the past. Signups are closed.' }, { status: 400 });
   }
 
@@ -292,7 +311,8 @@ export async function DELETE(req: NextRequest, context: RouteParams) {
   }
 
   const hasOrbatEditPermission = await checkPermission(currentUserId, 'orbat:edit');
-  if (!hasOrbatEditPermission && slot.orbat.eventDate && slot.orbat.eventDate < new Date()) {
+  const operationCutoff = getOperationCutoff(slot.orbat.eventDate, slot.orbat.startTime, slot.orbat.endTime);
+  if (!hasOrbatEditPermission && operationCutoff && operationCutoff < new Date()) {
     return NextResponse.json({ error: 'Operation is in the past. Signups cannot be modified.' }, { status: 400 });
   }
 

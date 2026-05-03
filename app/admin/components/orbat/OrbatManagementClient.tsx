@@ -10,6 +10,8 @@ type Orbat = {
   name: string;
   description: string | null;
   eventDate: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
   createdAt: string;
   createdBy: {
     id: number;
@@ -32,6 +34,27 @@ export default function OrbatManagementClient({ orbats: initialOrbats }: OrbatMa
 
   const canCreateOrbat = usePermission('orbat:create');
   const canEditOrbat = usePermission('orbat:edit');
+
+  const getOperationCutoff = (orbat: Orbat) => {
+    if (!orbat.eventDate) {
+      return null;
+    }
+
+    const cutoff = new Date(orbat.eventDate);
+    if (Number.isNaN(cutoff.getTime())) {
+      return null;
+    }
+
+    const timeValue = orbat.endTime || orbat.startTime;
+    if (timeValue && /^\d{2}:\d{2}$/.test(timeValue)) {
+      const [hour, minute] = timeValue.split(':').map(Number);
+      cutoff.setHours(hour, minute, 0, 0);
+    } else {
+      cutoff.setHours(23, 59, 59, 999);
+    }
+
+    return cutoff;
+  };
 
   useEffect(() => {
     const fetchOrbats = async () => {
@@ -85,21 +108,25 @@ export default function OrbatManagementClient({ orbats: initialOrbats }: OrbatMa
   // Categorize orbats
   const upcomingOrbats = orbats.filter(o => {
     if (!o.eventDate) return true; // No date = treat as upcoming
-    return new Date(o.eventDate) >= now;
+    const cutoff = getOperationCutoff(o);
+    return !cutoff || cutoff >= now;
   });
 
   const pastOrbats = orbats.filter(o => {
     if (!o.eventDate) return false;
-    return new Date(o.eventDate) < now;
+    const cutoff = getOperationCutoff(o);
+    return !!cutoff && cutoff < now;
   });
 
   // Filter orbats
   const filteredOrbats = orbats.filter(orbat => {
     // Apply time filter
     if (filter === 'upcoming') {
-      if (orbat.eventDate && new Date(orbat.eventDate) < now) return false;
+      const cutoff = getOperationCutoff(orbat);
+      if (cutoff && cutoff < now) return false;
     } else if (filter === 'past') {
-      if (!orbat.eventDate || new Date(orbat.eventDate) >= now) return false;
+      const cutoff = getOperationCutoff(orbat);
+      if (!cutoff || cutoff >= now) return false;
     }
 
     // Apply search filter
@@ -234,7 +261,8 @@ export default function OrbatManagementClient({ orbats: initialOrbats }: OrbatMa
               </thead>
               <tbody style={{ borderTopWidth: '1px', borderColor: 'var(--border)' }}>
                 {filteredOrbats.map((orbat) => {
-                  const isPast = orbat.eventDate && new Date(orbat.eventDate) < now;
+                  const cutoff = getOperationCutoff(orbat);
+                  const isPast = !!cutoff && cutoff < now;
                   return (
                     <tr key={orbat.id} style={{ borderBottomWidth: '1px', borderColor: 'var(--border)' }}>
                       <td className="px-6 py-4">
@@ -256,11 +284,7 @@ export default function OrbatManagementClient({ orbats: initialOrbats }: OrbatMa
                           <div>
                             <div>{new Date(orbat.eventDate).toLocaleDateString('en-GB')}</div>
                             <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-                              {new Date(orbat.eventDate).toLocaleTimeString('en-GB', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                hour12: false,
-                              })}
+                              {orbat.startTime || 'No start time'}{orbat.endTime ? ` - ${orbat.endTime}` : ''}
                             </div>
                           </div>
                         ) : (

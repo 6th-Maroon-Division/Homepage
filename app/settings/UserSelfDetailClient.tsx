@@ -43,6 +43,16 @@ type TrainingRequestItem = {
   handledByAdminUsername: string | null;
 };
 
+type LoaEntry = {
+  id: number;
+  startDate: string;
+  returnDate: string | null;
+  cancelledAt: string | null;
+  reason: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 type AttendanceEntry = {
   id: number;
   createdAt: string;
@@ -85,6 +95,7 @@ type UserSelfDetailClientProps = {
   attendance: AttendanceMetrics;
   availableTrainings: AvailableTraining[];
   trainingRequests: TrainingRequestItem[];
+  loaEntries: LoaEntry[];
 };
 
 type RankHistoryEntry = {
@@ -106,11 +117,20 @@ type RankHistoryPagination = {
   totalPages: number;
 };
 
-type TabKey = 'overview' | 'attendance' | 'trainings' | 'rank-history' | 'actions';
+type TabKey = 'overview' | 'attendance' | 'trainings' | 'loa' | 'rank-history' | 'actions';
 
-export default function UserSelfDetailClient({ user, attendance, availableTrainings, trainingRequests }: UserSelfDetailClientProps) {
+export default function UserSelfDetailClient({ user, attendance, availableTrainings, trainingRequests, loaEntries }: UserSelfDetailClientProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [requestRows, setRequestRows] = useState<TrainingRequestItem[]>(trainingRequests);
+  const [loaRows, setLoaRows] = useState<LoaEntry[]>(loaEntries);
+  const [loaStartDate, setLoaStartDate] = useState('');
+  const [loaReturnDate, setLoaReturnDate] = useState('');
+  const [loaReason, setLoaReason] = useState('');
+  const [loaReturnDateDrafts, setLoaReturnDateDrafts] = useState<Record<number, string>>({});
+  const [isSubmittingLoa, setIsSubmittingLoa] = useState(false);
+  const [isSavingLoaId, setIsSavingLoaId] = useState<number | null>(null);
+  const [isMarkingBackLoaId, setIsMarkingBackLoaId] = useState<number | null>(null);
+  const [isCancellingLoaId, setIsCancellingLoaId] = useState<number | null>(null);
   const [selectedTrainingId, setSelectedTrainingId] = useState<number>(0);
   const [requestMessage, setRequestMessage] = useState('');
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
@@ -220,6 +240,7 @@ export default function UserSelfDetailClient({ user, attendance, availableTraini
             { key: 'overview' as const, label: 'Overview' },
             { key: 'attendance' as const, label: 'Attendance' },
             { key: 'trainings' as const, label: 'Trainings' },
+            { key: 'loa' as const, label: 'LOA' },
             { key: 'rank-history' as const, label: 'Rank History' },
             { key: 'actions' as const, label: 'Actions' },
           ].map((tab) => (
@@ -645,6 +666,297 @@ export default function UserSelfDetailClient({ user, attendance, availableTraini
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === 'loa' && (
+        <div className="space-y-4">
+          <div className="rounded-lg border p-4 sm:p-6" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--secondary)' }}>
+            <h3 className="font-semibold mb-3" style={{ color: 'var(--foreground)' }}>
+              Submit Leave Of Absence
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  value={loaStartDate}
+                  onChange={(event) => setLoaStartDate(event.target.value)}
+                  className="mt-1 w-full px-3 py-2 rounded border text-sm"
+                  style={{
+                    backgroundColor: 'var(--background)',
+                    borderColor: 'var(--border)',
+                    color: 'var(--foreground)',
+                  }}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
+                  Return Date (Optional)
+                </label>
+                <input
+                  type="date"
+                  value={loaReturnDate}
+                  onChange={(event) => setLoaReturnDate(event.target.value)}
+                  className="mt-1 w-full px-3 py-2 rounded border text-sm"
+                  style={{
+                    backgroundColor: 'var(--background)',
+                    borderColor: 'var(--border)',
+                    color: 'var(--foreground)',
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <label className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
+                Reason (Optional)
+              </label>
+              <textarea
+                value={loaReason}
+                onChange={(event) => setLoaReason(event.target.value)}
+                rows={3}
+                placeholder="Reason for your leave"
+                className="mt-1 w-full px-3 py-2 rounded border text-sm"
+                style={{
+                  backgroundColor: 'var(--background)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--foreground)',
+                }}
+              />
+            </div>
+
+            <div className="mt-3 flex gap-2">
+              <button
+                disabled={isSubmittingLoa}
+                onClick={async () => {
+                  if (!loaStartDate) {
+                    showError('Start date is required');
+                    return;
+                  }
+
+                  setIsSubmittingLoa(true);
+                  try {
+                    const response = await fetch('/api/loa', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        startDate: loaStartDate,
+                        returnDate: loaReturnDate || null,
+                        reason: loaReason.trim() || null,
+                      }),
+                    });
+
+                    if (!response.ok) {
+                      const data = await response.json().catch(() => ({}));
+                      throw new Error(data.error || 'Failed to submit LOA');
+                    }
+
+                    const created = await response.json();
+                    setLoaRows((prev) => [created, ...prev]);
+                    setLoaStartDate('');
+                    setLoaReturnDate('');
+                    setLoaReason('');
+                    showSuccess('LOA submitted');
+                    router.refresh();
+                  } catch (error) {
+                    showError(error instanceof Error ? error.message : 'Failed to submit LOA');
+                  } finally {
+                    setIsSubmittingLoa(false);
+                  }
+                }}
+                className="px-4 py-2 rounded font-medium disabled:opacity-50"
+                style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+              >
+                {isSubmittingLoa ? 'Submitting…' : 'Submit LOA'}
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-lg border p-4 sm:p-6" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--secondary)' }}>
+            <h3 className="font-semibold mb-3" style={{ color: 'var(--foreground)' }}>
+              My LOA Entries
+            </h3>
+
+            {loaRows.length === 0 ? (
+              <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
+                No LOA entries yet.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {loaRows.map((entry) => {
+                  const now = new Date();
+                  const startDateObj = new Date(entry.startDate);
+                  const returnDateObj = entry.returnDate ? new Date(entry.returnDate) : null;
+                  const isCancelled = !!entry.cancelledAt;
+                  const isReadOnly = isCancelled;
+                  const isFuture = !isCancelled && startDateObj > now;
+                  const isActive = !isCancelled && startDateObj <= now && (!returnDateObj || returnDateObj >= now);
+                  const draftReturnDate = loaReturnDateDrafts[entry.id] ?? (entry.returnDate ? entry.returnDate.slice(0, 10) : '');
+                  return (
+                    <div
+                      key={entry.id}
+                      className="rounded border p-4"
+                      style={{
+                        backgroundColor: isReadOnly ? 'var(--muted)' : 'var(--background)',
+                        borderColor: 'var(--border)',
+                      }}
+                    >
+                      <div className="flex flex-col gap-2">
+                        <p className="text-sm" style={{ color: 'var(--foreground)' }}>
+                          <span className="font-semibold">Start:</span>{' '}
+                          {new Date(entry.startDate).toLocaleDateString('en-GB')}
+                        </p>
+                        <p className="text-sm" style={{ color: 'var(--foreground)' }}>
+                          <span className="font-semibold">Return:</span>{' '}
+                          {entry.returnDate ? new Date(entry.returnDate).toLocaleDateString('en-GB') : 'Not set yet'}
+                        </p>
+                        {isCancelled && (
+                          <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
+                            <span className="font-semibold">Status:</span> Cancelled
+                          </p>
+                        )}
+                        {entry.reason && (
+                          <p className="text-sm" style={{ color: 'var(--foreground)' }}>
+                            <span className="font-semibold">Reason:</span> {entry.reason}
+                          </p>
+                        )}
+                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2 items-end mt-2">
+                          <div>
+                            <label className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                              Set/Update Return Date
+                            </label>
+                            <input
+                              type="date"
+                              value={draftReturnDate}
+                              disabled={isReadOnly}
+                              onChange={(event) => {
+                                const nextValue = event.target.value;
+                                setLoaReturnDateDrafts((prev) => ({
+                                  ...prev,
+                                  [entry.id]: nextValue,
+                                }));
+                              }}
+                              className="mt-1 w-full px-3 py-2 rounded border text-sm"
+                              style={{
+                                backgroundColor: isReadOnly ? 'var(--muted)' : 'var(--background)',
+                                borderColor: 'var(--border)',
+                                color: isReadOnly ? 'var(--muted-foreground)' : 'var(--foreground)',
+                              }}
+                            />
+                          </div>
+                          <button
+                            disabled={isReadOnly || isSavingLoaId === entry.id}
+                            onClick={async () => {
+                              setIsSavingLoaId(entry.id);
+                              try {
+                                const response = await fetch(`/api/loa/${entry.id}`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ returnDate: draftReturnDate || null }),
+                                });
+
+                                if (!response.ok) {
+                                  const data = await response.json().catch(() => ({}));
+                                  throw new Error(data.error || 'Failed to update LOA return date');
+                                }
+
+                                const updated = await response.json();
+                                setLoaRows((prev) => prev.map((row) => (row.id === entry.id ? updated : row)));
+                                showSuccess('LOA return date updated');
+                                router.refresh();
+                              } catch (error) {
+                                showError(error instanceof Error ? error.message : 'Failed to update LOA return date');
+                              } finally {
+                                setIsSavingLoaId(null);
+                              }
+                            }}
+                            className="px-3 py-2 rounded text-sm font-medium disabled:opacity-50"
+                            style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                          >
+                            {isSavingLoaId === entry.id ? 'Saving…' : 'Save Return Date'}
+                          </button>
+                          <button
+                            disabled={(!isActive && !isFuture) || !!entry.returnDate || isMarkingBackLoaId === entry.id || isCancellingLoaId === entry.id}
+                            onClick={async () => {
+                              if (isFuture) {
+                                setIsCancellingLoaId(entry.id);
+                                try {
+                                  const response = await fetch(`/api/loa/${entry.id}`, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ cancel: true }),
+                                  });
+
+                                  if (!response.ok) {
+                                    const data = await response.json().catch(() => ({}));
+                                    throw new Error(data.error || 'Failed to cancel LOA');
+                                  }
+
+                                  const updated = await response.json();
+                                  setLoaRows((prev) => prev.map((row) => (row.id === entry.id ? updated : row)));
+                                  showSuccess('Future LOA cancelled');
+                                  router.refresh();
+                                } catch (error) {
+                                  showError(error instanceof Error ? error.message : 'Failed to cancel LOA');
+                                } finally {
+                                  setIsCancellingLoaId(null);
+                                }
+                                return;
+                              }
+
+                              setIsMarkingBackLoaId(entry.id);
+                              try {
+                                const today = new Date().toISOString().slice(0, 10);
+                                const startDate = entry.startDate.slice(0, 10);
+                                const returnDateToSet = today >= startDate ? today : startDate;
+                                const response = await fetch(`/api/loa/${entry.id}`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ returnDate: returnDateToSet }),
+                                });
+
+                                if (!response.ok) {
+                                  const data = await response.json().catch(() => ({}));
+                                  throw new Error(data.error || 'Failed to mark LOA as returned');
+                                }
+
+                                const updated = await response.json();
+                                setLoaRows((prev) => prev.map((row) => (row.id === entry.id ? updated : row)));
+                                setLoaReturnDateDrafts((prev) => ({
+                                  ...prev,
+                                  [entry.id]: returnDateToSet,
+                                }));
+                                showSuccess('Marked as back now');
+                                router.refresh();
+                              } catch (error) {
+                                showError(error instanceof Error ? error.message : 'Failed to mark LOA as returned');
+                              } finally {
+                                setIsMarkingBackLoaId(null);
+                              }
+                            }}
+                            className="px-3 py-2 rounded text-sm font-medium disabled:opacity-50"
+                            style={{
+                              backgroundColor: isFuture ? 'var(--destructive)' : 'var(--muted)',
+                              color: isFuture ? 'var(--destructive-foreground)' : 'var(--foreground)',
+                            }}
+                          >
+                            {isMarkingBackLoaId === entry.id || isCancellingLoaId === entry.id
+                              ? 'Updating…'
+                              : isFuture
+                                ? 'Cancel LOA'
+                                : "I'm Back Now"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

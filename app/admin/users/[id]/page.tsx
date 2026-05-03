@@ -82,6 +82,9 @@ export default async function UserDetailPage({
         },
         orderBy: { completedAt: 'desc' },
       },
+      leaveOfAbsences: {
+        orderBy: { createdAt: 'desc' },
+      },
       _count: {
         select: {
           signups: true,
@@ -183,6 +186,15 @@ export default async function UserDetailPage({
       notes: ut.notes,
       trainerId: ut.trainerId,
       trainerUsername: ut.trainer?.username ?? null,
+    })),
+    loaEntries: targetUser.leaveOfAbsences.map((entry) => ({
+      id: entry.id,
+      startDate: entry.startDate.toISOString(),
+      returnDate: entry.returnDate ? entry.returnDate.toISOString() : null,
+      cancelledAt: entry.cancelledAt ? entry.cancelledAt.toISOString() : null,
+      reason: entry.reason,
+      createdAt: entry.createdAt.toISOString(),
+      updatedAt: entry.updatedAt.toISOString(),
     })),
   };
 

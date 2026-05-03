@@ -155,7 +155,29 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
   const { showSuccess, showError } = useToast();
 
   const eventDate = orbat.eventDate ? new Date(orbat.eventDate) : null;
-  const isPast = !!eventDate && eventDate < new Date();
+  const getOperationCutoff = (dateValue: string | null, startTime?: string | null, endTime?: string | null) => {
+    if (!dateValue) {
+      return null;
+    }
+
+    const cutoff = new Date(dateValue);
+    if (Number.isNaN(cutoff.getTime())) {
+      return null;
+    }
+
+    const timeValue = endTime || startTime;
+    if (timeValue && /^\d{2}:\d{2}$/.test(timeValue)) {
+      const [hour, minute] = timeValue.split(':').map(Number);
+      cutoff.setHours(hour, minute, 0, 0);
+    } else {
+      cutoff.setHours(23, 59, 59, 999);
+    }
+
+    return cutoff;
+  };
+
+  const operationCutoff = getOperationCutoff(orbat.eventDate, orbat.startTime, orbat.endTime);
+  const isPast = !!operationCutoff && operationCutoff < new Date();
 
   // Fetch current user ID on mount
   useEffect(() => {
@@ -366,13 +388,16 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
         )}
 
         {eventDate && (
-          <p className="text-xs mt-2" style={{ color: 'var(--muted-foreground)' }}>
-            Event date:{' '}
-            {eventDate.toLocaleString('en-GB', {
-              dateStyle: 'medium',
-              timeStyle: 'short',
-            })}
-          </p>
+          <div className="text-xs mt-2" style={{ color: 'var(--muted-foreground)' }}>
+            <p>
+              Event date: {eventDate.toLocaleDateString('en-GB', { dateStyle: 'medium' })}
+            </p>
+            {(orbat.startTime || orbat.endTime) && (
+              <p>
+                Time: {orbat.startTime || '??:??'}{orbat.endTime ? ` - ${orbat.endTime}` : ''}
+              </p>
+            )}
+          </div>
         )}
 
         {isPast && (

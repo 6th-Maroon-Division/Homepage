@@ -48,6 +48,7 @@ model User {
   permissionChangesTarget PermissionAuditLog[] @relation("PermissionTarget")
   // Squad role audit logs
   squadRoleAuditLogs SquadRoleAuditLog[]
+  leaveOfAbsences   LeaveOfAbsence[]
 }
 
 enum MessageType {
@@ -493,6 +494,23 @@ model TrainingRequest {
   @@index([trainingId])
   @@index([status])
   @@index([handledByAdminId])
+}
+
+model LeaveOfAbsence {
+  id            Int       @id @default(autoincrement())
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        Int
+  startDate     DateTime
+  returnDate    DateTime?
+  cancelledAt   DateTime?
+  reason        String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([startDate])
+  @@index([returnDate])
+  @@index([cancelledAt])
 }
 
 // Legacy data tables for import process - stays as legacy only

@@ -24,6 +24,16 @@ type UserTraining = {
   trainerUsername: string | null;
 };
 
+type LoaEntry = {
+  id: number;
+  startDate: string;
+  returnDate: string | null;
+  cancelledAt: string | null;
+  reason: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 type AvailableTraining = {
   id: number;
   name: string;
@@ -57,6 +67,7 @@ type UserDetailData = {
   currentRank: string | null;
   attendanceSinceLastRank: number;
   trainings: UserTraining[];
+  loaEntries: LoaEntry[];
 };
 
 type AttendanceMetrics = {
@@ -84,7 +95,7 @@ type UserDetailClientProps = {
   isSelfUser: boolean;
 };
 
-type TabKey = 'overview' | 'attendance' | 'trainings' | 'permissions' | 'actions';
+type TabKey = 'overview' | 'attendance' | 'loa' | 'trainings' | 'permissions' | 'actions';
 
 export default function UserDetailClient({
   user,
@@ -162,6 +173,7 @@ export default function UserDetailClient({
   const visibleTabs: Array<{ key: TabKey; label: string }> = [
     { key: 'overview', label: 'Overview' },
     { key: 'attendance', label: 'Attendance' },
+    { key: 'loa', label: 'LOA' },
     ...(canViewTrainings ? [{ key: 'trainings' as const, label: 'Trainings' }] : []),
     ...(canViewPermissions ? [{ key: 'permissions' as const, label: 'Permissions' }] : []),
     ...(canViewActions ? [{ key: 'actions' as const, label: 'Actions' }] : []),
@@ -318,6 +330,59 @@ export default function UserDetailClient({
                 ))
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'loa' && (
+        <div className="rounded-lg border p-4" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--secondary)' }}>
+          <h3 className="font-semibold mb-3" style={{ color: 'var(--foreground)' }}>Leave Of Absence</h3>
+          <div className="space-y-2">
+            {user.loaEntries.length === 0 ? (
+              <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>No LOA entries.</p>
+            ) : (
+              user.loaEntries.map((entry) => {
+                const startDate = new Date(entry.startDate);
+                const endDate = entry.returnDate ? new Date(entry.returnDate) : new Date();
+                const isCancelled = !!entry.cancelledAt;
+                const isActive = !isCancelled && new Date(entry.startDate) <= new Date()
+                  && (!entry.returnDate || new Date(entry.returnDate) >= new Date());
+                const durationDays = Math.max(
+                  1,
+                  Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+                );
+
+                return (
+                  <div key={entry.id} className="rounded border p-3" style={{ borderColor: 'var(--border)' }}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-sm" style={{ color: 'var(--foreground)' }}>
+                        <span className="font-medium">Start:</span> {new Date(entry.startDate).toLocaleDateString('en-GB')}
+                        {' • '}
+                        <span className="font-medium">Return:</span>{' '}
+                        {entry.returnDate ? new Date(entry.returnDate).toLocaleDateString('en-GB') : 'Not set'}
+                      </div>
+                      <span
+                        className="px-2 py-1 rounded text-xs font-medium"
+                        style={{
+                          backgroundColor: isCancelled ? 'var(--destructive)' : isActive ? 'var(--accent)' : 'var(--muted)',
+                          color: isCancelled ? 'var(--destructive-foreground)' : isActive ? 'var(--accent-foreground)' : 'var(--foreground)',
+                        }}
+                      >
+                        {isCancelled ? 'Cancelled' : isActive ? 'Active' : 'Returned'}
+                      </span>
+                    </div>
+                    {entry.reason && (
+                      <p className="text-sm mt-2" style={{ color: 'var(--muted-foreground)' }}>
+                        Reason: {entry.reason}
+                      </p>
+                    )}
+                    <p className="text-sm mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                      Duration: {durationDays} day(s)
+                    </p>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       )}

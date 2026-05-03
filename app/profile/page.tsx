@@ -114,7 +114,7 @@ export default async function ProfilePage() {
     }),
   ]);
 
-  const [trainingRequests, allTrainings] = await Promise.all([
+  const [trainingRequests, allTrainings, loaEntries] = await Promise.all([
     prisma.trainingRequest.findMany({
       where: { userId },
       include: {
@@ -160,6 +160,10 @@ export default async function ProfilePage() {
         },
       },
       orderBy: { name: 'asc' },
+    }),
+    prisma.leaveOfAbsence.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
     }),
   ]);
 
@@ -208,6 +212,16 @@ export default async function ProfilePage() {
     requestedAt: request.requestedAt.toISOString(),
     updatedAt: request.updatedAt.toISOString(),
     handledByAdminUsername: request.handledByAdmin?.username ?? null,
+  }));
+
+  const serializedLoaEntries = loaEntries.map((entry) => ({
+    id: entry.id,
+    startDate: entry.startDate.toISOString(),
+    returnDate: entry.returnDate ? entry.returnDate.toISOString() : null,
+    cancelledAt: entry.cancelledAt ? entry.cancelledAt.toISOString() : null,
+    reason: entry.reason,
+    createdAt: entry.createdAt.toISOString(),
+    updatedAt: entry.updatedAt.toISOString(),
   }));
 
   const userData = {
@@ -261,6 +275,7 @@ export default async function ProfilePage() {
           attendance={attendanceData}
           availableTrainings={availableTrainings}
           trainingRequests={serializedRequests}
+          loaEntries={serializedLoaEntries}
         />
       </div>
     </main>

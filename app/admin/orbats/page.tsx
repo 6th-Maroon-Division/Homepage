@@ -75,6 +75,8 @@ export default async function AdminOrbatsPage() {
       name: orbat.name,
       description: orbat.description,
       eventDate: orbat.eventDate ? orbat.eventDate.toISOString() : null,
+      startTime: orbat.startTime || null,
+      endTime: orbat.endTime || null,
       createdAt: orbat.createdAt.toISOString(),
       createdBy: {
         id: orbat.createdBy.id,

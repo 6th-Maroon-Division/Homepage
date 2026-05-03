@@ -312,13 +312,14 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
                   </p>
                 )}
                 {eventDate && (
-                  <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
-                    Event date:{' '}
-                    {eventDate.toLocaleString('en-GB', {
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
-                    })}
-                  </p>
+                  <div className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                    <p>Event date: {eventDate.toLocaleDateString('en-GB', { dateStyle: 'medium' })}</p>
+                    {(orbat.startTime || orbat.endTime) && (
+                      <p>
+                        Time: {orbat.startTime || '??:??'}{orbat.endTime ? ` - ${orbat.endTime}` : ''}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
               <span className="px-3 py-1 text-xs font-medium rounded-full whitespace-nowrap" style={{ backgroundColor: '#9333ea', color: '#ffffff' }}>
