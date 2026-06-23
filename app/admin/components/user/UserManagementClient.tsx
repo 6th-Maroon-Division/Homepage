@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -556,8 +556,8 @@ export default function UserManagementClient({
               </thead>
               <tbody style={{ borderTopWidth: '1px', borderColor: 'var(--border)' }}>
                 {filteredUsers.map((user) => (
-                  <>
-                    <tr key={user.id} style={{ borderBottomWidth: '1px', borderColor: 'var(--border)' }}>
+                  <Fragment key={user.id}>
+                    <tr style={{ borderBottomWidth: '1px', borderColor: 'var(--border)' }}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
                         {user.avatarUrl && (
@@ -930,7 +930,7 @@ export default function UserManagementClient({
                       </td>
                     </tr>
                   )}
-                  </>
+                  </Fragment>
                 ))}
               </tbody>
             </table>
