@@ -93,10 +93,10 @@ export async function PATCH(
       createdAt: updated.createdAt.toISOString(),
       updatedAt: updated.updatedAt.toISOString(),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating LOA entry:', error);
 
-    if (error?.code === 'P2025') {
+    if ((error as { code?: string }).code === 'P2025') {
       return NextResponse.json({ error: 'LOA entry not found' }, { status: 404 });
     }
 

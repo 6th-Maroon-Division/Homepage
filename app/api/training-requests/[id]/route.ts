@@ -158,11 +158,11 @@ export async function PUT(
           : null,
       });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating training request:', error);
     
     // Handle Prisma "record not found" error
-    if (error?.code === 'P2025') {
+    if ((error as { code?: string }).code === 'P2025') {
       return NextResponse.json({ error: 'Training request not found' }, { status: 404 });
     }
     
@@ -205,11 +205,11 @@ export async function DELETE(
     });
 
     return NextResponse.json({ message: 'Training request deleted successfully' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting training request:', error);
     
     // Handle Prisma "record not found" error
-    if (error?.code === 'P2025') {
+    if ((error as { code?: string }).code === 'P2025') {
       return NextResponse.json({ error: 'Training request not found' }, { status: 404 });
     }
     

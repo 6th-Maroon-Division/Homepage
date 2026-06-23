@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import type { ReactNode } from 'react';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 
@@ -42,6 +43,21 @@ type ClientSquad = {
   slots: ClientSlot[];
 };
 
+type ClientFrequency = {
+  id: number;
+  orbatId: number;
+  radioFrequencyId: number;
+  radioFrequency: {
+    id: number;
+    frequency: string;
+    type: 'SR' | 'LR';
+    isAdditional: boolean;
+    channel?: string | null;
+    callsign?: string | null;
+    createdAt: Date;
+  };
+};
+
 type ClientOrbat = {
   id: number;
   name: string;
@@ -50,8 +66,8 @@ type ClientOrbat = {
   startTime?: string | null;
   endTime?: string | null;
   squads: ClientSquad[];
-  frequencies?: any[];
-  tempFrequencies?: any;
+  frequencies?: ClientFrequency[];
+  tempFrequencies?: unknown;
   bluforCountry?: string | null;
   bluforRelationship?: string | null;
   opforCountry?: string | null;
@@ -65,6 +81,77 @@ type ClientOrbat = {
   inGameTimezone?: string | null;
   operationDay?: string | null;
 };
+
+// Helper function to render frequencies section
+function renderFrequenciesSection(frequencies: ClientFrequency[] | undefined, tempFrequencies: unknown): ReactNode {
+  interface TempFrequency {
+    _id?: string;
+    callsign?: string;
+    frequency: string;
+    type: string;
+    isAdditional: boolean;
+    channel?: string | null;
+  }
+  
+  const allFreqs: Array<{ _id: string; callsign: string; frequency: string; type: string; isAdditional: boolean; channel?: string | null }> = [];
+  
+  // Add saved frequencies
+  if (frequencies && frequencies.length > 0) {
+    frequencies.forEach((f: ClientFrequency) => {
+      allFreqs.push({
+        _id: `saved-${f.radioFrequencyId}`,
+        callsign: f.radioFrequency?.callsign || 'N/A',
+        frequency: f.radioFrequency?.frequency,
+        type: f.radioFrequency?.type,
+        isAdditional: f.radioFrequency?.isAdditional,
+        channel: f.radioFrequency?.channel,
+      });
+    });
+  }
+  
+  // Add temporary frequencies
+  if (Array.isArray(tempFrequencies) && tempFrequencies.length > 0) {
+    (tempFrequencies as Array<TempFrequency>).forEach((f: TempFrequency) => {
+      allFreqs.push({
+        _id: `temp-${f._id || f.frequency}`,
+        callsign: f.callsign || 'N/A',
+        frequency: f.frequency,
+        type: f.type,
+        isAdditional: f.isAdditional,
+        channel: f.channel,
+      });
+    });
+  }
+
+  // If no frequencies, return null
+  if (allFreqs.length === 0) {
+    return null;
+  }
+
+  // Sort by callsign
+  allFreqs.sort((a, b) => (a.callsign || '').localeCompare(b.callsign || ''));
+
+  return (
+    <div className="border rounded-lg p-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+      <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--foreground)' }}>Radio Frequencies</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+        {allFreqs.map((freq) => (
+          <div
+            key={freq._id}
+            className="border-l-4 pl-3 py-1"
+            style={{ borderColor: 'var(--primary)', color: 'var(--foreground)' }}
+          >
+            <div className="font-semibold text-sm">{freq.callsign}</div>
+            <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+              {freq.frequency} · <span style={{ color: 'var(--primary)' }}>{freq.isAdditional ? 'A' : ''}{freq.type}</span>
+              {freq.channel && ` · ${freq.channel}`}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 type OrbatDetailClientProps = {
   orbat: ClientOrbat;
@@ -532,63 +619,8 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
       {/* Radio Frequencies and Extra Intel Section - at bottom */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Radio Frequencies Box */}
-        {((orbat.frequencies && orbat.frequencies.length > 0) || (orbat.tempFrequencies && orbat.tempFrequencies.length > 0)) && (
-        <div className="border rounded-lg p-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
-          <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--foreground)' }}>Radio Frequencies</h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-            {/* Combine and sort frequencies by callsign */}
-            {(() => {
-              const allFreqs: any[] = [];
-              
-              // Add saved frequencies
-              if (orbat.frequencies && orbat.frequencies.length > 0) {
-                orbat.frequencies.forEach((f: any) => {
-                  allFreqs.push({
-                    _id: `saved-${f.radioFrequencyId}`,
-                    callsign: f.radioFrequency?.callsign || 'N/A',
-                    frequency: f.radioFrequency?.frequency,
-                    type: f.radioFrequency?.type,
-                    isAdditional: f.radioFrequency?.isAdditional,
-                    channel: f.radioFrequency?.channel,
-                  });
-                });
-              }
-              
-              // Add temporary frequencies
-              if (Array.isArray(orbat.tempFrequencies) && orbat.tempFrequencies.length > 0) {
-                orbat.tempFrequencies.forEach((f: any) => {
-                  allFreqs.push({
-                    _id: `temp-${f._id || f.frequency}`,
-                    callsign: f.callsign || 'N/A',
-                    frequency: f.frequency,
-                    type: f.type,
-                    isAdditional: f.isAdditional,
-                    channel: f.channel,
-                  });
-                });
-              }
-
-              // Sort by callsign
-              allFreqs.sort((a, b) => (a.callsign || '').localeCompare(b.callsign || ''));
-
-              return allFreqs.map((freq) => (
-                <div
-                  key={freq._id}
-                  className="border-l-4 pl-3 py-1"
-                  style={{ borderColor: 'var(--primary)', color: 'var(--foreground)' }}
-                >
-                  <div className="font-semibold text-sm">{freq.callsign}</div>
-                  <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-                    {freq.frequency} · <span style={{ color: 'var(--primary)' }}>{freq.isAdditional ? 'A' : ''}{freq.type}</span>
-                    {freq.channel && ` · ${freq.channel}`}
-                  </div>
-                </div>
-              ));
-            })()}
-          </div>
-        </div>
-        )}
-
+        {renderFrequenciesSection(orbat.frequencies, orbat.tempFrequencies)}
+        
         {/* Extra Intel Box */}
         {(orbat.iedThreat || orbat.civilianRelationship || orbat.rulesOfEngagement || orbat.airspace || orbat.inGameTimezone || orbat.operationDay) && (
         <div className="border rounded-lg p-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>

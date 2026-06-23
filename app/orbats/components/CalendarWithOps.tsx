@@ -93,13 +93,13 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
           return previous;
         }
 
-        const next = [
+        const next: UiOp[] = [
           ...previous,
           {
-            id: payload.id,
-            name: payload.name,
+            id: payload.id!,
+            name: payload.name!,
             description: payload.description ?? null,
-            eventDate: payload.eventDate,
+            eventDate: payload.eventDate!,
             dateKey,
           },
         ];

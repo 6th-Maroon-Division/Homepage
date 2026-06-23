@@ -231,13 +231,33 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         
         // Handle slots - templates use slotsJson as squads with nested slots, orbats use squads
         let slots = null;
+        interface TemplateSquad {
+          id?: number;
+          name: string;
+          orderIndex: number;
+          slots: TemplateSlot[];
+        }
+        interface TemplateSlot {
+          id?: number;
+          name: string;
+          orderIndex: number;
+          maxSignups?: number;
+          squadRoleId?: number | null;
+        }
+        interface Squad {
+          id?: number;
+          name: string;
+          orderIndex: number;
+          slots: TemplateSlot[];
+        }
         if (data.slotsJson) {
-          const parsedSlotsJson = typeof data.slotsJson === 'string' ? JSON.parse(data.slotsJson) : data.slotsJson;
-          slots = (parsedSlotsJson as any[]).map((squad: any) => ({
+          const parsedSlotsJson: unknown = typeof data.slotsJson === 'string' ? JSON.parse(data.slotsJson) : data.slotsJson;
+          const templateSquads = parsedSlotsJson as TemplateSquad[];
+          slots = templateSquads.map((squad) => ({
             id: squad.id,
             name: squad.name,
             orderIndex: squad.orderIndex,
-            subslots: (squad.slots || []).map((slot: any) => ({
+            subslots: (squad.slots || []).map((slot) => ({
               id: slot.id,
               squadRoleId: slot.squadRoleId ?? null,
               name: slot.name,
@@ -246,11 +266,12 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
             })),
           }));
         } else if (data.squads) {
-          slots = data.squads.map((squad: any) => ({
+          const squads = data.squads as unknown as Squad[];
+          slots = squads.map((squad) => ({
             id: squad.id,
             name: squad.name,
             orderIndex: squad.orderIndex,
-            subslots: (squad.slots || []).map((slot: any) => ({
+            subslots: (squad.slots || []).map((slot) => ({
               id: slot.id,
               squadRoleId: slot.squadRoleId ?? null,
               name: slot.name,
@@ -306,14 +327,28 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
               if (template.name) setName(`${template.name} - Copy`);
               if (template.description) setDescription(template.description);
               if (template.slotsJson) {
-                const parsedSlotsJson = typeof template.slotsJson === 'string'
+                const parsedSlotsJson: unknown = typeof template.slotsJson === 'string'
                   ? JSON.parse(template.slotsJson)
                   : template.slotsJson;
-                const mappedSlots = (parsedSlotsJson as any[]).map((squad: any) => ({
+                interface TemplateSquad {
+                  id?: number;
+                  name: string;
+                  orderIndex: number;
+                  slots: TemplateSlot[];
+                }
+                interface TemplateSlot {
+                  id?: number;
+                  name: string;
+                  orderIndex: number;
+                  maxSignups?: number;
+                  squadRoleId?: number | null;
+                }
+                const templateSquads = parsedSlotsJson as TemplateSquad[];
+                const mappedSlots = templateSquads.map((squad) => ({
                   id: squad.id,
                   name: squad.name,
                   orderIndex: squad.orderIndex,
-                  subslots: (squad.slots || []).map((slot: any) => ({
+                  subslots: (squad.slots || []).map((slot) => ({
                     id: slot.id,
                     squadRoleId: slot.squadRoleId ?? null,
                     name: slot.name,

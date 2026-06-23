@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import type { AttendanceStatus } from '@/generated/prisma/enums';
 
 export type EligibilityReason =
   | 'eligible_auto'
@@ -27,12 +28,14 @@ export type EligibilityResult = {
 
 const PRESENT_STATUSES = ['present', 'late', 'gone_early', 'partial'] as const;
 
+const PRESENT_STATUSES_ARRAY = ['present', 'late', 'gone_early', 'partial'] as AttendanceStatus[];
+
 export async function getCurrentAttendance(userId: number): Promise<number> {
   return prisma.attendance.count({
     where: {
       userId,
       orbat: { isMainOp: true },
-      status: { in: PRESENT_STATUSES as any },
+      status: { in: PRESENT_STATUSES_ARRAY },
     },
   });
 }

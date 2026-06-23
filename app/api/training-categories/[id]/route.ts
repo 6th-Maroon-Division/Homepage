@@ -65,7 +65,7 @@ export async function PUT(
     }
 
     // Regular update (name or orderIndex)
-    const updateData: any = {};
+    const updateData: Record<string, string | number> = {};
     
     if (name !== undefined) {
       updateData.name = name.trim();
@@ -81,8 +81,8 @@ export async function PUT(
     });
 
     return NextResponse.json(category);
-  } catch (error: any) {
-    if (error.code === 'P2025') {
+  } catch (error: unknown) {
+    if ((error as { code?: string }).code === 'P2025') {
       return NextResponse.json(
         { error: 'Category not found' },
         { status: 404 }
@@ -134,8 +134,8 @@ export async function DELETE(
     ]);
 
     return NextResponse.json({ message: 'Category deleted successfully' });
-  } catch (error: any) {
-    if (error.code === 'P2025') {
+  } catch (error: unknown) {
+    if ((error as { code?: string }).code === 'P2025') {
       return NextResponse.json(
         { error: 'Category not found' },
         { status: 404 }

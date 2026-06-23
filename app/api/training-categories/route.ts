@@ -64,8 +64,8 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(category);
-  } catch (error: any) {
-    if (error.code === 'P2002') {
+  } catch (error: unknown) {
+    if ((error as { code?: string }).code === 'P2002') {
       return NextResponse.json(
         { error: 'Category already exists' },
         { status: 400 }
