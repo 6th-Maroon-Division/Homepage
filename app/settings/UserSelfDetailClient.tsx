@@ -151,7 +151,6 @@ export default function UserSelfDetailClient({ user, attendance, availableTraini
   const { update: updateSession } = useSession();
   const { showError, showSuccess } = useToast();
 
-  const requestableTrainings = availableTrainings.filter((training) => training.canRequest);
 
   const fetchRankHistory = useCallback(async (pageNum: number) => {
     setIsLoadingRankHistory(true);
