@@ -198,6 +198,21 @@ Default URL: `http://localhost:3000`
 - `npm run seed:prod` - Production seed data
 - `npm run seed:migrate` - Migration-time seed script
 
+## API Documentation
+
+The project includes a comprehensive OpenAPI 3.1 specification covering all API routes:
+
+- **File**: `openapi.yaml`
+- **Format**: OpenAPI 3.1.0
+- **Coverage**: All REST endpoints, SSE streams, and authentication routes
+- **Tags**: Organized by domain (Authentication, Users, ORBATs, Training, Ranks, etc.)
+- **Security**: Documents both cookie-based (bearerAuth) and API key authentication
+
+Use with tools like:
+- [Swagger UI](https://swagger.io/tools/swagger-ui/)
+- [Redoc](https://redocly.com/redoc/)
+- [Postman](https://www.postman.com/) (import OpenAPI file)
+
 ## Key Paths
 
 - `app/` - App Router pages and API routes
@@ -207,6 +222,7 @@ Default URL: `http://localhost:3000`
 - `prisma/schema.prisma` - Full data model
 - `docs/PERMISSIONS.md` - Permission model details
 - `docs/RANK_SYSTEM.md` - Rank subsystem documentation
+- `openapi.yaml` - OpenAPI 3.1 API specification
 
 ## Validation
 

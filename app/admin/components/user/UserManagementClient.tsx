@@ -682,7 +682,7 @@ export default function UserManagementClient({
                     </td>
                   </tr>
                   {expandedUserId === user.id && (
-                    <tr style={{ backgroundColor: 'rgba(0,0,0,0.1)', borderBottomWidth: '1px', borderColor: 'var(--border)' }}>
+                    <tr key={`expand-${user.id}`} style={{ backgroundColor: 'rgba(0,0,0,0.1)', borderBottomWidth: '1px', borderColor: 'var(--border)' }}>
                       <td colSpan={8} className="px-6 py-4">
                         <div className="space-y-4">
                           <h4 className="font-semibold text-sm" style={{ color: 'var(--foreground)' }}>

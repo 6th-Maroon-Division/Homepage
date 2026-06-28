@@ -34,6 +34,7 @@ model User {
   attendances       Attendance[]
   attendanceLogs    AttendanceLog[]
   attendanceSessions AttendanceSession[]
+  attendanceEvents  AttendanceEvent[]
   legacyAttendanceData LegacyAttendanceData[]
   legacyUserData    LegacyUserData[]
   createdMessages   Message[]          @relation("MessageCreator")
@@ -380,6 +381,18 @@ model AttendanceLog {
   @@index([changedById])
   @@index([timestamp])
   @@index([source])
+}
+
+// Raw attendance events from bot - ORBAT-agnostic
+model AttendanceEvent {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  isJoin   Boolean  // true = check-in/join, false = check-out/leave
+  eventTime DateTime
+
+  @@index([userId])
+  @@index([eventTime])
 }
 
 model OrbatTemplate {
