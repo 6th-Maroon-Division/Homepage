@@ -18,7 +18,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "db:push": "prisma db push"
+    "db:push": "prisma db push",
+    "swagger": "node scripts/swagger.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
@@ -42,9 +43,13 @@
     "dotenv": "^17.4.2",
     "eslint": "^10",
     "eslint-config-next": "^16.2.9",
+    "express": "^5.2.1",
     "prisma": "^7.8.0",
+    "swagger-ui-dist": "^5.32.8",
+    "swagger-ui-express": "^5.0.1",
     "tailwindcss": "^4",
     "tsx": "^4.22.4",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "yaml": "^2.9.0"
   }
 }
