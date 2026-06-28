@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
+import { publishUserProfileEvent } from '@/lib/realtime/user-events';
 
 // PUT /api/training-requests/[id] - Update training request status (admin only)
 export async function PUT(
@@ -77,11 +78,20 @@ export async function PUT(
           create: {
             userId: trainingRequest.userId,
             trainingId: trainingRequest.trainingId,
+            trainerId: session.user.id,
             notes: `Approved from request: ${adminResponse || 'No notes'}`,
           },
-          update: {},
+          update: {
+            trainerId: session.user.id,
+          },
         }),
       ]);
+
+      publishUserProfileEvent(updatedRequest.user.id, {
+        source: 'training-request.updated',
+        status: updatedRequest.status,
+        trainingId: updatedRequest.trainingId,
+      });
 
       return NextResponse.json({
         ...updatedRequest,
@@ -126,6 +136,12 @@ export async function PUT(
         },
       });
 
+      publishUserProfileEvent(updatedRequest.user.id, {
+        source: 'training-request.updated',
+        status: updatedRequest.status,
+        trainingId: updatedRequest.trainingId,
+      });
+
       return NextResponse.json({
         ...updatedRequest,
         requestedAt: updatedRequest.requestedAt.toISOString(),
@@ -142,11 +158,11 @@ export async function PUT(
           : null,
       });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating training request:', error);
     
     // Handle Prisma "record not found" error
-    if (error?.code === 'P2025') {
+    if ((error as { code?: string }).code === 'P2025') {
       return NextResponse.json({ error: 'Training request not found' }, { status: 404 });
     }
     
@@ -189,11 +205,11 @@ export async function DELETE(
     });
 
     return NextResponse.json({ message: 'Training request deleted successfully' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting training request:', error);
     
     // Handle Prisma "record not found" error
-    if (error?.code === 'P2025') {
+    if ((error as { code?: string }).code === 'P2025') {
       return NextResponse.json({ error: 'Training request not found' }, { status: 404 });
     }
     

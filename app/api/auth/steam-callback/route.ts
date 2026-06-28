@@ -57,10 +57,10 @@ export async function GET(request: NextRequest) {
       if (authAccount) {
         if (authAccount.userId === session.user.id) {
           // Already linked to this user
-          return NextResponse.redirect(new URL('/settings?success=AlreadyLinked', baseUrl));
+          return NextResponse.redirect(new URL('/profile?success=AlreadyLinked', baseUrl));
         } else {
           // Steam account already linked to another user
-          return NextResponse.redirect(new URL('/settings?error=SteamAlreadyLinked', baseUrl));
+          return NextResponse.redirect(new URL('/profile?error=SteamAlreadyLinked', baseUrl));
         }
       }
       
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
         });
       }
       
-      return NextResponse.redirect(new URL('/settings?success=SteamLinked', baseUrl));
+      return NextResponse.redirect(new URL('/profile?success=SteamLinked', baseUrl));
     }
     
     // User is not logged in - proceed with normal Steam login

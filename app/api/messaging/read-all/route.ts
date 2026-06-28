@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
+import { publishInboxEvent } from '@/lib/realtime/inbox-events';
 
 export async function PUT(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -23,6 +24,10 @@ export async function PUT(request: NextRequest) {
         readAt: new Date(),
       },
     });
+
+    if (result.count > 0) {
+      publishInboxEvent(Number(session.user.id));
+    }
 
     return NextResponse.json({
       success: true,

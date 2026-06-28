@@ -16,7 +16,8 @@ export default async function RankConfigPage() {
     checkPermission(session.user.id, 'rank:edit'),
     checkPermission(session.user.id, 'rank:delete'),
   ]);
-  const hasPermission = session.user.isAdmin || canCreateRank || canEditRank || canDeleteRank;
+  const hasSuperAdmin = (session.user.permissions?.['system:super_admin'] ?? 0) > 0;
+  const hasPermission = hasSuperAdmin || canCreateRank || canEditRank || canDeleteRank;
   
   if (!hasPermission) {
     redirect('/admin');

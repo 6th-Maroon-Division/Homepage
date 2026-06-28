@@ -60,7 +60,7 @@ export default function UserMenu() {
       {isOpen && (
         <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 z-50" style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)' }}>
           <Link
-            href="/trainings"
+            href="/profile"
             className="block px-4 py-2 transition-colors"
             style={{ color: 'var(--foreground)' }}
             onClick={() => setIsOpen(false)}
@@ -71,23 +71,9 @@ export default function UserMenu() {
               e.currentTarget.style.backgroundColor = 'transparent';
             }}
           >
-            My Trainings
+            My Profile
           </Link>
-          <Link
-            href="/settings"
-            className="block px-4 py-2 transition-colors"
-            style={{ color: 'var(--foreground)' }}
-            onClick={() => setIsOpen(false)}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--button-hover)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            Settings
-          </Link>
-          {(session.user?.isAdmin || (session.user?.permissions && Object.keys(session.user.permissions).length > 0)) && (
+          {session.user?.permissions && Object.keys(session.user.permissions).length > 0 && (
             <Link
               href="/admin"
               className="block px-4 py-2 transition-colors"

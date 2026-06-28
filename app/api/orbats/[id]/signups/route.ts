@@ -32,10 +32,8 @@ export async function GET(
     // Get all signups for this ORBAT
     const signups = await prisma.signup.findMany({
       where: {
-        subslot: {
-          slot: {
-            orbatId,
-          },
+        slot: {
+          orbatId,
         },
       },
       include: {
@@ -45,10 +43,11 @@ export async function GET(
             username: true,
           },
         },
-        subslot: {
+        slot: {
           select: {
-            name: true,
-            slot: {
+            id: true,
+            orderIndex: true,
+            squadRole: {
               select: {
                 name: true,
               },

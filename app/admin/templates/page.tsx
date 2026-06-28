@@ -21,7 +21,8 @@ export default async function AdminTemplatesPage() {
     checkPermission(session.user.id, 'orbat:create'),
     checkPermission(session.user.id, 'orbat:edit'),
   ]);
-  const canManageTemplates = session.user.isAdmin || canEditTemplates || canCreateTemplates || canDeleteTemplates;
+  const hasSuperAdmin = (session.user.permissions?.['system:super_admin'] ?? 0) > 0;
+  const canManageTemplates = hasSuperAdmin || canEditTemplates || canCreateTemplates || canDeleteTemplates;
   const hasPermission = canManageTemplates || canCreateOrbat || canEditOrbat;
   const isReadOnly = !canManageTemplates && (canCreateOrbat || canEditOrbat);
   

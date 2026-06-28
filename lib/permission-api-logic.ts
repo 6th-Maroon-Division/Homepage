@@ -1,7 +1,7 @@
 import { isValidPermissionValue } from '@/lib/permissions';
 
 export interface TemplateReadAccessContext {
-  isAdmin: boolean;
+  hasSuperAdmin: boolean;
   canCreateTemplate: boolean;
   canEditTemplate: boolean;
   canDeleteTemplate: boolean;
@@ -13,7 +13,37 @@ export function canAccessTemplateReadApi(context: TemplateReadAccessContext): bo
   const canManageTemplates =
     context.canCreateTemplate || context.canEditTemplate || context.canDeleteTemplate;
 
-  return context.isAdmin || canManageTemplates || context.canCreateOrbat || context.canEditOrbat;
+  return context.hasSuperAdmin || canManageTemplates || context.canCreateOrbat || context.canEditOrbat;
+}
+
+export interface SubslotReadAccessContext {
+  hasSuperAdmin: boolean;
+  canViewSubslot: boolean;
+  canCreateSubslot: boolean;
+  canEditSubslot: boolean;
+  canDeleteSubslot: boolean;
+  canCreateTemplate: boolean;
+  canEditTemplate: boolean;
+  canDeleteTemplate: boolean;
+  canCreateOrbat: boolean;
+  canEditOrbat: boolean;
+}
+
+export function canAccessSubslotReadApi(context: SubslotReadAccessContext): boolean {
+  const canManageSubslots =
+    context.canCreateSubslot || context.canEditSubslot || context.canDeleteSubslot;
+
+  const canManageTemplates =
+    context.canCreateTemplate || context.canEditTemplate || context.canDeleteTemplate;
+
+  return (
+    context.hasSuperAdmin ||
+    context.canViewSubslot ||
+    canManageSubslots ||
+    canManageTemplates ||
+    context.canCreateOrbat ||
+    context.canEditOrbat
+  );
 }
 
 export interface PermissionUpdateEntry {

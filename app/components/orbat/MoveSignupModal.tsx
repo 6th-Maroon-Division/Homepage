@@ -69,7 +69,7 @@ export default function MoveSignupModal({
 
         <div className="space-y-2 max-h-96 overflow-y-auto">
           {availableSubslots.length === 0 ? (
-            <p className="text-gray-400 text-sm">No available subslots to move to</p>
+            <p className="text-gray-400 text-sm">No available slots to move to</p>
           ) : (
             availableSubslots.map((subslot) => {
               const isFull = subslot.currentSignups >= subslot.maxSignups;

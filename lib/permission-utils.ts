@@ -93,10 +93,10 @@ export async function hasPermission(
 }
 
 /**
- * Check if user is full admin (system:admin >= 255)
+ * Check if user is full admin (system:super_admin >= 255)
  */
 export async function isFullAdmin(userId: number): Promise<boolean> {
-  const value = await getUserPermissionValue(userId, "admin:system");
+  const value = await getUserPermissionValue(userId, "system:super_admin");
   return value >= 255;
 }
 
@@ -196,4 +196,19 @@ export async function revokePermission(
   permissionKey: PermissionKey
 ): Promise<void> {
   await setUserPermission(userId, permissionKey, 0);
+}
+
+/**
+ * Resolve user IDs that currently have super-admin access.
+ */
+export async function getSuperAdminUserIds(): Promise<number[]> {
+  const entries = await prisma.userPermission.findMany({
+    where: {
+      value: { gt: 0 },
+      permission: { key: 'system:super_admin' },
+    },
+    select: { userId: true },
+  });
+
+  return entries.map((entry) => entry.userId);
 }

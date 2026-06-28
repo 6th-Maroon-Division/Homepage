@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  canAccessSubslotReadApi,
   canAccessTemplateReadApi,
   isPermissionUpdateEntry,
   validatePermissionUpdateEntries,
@@ -8,7 +9,7 @@ import {
 
 test('template read access allows admin without other permissions', () => {
   const allowed = canAccessTemplateReadApi({
-    isAdmin: true,
+    hasSuperAdmin: true,
     canCreateTemplate: false,
     canEditTemplate: false,
     canDeleteTemplate: false,
@@ -22,7 +23,7 @@ test('template read access allows admin without other permissions', () => {
 test('template read access allows template managers', () => {
   assert.equal(
     canAccessTemplateReadApi({
-      isAdmin: false,
+      hasSuperAdmin: false,
       canCreateTemplate: true,
       canEditTemplate: false,
       canDeleteTemplate: false,
@@ -34,7 +35,7 @@ test('template read access allows template managers', () => {
 
   assert.equal(
     canAccessTemplateReadApi({
-      isAdmin: false,
+      hasSuperAdmin: false,
       canCreateTemplate: false,
       canEditTemplate: true,
       canDeleteTemplate: false,
@@ -46,7 +47,7 @@ test('template read access allows template managers', () => {
 
   assert.equal(
     canAccessTemplateReadApi({
-      isAdmin: false,
+      hasSuperAdmin: false,
       canCreateTemplate: false,
       canEditTemplate: false,
       canDeleteTemplate: true,
@@ -60,7 +61,7 @@ test('template read access allows template managers', () => {
 test('template read access allows ORBAT create/edit users in read-only scenarios', () => {
   assert.equal(
     canAccessTemplateReadApi({
-      isAdmin: false,
+      hasSuperAdmin: false,
       canCreateTemplate: false,
       canEditTemplate: false,
       canDeleteTemplate: false,
@@ -72,7 +73,7 @@ test('template read access allows ORBAT create/edit users in read-only scenarios
 
   assert.equal(
     canAccessTemplateReadApi({
-      isAdmin: false,
+      hasSuperAdmin: false,
       canCreateTemplate: false,
       canEditTemplate: false,
       canDeleteTemplate: false,
@@ -85,7 +86,75 @@ test('template read access allows ORBAT create/edit users in read-only scenarios
 
 test('template read access denies users with no relevant permissions', () => {
   const allowed = canAccessTemplateReadApi({
-    isAdmin: false,
+    hasSuperAdmin: false,
+    canCreateTemplate: false,
+    canEditTemplate: false,
+    canDeleteTemplate: false,
+    canCreateOrbat: false,
+    canEditOrbat: false,
+  });
+
+  assert.equal(allowed, false);
+});
+
+test('subslot read access allows explicit subslot permissions', () => {
+  const allowed = canAccessSubslotReadApi({
+    hasSuperAdmin: false,
+    canViewSubslot: true,
+    canCreateSubslot: false,
+    canEditSubslot: false,
+    canDeleteSubslot: false,
+    canCreateTemplate: false,
+    canEditTemplate: false,
+    canDeleteTemplate: false,
+    canCreateOrbat: false,
+    canEditOrbat: false,
+  });
+
+  assert.equal(allowed, true);
+});
+
+test('subslot read access allows ORBAT/template users in read-only scenarios', () => {
+  assert.equal(
+    canAccessSubslotReadApi({
+      hasSuperAdmin: false,
+      canViewSubslot: false,
+      canCreateSubslot: false,
+      canEditSubslot: false,
+      canDeleteSubslot: false,
+      canCreateTemplate: true,
+      canEditTemplate: false,
+      canDeleteTemplate: false,
+      canCreateOrbat: false,
+      canEditOrbat: false,
+    }),
+    true
+  );
+
+  assert.equal(
+    canAccessSubslotReadApi({
+      hasSuperAdmin: false,
+      canViewSubslot: false,
+      canCreateSubslot: false,
+      canEditSubslot: false,
+      canDeleteSubslot: false,
+      canCreateTemplate: false,
+      canEditTemplate: false,
+      canDeleteTemplate: false,
+      canCreateOrbat: true,
+      canEditOrbat: false,
+    }),
+    true
+  );
+});
+
+test('subslot read access denies users with no relevant permissions', () => {
+  const allowed = canAccessSubslotReadApi({
+    hasSuperAdmin: false,
+    canViewSubslot: false,
+    canCreateSubslot: false,
+    canEditSubslot: false,
+    canDeleteSubslot: false,
     canCreateTemplate: false,
     canEditTemplate: false,
     canDeleteTemplate: false,

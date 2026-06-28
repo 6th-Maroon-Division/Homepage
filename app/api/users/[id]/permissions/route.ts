@@ -7,6 +7,7 @@ import { checkPermission } from '@/lib/auth-middleware';
 import { canModifyUserPermissions } from '@/lib/user-permission-guards';
 import { validatePermissionUpdateEntries } from '@/lib/permission-api-logic';
 import type { PermissionUpdateEntry } from '@/lib/permission-api-logic';
+import { publishUserProfileEvent } from '@/lib/realtime/user-events';
 
 /**
  * GET /api/users/[id]/permissions
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   // Verify target user exists
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, username: true, isAdmin: true },
+    select: { id: true, username: true },
   });
 
   if (!user) {
@@ -73,7 +74,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     user: {
       id: user.id,
       username: user.username,
-      isAdmin: user.isAdmin,
     },
     permissions,
   });
@@ -231,6 +231,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         });
       }
     }
+  });
+
+  publishUserProfileEvent(userId, {
+    source: 'permissions.updated',
   });
 
   return NextResponse.json({

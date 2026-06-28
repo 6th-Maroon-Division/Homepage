@@ -1,4 +1,3 @@
-// app/admin/orbats/[id]/page.tsx
 import { prisma } from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth/next';
@@ -16,10 +15,10 @@ export default async function AdminOrbatPage({ params }: AdminOrbatPageProps) {
   if (!session?.user?.id) {
     redirect('/');
   }
-  
-  // Check if user has ORBAT edit permission (viewing admin-side requires edit)
-  const hasPermission = session.user.isAdmin || await checkPermission(session.user.id, 'orbat:edit');
-  
+
+  const hasPermission =
+    (session.user.permissions?.['system:super_admin'] ?? 0) > 0 ||
+    await checkPermission(session.user.id, 'orbat:edit');
   if (!hasPermission) {
     redirect('/admin');
   }
@@ -34,12 +33,15 @@ export default async function AdminOrbatPage({ params }: AdminOrbatPageProps) {
   const orbat = await prisma.orbat.findUnique({
     where: { id: orbatId },
     include: {
-      slots: {
+      squads: {
         orderBy: { orderIndex: 'asc' },
         include: {
-          subslots: {
+          slots: {
             orderBy: { orderIndex: 'asc' },
             include: {
+              squadRole: {
+                select: { name: true },
+              },
               signups: {
                 include: {
                   user: {
@@ -68,7 +70,6 @@ export default async function AdminOrbatPage({ params }: AdminOrbatPageProps) {
     notFound();
   }
 
-  // Serialize for client component
   const clientOrbat = {
     id: orbat.id,
     name: orbat.name,
@@ -76,37 +77,35 @@ export default async function AdminOrbatPage({ params }: AdminOrbatPageProps) {
     eventDate: orbat.eventDate ? orbat.eventDate.toISOString() : null,
     startTime: orbat.startTime || null,
     endTime: orbat.endTime || null,
-    // Faction fields
     bluforCountry: orbat.bluforCountry || null,
     bluforRelationship: orbat.bluforRelationship || null,
     opforCountry: orbat.opforCountry || null,
     opforRelationship: orbat.opforRelationship || null,
     indepCountry: orbat.indepCountry || null,
     indepRelationship: orbat.indepRelationship || null,
-    // Extra Intel fields
     iedThreat: orbat.iedThreat || null,
     civilianRelationship: orbat.civilianRelationship || null,
     rulesOfEngagement: orbat.rulesOfEngagement || null,
     airspace: orbat.airspace || null,
     inGameTimezone: orbat.inGameTimezone || null,
     operationDay: orbat.operationDay || null,
-    slots: orbat.slots.map((slot) => ({
-      id: slot.id,
-      name: slot.name,
-      orderIndex: slot.orderIndex,
-      subslots: slot.subslots.map((sub) => ({
-        id: sub.id,
-        name: sub.name,
-        orderIndex: sub.orderIndex,
-        maxSignups: sub.maxSignups,
-        signups: sub.signups.map((s) => ({
-          id: s.id,
-          user: s.user
+    squads: orbat.squads.map((squad) => ({
+      id: squad.id,
+      name: squad.name,
+      orderIndex: squad.orderIndex,
+      slots: squad.slots.map((slot) => ({
+        id: slot.id,
+        name: slot.squadRole?.name || 'Unassigned Role',
+        orderIndex: slot.orderIndex,
+        maxSignups: slot.maxSignups ?? 9999,
+        signups: slot.signups.map((signup) => ({
+          id: signup.id,
+          user: signup.user
             ? {
-                id: s.user.id,
-                username: s.user.username ?? 'Unknown',
-                rankAbbreviation: s.user.userRank?.currentRank?.abbreviation,
-                rankName: s.user.userRank?.currentRank?.name,
+                id: signup.user.id,
+                username: signup.user.username ?? 'Unknown',
+                rankAbbreviation: signup.user.userRank?.currentRank?.abbreviation,
+                rankName: signup.user.userRank?.currentRank?.name,
               }
             : {
                 id: null,

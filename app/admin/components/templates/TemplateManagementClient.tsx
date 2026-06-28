@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
@@ -34,11 +34,59 @@ export default function TemplateManagementClient({ templates: initialTemplates, 
   const [isDeleting, setIsDeleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { showError, showSuccess } = useToast();
 
   const canCreateTemplate = usePermission('template:create');
   const canEditTemplate = usePermission('template:edit');
   const canDeleteTemplate = usePermission('template:delete');
+
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      try {
+        const response = await fetch('/api/templates');
+        if (!response.ok) {
+          return;
+        }
+
+        const data = (await response.json()) as OrbatTemplate[];
+        setTemplates(data);
+      } catch {
+        // keep current state on sync errors
+      }
+    };
+
+    const queueSync = () => {
+      if (syncTimerRef.current) {
+        return;
+      }
+
+      syncTimerRef.current = setTimeout(() => {
+        syncTimerRef.current = null;
+        void fetchTemplates();
+      }, 250);
+    };
+
+    const source = new EventSource('/api/admin/catalog/events');
+    source.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data) as { type?: string };
+        if (payload.type === 'template.changed') {
+          queueSync();
+        }
+      } catch {
+        // ignore invalid events
+      }
+    };
+
+    return () => {
+      source.close();
+      if (syncTimerRef.current) {
+        clearTimeout(syncTimerRef.current);
+        syncTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Get unique categories
   const categories: string[] = ['all', ...Array.from(new Set(templates.map(t => t.category).filter((c): c is string => Boolean(c))))];

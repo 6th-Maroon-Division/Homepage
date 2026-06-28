@@ -12,7 +12,9 @@ export default async function RadioFrequenciesPage() {
   }
   
   // Check if user has orbat edit permission (radio frequencies are part of ORBATs)
-  const hasPermission = session.user.isAdmin || await checkPermission(session.user.id, 'orbat:edit');
+  const hasPermission =
+    (session.user.permissions?.['system:super_admin'] ?? 0) > 0 ||
+    await checkPermission(session.user.id, 'orbat:edit');
   
   if (!hasPermission) {
     redirect('/admin');

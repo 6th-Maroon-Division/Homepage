@@ -44,7 +44,6 @@ export async function GET(request: NextRequest) {
         username: user.username,
         email: user.email,
         avatarUrl: user.avatarUrl,
-        isAdmin: user.isAdmin,
         createdAt: user.createdAt,
         permissions,
       },

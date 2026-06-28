@@ -18,7 +18,9 @@ export default async function EditOrbatPage({ params }: EditOrbatPageProps) {
   }
   
   // Check if user has ORBAT edit permission
-  const hasPermission = session.user.isAdmin || await checkPermission(session.user.id, 'orbat:edit');
+  const hasPermission =
+    (session.user.permissions?.['system:super_admin'] ?? 0) > 0 ||
+    await checkPermission(session.user.id, 'orbat:edit');
   
   if (!hasPermission) {
     redirect('/admin');
@@ -34,11 +36,21 @@ export default async function EditOrbatPage({ params }: EditOrbatPageProps) {
   const orbat = await prisma.orbat.findUnique({
     where: { id: orbatId },
     include: {
-      slots: {
+      squads: {
         orderBy: { orderIndex: 'asc' },
         include: {
-          subslots: {
+          slots: {
             orderBy: { orderIndex: 'asc' },
+            include: {
+              squadRole: {
+                select: {
+                  id: true,
+                  name: true,
+                  requiredTrainingIds: true,
+                  requiredRankIds: true,
+                },
+              },
+            },
           },
         },
       },
@@ -71,15 +83,20 @@ export default async function EditOrbatPage({ params }: EditOrbatPageProps) {
     airspace: orbat.airspace || '',
     inGameTimezone: orbat.inGameTimezone || '',
     operationDay: orbat.operationDay || '',
-    slots: orbat.slots.map((slot) => ({
-      id: slot.id,
-      name: slot.name,
-      orderIndex: slot.orderIndex,
-      subslots: slot.subslots.map((sub) => ({
-        id: sub.id,
-        name: sub.name,
-        orderIndex: sub.orderIndex,
-        maxSignups: sub.maxSignups,
+    slots: orbat.squads.map((squad) => ({
+      id: squad.id,
+      name: squad.name,
+      orderIndex: squad.orderIndex,
+      subslots: squad.slots.map((slot) => ({
+        id: slot.id,
+        squadRoleId: slot.squadRoleId,
+        name: slot.squadRole?.name || 'Unassigned Role',
+        orderIndex: slot.orderIndex,
+        maxSignups: slot.maxSignups ?? 1,
+        requiredTrainingIds: slot.squadRole?.requiredTrainingIds || [],
+        requiredRankIds: slot.squadRole?.requiredRankIds || [],
+        requiredTrainingId: (slot.squadRole?.requiredTrainingIds || [])[0] ?? null,
+        requiredRankId: (slot.squadRole?.requiredRankIds || [])[0] ?? null,
       })),
     })),
   };

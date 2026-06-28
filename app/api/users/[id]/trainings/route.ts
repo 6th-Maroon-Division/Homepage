@@ -29,7 +29,16 @@ export async function GET(
     const { id } = await params;
     const userTrainings = await prisma.userTraining.findMany({
       where: { userId: parseInt(id) },
-      include: { training: true },
+      include: {
+        training: true,
+        trainer: {
+          select: {
+            id: true,
+            username: true,
+            avatarUrl: true,
+          },
+        },
+      },
       orderBy: { completedAt: 'desc' },
     });
 
@@ -42,6 +51,8 @@ export async function GET(
       notes: ut.notes,
       completedAt: ut.completedAt.toISOString(),
       assignedAt: ut.assignedAt.toISOString(),
+      trainerId: ut.trainerId,
+      trainerUsername: ut.trainer?.username ?? null,
     }));
 
     return NextResponse.json(serialized);

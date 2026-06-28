@@ -76,10 +76,18 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   const session = await getServerSession(authOptions);
 
-  if (!session?.user?.isAdmin) {
+  if (!session?.user?.id) {
     return NextResponse.json(
       { error: 'Unauthorized - admin access required' },
       { status: 401 }
+    );
+  }
+
+  const hasPermission = await checkPermission(session.user.id, 'system:super_admin');
+  if (!hasPermission) {
+    return NextResponse.json(
+      { error: 'Forbidden' },
+      { status: 403 }
     );
   }
 

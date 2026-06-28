@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 type UiOp = {
@@ -61,10 +61,107 @@ function formatHumanDate(date: Date) {
 export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmin = false, helpText }: CalendarWithOpsProps) {
   const router = useRouter();
 
+  const [opsState, setOpsState] = useState<UiOp[]>(ops);
   const [currentYear, setCurrentYear] = useState(initialYear);
   const [currentMonth, setCurrentMonth] = useState(initialMonth); // 0-based
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
   const [showDayModal, setShowDayModal] = useState(false);
+  const fallbackTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    setOpsState(ops);
+  }, [ops]);
+
+  useEffect(() => {
+    const appendOrbat = (payload: { id?: number; name?: string; description?: string | null; eventDate?: string }) => {
+      if (!payload.id || !payload.name || !payload.eventDate) {
+        return;
+      }
+
+      const parsedDate = new Date(payload.eventDate);
+      if (Number.isNaN(parsedDate.getTime())) {
+        return;
+      }
+
+      const year = parsedDate.getFullYear();
+      const month = `${parsedDate.getMonth() + 1}`.padStart(2, '0');
+      const day = `${parsedDate.getDate()}`.padStart(2, '0');
+      const dateKey = `${year}-${month}-${day}`;
+
+      setOpsState((previous) => {
+        if (previous.some((item) => item.id === payload.id)) {
+          return previous;
+        }
+
+        const next: UiOp[] = [
+          ...previous,
+          {
+            id: payload.id!,
+            name: payload.name!,
+            description: payload.description ?? null,
+            eventDate: payload.eventDate!,
+            dateKey,
+          },
+        ];
+
+        return next.sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
+      });
+    };
+
+    const source = new EventSource('/api/orbats/events');
+    source.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data) as {
+          type?: string;
+          payload?: { id?: number; name?: string; description?: string | null; eventDate?: string };
+        };
+
+        if (data.type === 'orbat.created' && data.payload) {
+          appendOrbat(data.payload);
+        }
+      } catch {
+        // ignore malformed SSE messages
+      }
+    };
+
+    source.onerror = () => {
+      if (!fallbackTimerRef.current) {
+        fallbackTimerRef.current = setInterval(async () => {
+          try {
+            const res = await fetch('/api/orbats/calendar');
+            if (!res.ok) {
+              return;
+            }
+
+            const latest = (await res.json()) as UiOp[];
+            setOpsState((previous) => {
+              const existingIds = new Set(previous.map((item) => item.id));
+              const additions = latest.filter((item) => !existingIds.has(item.id));
+
+              return additions.length > 0 ? [...previous, ...additions] : previous;
+            });
+          } catch {
+            // keep waiting for stream recovery
+          }
+        }, 30000);
+      }
+    };
+
+    source.onopen = () => {
+      if (fallbackTimerRef.current) {
+        clearInterval(fallbackTimerRef.current);
+        fallbackTimerRef.current = null;
+      }
+    };
+
+    return () => {
+      source.close();
+      if (fallbackTimerRef.current) {
+        clearInterval(fallbackTimerRef.current);
+        fallbackTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const weeks = useMemo(
     () => getMonthCalendar(currentYear, currentMonth),
@@ -73,13 +170,13 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
 
   const opsByDate = useMemo(() => {
     const map = new Map<string, UiOp[]>();
-    for (const op of ops) {
+    for (const op of opsState) {
       const list = map.get(op.dateKey) ?? [];
       list.push(op);
       map.set(op.dateKey, list);
     }
     return map;
-  }, [ops]);
+  }, [opsState]);
 
   const monthLabel = useMemo(
     () =>
@@ -385,12 +482,12 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
         <section className="rounded-lg border p-4 space-y-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
           <h2 className="text-lg font-semibold" style={{ color: 'var(--foreground)' }}>All operations</h2>
 
-          {ops.length === 0 && (
+          {opsState.length === 0 && (
             <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>No operations yet.</p>
           )}
 
           <ul className="space-y-3">
-            {ops.map((op) => (
+            {opsState.map((op) => (
               <li
                 key={op.id}
                 className="rounded-md border px-3 py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"

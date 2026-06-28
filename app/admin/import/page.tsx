@@ -12,8 +12,8 @@ export default async function LegacyImportPage() {
     redirect('/');
   }
   
-  // Check if user has system admin permission (legacy import requires high-level access)
-  const hasPermission = session.user.isAdmin || await checkPermission(session.user.id, 'admin:system');
+  // Check if user has super admin permission (legacy import requires high-level access)
+  const hasPermission = await checkPermission(session.user.id, 'system:super_admin');
   
   if (!hasPermission) {
     redirect('/admin');

@@ -4,10 +4,13 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkRankupEligibility } from '@/lib/rank-eligibility';
 import { checkPermission } from '@/lib/auth-middleware';
+import { getSuperAdminUserIds } from '@/lib/permission-utils';
+import { publishInboxEvents } from '@/lib/realtime/inbox-events';
+import { publishPromotionEvent } from '@/lib/realtime/promotion-events';
 
 async function notifyAdminsOfProposal(userId: number, nextRankName: string) {
-  const admins = await prisma.user.findMany({ where: { isAdmin: true }, select: { id: true } });
-  if (!admins.length) return;
+  const adminUserIds = await getSuperAdminUserIds();
+  if (!adminUserIds.length) return;
 
   const message = await prisma.message.create({
     data: {
@@ -19,15 +22,17 @@ async function notifyAdminsOfProposal(userId: number, nextRankName: string) {
   });
 
   await prisma.messageRecipient.createMany({
-    data: admins.map((a) => ({
+    data: adminUserIds.map((recipientUserId) => ({
       messageId: message.id,
-      userId: a.id,
+      userId: recipientUserId,
       audienceType: 'admin',
       audienceValue: null,
       isRead: false,
       channel: 'web',
     })),
   });
+
+  publishInboxEvents(adminUserIds);
 }
 
 export async function POST(request: NextRequest) {
@@ -107,6 +112,8 @@ export async function POST(request: NextRequest) {
         status: 'pending',
       },
     });
+
+    publishPromotionEvent({ source: 'proposal.created', proposalId: proposal.id });
 
     await notifyAdminsOfProposal(Number(userId), eligibility.nextRank.name);
 

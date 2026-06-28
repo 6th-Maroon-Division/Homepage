@@ -8,12 +8,28 @@ Web application for managing Arma 3 unit operations, signups, attendance, ranks,
 - Discord OAuth via NextAuth
 - Steam OpenID login/link flow (custom callback routes)
 - Multi-provider account linking to one user account (`Discord + Steam`)
-- Session includes cached permission map and admin flag
+- Session includes cached permission map
+
+### User Profile
+- Primary user profile page at `/profile`
+- Tabbed self-service profile view:
+  - Overview
+  - Attendance
+  - Trainings (completed + available/request flow)
+  - Rank History
+  - Actions (avatar upload + provider refresh)
+- Legacy routes redirect to `/profile`:
+  - `/settings`
+  - `/settings/rank-history`
+  - `/trainings`
 
 ### Operations (ORBAT)
 - Calendar-based operations browsing (`/orbats`)
 - Detailed operation pages with slot/subslot hierarchy
 - Signup/unsignup flows and signup movement endpoints
+- Realtime ORBAT scoped change stream (SSE) at `/api/orbats/[id]/events` for signup/move/edit/delete updates
+- Global public ORBAT stream (SSE) at `/api/orbats/events` for live operation creation broadcasts
+- Calendar feed endpoint at `/api/orbats/calendar` for resilient client-side sync fallback
 - Operation metadata: factions, intel fields, start/end time
 - Radio frequency assignment (including temporary frequencies)
 - Admin ORBAT create/edit/delete workflows with permission checks
@@ -47,7 +63,7 @@ Web application for managing Arma 3 unit operations, signups, attendance, ranks,
 - Auto-rankup eligibility checks
 - Manual promotion proposal workflow (approve/decline)
 - User rank state (`retired`, interview flag, attendance since last rank)
-- Rank history timeline exposed to users in settings
+- Rank history timeline exposed to users in the profile tab view
 - Rank transition requirements (required trainings per target rank)
 - Rank migration preview/apply workflow
 - Legacy user rank data CSV import pipeline
@@ -57,16 +73,30 @@ Web application for managing Arma 3 unit operations, signups, attendance, ranks,
 - Message types: `general`, `orbat`, `training`, `rankup`, `alert`
 - Audience targeting: all users or admins
 - In-app inbox with unread badge, filters, and mark-read APIs
+- Realtime inbox stream (SSE) at `/api/messaging/events` with polling fallback
 - Auto message creation on rankup approval flows
 
 ### Permissions & Access Control
-- 22 granular permissions across 7 domains
+- 26 granular permissions across 8 domains
 - Integer permission values (`0-255`) with sparse storage
 - Enforcement layers:
   - API route authorization (authoritative)
   - server page guards
   - client-side UI visibility helpers
 - Permission audit logging and user-level permission management APIs
+- Live permission session sync: users receive realtime permission updates and session cache refresh (no re-login required)
+
+### Realtime & Synchronization (SSE)
+- ORBAT scoped stream: `/api/orbats/[id]/events`
+- ORBAT global stream: `/api/orbats/events`
+- User self profile stream: `/api/user/events`
+- Admin target-user stream: `/api/users/[id]/events`
+- Admin users list stream: `/api/admin/users/events`
+- Messaging inbox stream: `/api/messaging/events`
+- Promotions queue stream: `/api/ranks/promotions/events`
+- Admin catalog stream (templates/role definitions/orbats): `/api/admin/catalog/events`
+- Client behavior is SSE-first with polling fallback where applicable
+- Admin catalog pages use non-destructive live list sync (no full page refresh, preserving in-progress edits)
 
 ### Admin Areas
 - Dashboard (`/admin`) with module access by role/permission
@@ -78,6 +108,7 @@ Web application for managing Arma 3 unit operations, signups, attendance, ranks,
 - Attendance management
 - Rank configuration
 - Pending promotions
+- Pending promotions realtime queue stream (SSE) at `/api/ranks/promotions/events`
 - System messaging
 - Legacy user data import
 - Theme page currently indicates theme system removal (static light/dark behavior)
@@ -113,6 +144,8 @@ This project uses a custom Prisma client output path: `generated/prisma/`.
 - Do not import directly from generated files
 
 ## Local Development
+
+Node.js requirement: `^20.19 || ^22.12 || >=24.0`.
 
 1) Install dependencies
 
@@ -165,6 +198,21 @@ Default URL: `http://localhost:3000`
 - `npm run seed:prod` - Production seed data
 - `npm run seed:migrate` - Migration-time seed script
 
+## API Documentation
+
+The project includes a comprehensive OpenAPI 3.1 specification covering all API routes:
+
+- **File**: `openapi.yaml`
+- **Format**: OpenAPI 3.1.0
+- **Coverage**: All REST endpoints, SSE streams, and authentication routes
+- **Tags**: Organized by domain (Authentication, Users, ORBATs, Training, Ranks, etc.)
+- **Security**: Documents both cookie-based (bearerAuth) and API key authentication
+
+Use with tools like:
+- [Swagger UI](https://swagger.io/tools/swagger-ui/)
+- [Redoc](https://redocly.com/redoc/)
+- [Postman](https://www.postman.com/) (import OpenAPI file)
+
 ## Key Paths
 
 - `app/` - App Router pages and API routes
@@ -174,6 +222,7 @@ Default URL: `http://localhost:3000`
 - `prisma/schema.prisma` - Full data model
 - `docs/PERMISSIONS.md` - Permission model details
 - `docs/RANK_SYSTEM.md` - Rank subsystem documentation
+- `openapi.yaml` - OpenAPI 3.1 API specification
 
 ## Validation
 

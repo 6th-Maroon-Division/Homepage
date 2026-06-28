@@ -4,11 +4,20 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import CalendarWithOps from '@/app/orbats/components/CalendarWithOps';
 import OrbatManagementClient from '@/app/admin/components/orbat/OrbatManagementClient';
+import { checkPermission } from '@/lib/auth-middleware';
 
 export default async function AdminOrbatsPage() {
   const session = await getServerSession(authOptions);
   
-  if (!session?.user?.isAdmin) {
+  if (!session?.user?.id) {
+    redirect('/');
+  }
+
+  const hasPermission =
+    (session.user.permissions?.['system:super_admin'] ?? 0) > 0 ||
+    await checkPermission(session.user.id, 'orbat:edit');
+
+  if (!hasPermission) {
     redirect('/');
   }
 
@@ -20,9 +29,9 @@ export default async function AdminOrbatsPage() {
           username: true,
         },
       },
-      slots: {
+      squads: {
         include: {
-          subslots: {
+          slots: {
             include: {
               signups: true,
             },
@@ -55,9 +64,9 @@ export default async function AdminOrbatsPage() {
 
   // For table view
   const orbatsWithCounts = orbats.map((orbat) => {
-    const totalSubslots = orbat.slots.reduce((acc: number, slot) => acc + slot.subslots.length, 0);
-    const totalSignups = orbat.slots.reduce(
-      (acc: number, slot) => acc + slot.subslots.reduce((subAcc: number, subslot) => subAcc + subslot.signups.length, 0),
+    const totalSubslots = orbat.squads.reduce((acc: number, squad) => acc + squad.slots.length, 0);
+    const totalSignups = orbat.squads.reduce(
+      (acc: number, squad) => acc + squad.slots.reduce((slotAcc: number, slot) => slotAcc + slot.signups.length, 0),
       0
     );
     
@@ -66,12 +75,14 @@ export default async function AdminOrbatsPage() {
       name: orbat.name,
       description: orbat.description,
       eventDate: orbat.eventDate ? orbat.eventDate.toISOString() : null,
+      startTime: orbat.startTime || null,
+      endTime: orbat.endTime || null,
       createdAt: orbat.createdAt.toISOString(),
       createdBy: {
         id: orbat.createdBy.id,
         username: orbat.createdBy.username || 'Unknown',
       },
-      slotCount: orbat.slots.length,
+      slotCount: orbat.squads.length,
       totalSubslots,
       totalSignups,
     };

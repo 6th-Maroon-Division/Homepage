@@ -9,7 +9,7 @@ This audit summarizes the current (code-verified) permission model and enforceme
 
 ## Permission Model
 
-- 22 granular permissions across 7 domains
+- 26 granular permissions across 8 domains
 - Permission values use integer range `0-255`
 - Standard access check is `value > 0`
 - Sparse storage in `UserPermission` (zero values are not stored)
@@ -22,7 +22,7 @@ Domains:
 - Templates (`template:*`)
 - Attendance (`attendance:*`)
 - Rank (`rank:*`)
-- System (`admin:system`)
+- System (`system:super_admin`)
 
 ## Enforcement Layers
 
@@ -48,7 +48,7 @@ Examples:
 - `/app/admin/trainings/page.tsx` → any of `training:create/edit/delete`
 - `/app/admin/attendance/page.tsx` → `attendance:view` or `attendance:edit`
 - `/app/admin/promotions/page.tsx` → `rank:manage_promotions`
-- `/app/admin/messaging/page.tsx` → `admin:system`
+- `/app/admin/messaging/page.tsx` → `system:super_admin`
 - `/app/admin/orbats/new/page.tsx` → `orbat:create`
 - `/app/admin/templates/page.tsx` → template manage perms or ORBAT read-only eligibility
 

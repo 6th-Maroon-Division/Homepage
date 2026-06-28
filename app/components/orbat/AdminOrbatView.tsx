@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import type { ReactNode } from 'react';
 import MoveSignupModal from '@/app/components/orbat/MoveSignupModal';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
 import { useToast } from '@/app/components/ui/ToastContainer';
@@ -15,7 +16,7 @@ type ClientSignup = {
   } | null;
 };
 
-type ClientSubslot = {
+type ClientSlot = {
   id: number;
   name: string;
   orderIndex: number;
@@ -23,11 +24,26 @@ type ClientSubslot = {
   signups: ClientSignup[];
 };
 
-type ClientSlot = {
+type ClientSquad = {
   id: number;
   name: string;
   orderIndex: number;
-  subslots: ClientSubslot[];
+  slots: ClientSlot[];
+};
+
+type ClientFrequency = {
+  id: number;
+  orbatId: number;
+  radioFrequencyId: number;
+  radioFrequency: {
+    id: number;
+    frequency: string;
+    type: string;
+    isAdditional: boolean;
+    channel?: string | null;
+    callsign?: string | null;
+    createdAt: Date;
+  };
 };
 
 type ClientOrbat = {
@@ -37,9 +53,9 @@ type ClientOrbat = {
   eventDate: string | null;
   startTime?: string | null;
   endTime?: string | null;
-  slots: ClientSlot[];
-  frequencies?: any[];
-  tempFrequencies?: any;
+  squads?: ClientSquad[];
+  frequencies?: ClientFrequency[];
+  tempFrequencies?: unknown;
   // Faction fields
   bluforCountry?: string | null;
   bluforRelationship?: string | null;
@@ -55,6 +71,82 @@ type ClientOrbat = {
   inGameTimezone?: string | null;
   operationDay?: string | null;
 };
+
+// Helper function to render frequencies section
+function renderFrequenciesSection(frequencies: ClientFrequency[] | undefined, tempFrequencies: unknown): ReactNode {
+  interface TempFrequency {
+    _id?: string;
+    callsign?: string;
+    frequency: string;
+    type: string;
+    isAdditional: boolean;
+    channel?: string | null;
+  }
+  
+  const allFreqs: Array<{ _id: string; callsign: string; frequency: string; type: string; isAdditional: boolean; channel?: string | null; isTemp: boolean }> = [];
+  
+  // Add saved frequencies
+  if (frequencies && frequencies.length > 0) {
+    frequencies.forEach((f: ClientFrequency) => {
+      allFreqs.push({
+        _id: `saved-${f.radioFrequencyId}`,
+        callsign: f.radioFrequency?.callsign || 'N/A',
+        frequency: f.radioFrequency?.frequency,
+        type: f.radioFrequency?.type,
+        isAdditional: f.radioFrequency?.isAdditional,
+        channel: f.radioFrequency?.channel,
+        isTemp: false,
+      });
+    });
+  }
+  
+  // Add temporary frequencies
+  if (Array.isArray(tempFrequencies) && tempFrequencies.length > 0) {
+    (tempFrequencies as Array<TempFrequency>).forEach((f: TempFrequency) => {
+      allFreqs.push({
+        _id: `temp-${f._id || f.frequency}`,
+        callsign: f.callsign || 'N/A',
+        frequency: f.frequency,
+        type: f.type,
+        isAdditional: f.isAdditional,
+        channel: f.channel,
+        isTemp: true,
+      });
+    });
+  }
+
+  // If no frequencies, return null
+  if (allFreqs.length === 0) {
+    return null;
+  }
+
+  // Sort by callsign
+  allFreqs.sort((a, b) => (a.callsign || '').localeCompare(b.callsign || ''));
+
+  return (
+    <div className="border rounded-lg p-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+      <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--foreground)' }}>Radio Frequencies</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+        {allFreqs.map((freq) => (
+          <div
+            key={freq._id}
+            className="border-l-4 pl-3 py-1"
+            style={{ borderColor: freq.isTemp ? '#f59e0b' : 'var(--primary)', color: 'var(--foreground)' }}
+          >
+            <div className="font-semibold text-sm">
+              {freq.callsign}
+              {freq.isTemp && <span className="ml-2 text-xs font-normal" style={{ color: '#f59e0b' }}>(Temp)</span>}
+            </div>
+            <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+              {freq.frequency} · <span style={{ color: 'var(--primary)' }}>{freq.isAdditional ? 'A' : ''}{freq.type}</span>
+              {freq.channel && ` · ${freq.channel}`}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 type AdminOrbatViewProps = {
   orbat: ClientOrbat;
@@ -111,6 +203,7 @@ function getRelationshipColor(relationship: string): string {
 
 export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewProps) {
   const [orbat, setOrbat] = useState<ClientOrbat>(initialOrbat);
+  const [isStreamConnected, setIsStreamConnected] = useState(false);
   const [moveModalOpen, setMoveModalOpen] = useState(false);
   const [selectedSignup, setSelectedSignup] = useState<{
     id: number;
@@ -121,9 +214,73 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
   } | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<{ signupId: number; subslotId: number; userName: string } | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
-  const { showSuccess, showError } = useToast();
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { showSuccess, showError, showWarning } = useToast();
 
   const eventDate = orbat.eventDate ? new Date(orbat.eventDate) : null;
+
+  const refreshOrbat = useCallback(async () => {
+    try {
+      const refreshRes = await fetch(`/api/orbats/${initialOrbat.id}/full`);
+      if (!refreshRes.ok) {
+        return;
+      }
+
+      const updatedOrbat = await refreshRes.json();
+      setOrbat(updatedOrbat);
+    } catch {
+      // fallback interval may recover
+    }
+  }, [initialOrbat.id]);
+
+  const queueRefresh = useCallback(() => {
+    if (refreshTimerRef.current) {
+      return;
+    }
+
+    refreshTimerRef.current = setTimeout(() => {
+      refreshTimerRef.current = null;
+      void refreshOrbat();
+    }, 250);
+  }, [refreshOrbat]);
+
+  useEffect(() => {
+    const source = new EventSource(`/api/orbats/${initialOrbat.id}/events`);
+
+    source.onopen = () => {
+      setIsStreamConnected(true);
+    };
+
+    source.onmessage = () => {
+      setIsStreamConnected(true);
+      queueRefresh();
+    };
+
+    source.onerror = () => {
+      setIsStreamConnected(false);
+    };
+
+    return () => {
+      source.close();
+      setIsStreamConnected(false);
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
+    };
+  }, [initialOrbat.id, queueRefresh]);
+
+  useEffect(() => {
+    if (isStreamConnected) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      void refreshOrbat();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [isStreamConnected, refreshOrbat]);
 
   const handleMoveClick = (
     signupId: number,
@@ -148,7 +305,7 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ targetSubslotId }),
+      body: JSON.stringify({ targetSlotId: targetSubslotId }),
     });
 
     if (!res.ok) {
@@ -156,12 +313,16 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
       throw new Error(data.error || 'Failed to move signup');
     }
 
-    // Refresh the orbat data
-    const refreshRes = await fetch(`/api/orbats/${orbat.id}/full`);
-    if (refreshRes.ok) {
-      const updatedOrbat = await refreshRes.json();
-      setOrbat(updatedOrbat);
+    const data = await res.json();
+
+    // Show warnings if any
+    if (data.warnings && Array.isArray(data.warnings)) {
+      for (const warning of data.warnings) {
+        showWarning(warning, 8000);
+      }
     }
+
+    await refreshOrbat();
   };
 
   const handleRemoveSignup = async (signupId: number, subslotId: number, userName: string) => {
@@ -188,13 +349,8 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
         return;
       }
 
-      // Refresh the orbat data
-      const refreshRes = await fetch(`/api/orbats/${orbat.id}/full`);
-      if (refreshRes.ok) {
-        const updatedOrbat = await refreshRes.json();
-        setOrbat(updatedOrbat);
-        showSuccess('Signup removed successfully');
-      }
+      await refreshOrbat();
+      showSuccess('Signup removed successfully');
     } catch (error) {
       console.error('Error removing signup:', error);
       showError('Error removing signup');
@@ -206,7 +362,7 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
 
   // Get all available subslots for moving (excluding the current one)
   const getAvailableSubslots = () => {
-    if (!selectedSignup) return [];
+    if (!selectedSignup || !orbat.squads) return [];
 
     const available: Array<{
       id: number;
@@ -216,15 +372,15 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
       maxSignups: number;
     }> = [];
 
-    orbat.slots.forEach((slot) => {
-      slot.subslots.forEach((subslot) => {
-        if (subslot.id !== selectedSignup.currentSubslotId) {
+    orbat.squads.forEach((squad) => {
+      squad.slots.forEach((slot) => {
+        if (slot.id !== selectedSignup.currentSubslotId) {
           available.push({
-            id: subslot.id,
-            name: subslot.name,
-            slotName: slot.name,
-            currentSignups: subslot.signups.length,
-            maxSignups: subslot.maxSignups,
+            id: slot.id,
+            name: slot.name,
+            slotName: `${squad.name} - ${slot.name}`,
+            currentSignups: slot.signups.length,
+            maxSignups: slot.maxSignups,
           });
         }
       });
@@ -248,13 +404,14 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
                   </p>
                 )}
                 {eventDate && (
-                  <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
-                    Event date:{' '}
-                    {eventDate.toLocaleString('en-GB', {
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
-                    })}
-                  </p>
+                  <div className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                    <p>Event date: {eventDate.toLocaleDateString('en-GB', { dateStyle: 'medium' })}</p>
+                    {(orbat.startTime || orbat.endTime) && (
+                      <p>
+                        Time: {orbat.startTime || '??:??'}{orbat.endTime ? ` - ${orbat.endTime}` : ''}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
               <span className="px-3 py-1 text-xs font-medium rounded-full whitespace-nowrap" style={{ backgroundColor: '#9333ea', color: '#ffffff' }}>
@@ -290,40 +447,46 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
         </div>
       </div>
 
-      {/* Slots grid */}
+      {/* Squads grid */}
       <section className={`grid gap-4 md:gap-6 ${
-        orbat.slots.length === 1 ? 'grid-cols-1' :
-        orbat.slots.length === 2 ? 'grid-cols-1 md:grid-cols-2' :
+        !orbat.squads || orbat.squads.length === 0 ? 'grid-cols-1' :
+        orbat.squads.length === 1 ? 'grid-cols-1' :
+        orbat.squads.length === 2 ? 'grid-cols-1 md:grid-cols-2' :
         'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'
       }`}>
-        {orbat.slots.map((slot) => (
+        {!orbat.squads || orbat.squads.length === 0 ? (
+          <div className="col-span-full text-center py-8" style={{ color: 'var(--muted-foreground)' }}>
+            No squads found
+          </div>
+        ) : (
+          orbat.squads.map((squad) => (
           <article
-            key={slot.id}
+            key={squad.id}
             className="rounded-lg border p-4 flex flex-col gap-3"
             style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
           >
             <h2 className="text-lg font-semibold pb-2" style={{ color: 'var(--foreground)', borderBottom: '1px solid var(--border)' }}>
-              {slot.name}
+              {squad.name}
             </h2>
 
             <ul className="space-y-3">
-              {slot.subslots.map((sub) => {
-                const hasSignup = sub.signups.length > 0;
-                const isFull = sub.signups.length >= sub.maxSignups;
+              {squad.slots.map((slot) => {
+                const hasSignup = slot.signups.length > 0;
+                const isFull = slot.signups.length >= slot.maxSignups;
 
                 return (
-                  <li key={sub.id} className="flex flex-col gap-2">
+                  <li key={slot.id} className="flex flex-col gap-2">
                     <div className="flex justify-between items-start">
-                      <div className="font-medium" style={{ color: 'var(--foreground)' }}>{sub.name}</div>
+                      <div className="font-medium" style={{ color: 'var(--foreground)' }}>{slot.name}</div>
                       <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-                        {sub.signups.length}/{sub.maxSignups}
+                        {slot.signups.length}/{slot.maxSignups}
                         {isFull && <span className="ml-1" style={{ color: '#f59e0b' }}>(Full)</span>}
                       </div>
                     </div>
 
                     {hasSignup ? (
                       <div className="space-y-1 pl-2" style={{ borderLeft: '2px solid var(--primary)' }}>
-                        {sub.signups.map((signup) => {
+                        {slot.signups.map((signup) => {
                           const username = signup.user?.username ?? 'Unknown';
                           const rankAbbr = signup.user?.rankAbbreviation;
                           const displayName = rankAbbr ? `[${rankAbbr}] ${username}` : username;
@@ -342,9 +505,9 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
                                   handleMoveClick(
                                     signup.id,
                                     signup.user?.username ?? 'Unknown',
-                                    sub.id,
-                                    sub.name,
-                                    slot.name
+                                    slot.id,
+                                    slot.name,
+                                    squad.name
                                   )
                                 }
                                 className="px-2 py-0.5 text-xs"
@@ -354,7 +517,7 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
                                 Move
                               </button>
                               <button
-                                onClick={() => handleRemoveSignup(signup.id, sub.id, signup.user?.username || 'Unknown')}
+                                onClick={() => handleRemoveSignup(signup.id, slot.id, signup.user?.username || 'Unknown')}
                                 className="px-2 py-0.5 text-xs"
                                 style={{ color: '#ef4444' }}
                                 title="Remove signup"
@@ -374,73 +537,13 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
               })}
             </ul>
           </article>
-        ))}
+        )))}
       </section>
 
       {/* Radio Frequencies and Extra Intel Section - at bottom */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Radio Frequencies Box */}
-        {((orbat.frequencies && orbat.frequencies.length > 0) || (orbat.tempFrequencies && orbat.tempFrequencies.length > 0)) && (
-          <div className="border rounded-lg p-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
-            <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--foreground)' }}>Radio Frequencies</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-              {/* Combine and sort frequencies by callsign */}
-              {(() => {
-                const allFreqs: any[] = [];
-                
-                // Add saved frequencies
-                if (orbat.frequencies && orbat.frequencies.length > 0) {
-                  orbat.frequencies.forEach((f: any) => {
-                    allFreqs.push({
-                      _id: `saved-${f.radioFrequencyId}`,
-                      callsign: f.radioFrequency?.callsign || 'N/A',
-                      frequency: f.radioFrequency?.frequency,
-                      type: f.radioFrequency?.type,
-                      isAdditional: f.radioFrequency?.isAdditional,
-                      channel: f.radioFrequency?.channel,
-                      isTemp: false,
-                    });
-                  });
-                }
-                
-                // Add temporary frequencies
-                if (Array.isArray(orbat.tempFrequencies) && orbat.tempFrequencies.length > 0) {
-                  orbat.tempFrequencies.forEach((f: any) => {
-                    allFreqs.push({
-                      _id: `temp-${f._id || f.frequency}`,
-                      callsign: f.callsign || 'N/A',
-                      frequency: f.frequency,
-                      type: f.type,
-                      isAdditional: f.isAdditional,
-                      channel: f.channel,
-                      isTemp: true,
-                    });
-                  });
-                }
-
-                // Sort by callsign
-                allFreqs.sort((a, b) => (a.callsign || '').localeCompare(b.callsign || ''));
-
-                return allFreqs.map((freq) => (
-                  <div
-                    key={freq._id}
-                    className="border-l-4 pl-3 py-1"
-                    style={{ borderColor: freq.isTemp ? '#f59e0b' : 'var(--primary)', color: 'var(--foreground)' }}
-                  >
-                    <div className="font-semibold text-sm">
-                      {freq.callsign}
-                      {freq.isTemp && <span className="ml-2 text-xs font-normal" style={{ color: '#f59e0b' }}>(Temp)</span>}
-                    </div>
-                    <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-                      {freq.frequency} · <span style={{ color: 'var(--primary)' }}>{freq.isAdditional ? 'A' : ''}{freq.type}</span>
-                      {freq.channel && ` · ${freq.channel}`}
-                    </div>
-                  </div>
-                ));
-              })()}
-            </div>
-          </div>
-        )}
+        {renderFrequenciesSection(orbat.frequencies, orbat.tempFrequencies)}
 
         {/* Extra Intel Box */}
         {(orbat.iedThreat || orbat.civilianRelationship || orbat.rulesOfEngagement || orbat.airspace || orbat.inGameTimezone || orbat.operationDay) && (

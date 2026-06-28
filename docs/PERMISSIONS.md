@@ -2,7 +2,7 @@
 
 ## Overview
 
-The app uses a granular permission model with **22 permissions** in **7 domains**.
+The app uses a granular permission model with **26 permissions** in **8 domains**.
 
 - Permission values are integers from `0` to `255`
 - `0` means no access
@@ -35,6 +35,12 @@ The app uses a granular permission model with **22 permissions** in **7 domains*
 - `template:edit`
 - `template:delete`
 
+### Subslots (4)
+- `subslot:view`
+- `subslot:create`
+- `subslot:edit`
+- `subslot:delete`
+
 ### Attendance (2)
 - `attendance:view`
 - `attendance:edit`
@@ -46,7 +52,7 @@ The app uses a granular permission model with **22 permissions** in **7 domains*
 - `rank:manage_promotions`
 
 ### System (1)
-- `admin:system`
+- `system:super_admin`
 
 ## Enforcement Model
 

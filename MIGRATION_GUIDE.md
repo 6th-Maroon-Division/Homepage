@@ -39,7 +39,7 @@ npx prisma migrate dev
 ```
 
 **What this does:**
-- Creates `Permission` table (22 permissions)
+- Creates `Permission` table (26 permissions)
 - Creates `UserPermission` table (permission assignments)
 - Creates `PermissionAuditLog` table (audit trail)
 - PermissionAuditLog migration: `20260215033424_add_permission_audit_logs`
@@ -53,9 +53,9 @@ npm run seed:migrate
 ```
 
 **What this does:**
-- Seeds all 22 permissions into database (idempotent)
-- Finds all existing admin users (users with `isAdmin = true`)
-- Grants all 22 permissions with value 255 to each admin
+- Seeds all 26 permissions into database (idempotent)
+- Backfills super-admin access from legacy `isAdmin` users when present
+- Grants full permissions with value 255 to each resolved admin user
 - **Preserves all existing data** (ORBATs, signups, users, etc.)
 - Prints summary of affected admins and database status
 
@@ -66,7 +66,7 @@ npm run seed:migrate
 npm run prisma:studio
 
 # Check:
-# 1. Permission table has 22 records
+# 1. Permission table has 26 records
 # 2. Admin users have UserPermission entries
 # 3. All user/orbat/training data still present
 ```

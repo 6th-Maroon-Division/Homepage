@@ -13,7 +13,7 @@ export async function POST() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   
-  const hasPermission = await checkPermission(session.user.id, 'admin:system');
+  const hasPermission = await checkPermission(session.user.id, 'system:super_admin');
   if (!hasPermission) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }

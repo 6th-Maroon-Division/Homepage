@@ -1,11 +1,17 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { redirect } from 'next/navigation';
+import { checkPermission } from '@/lib/auth-middleware';
 
 export default async function ThemeManagementPage() {
   const session = await getServerSession(authOptions);
 
-  if (!session?.user?.isAdmin) {
+  if (!session?.user?.id) {
+    redirect('/');
+  }
+
+  const hasPermission = await checkPermission(session.user.id, 'system:super_admin');
+  if (!hasPermission) {
     redirect('/');
   }
 

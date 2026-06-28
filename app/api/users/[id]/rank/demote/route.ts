@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
+import { publishUserProfileEvent } from '@/lib/realtime/user-events';
 
 export async function POST(
   request: NextRequest,
@@ -65,6 +66,11 @@ export async function POST(
         outcome: 'approved',
         note: reason || null,
       },
+    });
+
+    publishUserProfileEvent(userId, {
+      source: 'rank.demoted',
+      rankId: rank.id,
     });
 
     return NextResponse.json({ success: true });

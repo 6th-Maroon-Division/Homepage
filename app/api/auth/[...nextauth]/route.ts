@@ -2,6 +2,7 @@ import NextAuth from 'next-auth';
 import type { AuthOptions, Session } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
 import DiscordProvider from 'next-auth/providers/discord';
+import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 
 interface DiscordProfile {
@@ -17,7 +18,6 @@ interface ExtendedJWT extends JWT {
   username?: string | null;
   email?: string | null;
   avatarUrl?: string | null;
-  isAdmin?: boolean;
   createdAt?: Date;
   permissions?: Record<string, number>;
 }
@@ -115,6 +115,25 @@ export const authOptions: AuthOptions = {
             },
           });
         }
+      } else if (provider === 'discord') {
+        const cookieStore = await cookies();
+        const shouldRefreshDiscordProfile = cookieStore.get('discord-avatar-refresh')?.value === '1';
+
+        if (shouldRefreshDiscordProfile) {
+          await prisma.user.update({
+            where: { id: authAccount.user.id },
+            data: {
+              username,
+              email,
+              avatarUrl,
+            },
+          });
+
+          cookieStore.set('discord-avatar-refresh', '', {
+            maxAge: 0,
+            path: '/',
+          });
+        }
       }
 
       return true;
@@ -159,7 +178,6 @@ export const authOptions: AuthOptions = {
           extendedToken.username = authAccount.user.username;
           extendedToken.email = authAccount.user.email ?? null;
           extendedToken.avatarUrl = authAccount.user.avatarUrl;
-          extendedToken.isAdmin = authAccount.user.isAdmin;
           extendedToken.createdAt = authAccount.user.createdAt;
           
           // Fetch user permissions
@@ -184,7 +202,6 @@ export const authOptions: AuthOptions = {
         session.user.username = extendedToken.username ?? null;
         session.user.email = extendedToken.email ?? null;
         session.user.avatarUrl = extendedToken.avatarUrl ?? null;
-        session.user.isAdmin = extendedToken.isAdmin as boolean;
         session.user.createdAt = extendedToken.createdAt as Date;
         session.user.permissions = extendedToken.permissions ?? {};
       }

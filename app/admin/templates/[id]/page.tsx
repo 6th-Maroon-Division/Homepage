@@ -6,16 +6,21 @@ import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 import { usePermission, usePermissionLoading } from '@/app/hooks/usePermissions';
 
-type Subslot = {
+type TemplateSlot = {
   name: string;
   orderIndex: number;
   maxSignups: number;
+  squadRoleId?: number | null;
+  requiredTrainingIds?: number[];
+  requiredRankIds?: number[];
+  requiredTrainingId?: number | null;
+  requiredRankId?: number | null;
 };
 
-type Slot = {
+type TemplateSquad = {
   name: string;
   orderIndex: number;
-  subslots: Subslot[];
+  slots: TemplateSlot[];
 };
 
 interface OrbatTemplate {
@@ -24,7 +29,7 @@ interface OrbatTemplate {
   description: string | null;
   category: string | null;
   tagsJson: string | null;
-  slotsJson: Slot[];
+  slotsJson: TemplateSquad[];
   frequencyIds: number[];
   bluforCountry: string | null;
   bluforRelationship: string | null;
@@ -54,6 +59,24 @@ export default function TemplateEditor() {
   const canEditTemplate = usePermission('template:edit');
   const isPermissionLoading = usePermissionLoading();
   const isReadOnly = !isNewTemplate && !canEditTemplate;
+  const [subslotDefinitions, setSubslotDefinitions] = useState<Array<{
+    id: number;
+    name: string;
+    maxSignups: number;
+    requiredTrainingIds?: number[];
+    requiredRankIds?: number[];
+    requiredTrainings?: Array<{ id: number; name: string }>;
+    requiredRanks?: Array<{ id: number; name: string; abbreviation: string }>;
+    requiredTraining: { id: number; name: string } | null;
+    requiredRank: { id: number; name: string; abbreviation: string } | null;
+    isRetired?: boolean;
+  }>>([]);
+  const [slotSearchBySquad, setSlotSearchBySquad] = useState<Record<number, string>>({});
+  const [selectedDefinitionBySquad, setSelectedDefinitionBySquad] = useState<Record<number, string>>({});
+  const [draggedSlot, setDraggedSlot] = useState<{ squadIndex: number; slotIndex: number } | null>(null);
+  const [dragOverTarget, setDragOverTarget] = useState<{ squadIndex: number; slotIndex: number | null } | null>(null);
+  const [draggedSquadIndex, setDraggedSquadIndex] = useState<number | null>(null);
+  const [dragOverSquadIndex, setDragOverSquadIndex] = useState<number | null>(null);
 
   const [template, setTemplate] = useState<OrbatTemplate>({
     name: '',
@@ -103,6 +126,21 @@ export default function TemplateEditor() {
       fetchTemplate();
     }
   }, [isNewTemplate, params.id, router, showError]);
+
+  useEffect(() => {
+    const fetchSubslotDefinitions = async () => {
+      try {
+        const response = await fetch('/api/subslot-definitions');
+        if (!response.ok) return;
+        const data = await response.json();
+        setSubslotDefinitions(data);
+      } catch (error) {
+        console.error('Error fetching subslot definitions:', error);
+      }
+    };
+
+    fetchSubslotDefinitions();
+  }, []);
 
   useEffect(() => {
     if (isPermissionLoading) {
@@ -160,57 +198,202 @@ export default function TemplateEditor() {
     }
   };
 
-  const addSlot = () => {
-    const newSlot: Slot = {
+  const addSquad = () => {
+    const newSquad: TemplateSquad = {
       name: '',
       orderIndex: template.slotsJson.length,
-      subslots: [],
+      slots: [],
     };
     setTemplate({
       ...template,
-      slotsJson: [...template.slotsJson, newSlot],
+      slotsJson: normalizeOrderIndexes([...template.slotsJson, newSquad]),
     });
   };
 
-  const removeSlot = (index: number) => {
+  const removeSquad = (index: number) => {
     setTemplate({
       ...template,
-      slotsJson: template.slotsJson.filter((_, i) => i !== index),
+      slotsJson: normalizeOrderIndexes(template.slotsJson.filter((_, i) => i !== index)),
     });
   };
 
-  const updateSlot = (index: number, field: keyof Slot, value: string | number) => {
+  const normalizeOrderIndexes = (squads: TemplateSquad[]) =>
+    squads.map((squad, squadIndex) => ({
+      ...squad,
+      orderIndex: squadIndex,
+      slots: squad.slots.map((slot, slotIndex) => ({
+        ...slot,
+        orderIndex: slotIndex,
+      })),
+    }));
+
+  const updateSquad = (index: number, field: keyof TemplateSquad, value: string | number) => {
     const updatedSlots = [...template.slotsJson];
     updatedSlots[index] = { ...updatedSlots[index], [field]: value };
     setTemplate({ ...template, slotsJson: updatedSlots });
   };
 
-  const addSubslot = (slotIndex: number) => {
-    const newSubslot: Subslot = {
-      name: '',
-      orderIndex: template.slotsJson[slotIndex].subslots.length,
-      maxSignups: 1,
-    };
-    const updatedSlots = [...template.slotsJson];
-    updatedSlots[slotIndex].subslots.push(newSubslot);
-    setTemplate({ ...template, slotsJson: updatedSlots });
-  };
+  const addSlotFromDefinition = (squadIndex: number, definitionId: number) => {
+    const definition = subslotDefinitions.find((item) => item.id === definitionId);
+    if (!definition) {
+      showError('Selected role definition was not found');
+      return;
+    }
 
-  const removeSubslot = (slotIndex: number, subslotIndex: number) => {
-    const updatedSlots = [...template.slotsJson];
-    updatedSlots[slotIndex].subslots = updatedSlots[slotIndex].subslots.filter(
-      (_, i) => i !== subslotIndex
+    const alreadyAdded = template.slotsJson[squadIndex].slots.some(
+      (slot) => slot.squadRoleId === definition.id
     );
+
+    if (alreadyAdded) {
+      showError('This slot is already added to the squad');
+      return;
+    }
+
+    const newSlot: TemplateSlot = {
+      name: definition.name,
+      orderIndex: template.slotsJson[squadIndex].slots.length,
+      maxSignups: definition.maxSignups,
+      squadRoleId: definition.id,
+      requiredTrainingIds:
+        definition.requiredTrainingIds && definition.requiredTrainingIds.length > 0
+          ? definition.requiredTrainingIds
+          : definition.requiredTraining
+            ? [definition.requiredTraining.id]
+            : [],
+      requiredRankIds:
+        definition.requiredRankIds && definition.requiredRankIds.length > 0
+          ? definition.requiredRankIds
+          : definition.requiredRank
+            ? [definition.requiredRank.id]
+            : [],
+      requiredTrainingId: definition.requiredTraining?.id ?? null,
+      requiredRankId: definition.requiredRank?.id ?? null,
+    };
+    const updatedSlots = [...template.slotsJson];
+    updatedSlots[squadIndex].slots.push(newSlot);
+    setTemplate({ ...template, slotsJson: normalizeOrderIndexes(updatedSlots) });
+    setSelectedDefinitionBySquad((prev) => ({ ...prev, [squadIndex]: '' }));
+  };
+
+  const updateSlotMaxSignups = (squadIndex: number, slotIndex: number, maxSignups: number) => {
+    const updatedSlots = [...template.slotsJson];
+    updatedSlots[squadIndex].slots[slotIndex] = {
+      ...updatedSlots[squadIndex].slots[slotIndex],
+      maxSignups,
+    };
     setTemplate({ ...template, slotsJson: updatedSlots });
   };
 
-  const updateSubslot = (slotIndex: number, subslotIndex: number, field: keyof Subslot, value: string | number) => {
+  const removeSlot = (squadIndex: number, slotIndex: number) => {
     const updatedSlots = [...template.slotsJson];
-    updatedSlots[slotIndex].subslots[subslotIndex] = {
-      ...updatedSlots[slotIndex].subslots[subslotIndex],
-      [field]: value,
+    updatedSlots[squadIndex].slots = updatedSlots[squadIndex].slots.filter(
+      (_, i) => i !== slotIndex
+    );
+    setTemplate({ ...template, slotsJson: normalizeOrderIndexes(updatedSlots) });
+  };
+
+  const moveSlotByDrag = (
+    fromSquadIndex: number,
+    fromSlotIndex: number,
+    toSquadIndex: number,
+    toSlotIndex: number | null
+  ) => {
+    const nextSquads = [...template.slotsJson];
+    const fromSlots = [...nextSquads[fromSquadIndex].slots];
+    const [movingSlot] = fromSlots.splice(fromSlotIndex, 1);
+
+    if (!movingSlot) return;
+
+    nextSquads[fromSquadIndex] = {
+      ...nextSquads[fromSquadIndex],
+      slots: fromSlots,
     };
-    setTemplate({ ...template, slotsJson: updatedSlots });
+
+    const toSlots = [...nextSquads[toSquadIndex].slots];
+    if (toSlotIndex === null || toSlotIndex >= toSlots.length) {
+      toSlots.push(movingSlot);
+    } else {
+      let insertIndex = toSlotIndex;
+      if (fromSquadIndex === toSquadIndex && fromSlotIndex < toSlotIndex) {
+        insertIndex -= 1;
+      }
+      toSlots.splice(Math.max(0, insertIndex), 0, movingSlot);
+    }
+
+    nextSquads[toSquadIndex] = {
+      ...nextSquads[toSquadIndex],
+      slots: toSlots,
+    };
+
+    setTemplate({ ...template, slotsJson: normalizeOrderIndexes(nextSquads) });
+  };
+
+  const handleSlotDragStart = (squadIndex: number, slotIndex: number) => {
+    setDraggedSlot({ squadIndex, slotIndex });
+  };
+
+  const handleSlotDragEnd = () => {
+    setDraggedSlot(null);
+    setDragOverTarget(null);
+  };
+
+  const handleSlotDrop = (squadIndex: number, slotIndex: number | null) => {
+    if (!draggedSlot) return;
+
+    if (
+      draggedSlot.squadIndex === squadIndex &&
+      slotIndex !== null &&
+      draggedSlot.slotIndex === slotIndex
+    ) {
+      handleSlotDragEnd();
+      return;
+    }
+
+    moveSlotByDrag(draggedSlot.squadIndex, draggedSlot.slotIndex, squadIndex, slotIndex);
+    handleSlotDragEnd();
+  };
+
+  const moveSquadByDrag = (fromSquadIndex: number, toSquadIndex: number | null) => {
+    if (toSquadIndex === null) {
+      return;
+    }
+
+    if (fromSquadIndex === toSquadIndex) {
+      return;
+    }
+
+    const nextSquads = [...template.slotsJson];
+    const [movingSquad] = nextSquads.splice(fromSquadIndex, 1);
+
+    if (!movingSquad) {
+      return;
+    }
+
+    let insertIndex = toSquadIndex;
+    if (fromSquadIndex < toSquadIndex) {
+      insertIndex -= 1;
+    }
+
+    nextSquads.splice(Math.max(0, insertIndex), 0, movingSquad);
+    setTemplate({ ...template, slotsJson: normalizeOrderIndexes(nextSquads) });
+  };
+
+  const handleSquadDragStart = (squadIndex: number) => {
+    setDraggedSquadIndex(squadIndex);
+  };
+
+  const handleSquadDragEnd = () => {
+    setDraggedSquadIndex(null);
+    setDragOverSquadIndex(null);
+  };
+
+  const handleSquadDrop = (squadIndex: number | null) => {
+    if (draggedSquadIndex === null) {
+      return;
+    }
+
+    moveSquadByDrag(draggedSquadIndex, squadIndex);
+    handleSquadDragEnd();
   };
 
   if (isLoading) {
@@ -329,48 +512,72 @@ export default function TemplateEditor() {
             </div>
           </div>
 
-          {/* Slots & Subslots */}
+          {/* Squads & Slots */}
           <div
             className="border rounded-lg p-6"
             style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
           >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold" style={{ color: 'var(--foreground)' }}>
-                Slots & Subslots
+                Squads & Slots
               </h2>
               <button
-                onClick={addSlot}
+                onClick={addSquad}
                 className="px-3 py-1 rounded text-sm font-medium"
                 style={{
                   backgroundColor: 'var(--primary)',
                   color: 'white',
                 }}
               >
-                + Add Slot
+                + Add Squad
               </button>
             </div>
 
             <div className="space-y-4">
               {template.slotsJson.length === 0 ? (
                 <p style={{ color: 'var(--muted-foreground)' }} className="text-center py-4">
-                  No slots yet. Add one to get started.
+                  No squads yet. Add one to get started.
                 </p>
               ) : (
-                template.slotsJson.map((slot, slotIndex) => (
-                  <div
-                    key={slotIndex}
-                    className="border rounded-lg p-4"
-                    style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}
-                  >
+                <>
+                  {template.slotsJson.map((squad, squadIndex) => (
+                    <div
+                      key={squadIndex}
+                      draggable={draggedSlot === null}
+                      onDragStart={() => {
+                        if (draggedSlot) return;
+                        handleSquadDragStart(squadIndex);
+                      }}
+                      onDragEnd={handleSquadDragEnd}
+                      onDragOver={(e) => {
+                        if (draggedSquadIndex === null) return;
+                        e.preventDefault();
+                      }}
+                      onDragEnter={() => {
+                        if (draggedSquadIndex === null) return;
+                        setDragOverSquadIndex(squadIndex);
+                      }}
+                      onDrop={(e) => {
+                        if (draggedSquadIndex === null) return;
+                        e.preventDefault();
+                        handleSquadDrop(squadIndex);
+                      }}
+                      className="border rounded-lg p-4"
+                      style={{
+                        backgroundColor: 'var(--background)',
+                        borderColor: dragOverSquadIndex === squadIndex ? 'var(--primary)' : 'var(--border)',
+                        opacity: draggedSquadIndex === squadIndex ? 0.6 : 1,
+                      }}
+                    >
                     <div className="flex items-end gap-2 mb-4">
                       <div className="flex-1">
                         <label className="block text-sm font-medium mb-1" style={{ color: 'var(--foreground)' }}>
-                          Slot Name
+                          Squad Name
                         </label>
                         <input
                           type="text"
-                          value={slot.name}
-                          onChange={(e) => updateSlot(slotIndex, 'name', e.target.value)}
+                          value={squad.name}
+                          onChange={(e) => updateSquad(squadIndex, 'name', e.target.value)}
                           placeholder="e.g., Platoon 1"
                           className="w-full border rounded px-2 py-1"
                           style={{
@@ -381,7 +588,7 @@ export default function TemplateEditor() {
                         />
                       </div>
                       <button
-                        onClick={() => removeSlot(slotIndex)}
+                        onClick={() => removeSquad(squadIndex)}
                         className="px-3 py-1 rounded text-sm font-medium"
                         style={{
                           backgroundColor: '#dc2626',
@@ -392,67 +599,227 @@ export default function TemplateEditor() {
                       </button>
                     </div>
 
-                    {/* Subslots */}
+                    {/* Slots */}
                     <div className="ml-4 space-y-2 border-l-2 pl-4" style={{ borderColor: 'var(--border)' }}>
-                      {slot.subslots.length === 0 ? (
-                        <p style={{ color: 'var(--muted-foreground)' }} className="text-sm">
-                          No subslots. Add one below.
-                        </p>
+                      <div className="space-y-2 rounded-md border p-3" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--secondary)' }}>
+                        <label className="block text-xs font-medium" style={{ color: 'var(--muted-foreground)' }}>
+                          Search slot by name
+                        </label>
+                        <input
+                          type="text"
+                          value={slotSearchBySquad[squadIndex] || ''}
+                          onChange={(e) =>
+                            setSlotSearchBySquad((prev) => ({ ...prev, [squadIndex]: e.target.value }))
+                          }
+                          className="w-full px-3 py-2 border rounded-md text-sm"
+                          style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                          placeholder="Type to filter slots..."
+                        />
+
+                        <div className="flex gap-2">
+                          <select
+                            value={selectedDefinitionBySquad[squadIndex] || ''}
+                            onChange={(e) =>
+                              setSelectedDefinitionBySquad((prev) => ({ ...prev, [squadIndex]: e.target.value }))
+                            }
+                            className="w-full px-3 py-2 border rounded-md text-sm"
+                            style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                          >
+                            <option value="">Select slot...</option>
+                            {subslotDefinitions
+                              .filter((definition) => {
+                                // Filter out retired roles
+                                if (definition.isRetired) return false;
+                                const searchTerm = (slotSearchBySquad[squadIndex] || '').trim().toLowerCase();
+                                if (!searchTerm) return true;
+                                return definition.name.toLowerCase().includes(searchTerm);
+                              })
+                              .map((definition) => (
+                                <option key={definition.id} value={definition.id}>
+                                  {definition.name}
+                                </option>
+                              ))}
+                          </select>
+
+                          <button
+                            onClick={() => {
+                              const value = selectedDefinitionBySquad[squadIndex];
+                              if (!value) return;
+                              addSlotFromDefinition(squadIndex, Number(value));
+                            }}
+                            className="px-3 py-2 rounded text-xs font-medium"
+                            style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                            disabled={!selectedDefinitionBySquad[squadIndex]}
+                          >
+                            Add
+                          </button>
+                        </div>
+                      </div>
+
+                      {squad.slots.length === 0 ? (
+                        <div
+                          className="text-sm rounded-md border border-dashed px-2 py-2"
+                          style={{
+                            color: 'var(--muted-foreground)',
+                            borderColor:
+                              dragOverTarget?.squadIndex === squadIndex && dragOverTarget?.slotIndex === null
+                                ? 'var(--primary)'
+                                : 'var(--border)',
+                          }}
+                          onDragOver={(e) => {
+                            if (!draggedSlot) return;
+                            e.preventDefault();
+                          }}
+                          onDragEnter={() => {
+                            if (!draggedSlot) return;
+                            setDragOverTarget({ squadIndex, slotIndex: null });
+                          }}
+                          onDrop={(e) => {
+                            if (!draggedSlot) return;
+                            e.preventDefault();
+                            handleSlotDrop(squadIndex, null);
+                          }}
+                        >
+                          No slots. Add one below.
+                        </div>
                       ) : (
-                        slot.subslots.map((subslot, subslotIndex) => (
-                          <div key={subslotIndex} className="flex items-end gap-2">
-                            <input
-                              type="text"
-                              value={subslot.name}
-                              onChange={(e) =>
-                                updateSubslot(slotIndex, subslotIndex, 'name', e.target.value)
-                              }
-                              placeholder="Subslot name"
-                              className="flex-1 border rounded px-2 py-1 text-sm"
+                        <>
+                          {squad.slots.map((slot, slotIndex) => (
+                          <div
+                            key={slotIndex}
+                            draggable
+                            onDragStart={(e) => {
+                              e.stopPropagation();
+                              handleSlotDragStart(squadIndex, slotIndex);
+                            }}
+                            onDragEnd={(e) => {
+                              e.stopPropagation();
+                              handleSlotDragEnd();
+                            }}
+                            onDragOver={(e) => {
+                              if (!draggedSlot) return;
+                              e.preventDefault();
+                            }}
+                            onDragEnter={() => {
+                              if (!draggedSlot) return;
+                              setDragOverTarget({ squadIndex, slotIndex });
+                            }}
+                            onDrop={(e) => {
+                              if (!draggedSlot) return;
+                              e.preventDefault();
+                              handleSlotDrop(squadIndex, slotIndex);
+                            }}
+                            className="cursor-move rounded"
+                            style={{
+                              outline:
+                                dragOverTarget?.squadIndex === squadIndex && dragOverTarget?.slotIndex === slotIndex
+                                  ? '1px solid var(--primary)'
+                                  : 'none',
+                              opacity:
+                                draggedSlot?.squadIndex === squadIndex && draggedSlot?.slotIndex === slotIndex
+                                  ? 0.6
+                                  : 1,
+                            }}
+                          >
+                            <div
+                              className="border rounded px-3 py-2 space-y-2"
                               style={{
                                 backgroundColor: 'var(--background)',
                                 borderColor: 'var(--border)',
                                 color: 'var(--foreground)',
-                              }}
-                            />
-                            <input
-                              type="number"
-                              min="1"
-                              value={subslot.maxSignups}
-                              onChange={(e) =>
-                                updateSubslot(slotIndex, subslotIndex, 'maxSignups', parseInt(e.target.value) || 1)
-                              }
-                              className="w-16 border rounded px-2 py-1 text-sm"
-                              style={{
-                                backgroundColor: 'var(--background)',
-                                borderColor: 'var(--border)',
-                                color: 'var(--foreground)',
-                              }}
-                            />
-                            <button
-                              onClick={() => removeSubslot(slotIndex, subslotIndex)}
-                              className="px-2 py-1 rounded text-xs font-medium"
-                              style={{
-                                backgroundColor: '#dc2626',
-                                color: 'white',
                               }}
                             >
-                              Delete
-                            </button>
+                              <div className="font-medium text-sm">{slot.name}</div>
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  <label className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                                    Max signups:
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={slot.maxSignups}
+                                    onChange={(e) => updateSlotMaxSignups(squadIndex, slotIndex, parseInt(e.target.value) || 1)}
+                                    className="w-20 border rounded px-2 py-1 text-xs"
+                                    style={{
+                                      backgroundColor: 'var(--background)',
+                                      borderColor: 'var(--border)',
+                                      color: 'var(--foreground)',
+                                    }}
+                                  />
+                                </div>
+                                <button
+                                  onClick={() => removeSlot(squadIndex, slotIndex)}
+                                  className="px-2 py-1 rounded text-xs font-medium"
+                                  style={{
+                                    backgroundColor: '#dc2626',
+                                    color: 'white',
+                                  }}
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
                           </div>
-                        ))
-                      )}
+                          ))}
 
-                      <button
-                        onClick={() => addSubslot(slotIndex)}
-                        className="mt-2 text-sm"
-                        style={{ color: 'var(--primary)' }}
-                      >
-                        + Add Subslot
-                      </button>
+                          <div
+                            className="rounded-md border border-dashed px-2 py-2 text-xs"
+                            style={{
+                              color: 'var(--muted-foreground)',
+                              borderColor:
+                                dragOverTarget?.squadIndex === squadIndex && dragOverTarget?.slotIndex === null
+                                  ? 'var(--primary)'
+                                  : 'var(--border)',
+                            }}
+                            onDragOver={(e) => {
+                              if (!draggedSlot) return;
+                              e.preventDefault();
+                            }}
+                            onDragEnter={() => {
+                              if (!draggedSlot) return;
+                              setDragOverTarget({ squadIndex, slotIndex: null });
+                            }}
+                            onDrop={(e) => {
+                              if (!draggedSlot) return;
+                              e.preventDefault();
+                              handleSlotDrop(squadIndex, null);
+                            }}
+                          >
+                            Drag here to move slot to end of this squad
+                          </div>
+                        </>
+                      )}
                     </div>
+                    </div>
+                  ))}
+
+                  <div
+                    className="rounded-lg border border-dashed px-3 py-6 text-sm"
+                    style={{
+                      color: 'var(--muted-foreground)',
+                      borderColor:
+                        dragOverSquadIndex === template.slotsJson.length
+                          ? 'var(--primary)'
+                          : 'var(--border)',
+                    }}
+                    onDragOver={(e) => {
+                      if (draggedSquadIndex === null) return;
+                      e.preventDefault();
+                    }}
+                    onDragEnter={() => {
+                      if (draggedSquadIndex === null) return;
+                      setDragOverSquadIndex(template.slotsJson.length);
+                    }}
+                    onDrop={(e) => {
+                      if (draggedSquadIndex === null) return;
+                      e.preventDefault();
+                      handleSquadDrop(template.slotsJson.length);
+                    }}
+                  >
+                    Drag here to move squad to end
                   </div>
-                ))
+                </>
               )}
             </div>
           </div>

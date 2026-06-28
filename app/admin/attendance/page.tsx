@@ -17,7 +17,8 @@ export default async function AdminAttendancePage() {
     checkPermission(session.user.id, 'attendance:view'),
     checkPermission(session.user.id, 'attendance:edit'),
   ]);
-  const hasPermission = session.user.isAdmin || canViewAttendance || canEditAttendance;
+  const hasSuperAdmin = (session.user.permissions?.['system:super_admin'] ?? 0) > 0;
+  const hasPermission = hasSuperAdmin || canViewAttendance || canEditAttendance;
   
   if (!hasPermission) {
     redirect('/admin');

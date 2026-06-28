@@ -32,6 +32,7 @@ export default function PendingPromotionsClient() {
   const { showSuccess, showError } = useToast();
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isStreamConnected, setIsStreamConnected] = useState(false);
   const [isActing, setIsActing] = useState(false);
   const [isRunningAutoRankup, setIsRunningAutoRankup] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -56,11 +57,39 @@ export default function PendingPromotionsClient() {
   }, [fetchProposals]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetchProposals();
-    }, 30000);
-    return () => clearInterval(interval);
+    const source = new EventSource('/api/ranks/promotions/events');
+
+    source.onopen = () => {
+      setIsStreamConnected(true);
+      void fetchProposals();
+    };
+
+    source.onmessage = () => {
+      setIsStreamConnected(true);
+      void fetchProposals();
+    };
+
+    source.onerror = () => {
+      setIsStreamConnected(false);
+    };
+
+    return () => {
+      source.close();
+      setIsStreamConnected(false);
+    };
   }, [fetchProposals]);
+
+  useEffect(() => {
+    if (isStreamConnected) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      void fetchProposals();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [isStreamConnected, fetchProposals]);
 
   const selectedCount = selected.size;
 

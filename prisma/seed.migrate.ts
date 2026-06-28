@@ -13,19 +13,54 @@ async function main() {
   // --- Seed Permissions (idempotent, won't overwrite existing) ---
   await seedPermissions();
 
-  // --- Grant permissions to all existing admins ---
-  console.log('🔐 Granting permissions to existing admin users...');
-  
-  const adminUsers = await prisma.user.findMany({
-    where: { isAdmin: true },
-  });
+  // --- Grant permissions to existing super-admin users ---
+  console.log('🔐 Granting permissions to super-admin users...');
 
-  for (const admin of adminUsers) {
-    console.log(`   > Granting permissions to ${admin.username} (ID: ${admin.id})`);
-    await grantAdminPermissions(admin.id);
+  const hasIsAdminColumn = await prisma.$queryRawUnsafe<Array<{ exists: boolean }>>(`
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_name = 'User' AND column_name = 'isAdmin'
+    ) AS "exists"
+  `);
+
+  const adminUserIds = new Set<number>();
+
+  if (hasIsAdminColumn[0]?.exists) {
+    const legacyAdmins = await prisma.$queryRawUnsafe<Array<{ id: number; username: string | null }>>(
+      'SELECT "id", "username" FROM "User" WHERE "isAdmin" = true'
+    );
+    for (const admin of legacyAdmins) {
+      adminUserIds.add(admin.id);
+      console.log(`   > Legacy admin detected: ${admin.username ?? 'Unknown'} (ID: ${admin.id})`);
+    }
   }
 
-  console.log(`✅ Granted permissions to ${adminUsers.length} admin user(s)`);
+  const permissionAdmins = await prisma.userPermission.findMany({
+    where: {
+      value: { gt: 0 },
+      permission: { key: 'system:super_admin' },
+    },
+    select: { userId: true },
+  });
+
+  for (const admin of permissionAdmins) {
+    adminUserIds.add(admin.userId);
+  }
+
+  if (adminUserIds.size === 0) {
+    const firstUser = await prisma.user.findFirst({ orderBy: { id: 'asc' } });
+    if (firstUser) {
+      adminUserIds.add(firstUser.id);
+      console.log(`   > Bootstrap super-admin fallback: ${firstUser.username ?? 'Unknown'} (ID: ${firstUser.id})`);
+    }
+  }
+
+  for (const adminUserId of adminUserIds) {
+    await grantAdminPermissions(adminUserId);
+  }
+
+  console.log(`✅ Granted permissions to ${adminUserIds.size} admin user(s)`);
 
   // --- Summary ---
   const permissionCount = await prisma.permission.count();

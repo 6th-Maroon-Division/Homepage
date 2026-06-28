@@ -27,11 +27,8 @@ interface AttendanceRecord {
       id: number;
       username: string;
     };
-    subslot: {
-      name: string;
-      slot: {
-        name: string;
-      };
+    slot: {
+      name?: string;
     };
   };
   logs: Array<{

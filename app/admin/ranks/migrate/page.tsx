@@ -4,11 +4,17 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import RankMigrationWizard from '@/app/admin/components/ranks/RankMigrationWizard';
+import { checkPermission } from '@/lib/auth-middleware';
 
 export default async function RankMigrationPage() {
   const session = await getServerSession(authOptions);
 
-  if (!session?.user?.isAdmin) {
+  if (!session?.user?.id) {
+    redirect('/');
+  }
+
+  const hasPermission = await checkPermission(session.user.id, 'system:super_admin');
+  if (!hasPermission) {
     redirect('/');
   }
 

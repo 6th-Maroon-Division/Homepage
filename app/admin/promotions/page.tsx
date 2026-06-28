@@ -12,7 +12,9 @@ export default async function PendingPromotionsPage() {
   }
   
   // Check if user has promotion management permission
-  const hasPermission = session.user.isAdmin || await checkPermission(session.user.id, 'rank:manage_promotions');
+  const hasPermission =
+    (session.user.permissions?.['system:super_admin'] ?? 0) > 0 ||
+    await checkPermission(session.user.id, 'rank:manage_promotions');
   
   if (!hasPermission) {
     redirect('/admin');

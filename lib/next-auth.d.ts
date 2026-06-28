@@ -9,7 +9,6 @@ declare module "next-auth" {
       username: string | null;
       email: string | null;
       avatarUrl: string | null;
-      isAdmin: boolean;
       createdAt: Date;
       permissions: Record<string, number>; // Permission key -> value (0-255)
     } & DefaultSession["user"];
@@ -22,7 +21,6 @@ declare module "next-auth/jwt" {
     username?: string | null;
     email?: string | null;
     avatarUrl?: string | null;
-    isAdmin?: boolean;
     createdAt?: Date;
     permissions?: Record<string, number>;
   }
