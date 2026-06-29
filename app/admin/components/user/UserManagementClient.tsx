@@ -561,13 +561,23 @@ export default function UserManagementClient({
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
                         {user.avatarUrl && (
-                          <Image
-                            src={user.avatarUrl}
-                            alt={user.username || 'User'}
-                            width={32}
-                            height={32}
-                            className="rounded-full"
-                          />
+                          user.avatarUrl.startsWith('data:') ? (
+                            <img
+                              src={user.avatarUrl}
+                              alt={user.username || 'User'}
+                              width={32}
+                              height={32}
+                              className="rounded-full"
+                            />
+                          ) : (
+                            <Image
+                              src={user.avatarUrl}
+                              alt={user.username || 'User'}
+                              width={32}
+                              height={32}
+                              className="rounded-full"
+                            />
+                          )
                         )}
                         <div>
                           <Link

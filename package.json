@@ -14,6 +14,7 @@
     "seed:dev": "tsx prisma/seed.dev.ts",
     "seed:prod": "tsx prisma/seed.prod.ts",
     "seed:migrate": "tsx prisma/seed.migrate.ts",
+    "avatars:migrate": "tsx scripts/migrate-data-urls.ts",
     "test:permissions": "tsx --test tests/*permissions*.test.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
@@ -29,7 +30,8 @@
     "next-auth": "^4.24.14",
     "pg": "^8.22.0",
     "react": "19.2.7",
-    "react-dom": "19.2.7"
+    "react-dom": "19.2.7",
+    "uuid": "^14.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

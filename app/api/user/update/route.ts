@@ -13,6 +13,13 @@ export async function POST(req: NextRequest) {
 
     const { username, email, avatarUrl } = await req.json();
 
+    // Reject data URLs - they should use the dedicated upload endpoint
+    if (avatarUrl && avatarUrl.startsWith('data:')) {
+      return NextResponse.json({ 
+        error: 'Data URLs not supported. Please use the dedicated avatar upload endpoint.' 
+      }, { status: 400 });
+    }
+
     // Update user in database
     const updatedUser = await prisma.user.update({
       where: { id: session.user.id },

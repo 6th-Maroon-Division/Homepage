@@ -1704,6 +1704,334 @@ paths:
         '500':
           description: Internal server error
 
+  /bot/promotions/pending:
+    get:
+      tags: [Bot, Ranks]
+      summary: Get pending promotions
+      description: |
+        Returns a list of pending promotion proposals that the bot can approve or decline.
+        Includes user details, current rank, proposed rank, and proposal reason.
+      security:
+        - apiKey: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+          description: Maximum number of promotions to return
+      responses:
+        '200':
+          description: List of pending promotions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  pendingPromotions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 123
+                        userId:
+                          type: integer
+                          example: 42
+                        username:
+                          type: string
+                          example: "Soldier_John"
+                        discordId:
+                          type: string
+                          nullable: true
+                          example: "123456789012345678"
+                        steamId:
+                          type: string
+                          nullable: true
+                          example: "76561198000000000"
+                        currentRank:
+                          type: object
+                          nullable: true
+                          properties:
+                            id:
+                              type: integer
+                            name:
+                              type: string
+                            abbreviation:
+                              type: string
+                        proposedRank:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            name:
+                              type: string
+                            abbreviation:
+                              type: string
+                        proposedById:
+                          type: integer
+                          nullable: true
+                        proposedByUsername:
+                          type: string
+                          nullable: true
+                        reason:
+                          type: string
+                          nullable: true
+                        createdAt:
+                          type: string
+                          format: date-time
+                          example: "2024-01-15T10:00:00.000Z"
+                  total:
+                    type: integer
+                    example: 5
+        '401':
+          description: Unauthorized - invalid or missing bot API token
+        '500':
+          description: Internal server error
+
+  /bot/promotions/{id}/approve:
+    post:
+      tags: [Bot, Ranks]
+      summary: Approve a promotion
+      description: |
+        Approves a pending promotion proposal and updates the user's rank.
+        Also creates a rank history entry and sends a notification message to the user.
+      security:
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID of the promotion proposal to approve
+      responses:
+        '200':
+          description: Promotion approved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Promotion approved"
+                  promotionId:
+                    type: integer
+                    example: 123
+                  userId:
+                    type: integer
+                    example: 42
+                  username:
+                    type: string
+                    example: "Soldier_John"
+                  discordId:
+                    type: string
+                    nullable: true
+                    example: "123456789012345678"
+                  previousRank:
+                    type: object
+                    nullable: true
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      abbreviation:
+                        type: string
+                  newRank:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      abbreviation:
+                        type: string
+        '400':
+          description: Invalid promotion ID or promotion already processed
+        '401':
+          description: Unauthorized - invalid or missing bot API token
+        '404':
+          description: Promotion not found
+        '500':
+          description: Internal server error
+
+  /bot/promotions/{id}/decline:
+    post:
+      tags: [Bot, Ranks]
+      summary: Decline a promotion
+      description: |
+        Declines a pending promotion proposal and optionally records a reason.
+        Sends a notification message to the user informing them of the decline.
+      security:
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID of the promotion proposal to decline
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: Optional reason for declining the promotion
+                  example: "Insufficient attendance"
+      responses:
+        '200':
+          description: Promotion declined successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Promotion declined"
+                  promotionId:
+                    type: integer
+                    example: 123
+                  userId:
+                    type: integer
+                    example: 42
+                  username:
+                    type: string
+                    example: "Soldier_John"
+                  discordId:
+                    type: string
+                    nullable: true
+                    example: "123456789012345678"
+                  proposedRank:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      abbreviation:
+                        type: string
+                  reason:
+                    type: string
+                    nullable: true
+                    example: "Insufficient attendance"
+        '400':
+          description: Invalid promotion ID or promotion already processed
+        '401':
+          description: Unauthorized - invalid or missing bot API token
+        '404':
+          description: Promotion not found
+        '500':
+          description: Internal server error
+
+  /bot/promotions/auto:
+    get:
+      tags: [Bot, Ranks]
+      summary: Get recent auto-promotions
+      description: |
+        Returns a list of users who were automatically promoted within a specified timeframe.
+        Useful for the bot to announce promotions in Discord.
+      security:
+        - apiKey: []
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 7
+          description: Number of days to look back for auto-promotions
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+          description: Maximum number of auto-promotions to return
+      responses:
+        '200':
+          description: List of recent auto-promotions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  autoPromotions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 456
+                        userId:
+                          type: integer
+                          example: 42
+                        username:
+                          type: string
+                          example: "Soldier_John"
+                        discordId:
+                          type: string
+                          nullable: true
+                          example: "123456789012345678"
+                        steamId:
+                          type: string
+                          nullable: true
+                          example: "76561198000000000"
+                        previousRank:
+                          type: object
+                          nullable: true
+                          properties:
+                            id:
+                              type: integer
+                            name:
+                              type: string
+                            abbreviation:
+                              type: string
+                        newRank:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            name:
+                              type: string
+                            abbreviation:
+                              type: string
+                        changedAt:
+                          type: string
+                          format: date-time
+                          example: "2024-01-15T10:00:00.000Z"
+                        reason:
+                          type: string
+                          nullable: true
+                  total:
+                    type: integer
+                    example: 10
+                  daysBack:
+                    type: integer
+                    example: 7
+        '401':
+          description: Unauthorized - invalid or missing bot API token
+        '500':
+          description: Internal server error
+
   /bot/attendance/compile:
     post:
       tags: [Bot, Attendance]

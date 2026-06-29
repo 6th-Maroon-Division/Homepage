@@ -5,6 +5,65 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const hasPermission = await checkPermission(session.user.id, 'user:manage');
+    if (!hasPermission) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const { id } = await params;
+    const userId = parseInt(id);
+
+    if (isNaN(userId)) {
+      return NextResponse.json({ error: 'Invalid user ID' }, { status: 400 });
+    }
+
+    // Prevent self-modification
+    if (userId === session.user.id) {
+      return NextResponse.json(
+        { error: 'Cannot modify your own account' },
+        { status: 400 }
+      );
+    }
+
+    const body = await request.json();
+    const { avatarUrl } = body;
+
+    // Check if user exists
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Update avatar
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { avatarUrl: avatarUrl },
+    });
+
+    return NextResponse.json({
+      success: true,
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error('Error updating user:', error);
+    return NextResponse.json({ error: 'Failed to update user' }, { status: 500 });
+  }
+}
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

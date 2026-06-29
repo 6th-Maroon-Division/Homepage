@@ -125,7 +125,6 @@ export default async function UserDetailPage({
       prisma.attendance.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
-        take: 15,
         include: {
           orbat: {
             select: {
@@ -252,7 +251,6 @@ export default async function UserDetailPage({
           },
         },
         orderBy: { name: 'asc' },
-        take: 12,
         select: {
           id: true,
           name: true,
