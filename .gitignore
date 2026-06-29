@@ -62,3 +62,6 @@ Thumbs.db
 # local development
 *.local
 .env
+
+# uploaded files
+/public/uploads/

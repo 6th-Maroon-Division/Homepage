@@ -985,6 +985,15 @@ export default function UserSelfDetailClient({ user, attendance, availableTraini
                 }
 
                 const maxBytes = 2 * 1024 * 1024;
+                const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                
+                if (!allowedTypes.includes(file.type)) {
+                  showError('Invalid file type. Allowed: JPEG, PNG, GIF, WebP');
+                  event.currentTarget.value = '';
+                  setSelectedAvatarFileName(null);
+                  return;
+                }
+
                 if (file.size > maxBytes) {
                   showError('Image must be 2MB or smaller');
                   event.currentTarget.value = '';
@@ -992,6 +1001,7 @@ export default function UserSelfDetailClient({ user, attendance, availableTraini
                   return;
                 }
 
+                // Create preview using FileReader
                 const reader = new FileReader();
                 reader.onload = () => {
                   const result = typeof reader.result === 'string' ? reader.result : null;
@@ -1009,7 +1019,7 @@ export default function UserSelfDetailClient({ user, attendance, availableTraini
               }}
             />
             <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-              {selectedAvatarFileName ? `Selected: ${selectedAvatarFileName}` : 'Choose an image file (max 2MB)'}
+              {selectedAvatarFileName ? `Selected: ${selectedAvatarFileName}` : 'Choose an image file (JPEG, PNG, GIF, WebP - max 2MB)'}
             </p>
             <div className="flex gap-2">
               <button
@@ -1017,26 +1027,37 @@ export default function UserSelfDetailClient({ user, attendance, availableTraini
                 onClick={async () => {
                   setIsSavingAvatar(true);
                   try {
-                    const response = await fetch('/api/user/update', {
+                    const fileInput = avatarFileInputRef.current;
+                    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+                      throw new Error('No file selected');
+                    }
+
+                    const file = fileInput.files[0];
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    const response = await fetch('/api/user/avatar/upload', {
                       method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ avatarUrl: profileImageUrl.trim() || null }),
+                      body: formData,
                     });
 
                     if (!response.ok) {
                       const data = await response.json().catch(() => ({}));
-                      throw new Error(data.error || 'Failed to update profile picture');
+                      throw new Error(data.error || 'Failed to upload profile picture');
                     }
 
+                    const result = await response.json();
+                    
                     showSuccess('Profile picture updated');
                     await updateSession();
                     if (avatarFileInputRef.current) {
                       avatarFileInputRef.current.value = '';
                     }
                     setSelectedAvatarFileName(null);
+                    setProfileImageUrl(result.avatarUrl || '');
                     router.refresh();
                   } catch (error) {
-                    showError(error instanceof Error ? error.message : 'Failed to update profile picture');
+                    showError(error instanceof Error ? error.message : 'Failed to upload profile picture');
                   } finally {
                     setIsSavingAvatar(false);
                   }
@@ -1132,6 +1153,48 @@ export default function UserSelfDetailClient({ user, attendance, availableTraini
               </button>
             </div>
 
+            {profileImageUrl?.startsWith('data:') && (
+              <div className="mt-3 p-3 rounded border" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--muted)' }}>
+                <p className="text-sm mb-2" style={{ color: 'var(--foreground)' }}>
+                  <strong>Note:</strong> Your current avatar is stored as a data URL. 
+                  Consider uploading a new image to use the more efficient file storage.
+                </p>
+                <button
+                  disabled={isSavingAvatar}
+                  onClick={async () => {
+                    setIsSavingAvatar(true);
+                    try {
+                      const response = await fetch('/api/user/avatar/migrate', {
+                        method: 'POST',
+                      });
+
+                      if (!response.ok) {
+                        const data = await response.json().catch(() => ({}));
+                        throw new Error(data.error || 'Failed to migrate avatar');
+                      }
+
+                      const result = await response.json();
+                      if (result.migrated) {
+                        showSuccess('Avatar migrated to file storage');
+                        setProfileImageUrl(result.newAvatarUrl || '');
+                        await updateSession();
+                        router.refresh();
+                      } else {
+                        showSuccess(result.message || 'Avatar is already using file storage');
+                      }
+                    } catch (error) {
+                      showError(error instanceof Error ? error.message : 'Failed to migrate avatar');
+                    } finally {
+                      setIsSavingAvatar(false);
+                    }
+                  }}
+                  className="px-3 py-2 rounded text-sm font-medium disabled:opacity-50"
+                  style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                >
+                  {isSavingAvatar ? 'Migrating…' : 'Migrate to File Storage'}
+                </button>
+              </div>
+            )}
             <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
               Refresh buttons require linked provider accounts.
             </p>

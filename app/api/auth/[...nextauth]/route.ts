@@ -17,7 +17,6 @@ interface ExtendedJWT extends JWT {
   id?: number;
   username?: string | null;
   email?: string | null;
-  avatarUrl?: string | null;
   createdAt?: Date;
   permissions?: Record<string, number>;
 }
@@ -177,7 +176,8 @@ export const authOptions: AuthOptions = {
           extendedToken.id = authAccount.user.id;
           extendedToken.username = authAccount.user.username;
           extendedToken.email = authAccount.user.email ?? null;
-          extendedToken.avatarUrl = authAccount.user.avatarUrl;
+          // Don't store avatarUrl in JWT - it can be very large (data URLs)
+          // The client will fetch it separately when needed
           extendedToken.createdAt = authAccount.user.createdAt;
           
           // Fetch user permissions
@@ -201,7 +201,7 @@ export const authOptions: AuthOptions = {
         session.user.id = extendedToken.id as number;
         session.user.username = extendedToken.username ?? null;
         session.user.email = extendedToken.email ?? null;
-        session.user.avatarUrl = extendedToken.avatarUrl ?? null;
+        // Don't include avatarUrl in session - it's fetched separately
         session.user.createdAt = extendedToken.createdAt as Date;
         session.user.permissions = extendedToken.permissions ?? {};
       }

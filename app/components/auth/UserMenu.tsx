@@ -8,7 +8,26 @@ import Image from 'next/image';
 export default function UserMenu() {
   const { data: session } = useSession();
   const [isOpen, setIsOpen] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Fetch avatar URL from database (not stored in session to avoid JWT size issues)
+  useEffect(() => {
+    if (session?.user?.id) {
+      const fetchAvatar = async () => {
+        try {
+          const response = await fetch('/api/user/current');
+          if (response.ok) {
+            const data = await response.json();
+            setAvatarUrl(data.avatarUrl || null);
+          }
+        } catch (error) {
+          console.error('Failed to fetch avatar:', error);
+        }
+      };
+      fetchAvatar();
+    }
+  }, [session?.user?.id]);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -37,9 +56,9 @@ export default function UserMenu() {
         className="flex items-center space-x-2 px-3 py-2 rounded-md transition-colors"
         style={{ backgroundColor: 'var(--secondary)', color: 'var(--foreground)', border: '1px solid var(--border)' }}
       >
-        {session.user?.avatarUrl && (
+        {avatarUrl && (
           <Image
-            src={session.user.avatarUrl}
+            src={avatarUrl}
             alt="User avatar"
             width={32}
             height={32}

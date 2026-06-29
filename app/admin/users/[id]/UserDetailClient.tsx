@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/components/ui/ToastContainer';
 
@@ -183,6 +184,7 @@ export default function UserDetailClient({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isPromoting, setIsPromoting] = useState(false);
   const [isDemoting, setIsDemoting] = useState(false);
+  const [isClearingAvatar, setIsClearingAvatar] = useState(false);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleDelete = async () => {
@@ -203,6 +205,30 @@ export default function UserDetailClient({
     } catch (error) {
       showError(error instanceof Error ? error.message : 'Failed to delete user');
       setIsDeleting(false);
+    }
+  };
+
+  const handleClearAvatar = async () => {
+    if (!canViewActions || isClearingAvatar) return;
+    const confirmed = window.confirm(`Clear ${user.username || 'this user'}'s avatar?`);
+    if (!confirmed) return;
+
+    setIsClearingAvatar(true);
+    try {
+      const res = await fetch(`/api/users/${user.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatarUrl: null }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to clear avatar');
+      }
+      showSuccess('Avatar cleared successfully');
+      router.refresh();
+    } catch (error) {
+      showError(error instanceof Error ? error.message : 'Failed to clear avatar');
+      setIsClearingAvatar(false);
     }
   };
 
@@ -236,16 +262,37 @@ export default function UserDetailClient({
         style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
       >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold" style={{ color: 'var(--foreground)' }}>
-              {user.username || 'Unknown User'}
-            </h1>
+          <div className="flex items-center gap-3">
+            {user.avatarUrl && (
+              user.avatarUrl.startsWith('data:') ? (
+                <img
+                  src={user.avatarUrl}
+                  alt={user.username || 'User'}
+                  width={48}
+                  height={48}
+                  className="rounded-full"
+                />
+              ) : (
+                <Image
+                  src={user.avatarUrl}
+                  alt={user.username || 'User'}
+                  width={48}
+                  height={48}
+                  className="rounded-full"
+                />
+              )
+            )}
+            <div>
+              <h1 className="text-2xl font-bold" style={{ color: 'var(--foreground)' }}>
+                {user.username || 'Unknown User'}
+              </h1>
             <p className="text-sm mt-1" style={{ color: 'var(--muted-foreground)' }}>
               ID: {user.id} • Joined {new Date(user.createdAt).toLocaleDateString('en-GB')}
             </p>
             <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
               {user.email || 'No email'}
             </p>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="rounded border px-3 py-2" style={{ borderColor: 'var(--border)' }}>
@@ -449,8 +496,14 @@ export default function UserDetailClient({
                           };
 
                           setTrainingRows((prev) => [createdRow, ...prev]);
-                          setAvailableTrainingRows((prev) => prev.filter((training) => training.id !== selectedTrainingId));
+                          
+                          // Compute new available trainings by removing the assigned one
+                          const newAvailableTrainings = availableTrainingRows.filter((training) => training.id !== selectedTrainingId);
+                          setAvailableTrainingRows(newAvailableTrainings);
                           setTrainingNotes('');
+                          
+                          // Reset selected training to the first available, or 0 if none left
+                          setSelectedTrainingId(newAvailableTrainings.length > 0 ? newAvailableTrainings[0].id : 0);
                           showSuccess('Training assigned');
                           router.refresh();
                         } catch (error) {
@@ -857,18 +910,32 @@ export default function UserDetailClient({
           )}
 
           <h3 className="font-semibold mb-3" style={{ color: 'var(--foreground)' }}>Danger Zone</h3>
-          <button
-            onClick={handleDelete}
-            disabled={isDeleting}
-            className="px-4 py-2 rounded text-sm font-medium"
-            style={{
-              backgroundColor: 'var(--destructive)',
-              color: 'var(--destructive-foreground)',
-              opacity: isDeleting ? 0.7 : 1,
-            }}
-          >
-            {isDeleting ? 'Deleting...' : 'Delete User'}
-          </button>
+          <div className="space-y-2">
+            <button
+              onClick={handleClearAvatar}
+              disabled={isClearingAvatar || isSelfUser}
+              className="px-4 py-2 rounded text-sm font-medium w-full"
+              style={{
+                backgroundColor: 'var(--destructive)',
+                color: 'var(--destructive-foreground)',
+                opacity: (isClearingAvatar || isSelfUser) ? 0.7 : 1,
+              }}
+            >
+              {isClearingAvatar ? 'Clearing...' : 'Clear Avatar'}
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="px-4 py-2 rounded text-sm font-medium w-full"
+              style={{
+                backgroundColor: 'var(--destructive)',
+                color: 'var(--destructive-foreground)',
+                opacity: isDeleting ? 0.7 : 1,
+              }}
+            >
+              {isDeleting ? 'Deleting...' : 'Delete User'}
+            </button>
+          </div>
         </div>
       )}
     </div>
