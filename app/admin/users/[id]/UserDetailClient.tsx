@@ -455,6 +455,9 @@ export default function UserDetailClient({
                         color: 'var(--foreground)',
                       }}
                     >
+                      <option value={0} disabled>
+                        Select a training...
+                      </option>
                       {availableTrainingRows.map((training) => (
                         <option key={training.id} value={training.id}>
                           {training.name}
