@@ -82,9 +82,12 @@ export async function POST(request: NextRequest) {
       orderBy: { eventTime: 'asc' },
     });
 
-    // Group events by user
+    // Group events by user (only include events with a userId)
     const userEvents: Record<number, { joins: Date[]; leaves: Date[] }> = {};
     for (const event of events) {
+      // Skip events that haven't been matched to a user yet (processed = false, userId = null)
+      if (!event.userId) continue;
+      
       if (!userEvents[event.userId]) {
         userEvents[event.userId] = { joins: [], leaves: [] };
       }

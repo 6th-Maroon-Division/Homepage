@@ -1,10 +1,13 @@
 import { prisma } from './prisma';
 
 /**
- * Processes pending attendance events for a newly created user
- * Looks up pending events by Steam ID or Discord ID and converts them to regular attendance events
- * @param steamId - Optional Steam ID to match pending events
- * @param discordId - Optional Discord ID to match pending events
+ * Processes unprocessed attendance events for a newly created user
+ * Looks up AttendanceEvent records with matching steamId or discordId that have processed=false
+ * and links them to the user, then marks them as processed.
+ * Also handles duplicate events (join-join, leave-leave) by only keeping the first.
+ * 
+ * @param steamId - Optional Steam ID to match unprocessed events
+ * @param discordId - Optional Discord ID to match unprocessed events
  * @param userId - The new user's ID to link events to
  */
 export async function processPendingEventsForUser(
@@ -17,51 +20,58 @@ export async function processPendingEventsForUser(
   }
 
   try {
-    // Find pending events matching either steamId or discordId
-    const pendingEvents = await prisma.pendingAttendanceEvent.findMany({
+    // Find unprocessed events matching either steamId or discordId
+    const unprocessedEvents = await prisma.attendanceEvent.findMany({
       where: {
         OR: [
-          steamId ? { steamId } : {},
-          discordId ? { discordId } : {},
+          steamId ? { steamId, processed: false } : {},
+          discordId ? { discordId, processed: false } : {},
         ],
-        processedAt: null, // Only process unprocessed events
       },
       orderBy: { eventTime: 'asc' },
     });
 
-    if (pendingEvents.length === 0) {
+    if (unprocessedEvents.length === 0) {
       return { processedCount: 0 };
     }
 
-    // Convert pending events to regular attendance events
-    const now = new Date();
-    const results = await Promise.allSettled(
-      pendingEvents.map(async (pendingEvent) => {
-        try {
-          await prisma.attendanceEvent.create({
-            data: {
+    let processedCount = 0;
+    let lastProcessedEventType: boolean | null = null;
+
+    // Process events in order and handle duplicates
+    for (const event of unprocessedEvents) {
+      try {
+        // Check if this would create a duplicate consecutive event
+        // Skip if same type as last processed event (join-join or leave-leave)
+        if (lastProcessedEventType === event.isJoin) {
+          // Mark as processed but don't count it as a new event
+          await prisma.attendanceEvent.update({
+            where: { id: event.id },
+            data: { 
               userId,
-              isJoin: pendingEvent.isJoin,
-              eventTime: pendingEvent.eventTime,
+              processed: true,
             },
           });
-
-          // Mark as processed
-          await prisma.pendingAttendanceEvent.update({
-            where: { id: pendingEvent.id },
-            data: { processedAt: now },
-          });
-
-          return { success: true };
-        } catch {
-          return { success: false };
+          continue;
         }
-      })
-    );
 
-    const successful = results.filter((r) => r.status === 'fulfilled' && r.value.success).length;
-    
-    return { processedCount: successful };
+        // Link event to user and mark as processed
+        await prisma.attendanceEvent.update({
+          where: { id: event.id },
+          data: { 
+            userId,
+            processed: true,
+          },
+        });
+        
+        lastProcessedEventType = event.isJoin;
+        processedCount++;
+      } catch (error) {
+        console.error(`Error processing pending event ${event.id}:`, error);
+      }
+    }
+
+    return { processedCount };
   } catch (error) {
     console.error('Error processing pending events:', error);
     return { processedCount: 0 };
@@ -69,9 +79,9 @@ export async function processPendingEventsForUser(
 }
 
 /**
- * Get count of unprocessed pending events for a specific Steam or Discord ID
+ * Get count of unprocessed attendance events for a specific Steam or Discord ID
  */
-export async function getPendingEventCount(
+export async function getUnprocessedEventCount(
   steamId: string | null | undefined,
   discordId: string | null | undefined
 ): Promise<number> {
@@ -79,13 +89,12 @@ export async function getPendingEventCount(
     return 0;
   }
 
-  const count = await prisma.pendingAttendanceEvent.count({
+  const count = await prisma.attendanceEvent.count({
     where: {
       OR: [
-        steamId ? { steamId } : {},
-        discordId ? { discordId } : {},
+        steamId ? { steamId, processed: false } : {},
+        discordId ? { discordId, processed: false } : {},
       ],
-      processedAt: null,
     },
   });
 
@@ -93,33 +102,39 @@ export async function getPendingEventCount(
 }
 
 /**
- * Process pending events for all users (can be run as a background job)
+ * Process all unprocessed attendance events (can be run as a background job)
+ * This matches unprocessed events to users based on steamId or discordId
  */
-export async function processAllPendingEvents(): Promise<{ totalProcessed: number }> {
+export async function processAllUnprocessedEvents(): Promise<{ totalProcessed: number }> {
   try {
-    const pendingEvents = await prisma.pendingAttendanceEvent.findMany({
-      where: { processedAt: null },
-      orderBy: { createdAt: 'asc' },
+    const unprocessedEvents = await prisma.attendanceEvent.findMany({
+      where: { 
+        processed: false,
+        OR: [
+          { steamId: { not: null } },
+          { discordId: { not: null } },
+        ],
+      },
+      orderBy: { eventTime: 'asc' },
     });
 
-    if (pendingEvents.length === 0) {
+    if (unprocessedEvents.length === 0) {
       return { totalProcessed: 0 };
     }
 
-    const now = new Date();
     let processedCount = 0;
 
-    for (const pendingEvent of pendingEvents) {
+    for (const event of unprocessedEvents) {
       try {
         // Try to find user by steamId or discordId
         let user = null;
         
-        if (pendingEvent.steamId) {
+        if (event.steamId) {
           const steamAccount = await prisma.authAccount.findUnique({
             where: {
               provider_providerUserId: {
                 provider: 'steam',
-                providerUserId: pendingEvent.steamId,
+                providerUserId: event.steamId,
               },
             },
             include: { user: true },
@@ -127,12 +142,12 @@ export async function processAllPendingEvents(): Promise<{ totalProcessed: numbe
           if (steamAccount) user = steamAccount.user;
         }
 
-        if (!user && pendingEvent.discordId) {
+        if (!user && event.discordId) {
           const discordAccount = await prisma.authAccount.findUnique({
             where: {
               provider_providerUserId: {
                 provider: 'discord',
-                providerUserId: pendingEvent.discordId,
+                providerUserId: event.discordId,
               },
             },
             include: { user: true },
@@ -141,32 +156,45 @@ export async function processAllPendingEvents(): Promise<{ totalProcessed: numbe
         }
 
         if (user) {
-          // Create attendance event for this user
-          await prisma.attendanceEvent.create({
-            data: {
+          // Check for duplicate consecutive events for this user
+          const lastEvent = await prisma.attendanceEvent.findFirst({
+            where: {
               userId: user.id,
-              isJoin: pendingEvent.isJoin,
-              eventTime: pendingEvent.eventTime,
+              processed: true,
             },
+            orderBy: { eventTime: 'desc' },
           });
 
-          // Mark as processed
-          await prisma.pendingAttendanceEvent.update({
-            where: { id: pendingEvent.id },
-            data: { processedAt: now },
-          });
-
-          processedCount++;
+          // Only link if not a duplicate consecutive event
+          if (!lastEvent || lastEvent.isJoin !== event.isJoin) {
+            await prisma.attendanceEvent.update({
+              where: { id: event.id },
+              data: { 
+                userId: user.id,
+                processed: true,
+              },
+            });
+            processedCount++;
+          } else {
+            // Mark as processed but it's a duplicate
+            await prisma.attendanceEvent.update({
+              where: { id: event.id },
+              data: { 
+                userId: user.id,
+                processed: true,
+              },
+            });
+          }
         }
         // If user still doesn't exist, leave it unprocessed for later
       } catch (error) {
-        console.error(`Error processing pending event ${pendingEvent.id}:`, error);
+        console.error(`Error processing unprocessed event ${event.id}:`, error);
       }
     }
 
     return { totalProcessed: processedCount };
   } catch (error) {
-    console.error('Error processing all pending events:', error);
+    console.error('Error processing all unprocessed events:', error);
     return { totalProcessed: 0 };
   }
 }

@@ -6,6 +6,32 @@ function validateBotToken(request: NextRequest): Promise<boolean> {
   return validateBotTokenLegacy(request);
 }
 
+// Helper to handle duplicate events: check last event and only store if different
+async function shouldStoreEvent(steamId: string | null | undefined, discordId: string | null | undefined, isJoin: boolean, eventTime: Date): Promise<boolean> {
+  if (!steamId && !discordId) return true;
+
+  // Find the last UNPROCESSED event for this user identifier
+  const lastEvent = await prisma.attendanceEvent.findFirst({
+    where: {
+      OR: [
+        steamId ? { steamId, processed: false } : {},
+        discordId ? { discordId, processed: false } : {},
+      ],
+    },
+    orderBy: { eventTime: 'desc' },
+  });
+
+  // If no previous event, or if the event type is different, store it
+  if (!lastEvent) return true;
+  
+  // If same event type consecutively (join-join or leave-leave), skip the duplicate
+  if (lastEvent.isJoin === isJoin) {
+    return false;
+  }
+
+  return true;
+}
+
 export async function POST(request: NextRequest) {
   try {
     if (!(await validateBotToken(request))) {
@@ -46,6 +72,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check for duplicate consecutive events (join-join, leave-leave)
+    const storeEvent = await shouldStoreEvent(steamId, discordUserId, isJoin, eventTime);
+    if (!storeEvent) {
+      return NextResponse.json({
+        success: true,
+        message: 'Duplicate consecutive event skipped',
+        steamId,
+        discordId: discordUserId,
+        isJoin,
+        eventTime: eventTime.toISOString(),
+        processed: true,
+        duplicate: true,
+      });
+    }
+
     // Look up user by Steam ID or Discord ID
     let user = null;
     if (steamId) {
@@ -64,47 +105,33 @@ export async function POST(request: NextRequest) {
       if (discordAccount) user = discordAccount.user;
     }
 
-    if (user) {
-      // User exists - store as normal attendance event
-      const event = await prisma.attendanceEvent.create({
-        data: {
-          userId: user.id,
-          isJoin,
-          eventTime,
-        },
-      });
-
-      return NextResponse.json({
-        success: true,
-        eventId: event.id,
-        userId: user.id,
-        username: user.username,
-        isJoin,
-        eventTime: event.eventTime.toISOString(),
-        processed: true,
-      });
-    } else {
-      // User doesn't exist yet - store as pending event to be processed later
-      const pendingEvent = await prisma.pendingAttendanceEvent.create({
-        data: {
-          steamId,
-          discordId: discordUserId,
-          isJoin,
-          eventTime,
-        },
-      });
-
-      return NextResponse.json({
-        success: true,
-        pendingEventId: pendingEvent.id,
+    // Always store the event in AttendanceEvent
+    // If user exists, link it and mark as processed; otherwise store with steamId/discordId
+    const event = await prisma.attendanceEvent.create({
+      data: {
+        userId: user?.id,
         steamId,
-        discordUserId,
+        discordId: discordUserId,
         isJoin,
-        eventTime: pendingEvent.eventTime.toISOString(),
-        processed: false,
-        message: 'Event stored as pending - will be processed when user is created',
-      });
-    }
+        eventTime,
+        processed: user !== null, // true if user found, false if pending
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      eventId: event.id,
+      userId: user?.id,
+      username: user?.username,
+      steamId,
+      discordId: discordUserId,
+      isJoin,
+      eventTime: event.eventTime.toISOString(),
+      processed: event.processed,
+      message: user 
+        ? 'Event recorded and processed'
+        : 'Event stored - will be matched to user when account is created',
+    });
   } catch (error) {
     console.error('Bot events error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
