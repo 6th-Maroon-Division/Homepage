@@ -129,7 +129,7 @@ export async function getRecentAttendanceWithLegacy(
 }
 
 /**
- * Get 6-month trend data including legacy attendance
+ * Get 6-month trend data (new system only; legacy excluded)
  * Returns monthly attendance counts for the last 6 months
  */
 export async function getSixMonthTrendWithLegacy(userId: number): Promise<Date[]> {
