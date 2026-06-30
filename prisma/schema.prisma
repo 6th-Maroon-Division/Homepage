@@ -50,6 +50,7 @@ model User {
   // Squad role audit logs
   squadRoleAuditLogs SquadRoleAuditLog[]
   leaveOfAbsences   LeaveOfAbsence[]
+  botTokens        BotToken[]
 }
 
 enum MessageType {
@@ -700,4 +701,18 @@ model LegacyUserData {
   @@index([isApplied])
   @@index([mappedUserId])
   @@index([legacyId])
+}
+
+model BotToken {
+  id          Int      @id @default(autoincrement())
+  name        String   // Token name/identifier (e.g., "Main Bot", "Backup Bot")
+  token       String   @unique // The actual token value
+  isActive    Boolean  @default(true) // Allow enabling/disabling tokens
+  createdAt   DateTime @default(now())
+  lastUsedAt  DateTime? // Track when token was last used
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  createdById Int?
+
+  @@index([token])
+  @@index([isActive])
 }
