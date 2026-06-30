@@ -99,7 +99,7 @@ export async function getRecentAttendanceWithLegacy(
   // Normalize and combine to match existing format
   const normalizedNew = newAttendance.map((a) => ({
     id: a.id,
-    orbatName: a.orbat?.name || 'Legacy Attendance',
+    orbatName: a.orbat?.name || 'Unknown ORBAT',
     orbatDate: a.orbat?.eventDate || a.createdAt,
     status: a.status,
     isLegacy: false,
