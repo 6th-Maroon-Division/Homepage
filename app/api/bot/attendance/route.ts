@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { validateBotTokenLegacy } from '@/lib/bot-token-validation';
 
-function validateBotToken(request: NextRequest): boolean {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader?.startsWith('Bearer ')) return false;
-  const token = authHeader.substring(7);
-  return token === process.env.BOT_API_TOKEN;
+function validateBotToken(request: NextRequest): Promise<boolean> {
+  return validateBotTokenLegacy(request);
 }
 
 export async function POST(request: NextRequest) {
   try {
-    if (!validateBotToken(request)) {
+    if (!(await validateBotToken(request))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
