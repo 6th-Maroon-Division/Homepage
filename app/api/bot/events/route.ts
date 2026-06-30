@@ -6,6 +6,32 @@ function validateBotToken(request: NextRequest): Promise<boolean> {
   return validateBotTokenLegacy(request);
 }
 
+// Helper to handle duplicate events: check last event and only store if different
+async function shouldStoreEvent(steamId: string | null | undefined, discordId: string | null | undefined, isJoin: boolean, eventTime: Date): Promise<boolean> {
+  if (!steamId && !discordId) return true;
+
+  // Find the last UNPROCESSED event for this user identifier
+  const lastEvent = await prisma.attendanceEvent.findFirst({
+    where: {
+      OR: [
+        steamId ? { steamId, processed: false } : {},
+        discordId ? { discordId, processed: false } : {},
+      ],
+    },
+    orderBy: { eventTime: 'desc' },
+  });
+
+  // If no previous event, or if the event type is different, store it
+  if (!lastEvent) return true;
+  
+  // If same event type consecutively (join-join or leave-leave), skip the duplicate
+  if (lastEvent.isJoin === isJoin) {
+    return false;
+  }
+
+  return true;
+}
+
 export async function POST(request: NextRequest) {
   try {
     if (!(await validateBotToken(request))) {
@@ -37,6 +63,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Parse timestamp first
+    const eventTime = new Date(timestamp);
+    if (isNaN(eventTime.getTime())) {
+      return NextResponse.json(
+        { error: 'Invalid timestamp format. Use ISO 8601 (e.g., 2024-01-15T12:00:00Z)' },
+        { status: 400 }
+      );
+    }
+
+    // Check for duplicate consecutive events (join-join, leave-leave)
+    const storeEvent = await shouldStoreEvent(steamId, discordUserId, isJoin, eventTime);
+    if (!storeEvent) {
+      return NextResponse.json({
+        success: true,
+        message: 'Duplicate consecutive event skipped',
+        steamId,
+        discordId: discordUserId,
+        isJoin,
+        eventTime: eventTime.toISOString(),
+        processed: true,
+        duplicate: true,
+      });
+    }
+
     // Look up user by Steam ID or Discord ID
     let user = null;
     if (steamId) {
@@ -55,38 +105,32 @@ export async function POST(request: NextRequest) {
       if (discordAccount) user = discordAccount.user;
     }
 
-    if (!user) {
-      return NextResponse.json(
-        { error: 'User not found', steamId, discordUserId },
-        { status: 404 }
-      );
-    }
-
-    // Parse timestamp
-    const eventTime = new Date(timestamp);
-    if (isNaN(eventTime.getTime())) {
-      return NextResponse.json(
-        { error: 'Invalid timestamp format. Use ISO 8601 (e.g., 2024-01-15T12:00:00Z)' },
-        { status: 400 }
-      );
-    }
-
-    // Store the raw event
+    // Always store the event in AttendanceEvent
+    // If user exists, link it and mark as processed; otherwise store with steamId/discordId
     const event = await prisma.attendanceEvent.create({
       data: {
-        userId: user.id,
+        userId: user?.id,
+        steamId,
+        discordId: discordUserId,
         isJoin,
         eventTime,
+        processed: user !== null, // true if user found, false if pending
       },
     });
 
     return NextResponse.json({
       success: true,
       eventId: event.id,
-      userId: user.id,
-      username: user.username,
+      userId: user?.id,
+      username: user?.username,
+      steamId,
+      discordId: discordUserId,
       isJoin,
       eventTime: event.eventTime.toISOString(),
+      processed: event.processed,
+      message: user 
+        ? 'Event recorded and processed'
+        : 'Event stored - will be matched to user when account is created',
     });
   } catch (error) {
     console.error('Bot events error:', error);

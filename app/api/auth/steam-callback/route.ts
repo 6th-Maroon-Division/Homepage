@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { processPendingEventsForUser } from '@/lib/pending-events';
 
 export async function GET(request: NextRequest) {
   const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
@@ -102,7 +103,8 @@ export async function GET(request: NextRequest) {
         },
       });
       
-      authAccount = await prisma.authAccount.findUnique({
+      // Get the newly created user to process any pending attendance events
+      const newAuthAccount = await prisma.authAccount.findUnique({
         where: {
           provider_providerUserId: {
             provider: 'steam',
@@ -111,6 +113,13 @@ export async function GET(request: NextRequest) {
         },
         include: { user: true },
       });
+
+      // Process any pending events for this Steam ID
+      if (newAuthAccount?.user) {
+        await processPendingEventsForUser(steamId, null, newAuthAccount.user.id);
+      }
+      
+      authAccount = newAuthAccount;
     }
     
     if (!authAccount) {

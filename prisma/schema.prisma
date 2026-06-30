@@ -386,14 +386,20 @@ model AttendanceLog {
 
 // Raw attendance events from bot - ORBAT-agnostic
 model AttendanceEvent {
-  id        Int      @id @default(autoincrement())
-  user      User     @relation(fields: [userId], references: [id])
-  userId    Int
-  isJoin   Boolean  // true = check-in/join, false = check-out/leave
-  eventTime DateTime
+  id           Int      @id @default(autoincrement())
+  user         User?    @relation(fields: [userId], references: [id])
+  userId       Int?
+  steamId      String?  // Original Steam ID for events before user was created
+  discordId    String?  // Original Discord ID for events before user was created
+  isJoin      Boolean  // true = check-in/join, false = check-out/leave
+  eventTime    DateTime
+  processed    Boolean  @default(false) // true = event was matched to user, false = pending
 
   @@index([userId])
+  @@index([steamId])
+  @@index([discordId])
   @@index([eventTime])
+  @@index([processed])
 }
 
 model OrbatTemplate {
@@ -716,3 +722,5 @@ model BotToken {
   @@index([token])
   @@index([isActive])
 }
+
+
