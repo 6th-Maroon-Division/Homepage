@@ -90,7 +90,7 @@ export default async function ProfilePage() {
   const ninetyDaysAgo = new Date(now);
   ninetyDaysAgo.setDate(now.getDate() - 90);
 
-  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+  // (sixMonthsAgo no longer needed; trend dates are provided by getSixMonthTrendWithLegacy)
 
   const [totalCount, count30d, count90d, recentAttendance, trendRecords] = await Promise.all([
     getTotalAttendanceWithLegacy(userId), // Total including legacy data
