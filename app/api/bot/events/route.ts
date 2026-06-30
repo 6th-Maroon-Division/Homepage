@@ -37,6 +37,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Parse timestamp first
+    const eventTime = new Date(timestamp);
+    if (isNaN(eventTime.getTime())) {
+      return NextResponse.json(
+        { error: 'Invalid timestamp format. Use ISO 8601 (e.g., 2024-01-15T12:00:00Z)' },
+        { status: 400 }
+      );
+    }
+
     // Look up user by Steam ID or Discord ID
     let user = null;
     if (steamId) {
@@ -55,39 +64,47 @@ export async function POST(request: NextRequest) {
       if (discordAccount) user = discordAccount.user;
     }
 
-    if (!user) {
-      return NextResponse.json(
-        { error: 'User not found', steamId, discordUserId },
-        { status: 404 }
-      );
-    }
+    if (user) {
+      // User exists - store as normal attendance event
+      const event = await prisma.attendanceEvent.create({
+        data: {
+          userId: user.id,
+          isJoin,
+          eventTime,
+        },
+      });
 
-    // Parse timestamp
-    const eventTime = new Date(timestamp);
-    if (isNaN(eventTime.getTime())) {
-      return NextResponse.json(
-        { error: 'Invalid timestamp format. Use ISO 8601 (e.g., 2024-01-15T12:00:00Z)' },
-        { status: 400 }
-      );
-    }
-
-    // Store the raw event
-    const event = await prisma.attendanceEvent.create({
-      data: {
+      return NextResponse.json({
+        success: true,
+        eventId: event.id,
         userId: user.id,
+        username: user.username,
         isJoin,
-        eventTime,
-      },
-    });
+        eventTime: event.eventTime.toISOString(),
+        processed: true,
+      });
+    } else {
+      // User doesn't exist yet - store as pending event to be processed later
+      const pendingEvent = await prisma.pendingAttendanceEvent.create({
+        data: {
+          steamId,
+          discordId: discordUserId,
+          isJoin,
+          eventTime,
+        },
+      });
 
-    return NextResponse.json({
-      success: true,
-      eventId: event.id,
-      userId: user.id,
-      username: user.username,
-      isJoin,
-      eventTime: event.eventTime.toISOString(),
-    });
+      return NextResponse.json({
+        success: true,
+        pendingEventId: pendingEvent.id,
+        steamId,
+        discordUserId,
+        isJoin,
+        eventTime: pendingEvent.eventTime.toISOString(),
+        processed: false,
+        message: 'Event stored as pending - will be processed when user is created',
+      });
+    }
   } catch (error) {
     console.error('Bot events error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

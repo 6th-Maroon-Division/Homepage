@@ -716,3 +716,19 @@ model BotToken {
   @@index([token])
   @@index([isActive])
 }
+
+model PendingAttendanceEvent {
+  id           Int      @id @default(autoincrement())
+  steamId      String?  // Steam ID if available
+  discordId    String?  // Discord ID if available
+  isJoin      Boolean  // true = join/check-in, false = leave/check-out
+  eventTime    DateTime // When the event occurred
+  processedAt DateTime? // When the event was processed (linked to a user)
+  createdAt    DateTime @default(now())
+
+  // Indexes for efficient lookups
+  @@index([steamId])
+  @@index([discordId])
+  @@index([isJoin])
+  @@index([processedAt])
+}

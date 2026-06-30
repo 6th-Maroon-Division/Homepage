@@ -4,6 +4,7 @@ import type { JWT } from 'next-auth/jwt';
 import DiscordProvider from 'next-auth/providers/discord';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
+import { processPendingEventsForUser } from '@/lib/pending-events';
 
 interface DiscordProfile {
   id: string;
@@ -99,7 +100,6 @@ export const authOptions: AuthOptions = {
           }
         } else {
           // Create new user and link the account
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const newUser = await prisma.user.create({
             data: {
               username,
@@ -113,6 +113,9 @@ export const authOptions: AuthOptions = {
               },
             },
           });
+
+          // Process any pending attendance events for this Discord user
+          await processPendingEventsForUser(undefined, providerUserId, newUser.id);
         }
       } else if (provider === 'discord') {
         const cookieStore = await cookies();
