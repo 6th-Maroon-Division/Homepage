@@ -171,6 +171,17 @@ export default async function AdminPage() {
               <p style={{ color: 'var(--muted-foreground)' }}>Send notifications to users</p>
             </Link>
           )}
+
+          {hasSuperAdmin && (
+            <Link
+              href="/admin/bot-tokens"
+              className="border rounded-lg p-8 transition-colors"
+              style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
+            >
+              <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>Bot Tokens</h2>
+              <p style={{ color: 'var(--muted-foreground)' }}>Manage API tokens for bot integrations</p>
+            </Link>
+          )}
         </div>
       </div>
     </main>
