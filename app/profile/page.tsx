@@ -97,7 +97,7 @@ export default async function ProfilePage() {
     prisma.attendance.count({ where: { userId, createdAt: { gte: thirtyDaysAgo } } }),
     prisma.attendance.count({ where: { userId, createdAt: { gte: ninetyDaysAgo } } }),
     getRecentAttendanceWithLegacy(userId, 15), // Recent attendance including legacy
-    getSixMonthTrendWithLegacy(userId), // 6-month trend including legacy
+    getSixMonthTrendWithLegacy(userId), // 6-month trend (legacy excluded)
   ]);
 
   const [trainingRequests, allTrainings, loaEntries] = await Promise.all([
