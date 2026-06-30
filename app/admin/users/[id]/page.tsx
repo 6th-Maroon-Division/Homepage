@@ -124,7 +124,7 @@ export default async function UserDetailPage({
       prisma.attendance.count({ where: { userId, createdAt: { gte: thirtyDaysAgo } } }),
       prisma.attendance.count({ where: { userId, createdAt: { gte: ninetyDaysAgo } } }),
       getRecentAttendanceWithLegacy(userId, 15), // Recent attendance including legacy
-      getSixMonthTrendWithLegacy(userId), // 6-month trend including legacy
+      getSixMonthTrendWithLegacy(userId), // 6-month trend (legacy excluded)
       prisma.permission.findMany({
         orderBy: { key: 'asc' },
         select: {
