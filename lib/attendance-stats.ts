@@ -13,6 +13,143 @@ export interface AttendanceStats {
 }
 
 /**
+ * Get total attendance count including legacy data for verification purposes
+ * @param userId - User ID
+ * @returns Total attendance count including new system and legacy data
+ */
+export async function getTotalAttendanceWithLegacy(userId: number): Promise<number> {
+  // Count attendance from new system
+  const newAttendanceCount = await prisma.attendance.count({
+    where: { userId },
+  });
+
+  // Count attendance from legacy system (2024 to today) - individual attendance events
+  const legacyAttendanceCount = await prisma.legacyAttendanceData.count({
+    where: {
+      mappedUserId: userId,
+      legacyStatus: { in: ['P'] }, // Only count Present status
+    },
+  });
+
+  // Get old attendance data (before 2024) from LegacyUserData
+  const legacyUserData = await prisma.legacyUserData.findMany({
+    where: {
+      mappedUserId: userId,
+      isApplied: true, // Only count if legacy data has been applied
+      oldData: { gt: 0 }, // Only include records with actual attendance data
+    },
+    select: { oldData: true },
+  });
+
+  // Sum up all old legacy attendance for this user
+  const oldLegacyAttendance = legacyUserData.reduce((sum: number, record: { oldData: number }) => sum + record.oldData, 0);
+
+  // Total attendance = new system + legacy system (2024-today) + old system (before 2024)
+  return newAttendanceCount + legacyAttendanceCount + oldLegacyAttendance;
+}
+
+// Type for combined attendance record (new system + legacy)
+interface LegacyAttendanceRecord {
+  id: number;
+  createdAt: Date;
+  status: string;
+  legacyStatus?: string;
+  legacyEventDate?: Date | string;
+  isLegacy: boolean;
+  orbat?: { name: string; eventDate: Date | null };
+}
+
+/**
+ * Get recent attendance including legacy data for user history display
+ * Efficiently combines new system and legacy attendance in one call pattern
+ */
+export async function getRecentAttendanceWithLegacy(
+  userId: number,
+  limit: number = 15
+): Promise<Array<{
+  id: number;
+  createdAt: Date;
+  status: string;
+  orbatName: string;
+  orbatDate: Date | string;
+  isLegacy: boolean;
+}>> {
+  // Get recent attendance from new system
+  const newAttendance = await prisma.attendance.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+    include: {
+      orbat: {
+        select: { name: true, eventDate: true },
+      },
+    },
+  });
+
+  // Get recent legacy attendance events
+  const legacyAttendance = await prisma.legacyAttendanceData.findMany({
+    where: {
+      mappedUserId: userId,
+      legacyStatus: { in: ['P'] }, // Only include Present status
+    },
+    orderBy: { legacyEventDate: 'desc' },
+    take: limit,
+  });
+
+  // Normalize and combine to match existing format
+  const normalizedNew = newAttendance.map((a) => ({
+    id: a.id,
+    orbatName: a.orbat?.name || 'Unknown ORBAT',
+    orbatDate: a.orbat?.eventDate || a.createdAt,
+    status: a.status,
+    isLegacy: false,
+    createdAt: a.createdAt,
+  }));
+
+  const normalizedLegacy = legacyAttendance.map((l) => ({
+    id: l.id,
+    orbatName: 'Legacy Attendance', // No orbat info for legacy data
+    orbatDate: l.legacyEventDate || new Date(),
+    status: l.legacyStatus,
+    isLegacy: true,
+    createdAt: l.legacyEventDate || new Date(),
+  }));
+
+  // Combine and sort by date (newest first)
+  const combined = [...normalizedNew, ...normalizedLegacy];
+  
+  // Sort by date descending
+  combined.sort((a, b) => {
+    const dateA = a.orbatDate instanceof Date ? a.orbatDate : new Date(a.orbatDate);
+    const dateB = b.orbatDate instanceof Date ? b.orbatDate : new Date(b.orbatDate);
+    return dateB.getTime() - dateA.getTime();
+  });
+
+  return combined.slice(0, limit); // Return only the requested limit
+}
+
+/**
+ * Get 6-month trend data (new system only; legacy excluded)
+ * Returns monthly attendance counts for the last 6 months
+ */
+export async function getSixMonthTrendWithLegacy(userId: number): Promise<Date[]> {
+  const now = new Date();
+  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+
+  // Get new system attendance for trend (only new system, no legacy as per user requirement)
+  const newAttendance = await prisma.attendance.findMany({
+    where: {
+      userId,
+      createdAt: { gte: sixMonthsAgo },
+    },
+    select: { createdAt: true },
+  });
+
+  // Return just the dates for buildLastSixMonthsTrend to process
+  return newAttendance.map(a => a.createdAt);
+}
+
+/**
  * Calculate attendance statistics for a user over a given period
  * @param userId - User ID
  * @param daysBack - How many days back to calculate (default: 30)

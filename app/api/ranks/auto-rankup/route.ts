@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 import { publishInboxEvent } from '@/lib/realtime/inbox-events';
 import { publishUserProfileEvent } from '@/lib/realtime/user-events';
+import { getCurrentAttendance } from '@/lib/rank-eligibility';
 
 type PromotionResult = {
   userId: number;
@@ -98,13 +99,7 @@ export async function POST() {
         // This will be checked through rank transition requirements when the schema is ready
 
         // Check attendance requirement
-        const attendance = await prisma.attendance.count({
-          where: {
-            userId: userRank.userId,
-            status: 'present',
-            orbat: { isMainOp: true },
-          },
-        });
+        const attendance = await getCurrentAttendance(userRank.userId);
 
         const attendanceSinceLastRank = userRank.attendanceSinceLastRank;
         const attendanceDelta = attendance - attendanceSinceLastRank;

@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 
-interface LegacyRecord {
+interface LegacyAttendanceRecord {
   id: number;
   legacyName: string;
   legacyStatus: string;
@@ -13,6 +13,22 @@ interface LegacyRecord {
   isMapped: boolean;
   mappedUser?: { id: number; username: string; email: string } | null;
 }
+
+interface LegacyUserDataRecord {
+  id: number;
+  legacyId: string;
+  discordUsername: string;
+  rankName: string;
+  dateJoined: string | null;
+  tigSinceLastPromo: number;
+  totalTig: number;
+  oldData: number;
+  isMapped: boolean;
+  mappedUser?: { id: number; username: string } | null;
+  notes?: string | null;
+}
+
+type LegacyRecord = LegacyAttendanceRecord | LegacyUserDataRecord;
 
 interface User {
   id: number;
@@ -29,6 +45,7 @@ export function LegacyDataMappingClient({
   const { showToast } = useToast();
   const [activeSubTab, setActiveSubTab] = useState<'all' | 'unmapped' | 'import'>('all');
   const [csvInput, setCsvInput] = useState('');
+  const [userDataCsvInput, setUserDataCsvInput] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [previewRecords, setPreviewRecords] = useState<LegacyRecord[]>([]);
@@ -42,6 +59,7 @@ export function LegacyDataMappingClient({
   const [isSavingMapping, setIsSavingMapping] = useState(false);
   const [isFetchingUsers, setIsFetchingUsers] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
+  const [importType, setImportType] = useState<'attendance' | 'user-data'>('attendance');
 
   // Load data initially and whenever user views Show All / Unmapped
   React.useEffect(() => {
@@ -57,23 +75,33 @@ export function LegacyDataMappingClient({
   }, [activeSubTab]);
 
   const handleImportCSV = async () => {
-    if (!csvInput.trim()) {
+    const csvData = importType === 'attendance' ? csvInput : userDataCsvInput;
+    if (!csvData.trim()) {
       showToast('Please paste CSV data', 'error');
       return;
     }
 
     setIsImporting(true);
     try {
-      const response = await fetch('/api/attendance/legacy-import', {
+      const endpoint = importType === 'attendance' 
+        ? '/api/attendance/legacy-import' 
+        : '/api/attendance/legacy-import/user-data';
+      
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ csvData: csvInput }),
+        body: JSON.stringify({ csvData }),
       });
 
       const result = await response.json();
       if (response.ok) {
-        showToast(`Imported ${result.imported} records - switch to tabs to map users`, 'success');
-        setCsvInput('');
+        const recordType = importType === 'attendance' ? 'attendance' : 'user data';
+        showToast(`Imported ${result.imported} ${recordType} records - switch to tabs to map users`, 'success');
+        if (importType === 'attendance') {
+          setCsvInput('');
+        } else {
+          setUserDataCsvInput('');
+        }
         setPreviewRecords([]);
         await fetchLegacyData();
         setActiveSubTab('unmapped');
@@ -88,17 +116,22 @@ export function LegacyDataMappingClient({
   };
 
   const handlePreviewCSV = async () => {
-    if (!csvInput.trim()) {
+    const csvData = importType === 'attendance' ? csvInput : userDataCsvInput;
+    if (!csvData.trim()) {
       showToast('Please paste CSV data', 'error');
       return;
     }
 
     setIsPreviewing(true);
     try {
-      const response = await fetch('/api/attendance/legacy-import', {
+      const endpoint = importType === 'attendance' 
+        ? '/api/attendance/legacy-import' 
+        : '/api/attendance/legacy-import/user-data';
+      
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ csvData: csvInput, previewOnly: true }),
+        body: JSON.stringify({ csvData, previewOnly: true }),
       });
 
       const result = await response.json();
@@ -106,11 +139,15 @@ export function LegacyDataMappingClient({
         setPreviewRecords(result.preview || []);
         setConflicts(result.conflicts || []);
         setConflictResolutions({}); // Reset conflict choices
-        setPreviewMeta({ skippedCells: result.skippedCells, processedCells: result.processedCells });
+        setPreviewMeta({
+          skippedCells: result.skippedCells,
+          processedCells: result.processedCells
+        });
         
+        const recordType = importType === 'attendance' ? 'attendance' : 'user data';
         const message = result.conflicts?.length > 0 
-          ? `Preview ready: ${result.imported} records + ${result.conflicts.length} conflicts`
-          : `Preview ready: ${result.imported} records (skipping LOA/NO/EO)`;
+          ? `Preview ready: ${result.imported} ${recordType} records + ${result.conflicts.length} conflicts`
+          : `Preview ready: ${result.imported} ${recordType} records`;
         showToast(message, 'success');
       } else {
         showToast(result.error || 'Preview failed', 'error');
@@ -130,9 +167,27 @@ export function LegacyDataMappingClient({
         ...(searchText && { search: searchText }),
       });
 
-      const response = await fetch(`/api/attendance/legacy-data?${params}`);
-      const result = await response.json();
-      setLegacyData(result.data || []);
+      // Fetch both attendance and user data, then combine
+      const [attendanceResponse, userDataResponse] = await Promise.all([
+        fetch(`/api/attendance/legacy-data?${params}`),
+        fetch(`/api/attendance/legacy-import/user-data?${params}`)
+      ]);
+
+      const attendanceResult = await attendanceResponse.json();
+      const userDataResult = await userDataResponse.json();
+
+      // Combine both datasets - normalize user data records to have legacyName for consistency
+      const normalizedUserData = (userDataResult.records || []).map((record: LegacyUserDataRecord) => ({
+        ...record,
+        legacyName: record.discordUsername, // Add legacyName for compatibility
+      }));
+
+      const combinedData: LegacyRecord[] = [
+        ...(attendanceResult.data || []),
+        ...normalizedUserData
+      ];
+      
+      setLegacyData(combinedData);
     } catch {
       showToast('Failed to fetch legacy data', 'error');
     } finally {
@@ -167,15 +222,27 @@ export function LegacyDataMappingClient({
         return;
       }
 
-      const recordsToUpdate = legacyData.filter(r => r.legacyName === targetRecord.legacyName);
+      // Determine record type and find all records with same identifier
+      const isUserData = 'discordUsername' in targetRecord;
+      const identifier = isUserData ? (targetRecord as LegacyUserDataRecord).discordUsername : (targetRecord as LegacyAttendanceRecord).legacyName;
+      
+      const recordsToUpdate = legacyData.filter(r => 
+        isUserData ? (r as LegacyUserDataRecord).discordUsername === identifier : (r as LegacyAttendanceRecord).legacyName === identifier
+      );
 
-      const updatePromises = recordsToUpdate.map(record => 
-        fetch('/api/attendance/legacy-data', {
+      const updatePromises = recordsToUpdate.map(record => {
+        const endpoint = isUserData ? '/api/attendance/legacy-import/user-data/map' : '/api/attendance/legacy-data';
+        const isUserDataRecord = 'discordUsername' in record;
+        const body = isUserDataRecord 
+          ? JSON.stringify({ legacyUserDataId: record.id, mappedUserId })
+          : JSON.stringify({ legacyDataId: record.id, mappedUserId });
+        
+        return fetch(endpoint, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ legacyDataId: record.id, mappedUserId }),
-        })
-      );
+          body,
+        });
+      });
 
       const responses = await Promise.all(updatePromises);
       const allSuccessful = responses.every(r => r.ok);
@@ -202,12 +269,16 @@ export function LegacyDataMappingClient({
     return true;
   });
 
-  const filteredData = filteredByTab.filter((item) =>
-    item.legacyName.toLowerCase().includes(searchText.toLowerCase())
-  );
+  const filteredData = filteredByTab.filter((item) => {
+    const displayName = 'discordUsername' in item ? (item as LegacyUserDataRecord).discordUsername : (item as LegacyAttendanceRecord).legacyName;
+    return displayName.toLowerCase().includes(searchText.toLowerCase());
+  });
 
   const groupedData = filteredData.reduce((acc, record) => {
-    const existing = acc.find(g => g.legacyName === record.legacyName);
+    // Get the display name based on record type
+    const displayName = 'discordUsername' in record ? (record as LegacyUserDataRecord).discordUsername : (record as LegacyAttendanceRecord).legacyName;
+    
+    const existing = acc.find(g => g.displayName === displayName);
     if (existing) {
       existing.records.push(record);
       // Update group status based on all records
@@ -215,7 +286,7 @@ export function LegacyDataMappingClient({
       existing.mappedUser = existing.records.find(r => r.mappedUser)?.mappedUser || null;
     } else {
       acc.push({
-        legacyName: record.legacyName,
+        displayName: displayName,
         records: [record],
         isMapped: record.isMapped,
         mappedUser: record.mappedUser,
@@ -223,16 +294,16 @@ export function LegacyDataMappingClient({
     }
     return acc;
   }, [] as Array<{
-    legacyName: string;
+    displayName: string;
     records: LegacyRecord[];
     isMapped: boolean;
-    mappedUser?: { id: number; username: string; email: string } | null;
+    mappedUser?: { id: number; username: string; email?: string } | null;
   }>);
 
   const unmappedCount = legacyData.filter((r) => !r.isMapped).length;
   const mappedCount = legacyData.filter((r) => r.isMapped).length;
-  const uniqueUserCount = [...new Set(legacyData.map(r => r.legacyName))].length;
-  const uniqueUnmappedCount = [...new Set(legacyData.filter(r => !r.isMapped).map(r => r.legacyName))].length;
+  const uniqueUserCount = [...new Set(legacyData.map(r => 'discordUsername' in r ? (r as LegacyUserDataRecord).discordUsername : (r as LegacyAttendanceRecord).legacyName))].length;
+  const uniqueUnmappedCount = [...new Set(legacyData.filter(r => !r.isMapped).map(r => 'discordUsername' in r ? (r as LegacyUserDataRecord).discordUsername : (r as LegacyAttendanceRecord).legacyName))].length;
 
   return (
     <div
@@ -246,14 +317,14 @@ export function LegacyDataMappingClient({
     >
       <div>
         <h3 style={{ color: 'var(--foreground)' }} className="text-lg font-bold mb-4">
-          Legacy Attendance Import & User Mapping
+          Legacy Data Import & User Mapping
         </h3>
 
         <p className="text-sm mb-4" style={{ color: 'var(--muted-foreground)' }}>
-          Import historical attendance records from matrix CSV. Map legacy names to user accounts.
+          Import historical attendance matrix CSV and user data CSV. Map legacy names to user accounts.
         </p>
 
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-2 mb-4 flex-wrap">
           <button
             onClick={() => setActiveSubTab('all')}
             className="px-3 py-1.5 rounded text-sm font-semibold"
@@ -277,7 +348,7 @@ export function LegacyDataMappingClient({
             Unmapped ({uniqueUnmappedCount})
           </button>
           <button
-            onClick={() => setActiveSubTab('import')}
+            onClick={() => { setActiveSubTab('import'); setImportType('attendance'); }}
             className="px-3 py-1.5 rounded text-sm font-semibold"
             style={{
               backgroundColor: activeSubTab === 'import' ? 'var(--accent)' : 'var(--primary)',
@@ -285,34 +356,97 @@ export function LegacyDataMappingClient({
               border: '1px solid var(--border)',
             }}
           >
-            Import CSV
+            Import Attendance CSV
+          </button>
+          <button
+            onClick={() => { setActiveSubTab('import'); setImportType('user-data'); }}
+            className="px-3 py-1.5 rounded text-sm font-semibold"
+            style={{
+              backgroundColor: activeSubTab === 'import' ? 'var(--accent)' : 'var(--primary)',
+              color: 'var(--foreground)',
+              border: '1px solid var(--border)',
+            }}
+          >
+            Import User Data CSV
           </button>
         </div>
 
         {activeSubTab === 'import' ? (
           <div className="space-y-4">
-            <p style={{ color: 'var(--foreground)' }} className="text-sm font-semibold">
-              Import Matrix CSV from Google Sheets
-            </p>
-            <p style={{ color: 'var(--muted-foreground)' }} className="text-xs">
-              Expected format: YEAR: 2025 in headers, then RANK, NAME, ID columns followed by date columns (26-Dec, 2-Jan, etc.)
-              <br />
-              Status codes imported: P (Operation), A (Absent), NA (Noted Absence)
-              <br />
-              Note: LOA, NO, and EO are automatically skipped during import.
-            </p>
+            <div className="flex gap-2 mb-4">
+              <button
+                onClick={() => setImportType('attendance')}
+                className="px-3 py-1.5 rounded text-sm font-semibold"
+                style={{
+                  backgroundColor: importType === 'attendance' ? 'var(--accent)' : 'var(--primary)',
+                  color: 'var(--foreground)',
+                  border: '1px solid var(--border)',
+                }}
+              >
+                Attendance Matrix CSV
+              </button>
+              <button
+                onClick={() => setImportType('user-data')}
+                className="px-3 py-1.5 rounded text-sm font-semibold"
+                style={{
+                  backgroundColor: importType === 'user-data' ? 'var(--accent)' : 'var(--primary)',
+                  color: 'var(--foreground)',
+                  border: '1px solid var(--border)',
+                }}
+              >
+                User Data CSV
+              </button>
+            </div>
 
-            <textarea
-              value={csvInput}
-              onChange={(e) => setCsvInput(e.target.value)}
-              placeholder="Paste CSV data here..."
-              style={{
-                backgroundColor: 'var(--primary)',
-                color: 'var(--foreground)',
-                borderColor: 'var(--border)',
-              }}
-              className="w-full h-32 border rounded p-2 text-sm font-mono"
-            />
+            {importType === 'attendance' ? (
+              <>
+                <p style={{ color: 'var(--foreground)' }} className="text-sm font-semibold">
+                  Import Matrix CSV from Google Sheets
+                </p>
+                <p style={{ color: 'var(--muted-foreground)' }} className="text-xs">
+                  Expected format: YEAR: 2025 in headers, then RANK, NAME, ID columns followed by date columns (26-Dec, 2-Jan, etc.)
+                  <br />
+                  Status codes imported: P (Operation), A (Absent), NA (Noted Absence)
+                  <br />
+                  Note: LOA, NO, and EO are automatically skipped during import.
+                </p>
+
+                <textarea
+                  value={csvInput}
+                  onChange={(e) => setCsvInput(e.target.value)}
+                  placeholder="Paste attendance matrix CSV data here..."
+                  style={{
+                    backgroundColor: 'var(--primary)',
+                    color: 'var(--foreground)',
+                    borderColor: 'var(--border)',
+                  }}
+                  className="w-full h-32 border rounded p-2 text-sm font-mono"
+                />
+              </>
+            ) : (
+              <>
+                <p style={{ color: 'var(--foreground)' }} className="text-sm font-semibold">
+                  Import User Data CSV
+                </p>
+                <p style={{ color: 'var(--muted-foreground)' }} className="text-xs">
+                  Expected format: ID, NAME, Rank, Date Joined, TIG Since Last Promo, TOTAL TIG, Old Data
+                  <br />
+                  Example: 001,Stas,LtCol,02/06/2020,58,0,16
+                </p>
+
+                <textarea
+                  value={userDataCsvInput}
+                  onChange={(e) => setUserDataCsvInput(e.target.value)}
+                  placeholder="Paste user data CSV here..."
+                  style={{
+                    backgroundColor: 'var(--primary)',
+                    color: 'var(--foreground)',
+                    borderColor: 'var(--border)',
+                  }}
+                  className="w-full h-32 border rounded p-2 text-sm font-mono"
+                />
+              </>
+            )}
 
             <div className="flex gap-2">
               <button
@@ -324,17 +458,17 @@ export function LegacyDataMappingClient({
                 }}
                 className="px-4 py-2 rounded text-sm font-semibold disabled:opacity-50"
               >
-                {isPreviewing ? <LoadingSpinner /> : 'Preview (skip LOA/NO/EO)'}
+                {isPreviewing ? <LoadingSpinner /> : (importType === 'attendance' ? 'Preview (skip LOA/NO/EO)' : 'Preview')}
               </button>
               <button
                 onClick={handleImportCSV}
-                disabled={isImporting || previewRecords.length === 0 || (conflicts.length > 0 && Object.keys(conflictResolutions).length < conflicts.length)}
+                disabled={isImporting || previewRecords.length === 0 || (importType === 'attendance' && conflicts.length > 0 && Object.keys(conflictResolutions).length < conflicts.length)}
                 style={{
                   backgroundColor: isImporting ? 'var(--muted-foreground)' : '#10b981',
                   color: 'white',
                 }}
                 className="px-4 py-2 rounded text-sm font-semibold disabled:opacity-50"
-                title={conflicts.length > 0 && Object.keys(conflictResolutions).length < conflicts.length ? 'Resolve all conflicts first' : ''}
+                title={importType === 'attendance' && conflicts.length > 0 && Object.keys(conflictResolutions).length < conflicts.length ? 'Resolve all conflicts first' : ''}
               >
                 {isImporting ? <LoadingSpinner /> : 'Save to Database'}
               </button>
@@ -346,29 +480,50 @@ export function LegacyDataMappingClient({
                 style={{ backgroundColor: 'var(--primary)', borderColor: 'var(--border)' }}
               >
                 <p style={{ color: 'var(--foreground)' }} className="text-sm font-semibold">
-                  Preview ({previewRecords.length} records) — already skipping LOA/NO/EO
-                  {previewMeta?.processedCells !== undefined && (
-                    <span className="ml-2 text-xs" style={{ color: 'var(--muted-foreground)' }}>
-                      Processed cells: {previewMeta.processedCells} • Skipped: {previewMeta.skippedCells ?? 0}
-                    </span>
-                  )}
+                  Preview ({previewRecords.length} records)
+                  {importType === 'attendance' ? ' — already skipping LOA/NO/EO' : ''}
                 </p>
-                <div className="max-h-48 overflow-y-auto text-xs" style={{ color: 'var(--muted-foreground)' }}>
-                  {previewRecords.slice(0, 50).map((r, idx) => (
-                    <div key={`${r.legacyName}-${r.legacyEventDate}-${idx}`} className="py-1 border-b border-border last:border-b-0">
-                      <span style={{ color: 'var(--foreground)' }} className="font-semibold">{r.legacyName}</span>
-                      {' '}• {r.legacyStatus}
-                      {r.legacyEventDate && ` • ${new Date(r.legacyEventDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
-                    </div>
-                  ))}
+                {importType === 'attendance' && previewMeta?.processedCells !== undefined && (
+                  <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                    Processed cells: {previewMeta.processedCells} • Skipped: {previewMeta.skippedCells ?? 0}
+                  </p>
+                )}
+                <div className="max-h-48 overflow-y-auto text-xs">
+                  {previewRecords && previewRecords.length > 0 ? (
+                    <>
+                      {previewRecords.slice(0, 50).map((r, idx) => {
+                    const isUserData = 'discordUsername' in r;
+                    const displayName = isUserData ? (r as LegacyUserDataRecord).discordUsername : (r as LegacyAttendanceRecord).legacyName;
+                    const legacyId = isUserData ? (r as LegacyUserDataRecord).legacyId : (r as LegacyAttendanceRecord).legacyName;
+                    const recordId = r.id || legacyId || idx;
+                    
+                    // Fallback for empty display names
+                    const safeDisplayName = displayName || `Record ${idx + 1}`;
+                    
+                    return (
+                      <div key={`preview-${recordId}-${idx}`} className="py-1 border-b border-border last:border-b-0">
+                        <span style={{ color: 'var(--foreground)' }} className="font-semibold">{safeDisplayName}</span>
+                        <span style={{ color: 'var(--muted-foreground)' }}>
+                          {isUserData 
+                            ? ` • Rank: ${(r as LegacyUserDataRecord).rankName || 'N/A'} • TIG: ${(r as LegacyUserDataRecord).tigSinceLastPromo || 0} • Old Data: ${(r as LegacyUserDataRecord).oldData || 0}`
+                            : ` • Status: ${(r as LegacyAttendanceRecord).legacyStatus || 'N/A'}${((r as LegacyAttendanceRecord).legacyEventDate ? ` • ${new Date((r as LegacyAttendanceRecord).legacyEventDate!).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : '')}`
+                          }
+                        </span>
+                      </div>
+                    );
+                  })}
                   {previewRecords.length > 50 && (
-                    <p className="mt-2">...and {previewRecords.length - 50} more</p>
+                    <p className="mt-2" style={{ color: 'var(--muted-foreground)' }}>...and {previewRecords.length - 50} more</p>
                   )}
+                  </>
+                ) : (
+                    <p className="py-2 text-center" style={{ color: 'var(--muted-foreground)' }}>No preview records</p>
+                )}
                 </div>
               </div>
             )}
 
-            {conflicts.length > 0 && (
+            {importType === 'attendance' && conflicts.length > 0 && (
               <div
                 className="space-y-3 border rounded p-3"
                 style={{ backgroundColor: '#f97316', borderColor: '#ea580c' }}
@@ -438,7 +593,7 @@ export function LegacyDataMappingClient({
             >
               <p style={{ color: 'var(--foreground)' }}>
                 {activeSubTab === 'all' 
-                  ? `Total: ${legacyData.length} records | Users: ${uniqueUserCount} | Mapped: ${mappedCount} | Unmapped: ${unmappedCount}`
+                  ? `Total: ${legacyData.length} records | Unique users: ${uniqueUserCount} | Mapped: ${mappedCount} | Unmapped: ${unmappedCount}`
                   : `Unmapped Users: ${uniqueUnmappedCount} (${unmappedCount} records)`
                 }
               </p>
@@ -488,42 +643,58 @@ export function LegacyDataMappingClient({
                 </p>
               ) : (
                 <div className="divide-y divide-border">
-                  {groupedData.map((group) => (
-                    <div
-                      key={group.legacyName}
-                      style={{ padding: '12px', borderColor: 'var(--border)' }}
-                      className="flex justify-between items-center"
-                    >
-                      <div className="flex-1">
-                        <p style={{ color: 'var(--foreground)' }} className="text-sm font-semibold">
-                          {group.legacyName}
-                        </p>
-                        <p style={{ color: 'var(--muted-foreground)' }} className="text-xs">
-                          {group.records.length} record{group.records.length > 1 ? 's' : ''} ({group.records.map(r => r.legacyStatus).join(', ')})
-                        </p>
-                        <p style={{ color: 'var(--muted-foreground)' }} className="text-xs">
-                          Dates: {group.records.map(r => 
-                            r.legacyEventDate ? new Date(r.legacyEventDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'N/A'
-                          ).join(', ')}
-                        </p>
-                        {group.mappedUser && (
-                          <p style={{ color: '#10b981' }} className="text-xs font-semibold">
-                            ✓ Mapped to: {group.mappedUser.username || group.mappedUser.email}
-                          </p>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => handleOpenMapping(group.records[0].id)}
-                        style={{
-                          backgroundColor: group.isMapped ? '#10b981' : 'var(--muted-foreground)',
-                          color: 'white',
-                        }}
-                        className="px-3 py-1 rounded text-xs font-semibold"
+                  {groupedData.map((group) => {
+                    const firstRecord = group.records[0];
+                    const isUserData = 'discordUsername' in firstRecord;
+                    const displayName = isUserData ? (firstRecord as LegacyUserDataRecord).discordUsername : (firstRecord as LegacyAttendanceRecord).legacyName;
+                    
+                    return (
+                      <div
+                        key={`group-${displayName}-${group.records[0].id}`}
+                        style={{ padding: '12px', borderColor: 'var(--border)' }}
+                        className="flex justify-between items-center"
                       >
-                        {group.isMapped ? 'Remap' : 'Map'}
-                      </button>
-                    </div>
-                  ))}
+                        <div className="flex-1">
+                          <p style={{ color: 'var(--foreground)' }} className="text-sm font-semibold">
+                            {displayName}
+                            {isUserData && ` (${(firstRecord as LegacyUserDataRecord).rankName})`}
+                          </p>
+                          {isUserData ? (
+                            <p style={{ color: 'var(--muted-foreground)' }} className="text-xs">
+                              User Data: TIG={ (firstRecord as LegacyUserDataRecord).tigSinceLastPromo } | Old Data={ (firstRecord as LegacyUserDataRecord).oldData }
+                              { (firstRecord as LegacyUserDataRecord).dateJoined && ` | Joined: ${(firstRecord as LegacyUserDataRecord).dateJoined}`}
+                            </p>
+                          ) : (
+                            <>
+                              <p style={{ color: 'var(--muted-foreground)' }} className="text-xs">
+                                {group.records.length} record{group.records.length > 1 ? 's' : ''} ({group.records.map(r => (r as LegacyAttendanceRecord).legacyStatus).join(', ')})
+                              </p>
+                              <p style={{ color: 'var(--muted-foreground)' }} className="text-xs">
+                                Dates: {group.records.map(r => 
+                                  (r as LegacyAttendanceRecord).legacyEventDate ? new Date((r as LegacyAttendanceRecord).legacyEventDate!).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'N/A'
+                                ).join(', ')}
+                              </p>
+                            </>
+                          )}
+                          {group.mappedUser && (
+                            <p style={{ color: '#10b981' }} className="text-xs font-semibold">
+                              ✓ Mapped to: {group.mappedUser.username || group.mappedUser.email}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleOpenMapping(group.records[0].id)}
+                          style={{
+                            backgroundColor: group.isMapped ? '#10b981' : 'var(--muted-foreground)',
+                            color: 'white',
+                          }}
+                          className="px-3 py-1 rounded text-xs font-semibold"
+                        >
+                          {group.isMapped ? 'Remap' : 'Map'}
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -571,6 +742,11 @@ function MappingModal({
       u.email?.toLowerCase().includes(userSearch.toLowerCase())
   );
 
+  // Get display name based on record type
+  const displayName = 'discordUsername' in legacyRecord 
+    ? (legacyRecord as LegacyUserDataRecord).discordUsername 
+    : (legacyRecord as LegacyAttendanceRecord).legacyName;
+
   return (
     <div
       style={{
@@ -601,7 +777,7 @@ function MappingModal({
         onClick={(e) => e.stopPropagation()}
       >
         <h3 style={{ color: 'var(--foreground)' }} className="text-lg font-bold mb-4">
-          Map: {legacyRecord.legacyName}
+          Map: {displayName}
         </h3>
 
         {isFetchingUsers ? (

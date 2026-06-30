@@ -1,6 +1,9 @@
 import { prisma } from '@/lib/prisma';
 import type { AttendanceStatus } from '@/generated/prisma/enums';
 
+// Present statuses for attendance counting
+const PRESENT_STATUSES_ARRAY = ['present', 'late', 'gone_early', 'partial'] as AttendanceStatus[];
+
 export type EligibilityReason =
   | 'eligible_auto'
   | 'eligible_manual'
@@ -26,18 +29,75 @@ export type EligibilityResult = {
   proposalId?: number | null;
 };
 
-const PRESENT_STATUSES = ['present', 'late', 'gone_early', 'partial'] as const;
-
-const PRESENT_STATUSES_ARRAY = ['present', 'late', 'gone_early', 'partial'] as AttendanceStatus[];
-
+/**
+ * Get current attendance count for rank eligibility, including legacy data
+ * This counts only present attendance on main operations from all time periods
+ */
 export async function getCurrentAttendance(userId: number): Promise<number> {
-  return prisma.attendance.count({
+  // Count attendance from new system
+  // Fetch counts and legacy user data in parallel to reduce latency
+  const [newAttendanceCount, legacyAttendanceCount, legacyUserData] = await Promise.all([
+    prisma.attendance.count({
+      where: {
+        userId,
+        orbat: { isMainOp: true },
+        status: { in: PRESENT_STATUSES_ARRAY },
+      },
+    }),
+    prisma.legacyAttendanceData.count({
+      where: {
+        mappedUserId: userId,
+        legacyStatus: { in: ['P'] }, // Only count Present status from legacy data
+      },
+    }),
+    prisma.legacyUserData.findMany({
+      where: {
+        mappedUserId: userId,
+        isApplied: true, // Only count if legacy data has been applied
+        oldData: { gt: 0 }, // Only include records with actual attendance data
+      },
+      select: { oldData: true },
+    }),
+  ]);
+
+  // Sum up all old legacy attendance for this user
+  const oldLegacyAttendance = legacyUserData.reduce((sum: number, record: { oldData: number }) => sum + record.oldData, 0);
+
+  // Total attendance = new system + legacy system (2024-today) + old system (before 2024)
+  return newAttendanceCount + legacyAttendanceCount + oldLegacyAttendance;
+}
+
+/**
+ * Get total attendance count including all legacy data (for display purposes)
+ * This counts all attendance regardless of ORBAT type or status
+ */
+export async function getTotalAttendanceWithLegacy(userId: number): Promise<number> {
+  // Count all attendance from new system
+  const newAttendanceCount = await prisma.attendance.count({
+    where: { userId },
+  });
+
+  // Count all attendance from legacy system (2024 to today)
+  const legacyAttendanceCount = await prisma.legacyAttendanceData.count({
     where: {
-      userId,
-      orbat: { isMainOp: true },
-      status: { in: PRESENT_STATUSES_ARRAY },
+      mappedUserId: userId,
+      legacyStatus: { in: ['P'] }, // Only count Present status
     },
   });
+
+  // Get old attendance data (before 2024) from LegacyUserData
+  const legacyUserData = await prisma.legacyUserData.findMany({
+    where: {
+      mappedUserId: userId,
+      isApplied: true,
+      oldData: { gt: 0 },
+    },
+    select: { oldData: true },
+  });
+
+  const oldLegacyAttendance = legacyUserData.reduce((sum: number, record: { oldData: number }) => sum + record.oldData, 0);
+
+  return newAttendanceCount + legacyAttendanceCount + oldLegacyAttendance;
 }
 
 export async function checkRankupEligibility(userId: number): Promise<EligibilityResult> {
@@ -176,7 +236,7 @@ export async function checkRankupEligibility(userId: number): Promise<Eligibilit
       where: { userId },
       select: { trainingId: true },
     });
-    const completed = new Set(userTrainingIds.map((t) => t.trainingId));
+    const completed = new Set(userTrainingIds.map((t) => t.trainingId).filter((id): id is number => id !== null && id !== undefined));
     missingTrainingIds = requiredIds.filter((id) => !completed.has(id));
 
     if (missingTrainingIds.length > 0) {

@@ -367,9 +367,12 @@ export default function UserDetailClient({
               {attendance.recent.length === 0 ? (
                 <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>No attendance records.</p>
               ) : (
-                attendance.recent.map((entry) => (
+                attendance.recent.map((entry: any) => (
                   <div key={entry.id} className="rounded border p-3 text-sm" style={{ borderColor: 'var(--border)' }}>
-                    <div className="font-medium" style={{ color: 'var(--foreground)' }}>{entry.orbatName}</div>
+                    <div className="font-medium" style={{ color: entry.isLegacy ? '#6b7280' : 'var(--foreground)' }}>
+                      {entry.orbatName}
+                      {entry.isLegacy && ' (Legacy)'}
+                    </div>
                     <div style={{ color: 'var(--muted-foreground)' }}>
                       {new Date(entry.orbatDate).toLocaleDateString('en-GB')} • {entry.status}
                     </div>

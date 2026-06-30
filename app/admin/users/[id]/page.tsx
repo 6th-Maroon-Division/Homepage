@@ -4,6 +4,7 @@ import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
+import { getTotalAttendanceWithLegacy, getRecentAttendanceWithLegacy, getSixMonthTrendWithLegacy } from '@/lib/attendance-stats';
 import UserDetailClient from './UserDetailClient';
 
 function formatMonth(date: Date): string {
@@ -119,25 +120,11 @@ export default async function UserDetailPage({
     ranks,
   ] =
     await Promise.all([
-      prisma.attendance.count({ where: { userId } }),
+      getTotalAttendanceWithLegacy(userId), // Total including legacy data
       prisma.attendance.count({ where: { userId, createdAt: { gte: thirtyDaysAgo } } }),
       prisma.attendance.count({ where: { userId, createdAt: { gte: ninetyDaysAgo } } }),
-      prisma.attendance.findMany({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-        include: {
-          orbat: {
-            select: {
-              name: true,
-              eventDate: true,
-            },
-          },
-        },
-      }),
-      prisma.attendance.findMany({
-        where: { userId, createdAt: { gte: sixMonthsAgo } },
-        select: { createdAt: true },
-      }),
+      getRecentAttendanceWithLegacy(userId, 15), // Recent attendance including legacy
+      getSixMonthTrendWithLegacy(userId), // 6-month trend (legacy excluded)
       prisma.permission.findMany({
         orderBy: { key: 'asc' },
         select: {
@@ -202,13 +189,14 @@ export default async function UserDetailPage({
     lastAttendanceDate: recentAttendance[0]?.createdAt.toISOString() ?? null,
     count30d,
     count90d,
-    trend: buildLastSixMonthsTrend(trendRecords.map((record) => record.createdAt)),
-    recent: recentAttendance.map((entry) => ({
+    trend: buildLastSixMonthsTrend(trendRecords),
+    recent: recentAttendance.map((entry: any) => ({
       id: entry.id,
       createdAt: entry.createdAt.toISOString(),
       status: entry.status,
-      orbatName: entry.orbat.name,
-      orbatDate: (entry.orbat.eventDate ?? entry.createdAt).toISOString(),
+      orbatName: entry.orbatName || 'Legacy Attendance',
+      orbatDate: (entry.orbatDate instanceof Date ? entry.orbatDate : new Date(entry.orbatDate ?? entry.createdAt)).toISOString(),
+      isLegacy: entry.isLegacy || false,
     })),
   };
 

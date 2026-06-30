@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
+import { getTotalAttendanceWithLegacy, getRecentAttendanceWithLegacy, getSixMonthTrendWithLegacy } from '@/lib/attendance-stats';
 import UserSelfDetailClient from '@/app/settings/UserSelfDetailClient';
 
 function formatMonth(date: Date): string {
@@ -89,29 +90,14 @@ export default async function ProfilePage() {
   const ninetyDaysAgo = new Date(now);
   ninetyDaysAgo.setDate(now.getDate() - 90);
 
-  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+  // (sixMonthsAgo no longer needed; trend dates are provided by getSixMonthTrendWithLegacy)
 
   const [totalCount, count30d, count90d, recentAttendance, trendRecords] = await Promise.all([
-    prisma.attendance.count({ where: { userId } }),
+    getTotalAttendanceWithLegacy(userId), // Total including legacy data
     prisma.attendance.count({ where: { userId, createdAt: { gte: thirtyDaysAgo } } }),
     prisma.attendance.count({ where: { userId, createdAt: { gte: ninetyDaysAgo } } }),
-    prisma.attendance.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 15,
-      include: {
-        orbat: {
-          select: {
-            name: true,
-            eventDate: true,
-          },
-        },
-      },
-    }),
-    prisma.attendance.findMany({
-      where: { userId, createdAt: { gte: sixMonthsAgo } },
-      select: { createdAt: true },
-    }),
+    getRecentAttendanceWithLegacy(userId, 15), // Recent attendance including legacy
+    getSixMonthTrendWithLegacy(userId), // 6-month trend (legacy excluded)
   ]);
 
   const [trainingRequests, allTrainings, loaEntries] = await Promise.all([
@@ -257,13 +243,14 @@ export default async function ProfilePage() {
     lastAttendanceDate: recentAttendance[0]?.createdAt.toISOString() ?? null,
     count30d,
     count90d,
-    trend: buildLastSixMonthsTrend(trendRecords.map((record) => record.createdAt)),
+    trend: buildLastSixMonthsTrend(trendRecords),
     recent: recentAttendance.map((entry) => ({
       id: entry.id,
       createdAt: entry.createdAt.toISOString(),
       status: entry.status,
-      orbatName: entry.orbat.name,
-      orbatDate: (entry.orbat.eventDate ?? entry.createdAt).toISOString(),
+      orbatName: entry.orbatName || 'Legacy Attendance',
+      orbatDate: (entry.orbatDate instanceof Date ? entry.orbatDate : new Date(entry.orbatDate ?? entry.createdAt)).toISOString(),
+      isLegacy: entry.isLegacy || false,
     })),
   };
 

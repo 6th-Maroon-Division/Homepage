@@ -5,6 +5,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 import { publishUserProfileEvent } from '@/lib/realtime/user-events';
+import { getCurrentAttendance } from '@/lib/rank-eligibility';
 
 export async function POST(
   request: NextRequest,
@@ -32,9 +33,7 @@ export async function POST(
     const rank = await prisma.rank.findUnique({ where: { id: Number(rankId) } });
     if (!rank) return NextResponse.json({ error: 'Rank not found' }, { status: 404 });
 
-    const attendanceTotal = await prisma.attendance.count({
-      where: { userId, status: 'present', orbat: { isMainOp: true } },
-    });
+    const attendanceTotal = await getCurrentAttendance(userId);
 
     const existing = await prisma.userRank.findUnique({ where: { userId } });
     const previousRankName = existing?.currentRankId
