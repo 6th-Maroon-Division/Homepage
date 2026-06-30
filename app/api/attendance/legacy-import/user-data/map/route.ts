@@ -28,11 +28,13 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
-    const { legacyUserDataId, mappedUserId } = await request.json();
+    const body = await request.json();
+    const legacyUserDataId = Number(body.legacyUserDataId);
+    const mappedUserId = body.mappedUserId === null || body.mappedUserId === undefined ? null : Number(body.mappedUserId);
 
-    if (!legacyUserDataId) {
+    if (!Number.isInteger(legacyUserDataId) || legacyUserDataId <= 0) {
       return NextResponse.json(
-        { error: 'Missing legacyUserDataId' },
+        { error: 'Invalid legacyUserDataId' },
         { status: 400 }
       );
     }
