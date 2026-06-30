@@ -1,6 +1,7 @@
 // app/api/users/[id]/rank/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getCurrentAttendance } from '@/lib/rank-eligibility';
 
 export async function GET(
   _request: NextRequest,
@@ -17,9 +18,7 @@ export async function GET(
     });
     if (!userRank) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    const attendanceTotal = await prisma.attendance.count({
-      where: { userId, status: 'present', orbat: { isMainOp: true } },
-    });
+    const attendanceTotal = await getCurrentAttendance(userId);
     const delta = attendanceTotal - (userRank.attendanceSinceLastRank || 0);
 
     return NextResponse.json({
