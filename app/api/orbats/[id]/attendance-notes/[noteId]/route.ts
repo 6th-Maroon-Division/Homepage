@@ -198,6 +198,39 @@ export async function DELETE(_req: NextRequest, context: RouteParams) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    const isAdminOverride = actorUserId !== existing.userId;
+    if (!isAdminOverride) {
+      const orbat = await prisma.orbat.findUnique({
+        where: { id: orbatId },
+        select: { eventDate: true, startTime: true, endTime: true },
+      });
+
+      const operationCutoff = (() => {
+        if (!orbat?.eventDate) {
+          return null;
+        }
+
+        const cutoff = new Date(orbat.eventDate);
+        const timeValue = orbat.endTime || orbat.startTime;
+
+        if (timeValue && /^\d{2}:\d{2}$/.test(timeValue)) {
+          const [hour, minute] = timeValue.split(':').map(Number);
+          cutoff.setHours(hour, minute, 0, 0);
+        } else {
+          cutoff.setHours(23, 59, 59, 999);
+        }
+
+        return cutoff;
+      })();
+
+      if (operationCutoff && operationCutoff < new Date()) {
+        return NextResponse.json(
+          { error: 'Operation is in the past. Attendance notes are closed.' },
+          { status: 400 }
+        );
+      }
+    }
+
     await prisma.orbatAttendanceNote.delete({ where: { id: parsedNoteId } });
 
     return NextResponse.json({ success: true });
