@@ -127,6 +127,8 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
   };
   const [tempFrequencies, setTempFrequencies] = useState<TempFrequency[]>([]);
   const [selectedFrequencyIds, setSelectedFrequencyIds] = useState<number[]>([]);
+  const [draggedFrequency, setDraggedFrequency] = useState<{ list: 'existing' | 'temp'; index: number } | null>(null);
+  const [dragOverFrequency, setDragOverFrequency] = useState<{ list: 'existing' | 'temp'; index: number } | null>(null);
   const [tempFreqForm, setTempFreqForm] = useState({
     frequency: '',
     type: 'SR' as 'SR' | 'LR',
@@ -460,6 +462,52 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
 
   const removeTempFrequency = (id: string) => {
     setTempFrequencies(tempFrequencies.filter((f) => f._id !== id));
+  };
+
+  const moveExistingFrequency = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+
+    setSelectedFrequencyIds((previous) => {
+      const next = [...previous];
+      const [moved] = next.splice(fromIndex, 1);
+      if (typeof moved !== 'number') return previous;
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  };
+
+  const moveTempFrequency = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+
+    setTempFrequencies((previous) => {
+      const next = [...previous];
+      const [moved] = next.splice(fromIndex, 1);
+      if (!moved) return previous;
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  };
+
+  const handleFrequencyDragStart = (list: 'existing' | 'temp', index: number) => {
+    setDraggedFrequency({ list, index });
+  };
+
+  const handleFrequencyDrop = (list: 'existing' | 'temp', index: number) => {
+    if (!draggedFrequency || draggedFrequency.list !== list) return;
+
+    if (list === 'existing') {
+      moveExistingFrequency(draggedFrequency.index, index);
+    } else {
+      moveTempFrequency(draggedFrequency.index, index);
+    }
+
+    setDraggedFrequency(null);
+    setDragOverFrequency(null);
+  };
+
+  const handleFrequencyDragEnd = () => {
+    setDraggedFrequency(null);
+    setDragOverFrequency(null);
   };
 
   const addSlot = () => {
@@ -1567,6 +1615,9 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         {/* Assigned Frequencies Display */}
         <div className="space-y-2">
           <h3 className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>Assigned Frequencies</h3>
+          <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+            Drag frequency cards to reorder them.
+          </p>
           {selectedFrequencyIds.length === 0 && tempFrequencies.length === 0 ? (
             <div className="p-4 rounded-md border-2 border-dashed text-center" style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}>
               <p style={{ color: 'var(--muted-foreground)' }}>No radio frequencies assigned.</p>
@@ -1574,14 +1625,43 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {/* Display selected existing frequencies */}
-              {selectedFrequencyIds.map((freqId) => {
+              {selectedFrequencyIds.map((freqId, freqIndex) => {
                 const freq = radioFrequencies.find((f) => f.id === freqId);
                 if (!freq) return null;
                 return (
                   <div
                     key={`existing-${freqId}`}
-                    className="rounded-lg border p-3"
-                    style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}
+                    draggable
+onDragStart={(e) => {
+  e.dataTransfer.setData('text/plain', '');
+  handleFrequencyDragStart('existing', freqIndex);
+}}
+                    onDragOver={(e) => {
+                      if (!draggedFrequency || draggedFrequency.list !== 'existing') return;
+                      e.preventDefault();
+                    }}
+                    onDragEnter={() => {
+                      if (!draggedFrequency || draggedFrequency.list !== 'existing') return;
+                      setDragOverFrequency({ list: 'existing', index: freqIndex });
+                    }}
+                    onDrop={(e) => {
+                      if (!draggedFrequency || draggedFrequency.list !== 'existing') return;
+                      e.preventDefault();
+                      handleFrequencyDrop('existing', freqIndex);
+                    }}
+                    onDragEnd={handleFrequencyDragEnd}
+                    className="rounded-lg border p-3 cursor-move"
+                    style={{
+                      backgroundColor: 'var(--background)',
+                      borderColor:
+                        dragOverFrequency?.list === 'existing' && dragOverFrequency?.index === freqIndex
+                          ? 'var(--primary)'
+                          : 'var(--border)',
+                      opacity:
+                        draggedFrequency?.list === 'existing' && draggedFrequency?.index === freqIndex
+                          ? 0.6
+                          : 1,
+                    }}
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div className="font-semibold text-lg" style={{ color: 'var(--foreground)' }}>
@@ -1611,11 +1691,40 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
               })}
               
               {/* Display temporary frequencies */}
-              {tempFrequencies.map((freq) => (
+              {tempFrequencies.map((freq, freqIndex) => (
                 <div
                   key={freq._id}
-                  className="rounded-lg border p-3 opacity-75"
-                  style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}
+                  draggable
+onDragStart={(e) => {
+  e.dataTransfer.setData('text/plain', '');
+  handleFrequencyDragStart('temp', freqIndex);
+}}
+                  onDragOver={(e) => {
+                    if (!draggedFrequency || draggedFrequency.list !== 'temp') return;
+                    e.preventDefault();
+                  }}
+                  onDragEnter={() => {
+                    if (!draggedFrequency || draggedFrequency.list !== 'temp') return;
+                    setDragOverFrequency({ list: 'temp', index: freqIndex });
+                  }}
+                  onDrop={(e) => {
+                    if (!draggedFrequency || draggedFrequency.list !== 'temp') return;
+                    e.preventDefault();
+                    handleFrequencyDrop('temp', freqIndex);
+                  }}
+                  onDragEnd={handleFrequencyDragEnd}
+                  className="rounded-lg border p-3 opacity-75 cursor-move"
+                  style={{
+                    backgroundColor: 'var(--background)',
+                    borderColor:
+                      dragOverFrequency?.list === 'temp' && dragOverFrequency?.index === freqIndex
+                        ? 'var(--primary)'
+                        : 'var(--border)',
+                    opacity:
+                      draggedFrequency?.list === 'temp' && draggedFrequency?.index === freqIndex
+                        ? 0.45
+                        : 0.75,
+                  }}
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="font-semibold text-lg" style={{ color: 'var(--foreground)' }}>

@@ -37,7 +37,31 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { avatarUrl } = body;
+    const { avatarUrl, username } = body as { avatarUrl?: string | null; username?: string };
+
+    const updateData: { avatarUrl?: string | null; username?: string } = {};
+
+    if (Object.prototype.hasOwnProperty.call(body, 'avatarUrl')) {
+      updateData.avatarUrl = avatarUrl ?? null;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body, 'username')) {
+      const normalizedUsername = typeof username === 'string' ? username.trim() : '';
+
+      if (!normalizedUsername) {
+        return NextResponse.json({ error: 'Username is required' }, { status: 400 });
+      }
+
+      if (normalizedUsername.length > 50) {
+        return NextResponse.json({ error: 'Username must be 50 characters or fewer' }, { status: 400 });
+      }
+
+      updateData.username = normalizedUsername;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+    }
 
     // Check if user exists
     const user = await prisma.user.findUnique({
@@ -48,10 +72,10 @@ export async function PATCH(
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Update avatar
+    // Update allowed fields
     const updatedUser = await prisma.user.update({
       where: { id: userId },
-      data: { avatarUrl: avatarUrl },
+      data: updateData,
     });
 
     return NextResponse.json({

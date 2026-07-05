@@ -52,6 +52,7 @@ export default async function OrbatPage({ params }: OrbatPageProps) {
         },
       },
       frequencies: {
+        orderBy: { id: 'asc' },
         include: {
           radioFrequency: true,
         },

@@ -138,6 +138,9 @@ export default function UserSelfDetailClient({ user, attendance, availableTraini
   const [profileImageUrl, setProfileImageUrl] = useState(user.avatarUrl ?? '');
   const [selectedAvatarFileName, setSelectedAvatarFileName] = useState<string | null>(null);
   const [isSavingAvatar, setIsSavingAvatar] = useState(false);
+  const [isSavingUsername, setIsSavingUsername] = useState(false);
+  const [editableUsername, setEditableUsername] = useState(user.username ?? '');
+  const [displayUsername, setDisplayUsername] = useState(user.username ?? 'Unknown User');
   const [isRefreshingSteamAvatar, setIsRefreshingSteamAvatar] = useState(false);
   const [trainingsViewTab, setTrainingsViewTab] = useState<'my-trainings' | 'available'>('my-trainings');
   const [rankHistoryRows, setRankHistoryRows] = useState<RankHistoryEntry[]>([]);
@@ -179,6 +182,11 @@ export default function UserSelfDetailClient({ user, attendance, availableTraini
   }, [activeTab, rankHistoryPage, fetchRankHistory]);
 
   useEffect(() => {
+    setEditableUsername(user.username ?? '');
+    setDisplayUsername(user.username ?? 'Unknown User');
+  }, [user.username]);
+
+  useEffect(() => {
     const source = new EventSource('/api/user/events');
 
     source.onmessage = () => {
@@ -210,7 +218,7 @@ export default function UserSelfDetailClient({ user, attendance, availableTraini
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold" style={{ color: 'var(--foreground)' }}>
-              {user.username || 'Unknown User'}
+              {displayUsername}
             </h1>
             <p className="text-sm mt-1" style={{ color: 'var(--muted-foreground)' }}>
               Joined {new Date(user.createdAt).toLocaleDateString('en-GB')}
@@ -967,6 +975,65 @@ export default function UserSelfDetailClient({ user, attendance, availableTraini
           <h3 className="font-semibold mb-3" style={{ color: 'var(--foreground)' }}>Profile Actions</h3>
 
           <div className="space-y-3 max-w-2xl">
+            <label className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
+              Username
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={editableUsername}
+                onChange={(event) => setEditableUsername(event.target.value)}
+                className="flex-1 min-w-0 px-3 py-2 rounded border text-sm"
+                style={{
+                  borderColor: 'var(--border)',
+                  backgroundColor: 'var(--background)',
+                  color: 'var(--foreground)',
+                }}
+                maxLength={50}
+                placeholder="Enter username"
+                disabled={isSavingUsername || isSavingAvatar}
+              />
+              <button
+                type="button"
+                disabled={isSavingUsername || isSavingAvatar}
+                onClick={async () => {
+                  const normalizedUsername = editableUsername.trim();
+                  if (!normalizedUsername) {
+                    showError('Username is required');
+                    return;
+                  }
+
+                  setIsSavingUsername(true);
+                  try {
+                    const response = await fetch('/api/user/update', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ username: normalizedUsername }),
+                    });
+
+                    if (!response.ok) {
+                      const data = await response.json().catch(() => ({}));
+                      throw new Error(data.error || 'Failed to update username');
+                    }
+
+                    setEditableUsername(normalizedUsername);
+                    setDisplayUsername(normalizedUsername);
+                    showSuccess('Username updated');
+                    await updateSession();
+                    router.refresh();
+                  } catch (error) {
+                    showError(error instanceof Error ? error.message : 'Failed to update username');
+                  } finally {
+                    setIsSavingUsername(false);
+                  }
+                }}
+                className="shrink-0 px-3 py-2 rounded text-sm font-medium disabled:opacity-50"
+                style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+              >
+                {isSavingUsername ? 'Saving…' : 'Save Username'}
+              </button>
+            </div>
+
             <label className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
               Upload Profile Picture
             </label>

@@ -225,6 +225,7 @@ export async function POST(request: NextRequest) {
             },
           },
           frequencies: {
+            orderBy: { id: 'asc' },
             include: {
               radioFrequency: true,
             },

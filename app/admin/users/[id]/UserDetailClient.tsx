@@ -185,7 +185,15 @@ export default function UserDetailClient({
   const [isPromoting, setIsPromoting] = useState(false);
   const [isDemoting, setIsDemoting] = useState(false);
   const [isClearingAvatar, setIsClearingAvatar] = useState(false);
+  const [editableUsername, setEditableUsername] = useState(user.username ?? '');
+  const [displayUsername, setDisplayUsername] = useState(user.username ?? 'Unknown User');
+  const [isSavingUsername, setIsSavingUsername] = useState(false);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setEditableUsername(user.username ?? '');
+    setDisplayUsername(user.username ?? 'Unknown User');
+  }, [user.username]);
 
   const handleDelete = async () => {
     if (!canViewActions || isDeleting) return;
@@ -284,7 +292,7 @@ export default function UserDetailClient({
             )}
             <div>
               <h1 className="text-2xl font-bold" style={{ color: 'var(--foreground)' }}>
-                {user.username || 'Unknown User'}
+                {displayUsername}
               </h1>
             <p className="text-sm mt-1" style={{ color: 'var(--muted-foreground)' }}>
               ID: {user.id} • Joined {new Date(user.createdAt).toLocaleDateString('en-GB')}
@@ -831,6 +839,74 @@ export default function UserDetailClient({
 
       {activeTab === 'actions' && canViewActions && (
         <div className="rounded-lg border p-4" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--secondary)' }}>
+          <div className="mb-4">
+            <h3 className="font-semibold mb-3" style={{ color: 'var(--foreground)' }}>Profile</h3>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium" style={{ color: 'var(--foreground)' }}>
+                Username
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={editableUsername}
+                  onChange={(event) => setEditableUsername(event.target.value)}
+                  className="flex-1 min-w-0 px-3 py-2 rounded border text-sm"
+                  style={{
+                    borderColor: 'var(--border)',
+                    backgroundColor: 'var(--background)',
+                    color: 'var(--foreground)',
+                  }}
+                  maxLength={50}
+                  placeholder="Enter username"
+                  disabled={isSavingUsername || isSelfUser}
+                />
+                <button
+                  type="button"
+                  disabled={isSavingUsername || isSelfUser}
+                  onClick={async () => {
+                    const normalizedUsername = editableUsername.trim();
+                    if (!normalizedUsername) {
+                      showError('Username is required');
+                      return;
+                    }
+
+                    setIsSavingUsername(true);
+                    try {
+                      const response = await fetch(`/api/users/${user.id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username: normalizedUsername }),
+                      });
+
+                      if (!response.ok) {
+                        const data = await response.json().catch(() => ({}));
+                        throw new Error(data.error || 'Failed to update username');
+                      }
+
+                      setEditableUsername(normalizedUsername);
+                      setDisplayUsername(normalizedUsername);
+                      showSuccess('Username updated');
+                      router.refresh();
+                    } catch (error) {
+                      showError(error instanceof Error ? error.message : 'Failed to update username');
+                    } finally {
+                      setIsSavingUsername(false);
+                    }
+                  }}
+                  className="px-4 py-2 rounded text-sm font-medium disabled:opacity-50"
+                  style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                >
+                  {isSavingUsername ? 'Saving...' : 'Save Username'}
+                </button>
+              </div>
+              {isSelfUser && (
+                <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                  You cannot modify your own admin profile from this page.
+                </p>
+              )}
+            </div>
+          </div>
+
           {canManagePromotions && (
             <div className="mb-4">
               <h3 className="font-semibold mb-3" style={{ color: 'var(--foreground)' }}>Rank Actions</h3>

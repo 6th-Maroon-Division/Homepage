@@ -58,6 +58,7 @@ export default async function AdminOrbatPage({ params }: AdminOrbatPageProps) {
         },
       },
       frequencies: {
+        orderBy: { id: 'asc' },
         include: {
           radioFrequency: true,
         },

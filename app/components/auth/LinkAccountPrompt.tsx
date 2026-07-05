@@ -40,6 +40,12 @@ export default function LinkAccountPrompt() {
   const missingProvider = !hasSteam ? 'Steam' : 'Discord';
   const linkUrl = !hasSteam ? '/api/auth/steam-login' : '/api/auth/signin?provider=discord';
 
+  const handleDiscordSignIn = async () => {
+    if (typeof window === 'undefined') return;
+    const callbackUrl = encodeURIComponent(window.location.href);
+    window.location.assign(`/api/auth/signin/discord?callbackUrl=${callbackUrl}`);
+  };
+
   return (
     <div className="fixed bottom-4 right-4 max-w-md bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-400 dark:border-yellow-600 rounded-lg shadow-lg p-4 z-50">
       <div className="flex items-start gap-3">
@@ -56,12 +62,22 @@ export default function LinkAccountPrompt() {
             Some features require both Steam and Discord accounts to be linked. Link your {missingProvider} account now for full functionality.
           </p>
           <div className="flex gap-2">
-            <a
-              href={linkUrl}
-              className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm font-medium transition-colors"
-            >
-              Link {missingProvider}
-            </a>
+            {!hasSteam ? (
+              <a
+                href={linkUrl}
+                className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm font-medium transition-colors"
+              >
+                Link {missingProvider}
+              </a>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void handleDiscordSignIn()}
+                className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm font-medium transition-colors"
+              >
+                Link {missingProvider}
+              </button>
+            )}
             <button
               onClick={handleDismiss}
               className="px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-md text-sm font-medium transition-colors"

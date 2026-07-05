@@ -6,12 +6,19 @@ import { signIn, signOut, useSession } from 'next-auth/react';
 export default function AuthButtons() {
   const { data: session } = useSession();
 
+  const handleDiscordSignIn = async () => {
+    if (typeof window === 'undefined') return;
+    const callbackUrl = encodeURIComponent(window.location.href);
+    window.location.assign(`/api/auth/signin/discord?callbackUrl=${callbackUrl}`);
+  };
+
   return (
     <div className="flex items-center space-x-4">
       {!session ? (
         <>
           <button
-            onClick={() => signIn('discord')}
+            type="button"
+            onClick={handleDiscordSignIn}
             className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center gap-2"
           >
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -20,6 +27,7 @@ export default function AuthButtons() {
             Discord
           </button>
           <button
+            type="button"
             onClick={() => signIn('steam')}
             className="bg-gray-800 text-white px-4 py-2 rounded-md hover:bg-gray-900 flex items-center gap-2"
           >
@@ -33,6 +41,7 @@ export default function AuthButtons() {
         <>
           <span>Welcome, {session.user?.username}</span>
           <button
+            type="button"
             onClick={() => signOut()}
             className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
           >

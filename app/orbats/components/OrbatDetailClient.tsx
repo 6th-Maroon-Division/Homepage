@@ -128,9 +128,6 @@ function renderFrequenciesSection(frequencies: ClientFrequency[] | undefined, te
     return null;
   }
 
-  // Sort by callsign
-  allFreqs.sort((a, b) => (a.callsign || '').localeCompare(b.callsign || ''));
-
   return (
     <div className="border rounded-lg p-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
       <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--foreground)' }}>Radio Frequencies</h2>
