@@ -51,6 +51,7 @@ model User {
   squadRoleAuditLogs SquadRoleAuditLog[]
   leaveOfAbsences   LeaveOfAbsence[]
   botTokens        BotToken[]
+  orbatAttendanceNotes OrbatAttendanceNote[]
 }
 
 enum MessageType {
@@ -207,6 +208,31 @@ model Orbat {
   airspace         String?   // Airspace
   inGameTimezone   String?   // In Game Timezone
   operationDay     String?   // Operation Day
+  attendanceNotes  OrbatAttendanceNote[]
+}
+
+enum OrbatAttendanceNoteStatus {
+  absent
+  unsure
+  late_unsure
+}
+
+model OrbatAttendanceNote {
+  id               Int                      @id @default(autoincrement())
+  orbat            Orbat                    @relation(fields: [orbatId], references: [id], onDelete: Cascade)
+  orbatId          Int
+  user             User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId           Int
+  status           OrbatAttendanceNoteStatus
+  reason           String?
+  lateMinutes      Int?
+  leaveEarlyMinutes Int?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  @@unique([orbatId, userId])
+  @@index([orbatId])
+  @@index([userId])
 }
 
 // Global role definition

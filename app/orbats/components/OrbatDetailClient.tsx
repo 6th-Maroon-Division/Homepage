@@ -67,6 +67,7 @@ type ClientOrbat = {
   endTime?: string | null;
   squads: ClientSquad[];
   frequencies?: ClientFrequency[];
+  attendanceNotes?: OrbatAttendanceNote[];
   tempFrequencies?: unknown;
   bluforCountry?: string | null;
   bluforRelationship?: string | null;
@@ -80,6 +81,27 @@ type ClientOrbat = {
   airspace?: string | null;
   inGameTimezone?: string | null;
   operationDay?: string | null;
+};
+
+type OrbatAttendanceNote = {
+  id: number;
+  orbatId: number;
+  userId: number;
+  status: 'absent' | 'unsure' | 'late_unsure';
+  reason?: string | null;
+  lateMinutes?: number | null;
+  leaveEarlyMinutes?: number | null;
+  createdAt: string;
+  updatedAt: string;
+  user: {
+    id: number;
+    username: string | null;
+    userRank?: {
+      currentRank?: {
+        abbreviation?: string | null;
+      } | null;
+    } | null;
+  };
 };
 
 // Helper function to render frequencies section
@@ -169,6 +191,8 @@ type ApiSlot = {
     user: {
       id: number | null;
       username: string;
+      rankAbbreviation?: string | null;
+      rankName?: string | null;
     } | null;
   }[];
   radioFrequency?: {
@@ -235,6 +259,12 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
   const [loadingSubslotId, setLoadingSubslotId] = useState<number | null>(null);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [isStreamConnected, setIsStreamConnected] = useState(false);
+  const [noteStatus, setNoteStatus] = useState<'absent' | 'unsure' | 'late_unsure'>('absent');
+  const [noteReason, setNoteReason] = useState('');
+  const [noteLateMinutes, setNoteLateMinutes] = useState('');
+  const [noteLeaveEarlyMinutes, setNoteLeaveEarlyMinutes] = useState('');
+  const [isSavingAttendanceNote, setIsSavingAttendanceNote] = useState(false);
+  const [isDeletingAttendanceNote, setIsDeletingAttendanceNote] = useState(false);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { showSuccess, showError } = useToast();
 
@@ -262,6 +292,14 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
 
   const operationCutoff = getOperationCutoff(orbat.eventDate, orbat.startTime, orbat.endTime);
   const isPast = !!operationCutoff && operationCutoff < new Date();
+  const attendanceNotes = orbat.attendanceNotes || [];
+  const absentNotes = attendanceNotes.filter((note) => note.status === 'absent');
+  const unsureNotes = attendanceNotes.filter((note) => note.status === 'unsure');
+  const lateUnsureNotes = attendanceNotes.filter((note) => note.status === 'late_unsure');
+  const myAttendanceNote =
+    currentUserId === null
+      ? null
+      : attendanceNotes.find((note) => note.userId === currentUserId) || null;
 
   // Fetch current user ID on mount
   useEffect(() => {
@@ -274,6 +312,25 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
         // Ignore error - user might not be logged in
       });
   }, []);
+
+  useEffect(() => {
+    if (!myAttendanceNote) {
+      setNoteStatus('absent');
+      setNoteReason('');
+      setNoteLateMinutes('');
+      setNoteLeaveEarlyMinutes('');
+      return;
+    }
+
+    setNoteStatus(myAttendanceNote.status);
+    setNoteReason(myAttendanceNote.reason || '');
+    setNoteLateMinutes(
+      typeof myAttendanceNote.lateMinutes === 'number' ? String(myAttendanceNote.lateMinutes) : ''
+    );
+    setNoteLeaveEarlyMinutes(
+      typeof myAttendanceNote.leaveEarlyMinutes === 'number' ? String(myAttendanceNote.leaveEarlyMinutes) : ''
+    );
+  }, [myAttendanceNote?.id, myAttendanceNote?.updatedAt]);
 
   const refreshOrbat = useCallback(async () => {
     try {
@@ -376,6 +433,8 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
             ? {
                 id: s.user.id,
                 username: s.user.username,
+                rankAbbreviation: s.user.rankAbbreviation ?? null,
+                rankName: s.user.rankName ?? null,
               }
             : null,
         })),
@@ -436,6 +495,8 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
             ? {
                 id: s.user.id,
                 username: s.user.username,
+                rankAbbreviation: s.user.rankAbbreviation ?? null,
+                rankName: s.user.rankName ?? null,
               }
             : null,
         })),
@@ -456,6 +517,89 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
       showError('Network error while removing signup.');
     } finally {
       setLoadingSubslotId(null);
+    }
+  }
+
+  const formatNoteUser = (note: OrbatAttendanceNote) => {
+    const username = note.user?.username || 'Unknown';
+    const rank = note.user?.userRank?.currentRank?.abbreviation;
+    return rank ? `[${rank}] ${username}` : username;
+  };
+
+  async function handleSaveAttendanceNote() {
+    if (currentUserId === null) {
+      showError('You must be logged in to set attendance notes.');
+      return;
+    }
+
+    if (isPast) {
+      showError('Operation is in the past. Attendance notes are closed.');
+      return;
+    }
+
+    const parsedLate = noteLateMinutes.trim() === '' ? null : Number(noteLateMinutes);
+    const parsedLeaveEarly = noteLeaveEarlyMinutes.trim() === '' ? null : Number(noteLeaveEarlyMinutes);
+
+    if (noteStatus === 'late_unsure') {
+      const hasLate = Number.isInteger(parsedLate) && parsedLate !== null && parsedLate >= 0;
+      const hasLeaveEarly = Number.isInteger(parsedLeaveEarly) && parsedLeaveEarly !== null && parsedLeaveEarly >= 0;
+      if (!hasLate && !hasLeaveEarly) {
+        showError('Add how late you are or how early you will leave.');
+        return;
+      }
+    }
+
+    setIsSavingAttendanceNote(true);
+    try {
+      const res = await fetch(`/api/orbats/${orbat.id}/attendance-notes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: noteStatus,
+          reason: noteReason,
+          lateMinutes: noteStatus === 'late_unsure' ? parsedLate : null,
+          leaveEarlyMinutes: noteStatus === 'late_unsure' ? parsedLeaveEarly : null,
+        }),
+      });
+
+      if (!res.ok) {
+        const body: { error?: string } = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Failed to save attendance note');
+      }
+
+      await refreshOrbat();
+      showSuccess('Attendance note saved.');
+    } catch (error) {
+      showError(error instanceof Error ? error.message : 'Failed to save attendance note.');
+    } finally {
+      setIsSavingAttendanceNote(false);
+    }
+  }
+
+  async function handleDeleteAttendanceNote() {
+    if (!myAttendanceNote) {
+      return;
+    }
+
+    setIsDeletingAttendanceNote(true);
+    try {
+      const res = await fetch(`/api/orbats/${orbat.id}/attendance-notes/${myAttendanceNote.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        const body: { error?: string } = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Failed to delete attendance note');
+      }
+
+      await refreshOrbat();
+      showSuccess('Attendance note removed.');
+    } catch (error) {
+      showError(error instanceof Error ? error.message : 'Failed to delete attendance note.');
+    } finally {
+      setIsDeletingAttendanceNote(false);
     }
   }
 
@@ -536,13 +680,18 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
                       {/* Show participant names only if there are any */}
                       {hasSignup && (
                         <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-                          {slot.signups
-                            .map((s) => {
-                              const username = s.user?.username ?? 'Unknown';
-                              const rankAbbr = s.user?.rankAbbreviation;
-                              return rankAbbr ? `[${rankAbbr}] ${username}` : username;
-                            })
-                            .join(', ')}
+                          {slot.signups.map((s, index) => {
+                            const username = s.user?.username ?? 'Unknown';
+                            const rankAbbr = s.user?.rankAbbreviation;
+                            const label = rankAbbr ? `[${rankAbbr}] ${username}` : username;
+
+                            return (
+                              <span key={s.id} style={{ color: '#22c55e' }}>
+                                {index > 0 ? ', ' : ''}
+                                {label}
+                              </span>
+                            );
+                          })}
                         </div>
                       )}
 
@@ -611,6 +760,167 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
             </ul>
           </article>
         ))}
+      </section>
+
+      {/* Absent / Late-Unsure Section */}
+      <section className="rounded-lg border p-4 space-y-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+        <h2 className="text-lg font-semibold" style={{ color: 'var(--foreground)' }}>Attendance Notes</h2>
+
+        {!isPast && (
+          <div className="rounded-md border p-3 space-y-3" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)' }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--muted-foreground)' }}>
+                  Category
+                </label>
+                <select
+                  value={noteStatus}
+                  onChange={(event) => setNoteStatus(event.target.value as 'absent' | 'unsure' | 'late_unsure')}
+                  className="w-full px-3 py-2 rounded-md border text-sm"
+                  style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)', color: 'var(--foreground)' }}
+                >
+                  <option value="absent">Absent</option>
+                  <option value="unsure">Unsure</option>
+                  <option value="late_unsure">Late / Leaving Early</option>
+                </select>
+              </div>
+
+              {noteStatus === 'late_unsure' && (
+                <>
+                  <div>
+                    <label className="block text-xs mb-1" style={{ color: 'var(--muted-foreground)' }}>
+                      Late By (minutes)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={noteLateMinutes}
+                      onChange={(event) => setNoteLateMinutes(event.target.value)}
+                      className="w-full px-3 py-2 rounded-md border text-sm"
+                      style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)', color: 'var(--foreground)' }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs mb-1" style={{ color: 'var(--muted-foreground)' }}>
+                      Leaving Early (minutes)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={noteLeaveEarlyMinutes}
+                      onChange={(event) => setNoteLeaveEarlyMinutes(event.target.value)}
+                      className="w-full px-3 py-2 rounded-md border text-sm"
+                      style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)', color: 'var(--foreground)' }}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs mb-1" style={{ color: 'var(--muted-foreground)' }}>
+                Reason (optional)
+              </label>
+              <textarea
+                value={noteReason}
+                onChange={(event) => setNoteReason(event.target.value)}
+                rows={2}
+                className="w-full px-3 py-2 rounded-md border text-sm"
+                style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)', color: 'var(--foreground)' }}
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => void handleSaveAttendanceNote()}
+                disabled={isSavingAttendanceNote}
+                className="px-3 py-2 rounded text-sm font-medium disabled:opacity-50"
+                style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+              >
+                {isSavingAttendanceNote ? 'Saving…' : myAttendanceNote ? 'Update My Note' : 'Save My Note'}
+              </button>
+              {myAttendanceNote && (
+                <button
+                  type="button"
+                  onClick={() => void handleDeleteAttendanceNote()}
+                  disabled={isDeletingAttendanceNote}
+                  className="px-3 py-2 rounded text-sm font-medium disabled:opacity-50"
+                  style={{ backgroundColor: 'var(--destructive)', color: 'var(--destructive-foreground)' }}
+                >
+                  {isDeletingAttendanceNote ? 'Removing…' : 'Delete My Note'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <div className="rounded-md border p-3" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)' }}>
+            <h3 className="font-semibold text-sm mb-2" style={{ color: 'var(--foreground)' }}>Absent</h3>
+            {absentNotes.length === 0 ? (
+              <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>No absent notes.</p>
+            ) : (
+              <div className="space-y-2">
+                {absentNotes.map((note) => (
+                  <div key={note.id} className="rounded border p-2" style={{ borderColor: 'var(--border)' }}>
+                    <div className="text-sm font-medium" style={{ color: '#22c55e' }}>{formatNoteUser(note)}</div>
+                    {note.reason && (
+                      <div className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                        Reason: {note.reason}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+            <div className="rounded-md border p-3" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)' }}>
+            <h3 className="font-semibold text-sm mb-2" style={{ color: 'var(--foreground)' }}>Unsure</h3>
+            {unsureNotes.length === 0 ? (
+              <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>No unsure notes.</p>
+            ) : (
+              <div className="space-y-2">
+                {unsureNotes.map((note) => (
+                  <div key={note.id} className="rounded border p-2" style={{ borderColor: 'var(--border)' }}>
+                    <div className="text-sm font-medium" style={{ color: '#22c55e' }}>{formatNoteUser(note)}</div>
+                    {note.reason && (
+                      <div className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                        Reason: {note.reason}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-md border p-3" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)' }}>
+            <h3 className="font-semibold text-sm mb-2" style={{ color: 'var(--foreground)' }}>Late / Leaving Early</h3>
+            {lateUnsureNotes.length === 0 ? (
+              <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>No late/leaving-early notes.</p>
+            ) : (
+              <div className="space-y-2">
+                {lateUnsureNotes.map((note) => (
+                  <div key={note.id} className="rounded border p-2" style={{ borderColor: 'var(--border)' }}>
+                    <div className="text-sm font-medium" style={{ color: '#22c55e' }}>{formatNoteUser(note)}</div>
+                    <div className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                      {typeof note.lateMinutes === 'number' ? `Late: ${note.lateMinutes}m` : 'Late: n/a'}
+                      {' · '}
+                      {typeof note.leaveEarlyMinutes === 'number' ? `Leaving early: ${note.leaveEarlyMinutes}m` : 'Leaving early: n/a'}
+                    </div>
+                    {note.reason && (
+                      <div className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                        Reason: {note.reason}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </section>
 
       {/* Radio Frequencies and Extra Intel Section - at bottom */}

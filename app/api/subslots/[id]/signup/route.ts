@@ -23,6 +23,8 @@ type SlotResponse = {
     user: {
       id: number;
       username: string | null;
+      rankAbbreviation?: string | null;
+      rankName?: string | null;
     } | null;
   }[];
 };
@@ -57,7 +59,22 @@ async function buildSlotResponse(slotId: number): Promise<SlotResponse | null> {
         },
       },
       signups: {
-        include: { user: true },
+        include: {
+          user: {
+            include: {
+              userRank: {
+                include: {
+                  currentRank: {
+                    select: {
+                      abbreviation: true,
+                      name: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     },
   });
@@ -110,6 +127,8 @@ async function buildSlotResponse(slotId: number): Promise<SlotResponse | null> {
         ? {
             id: signup.user.id,
             username: signup.user.username,
+            rankAbbreviation: signup.user.userRank?.currentRank?.abbreviation ?? null,
+            rankName: signup.user.userRank?.currentRank?.name ?? null,
           }
         : null,
     })),
@@ -187,6 +206,28 @@ export async function POST(_req: NextRequest, context: RouteParams) {
     const roleName = existingSignupInOrbat.slot.squadRole?.name || 'slot';
     return NextResponse.json(
       { error: `You are already signed up for "${roleName}" in ${existingSignupInOrbat.slot.squad.name}.` },
+      { status: 400 }
+    );
+  }
+
+  const absentNote = await prisma.orbatAttendanceNote.findUnique({
+    where: {
+      orbatId_userId: {
+        orbatId: slot.orbat.id,
+        userId: currentUserId,
+      },
+    },
+    select: {
+      status: true,
+    },
+  });
+
+  if (absentNote?.status === 'absent') {
+    return NextResponse.json(
+      {
+        error:
+          'You marked yourself as absent for this operation. Remove or change that note before signing up.',
+      },
       { status: 400 }
     );
   }

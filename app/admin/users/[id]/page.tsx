@@ -42,15 +42,22 @@ export default async function UserDetailPage({
     redirect('/');
   }
 
-  const [canManageUsers, canManagePermissions, canMarkTrainings, canManagePromotions] = await Promise.all([
+  const [canManageUsers, canManagePermissions, canMarkTrainings, canApproveTrainingRequests, canManagePromotions] = await Promise.all([
     checkPermission(session.user.id, 'user:manage'),
     checkPermission(session.user.id, 'user:manage_permissions'),
     checkPermission(session.user.id, 'training:mark'),
+    checkPermission(session.user.id, 'training:approve_request'),
     checkPermission(session.user.id, 'rank:manage_promotions'),
   ]);
 
   const hasSuperAdmin = (session.user.permissions?.['system:super_admin'] ?? 0) > 0;
-  const canAccessPage = hasSuperAdmin || canManageUsers || canManagePermissions || canMarkTrainings || canManagePromotions;
+  const canAccessPage =
+    hasSuperAdmin ||
+    canManageUsers ||
+    canManagePermissions ||
+    canMarkTrainings ||
+    canApproveTrainingRequests ||
+    canManagePromotions;
 
   if (!canAccessPage) {
     redirect('/admin');
@@ -210,7 +217,7 @@ export default async function UserDetailPage({
     maxValue: permission.maxValue,
   }));
 
-  const canViewTrainings = hasSuperAdmin || canManageUsers || canMarkTrainings;
+  const canViewTrainings = hasSuperAdmin || canManageUsers || canMarkTrainings || canApproveTrainingRequests;
   const canViewPermissions = hasSuperAdmin || canManagePermissions;
   const canEditPermissions = canManagePermissions;
   const canViewActions = hasSuperAdmin || canManageUsers;
