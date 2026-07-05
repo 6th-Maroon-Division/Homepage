@@ -1695,7 +1695,10 @@ onDragStart={(e) => {
                 <div
                   key={freq._id}
                   draggable
-                  onDragStart={() => handleFrequencyDragStart('temp', freqIndex)}
+onDragStart={(e) => {
+  e.dataTransfer.setData('text/plain', '');
+  handleFrequencyDragStart('temp', freqIndex);
+}}
                   onDragOver={(e) => {
                     if (!draggedFrequency || draggedFrequency.list !== 'temp') return;
                     e.preventDefault();
