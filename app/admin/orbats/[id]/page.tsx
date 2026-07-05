@@ -63,6 +63,25 @@ export default async function AdminOrbatPage({ params }: AdminOrbatPageProps) {
           radioFrequency: true,
         },
       },
+      attendanceNotes: {
+        orderBy: { createdAt: 'asc' },
+        include: {
+          user: {
+            include: {
+              userRank: {
+                include: {
+                  currentRank: {
+                    select: {
+                      abbreviation: true,
+                      name: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       createdBy: true,
     },
   });
@@ -116,6 +135,7 @@ export default async function AdminOrbatPage({ params }: AdminOrbatPageProps) {
       })),
     })),
     frequencies: orbat.frequencies,
+    attendanceNotes: orbat.attendanceNotes,
     tempFrequencies: orbat.tempFrequencies,
   };
 

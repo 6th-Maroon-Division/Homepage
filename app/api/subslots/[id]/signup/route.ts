@@ -191,6 +191,28 @@ export async function POST(_req: NextRequest, context: RouteParams) {
     );
   }
 
+  const absentNote = await prisma.orbatAttendanceNote.findUnique({
+    where: {
+      orbatId_userId: {
+        orbatId: slot.orbat.id,
+        userId: currentUserId,
+      },
+    },
+    select: {
+      status: true,
+    },
+  });
+
+  if (absentNote?.status === 'absent') {
+    return NextResponse.json(
+      {
+        error:
+          'You marked yourself as absent for this operation. Remove or change that note before signing up.',
+      },
+      { status: 400 }
+    );
+  }
+
   const requiredTrainingIds = slot.squadRole?.requiredTrainingIds || [];
   if (requiredTrainingIds.length > 0) {
     const completedTrainings = await prisma.userTraining.findMany({

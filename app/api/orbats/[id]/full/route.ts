@@ -43,6 +43,25 @@ export async function GET(
             radioFrequency: true,
           },
         },
+        attendanceNotes: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            user: {
+              include: {
+                userRank: {
+                  include: {
+                    currentRank: {
+                      select: {
+                        abbreviation: true,
+                        name: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
 
@@ -141,6 +160,7 @@ export async function GET(
         }),
       })),
       frequencies: orbat.frequencies,
+      attendanceNotes: orbat.attendanceNotes,
       tempFrequencies: orbat.tempFrequencies,
     };
 
