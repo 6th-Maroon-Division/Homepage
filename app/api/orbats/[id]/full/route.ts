@@ -38,6 +38,7 @@ export async function GET(
           },
         },
         frequencies: {
+          orderBy: { id: 'asc' },
           include: {
             radioFrequency: true,
           },

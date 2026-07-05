@@ -241,6 +241,7 @@ export async function PATCH(
           },
         },
         frequencies: {
+          orderBy: { id: 'asc' },
           include: { radioFrequency: true },
         },
       },

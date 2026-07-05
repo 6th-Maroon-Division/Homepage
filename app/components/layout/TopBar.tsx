@@ -15,6 +15,12 @@ export default function TopBar() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const handleDiscordSignIn = async () => {
+    if (typeof window === 'undefined') return;
+    const callbackUrl = encodeURIComponent(window.location.href);
+    window.location.assign(`/api/auth/signin/discord?callbackUrl=${callbackUrl}`);
+  };
+
   const isAdminRoute = pathname?.startsWith('/admin');
 
   const publicNavLinks = [
@@ -130,7 +136,8 @@ export default function TopBar() {
           {!session ? (
             <div className="flex gap-2">
               <button
-                onClick={() => signIn('discord')}
+                type="button"
+                onClick={handleDiscordSignIn}
                 className="px-4 py-2 rounded-md transition-colors flex items-center gap-2"
                 style={{
                   backgroundColor: '#5865F2',
@@ -236,9 +243,10 @@ export default function TopBar() {
             {!session ? (
               <div className="space-y-2">
                 <button
+                  type="button"
                   onClick={() => {
                     setMobileMenuOpen(false);
-                    signIn('discord');
+                    void handleDiscordSignIn();
                   }}
                   className="w-full px-3 py-2 rounded-md transition-colors flex items-center justify-center gap-2"
                   style={{
