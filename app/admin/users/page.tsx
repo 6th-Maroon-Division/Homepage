@@ -13,10 +13,17 @@ export default async function UsersManagementPage() {
     redirect('/');
   }
   
-  // Check if user has user management permission
+  // Check if user can manage users or trainings on user profiles
+  const [canManageUsers, canMarkTrainings, canApproveTrainingRequests] = await Promise.all([
+    checkPermission(session.user.id, 'user:manage'),
+    checkPermission(session.user.id, 'training:mark'),
+    checkPermission(session.user.id, 'training:approve_request'),
+  ]);
   const hasPermission =
     (session.user.permissions?.['system:super_admin'] ?? 0) > 0 ||
-    await checkPermission(session.user.id, 'user:manage');
+    canManageUsers ||
+    canMarkTrainings ||
+    canApproveTrainingRequests;
   
   if (!hasPermission) {
     redirect('/admin');

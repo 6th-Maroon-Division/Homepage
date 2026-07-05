@@ -38,13 +38,19 @@ export default async function AdminPage() {
     (userPermissions['template:delete'] ?? 0) > 0 ||
     (userPermissions['orbat:create'] ?? 0) > 0 ||
     (userPermissions['orbat:edit'] ?? 0) > 0;
-  const canAccessUsers = hasSuperAdmin || (userPermissions['user:manage'] ?? 0) > 0;
+  const canAccessUsers =
+    hasSuperAdmin ||
+    (userPermissions['user:manage'] ?? 0) > 0 ||
+    (userPermissions['training:mark'] ?? 0) > 0 ||
+    (userPermissions['training:approve_request'] ?? 0) > 0;
   const canAccessRadioFrequencies = hasSuperAdmin || (userPermissions['orbat:edit'] ?? 0) > 0;
   const canAccessTrainings =
     hasSuperAdmin ||
     (userPermissions['training:create'] ?? 0) > 0 ||
     (userPermissions['training:edit'] ?? 0) > 0 ||
-    (userPermissions['training:delete'] ?? 0) > 0;
+    (userPermissions['training:delete'] ?? 0) > 0 ||
+    (userPermissions['training:mark'] ?? 0) > 0 ||
+    (userPermissions['training:approve_request'] ?? 0) > 0;
   const canAccessAttendance =
     hasSuperAdmin ||
     (userPermissions['attendance:view'] ?? 0) > 0 ||
