@@ -129,7 +129,10 @@ export async function POST(req: NextRequest, context: RouteParams) {
     }
 
     const [orbat, user] = await Promise.all([
-      prisma.orbat.findUnique({ where: { id: orbatId }, select: { id: true } }),
+      prisma.orbat.findUnique({
+        where: { id: orbatId },
+        select: { id: true, eventDate: true, startTime: true, endTime: true },
+      }),
       prisma.user.findUnique({ where: { id: targetUserId }, select: { id: true } }),
     ]);
 
@@ -137,10 +140,36 @@ export async function POST(req: NextRequest, context: RouteParams) {
       return NextResponse.json({ error: 'ORBAT not found' }, { status: 404 });
     }
 
+    if (!isAdminOverride) {
+      const operationCutoff = (() => {
+        if (!orbat.eventDate) {
+          return null;
+        }
+
+        const cutoff = new Date(orbat.eventDate);
+        const timeValue = orbat.endTime || orbat.startTime;
+
+        if (timeValue && /^\d{2}:\d{2}$/.test(timeValue)) {
+          const [hour, minute] = timeValue.split(':').map(Number);
+          cutoff.setHours(hour, minute, 0, 0);
+        } else {
+          cutoff.setHours(23, 59, 59, 999);
+        }
+
+        return cutoff;
+      })();
+
+      if (operationCutoff && operationCutoff < new Date()) {
+        return NextResponse.json(
+          { error: 'Operation is in the past. Attendance notes are closed.' },
+          { status: 400 }
+        );
+      }
+    }
+
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
-
     const note = await prisma.orbatAttendanceNote.upsert({
       where: {
         orbatId_userId: {
