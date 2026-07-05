@@ -1632,7 +1632,10 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
                   <div
                     key={`existing-${freqId}`}
                     draggable
-                    onDragStart={() => handleFrequencyDragStart('existing', freqIndex)}
+onDragStart={(e) => {
+  e.dataTransfer.setData('text/plain', '');
+  handleFrequencyDragStart('existing', freqIndex);
+}}
                     onDragOver={(e) => {
                       if (!draggedFrequency || draggedFrequency.list !== 'existing') return;
                       e.preventDefault();
