@@ -49,6 +49,14 @@ export async function GET(_req: NextRequest, context: RouteParams) {
       return NextResponse.json({ error: 'Invalid ORBAT id' }, { status: 400 });
     }
 
+    const orbat = await prisma.orbat.findUnique({
+      where: { id: orbatId },
+      select: { id: true },
+    });
+    if (!orbat) {
+      return NextResponse.json({ error: 'ORBAT not found' }, { status: 404 });
+    }
+
     const notes = await prisma.orbatAttendanceNote.findMany({
       where: { orbatId },
       include: {
