@@ -187,7 +187,11 @@ export default async function OrbatPage({ params }: OrbatPageProps) {
       }),
     })),
     frequencies: orbat.frequencies,
-    attendanceNotes: orbat.attendanceNotes,
+    attendanceNotes: orbat.attendanceNotes.map((note) => ({
+      ...note,
+      createdAt: note.createdAt.toISOString(),
+      updatedAt: note.updatedAt.toISOString(),
+    })),
     tempFrequencies: orbat.tempFrequencies,
   };
 
