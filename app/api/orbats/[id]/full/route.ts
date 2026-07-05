@@ -31,7 +31,22 @@ export async function GET(
                   },
                 },
                 signups: {
-                  include: { user: true },
+                  include: {
+                    user: {
+                      include: {
+                        userRank: {
+                          include: {
+                            currentRank: {
+                              select: {
+                                abbreviation: true,
+                                name: true,
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -153,6 +168,8 @@ export async function GET(
                 ? {
                     id: signup.user.id,
                     username: signup.user.username ?? 'Unknown',
+                    rankAbbreviation: signup.user.userRank?.currentRank?.abbreviation ?? null,
+                    rankName: signup.user.userRank?.currentRank?.name ?? null,
                   }
                 : null,
             })),

@@ -23,6 +23,8 @@ type SlotResponse = {
     user: {
       id: number;
       username: string | null;
+      rankAbbreviation?: string | null;
+      rankName?: string | null;
     } | null;
   }[];
 };
@@ -57,7 +59,22 @@ async function buildSlotResponse(slotId: number): Promise<SlotResponse | null> {
         },
       },
       signups: {
-        include: { user: true },
+        include: {
+          user: {
+            include: {
+              userRank: {
+                include: {
+                  currentRank: {
+                    select: {
+                      abbreviation: true,
+                      name: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     },
   });
@@ -110,6 +127,8 @@ async function buildSlotResponse(slotId: number): Promise<SlotResponse | null> {
         ? {
             id: signup.user.id,
             username: signup.user.username,
+            rankAbbreviation: signup.user.userRank?.currentRank?.abbreviation ?? null,
+            rankName: signup.user.userRank?.currentRank?.name ?? null,
           }
         : null,
     })),

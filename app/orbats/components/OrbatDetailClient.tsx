@@ -191,6 +191,8 @@ type ApiSlot = {
     user: {
       id: number | null;
       username: string;
+      rankAbbreviation?: string | null;
+      rankName?: string | null;
     } | null;
   }[];
   radioFrequency?: {
@@ -431,6 +433,8 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
             ? {
                 id: s.user.id,
                 username: s.user.username,
+                rankAbbreviation: s.user.rankAbbreviation ?? null,
+                rankName: s.user.rankName ?? null,
               }
             : null,
         })),
@@ -491,6 +495,8 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
             ? {
                 id: s.user.id,
                 username: s.user.username,
+                rankAbbreviation: s.user.rankAbbreviation ?? null,
+                rankName: s.user.rankName ?? null,
               }
             : null,
         })),
@@ -674,13 +680,18 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
                       {/* Show participant names only if there are any */}
                       {hasSignup && (
                         <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-                          {slot.signups
-                            .map((s) => {
-                              const username = s.user?.username ?? 'Unknown';
-                              const rankAbbr = s.user?.rankAbbreviation;
-                              return rankAbbr ? `[${rankAbbr}] ${username}` : username;
-                            })
-                            .join(', ')}
+                          {slot.signups.map((s, index) => {
+                            const username = s.user?.username ?? 'Unknown';
+                            const rankAbbr = s.user?.rankAbbreviation;
+                            const label = rankAbbr ? `[${rankAbbr}] ${username}` : username;
+
+                            return (
+                              <span key={s.id} style={{ color: '#22c55e' }}>
+                                {index > 0 ? ', ' : ''}
+                                {label}
+                              </span>
+                            );
+                          })}
                         </div>
                       )}
 
@@ -853,7 +864,7 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
               <div className="space-y-2">
                 {absentNotes.map((note) => (
                   <div key={note.id} className="rounded border p-2" style={{ borderColor: 'var(--border)' }}>
-                    <div className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>{formatNoteUser(note)}</div>
+                    <div className="text-sm font-medium" style={{ color: '#22c55e' }}>{formatNoteUser(note)}</div>
                     {note.reason && (
                       <div className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
                         Reason: {note.reason}
@@ -873,7 +884,7 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
               <div className="space-y-2">
                 {unsureNotes.map((note) => (
                   <div key={note.id} className="rounded border p-2" style={{ borderColor: 'var(--border)' }}>
-                    <div className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>{formatNoteUser(note)}</div>
+                    <div className="text-sm font-medium" style={{ color: '#22c55e' }}>{formatNoteUser(note)}</div>
                     {note.reason && (
                       <div className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
                         Reason: {note.reason}
@@ -893,7 +904,7 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
               <div className="space-y-2">
                 {lateUnsureNotes.map((note) => (
                   <div key={note.id} className="rounded border p-2" style={{ borderColor: 'var(--border)' }}>
-                    <div className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>{formatNoteUser(note)}</div>
+                    <div className="text-sm font-medium" style={{ color: '#22c55e' }}>{formatNoteUser(note)}</div>
                     <div className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
                       {typeof note.lateMinutes === 'number' ? `Late: ${note.lateMinutes}m` : 'Late: n/a'}
                       {' · '}
