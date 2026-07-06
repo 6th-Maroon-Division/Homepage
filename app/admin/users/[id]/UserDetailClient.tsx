@@ -1056,9 +1056,29 @@ export default function UserDetailClient({
 
                     setIsMergingAccount(true);
                     try {
+                      const csrfResponse = await fetch('/api/auth/csrf', {
+                        method: 'GET',
+                        cache: 'no-store',
+                        credentials: 'same-origin',
+                      });
+
+                      if (!csrfResponse.ok) {
+                        throw new Error('Failed to fetch CSRF token');
+                      }
+
+                      const csrfData = await csrfResponse.json().catch(() => ({}));
+                      const csrfToken = typeof csrfData?.csrfToken === 'string' ? csrfData.csrfToken : '';
+                      if (!csrfToken) {
+                        throw new Error('Missing CSRF token');
+                      }
+
                       const response = await fetch('/api/admin/users/merge', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'x-csrf-token': csrfToken,
+                        },
+                        credentials: 'same-origin',
                         body: JSON.stringify({
                           sourceUserId: selectedMergeSourceId,
                           targetUserId: user.id,
