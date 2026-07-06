@@ -35,6 +35,31 @@ type RemainingReference = {
   rowCount: bigint;
 };
 
+function getCsrfCookieToken(request: NextRequest) {
+  const cookieValue =
+    request.cookies.get('__Host-next-auth.csrf-token')?.value ??
+    request.cookies.get('next-auth.csrf-token')?.value ??
+    null;
+
+  if (!cookieValue) {
+    return null;
+  }
+
+  const [token] = cookieValue.split('|');
+  return token || null;
+}
+
+function hasValidCsrfToken(request: NextRequest) {
+  const headerToken = request.headers.get('x-csrf-token')?.trim() ?? '';
+  const cookieToken = getCsrfCookieToken(request);
+
+  if (!headerToken || !cookieToken) {
+    return false;
+  }
+
+  return headerToken === cookieToken;
+}
+
 function quoteIdentifier(identifier: string) {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(identifier)) {
     throw new Error(`Unsafe identifier: ${identifier}`);
@@ -128,9 +153,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const origin = request.headers.get('origin');
-    if (origin && origin !== request.nextUrl.origin) {
-      return NextResponse.json({ error: 'Invalid origin' }, { status: 403 });
+    if (!hasValidCsrfToken(request)) {
+      return NextResponse.json({ error: 'Invalid CSRF token' }, { status: 403 });
     }
 
     const body = (await request.json()) as MergeRequestBody;
