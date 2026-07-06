@@ -51,13 +51,22 @@ function getCsrfCookieToken(request: NextRequest) {
 
 function hasValidCsrfToken(request: NextRequest) {
   const headerToken = request.headers.get('x-csrf-token')?.trim() ?? '';
-  const cookieToken = getCsrfCookieToken(request);
+  const cookieToken = getCsrfCookieToken(request)?.trim() ?? '';
 
   if (!headerToken || !cookieToken) {
     return false;
   }
 
-  return headerToken === cookieToken;
+  if (headerToken.length !== cookieToken.length) {
+    return false;
+  }
+
+  let diff = 0;
+  for (let i = 0; i < headerToken.length; i += 1) {
+    diff |= headerToken.charCodeAt(i) ^ cookieToken.charCodeAt(i);
+  }
+
+  return diff === 0;
 }
 
 function quoteIdentifier(identifier: string) {
