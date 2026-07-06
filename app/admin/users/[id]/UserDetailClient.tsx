@@ -80,10 +80,18 @@ type AttendanceMetrics = {
   recent: AttendanceEntry[];
 };
 
+type MergeCandidate = {
+  id: number;
+  username: string | null;
+  email: string | null;
+  providers: string[];
+};
+
 type UserDetailClientProps = {
   user: UserDetailData;
   attendance: AttendanceMetrics;
   permissions: UserPermission[];
+  mergeCandidates: MergeCandidate[];
   availableTrainings: AvailableTraining[];
   canViewTrainings: boolean;
   canAssignTrainings: boolean;
@@ -102,6 +110,7 @@ export default function UserDetailClient({
   user,
   attendance,
   permissions,
+  mergeCandidates,
   availableTrainings,
   canViewTrainings,
   canAssignTrainings,
@@ -136,6 +145,8 @@ export default function UserDetailClient({
   const [isRemovingTrainingById, setIsRemovingTrainingById] = useState<Record<number, boolean>>({});
   const [selectedTrainingId, setSelectedTrainingId] = useState<number>(availableTrainings[0]?.id ?? 0);
   const [trainingNotes, setTrainingNotes] = useState('');
+  const [selectedMergeSourceId, setSelectedMergeSourceId] = useState<number>(mergeCandidates[0]?.id ?? 0);
+  const [isMergingAccount, setIsMergingAccount] = useState(false);
 
   const groupedPermissions = useMemo(() => {
     const groupMap = new Map<string, UserPermission[]>();
@@ -170,6 +181,10 @@ export default function UserDetailClient({
   useEffect(() => {
     setAvailableTrainingRows(availableTrainings);
   }, [availableTrainings]);
+
+  useEffect(() => {
+    setSelectedMergeSourceId(mergeCandidates[0]?.id ?? 0);
+  }, [mergeCandidates]);
 
   const visibleTabs: Array<{ key: TabKey; label: string }> = [
     { key: 'overview', label: 'Overview' },
@@ -990,6 +1005,89 @@ export default function UserDetailClient({
               </div>
             </div>
           )}
+
+          <div className="mb-4">
+            <h3 className="font-semibold mb-3" style={{ color: 'var(--foreground)' }}>Account Merge</h3>
+            <p className="text-xs mb-3" style={{ color: 'var(--muted-foreground)' }}>
+              Merge a duplicate account into this user. Linked providers and profile data are moved, then the source account is deleted.
+            </p>
+            {mergeCandidates.length === 0 ? (
+              <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
+                No other users available to merge.
+              </p>
+            ) : (
+              <div className="flex flex-col sm:flex-row gap-2">
+                <select
+                  value={selectedMergeSourceId}
+                  onChange={(event) => setSelectedMergeSourceId(Number(event.target.value))}
+                  className="flex-1 min-w-0 px-3 py-2 rounded border text-sm"
+                  style={{
+                    borderColor: 'var(--border)',
+                    backgroundColor: 'var(--background)',
+                    color: 'var(--foreground)',
+                  }}
+                  disabled={isMergingAccount}
+                >
+                  <option value={0} disabled>Select source account to merge</option>
+                  {mergeCandidates.map((candidate) => (
+                    <option key={candidate.id} value={candidate.id}>
+                      #{candidate.id} {candidate.username || 'Unknown User'}
+                      {candidate.providers.length > 0 ? ` (${candidate.providers.join(', ')})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={!selectedMergeSourceId || isMergingAccount}
+                  onClick={async () => {
+                    if (!selectedMergeSourceId) {
+                      return;
+                    }
+
+                    const sourceUser = mergeCandidates.find((candidate) => candidate.id === selectedMergeSourceId);
+                    const sourceLabel = sourceUser?.username || `User #${selectedMergeSourceId}`;
+                    const confirmed = window.confirm(
+                      `Merge ${sourceLabel} (#${selectedMergeSourceId}) into ${displayUsername} (#${user.id})? This deletes the source account.`
+                    );
+
+                    if (!confirmed) {
+                      return;
+                    }
+
+                    setIsMergingAccount(true);
+                    try {
+                      const response = await fetch('/api/admin/users/merge', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          sourceUserId: selectedMergeSourceId,
+                          targetUserId: user.id,
+                        }),
+                      });
+
+                      if (!response.ok) {
+                        const data = await response.json().catch(() => ({}));
+                        throw new Error(data.error || 'Failed to merge accounts');
+                      }
+
+                      const data = await response.json();
+                      const movedAccounts = Number(data?.summary?.movedAccounts ?? 0);
+                      showSuccess(`Accounts merged successfully. Linked providers moved: ${movedAccounts}.`);
+                      router.refresh();
+                    } catch (error) {
+                      showError(error instanceof Error ? error.message : 'Failed to merge accounts');
+                    } finally {
+                      setIsMergingAccount(false);
+                    }
+                  }}
+                  className="px-4 py-2 rounded text-sm font-medium disabled:opacity-50"
+                  style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                >
+                  {isMergingAccount ? 'Merging...' : 'Merge Into This User'}
+                </button>
+              </div>
+            )}
+          </div>
 
           <h3 className="font-semibold mb-3" style={{ color: 'var(--foreground)' }}>Danger Zone</h3>
           <div className="space-y-2">
