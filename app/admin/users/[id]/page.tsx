@@ -125,6 +125,7 @@ export default async function UserDetailPage({
     allPermissions,
     assignedPermissions,
     ranks,
+    mergeCandidates,
   ] =
     await Promise.all([
       getTotalAttendanceWithLegacy(userId), // Total including legacy data
@@ -153,6 +154,25 @@ export default async function UserDetailPage({
           name: true,
           abbreviation: true,
           orderIndex: true,
+        },
+      }),
+      prisma.user.findMany({
+        where: {
+          id: { not: userId },
+        },
+        orderBy: [
+          { username: 'asc' },
+          { id: 'asc' },
+        ],
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          accounts: {
+            select: {
+              provider: true,
+            },
+          },
         },
       }),
     ]);
@@ -270,6 +290,12 @@ export default async function UserDetailPage({
           user={userData}
           attendance={attendanceData}
           permissions={permissions}
+          mergeCandidates={mergeCandidates.map((candidate) => ({
+            id: candidate.id,
+            username: candidate.username,
+            email: candidate.email,
+            providers: candidate.accounts.map((account) => account.provider),
+          }))}
           availableTrainings={availableTrainings}
           canViewTrainings={canViewTrainings}
           canAssignTrainings={canMarkTrainings}
