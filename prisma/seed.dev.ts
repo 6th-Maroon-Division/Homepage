@@ -401,7 +401,7 @@ async function main() {
       totalMinutesMissed: 11,
       totalMinutesPresent: 109,
       startMinuteOffset: 8,
-      endMinuteOffset: 57,
+      endMinuteOffset: 3,
       note: 'Arrived slightly late but maintained command presence.',
     },
     {

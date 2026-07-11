@@ -793,12 +793,12 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     }
 
     try {
-      const cleanSquads = slots.map((slot) => ({
+      const cleanSquads = (mode === 'edit' ? slots : slots.filter((slot) => !slot._deleted)).map((slot) => ({
         ...(mode === 'edit' && slot.id ? { id: slot.id } : {}),
         name: slot.name,
         orderIndex: slot.orderIndex,
         ...(mode === 'edit' && slot._deleted ? { _deleted: true } : {}),
-        slots: slot.subslots.map((subslot) => ({
+        slots: (mode === 'edit' ? slot.subslots : slot.subslots.filter((subslot) => !subslot._deleted)).map((subslot) => ({
           ...(mode === 'edit' && subslot.id ? { id: subslot.id } : {}),
           squadRoleId: subslot.squadRoleId ?? null,
           name: subslot.name,

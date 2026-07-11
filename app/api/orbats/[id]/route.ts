@@ -294,6 +294,10 @@ export async function PATCH(
           .filter((slotId): slotId is number => typeof slotId === 'number')
       );
 
+      if (retainedSlotIds.size !== desiredSlotPlacements.filter(({ slot }) => typeof slot.id === 'number').length) {
+        throw new Error('DUPLICATE_SLOT_ID');
+      }
+
       const slotsToDelete = Array.from(existingSlotMap.keys()).filter((slotId) => !retainedSlotIds.has(slotId));
 
       if (slotsToDelete.length > 0) {
@@ -411,6 +415,10 @@ export async function PATCH(
 
     if (error instanceof Error && error.message === 'DUPLICATE_SLOT_ORDER') {
       return NextResponse.json({ error: 'Two or more roles in the same squad share the same order index.' }, { status: 400 });
+    }
+
+    if (error instanceof Error && error.message === 'DUPLICATE_SLOT_ID') {
+      return NextResponse.json({ error: 'The same existing role cannot be submitted more than once in a single update.' }, { status: 400 });
     }
 
     console.error('Error updating OrbAT:', error);
