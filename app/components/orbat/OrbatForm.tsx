@@ -692,18 +692,14 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     const newSlots = [...slots];
     const activeSubslots = newSlots[slotIndex].subslots.filter((s) => !s._deleted);
 
-    const alreadyAdded = activeSubslots.some((subslot) => subslot.squadRoleId === definition.id);
-    if (alreadyAdded) {
-      showError('This role is already added to the slot');
-      return;
-    }
-
     const newOrderIndex = activeSubslots.length;
     newSlots[slotIndex].subslots.push({
       squadRoleId: definition.id,
       name: definition.name,
       orderIndex: newOrderIndex,
-      maxSignups: definition.maxSignups,
+      maxSignups: Number.isInteger(definition.maxSignups) && definition.maxSignups > 0
+        ? definition.maxSignups
+        : 1,
       requiredTrainingIds:
         definition.requiredTrainingIds && definition.requiredTrainingIds.length > 0
           ? definition.requiredTrainingIds
@@ -797,21 +793,20 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     }
 
     try {
-      // Clean up slots/squads for API: remove _deleted flags and filter out deleted items
-      const cleanSquads = slots
-        .filter((s) => !s._deleted)
-        .map((slot) => ({
-          name: slot.name,
-          orderIndex: slot.orderIndex,
-          slots: slot.subslots
-            .filter((sub) => !sub._deleted)
-            .map((subslot) => ({
-              squadRoleId: subslot.squadRoleId ?? null,
-              name: subslot.name,
-              orderIndex: subslot.orderIndex,
-              maxSignups: subslot.maxSignups,
-            })),
-        }));
+      const cleanSquads = slots.map((slot) => ({
+        ...(mode === 'edit' && slot.id ? { id: slot.id } : {}),
+        name: slot.name,
+        orderIndex: slot.orderIndex,
+        ...(mode === 'edit' && slot._deleted ? { _deleted: true } : {}),
+        slots: slot.subslots.map((subslot) => ({
+          ...(mode === 'edit' && subslot.id ? { id: subslot.id } : {}),
+          squadRoleId: subslot.squadRoleId ?? null,
+          name: subslot.name,
+          orderIndex: subslot.orderIndex,
+          maxSignups: subslot.maxSignups ?? 1,
+          ...(mode === 'edit' && subslot._deleted ? { _deleted: true } : {}),
+        })),
+      }));
 
       const payload = {
         name,
@@ -1477,7 +1472,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
                                   <input
                                     type="number"
                                     min={1}
-                                    value={subslot.maxSignups}
+                                    value={subslot.maxSignups ?? 1}
                                     onChange={(e) =>
                                       updateSubslotMaxSignups(
                                         slotIndex,

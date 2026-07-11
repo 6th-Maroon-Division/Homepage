@@ -1,10 +1,121 @@
 // app/orbats/[id]/page.tsx
+import type { Metadata } from 'next';
 import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import OrbatDetailClient from '../components/OrbatDetailClient';
 
 interface OrbatPageProps {
   params: Promise<{ id: string }>;
+}
+
+const formatEventDate = (date: Date | null) => {
+  if (!date) {
+    return null;
+  }
+
+  return date.toLocaleDateString('en-GB', {
+    dateStyle: 'medium',
+    timeZone: 'UTC',
+  });
+};
+
+export async function generateMetadata({ params }: OrbatPageProps): Promise<Metadata> {
+  const { id } = await params;
+  const orbatId = Number(id);
+
+  if (Number.isNaN(orbatId)) {
+    return {
+      title: 'ORBAT | Invalid Operation',
+      description: 'The requested operation could not be found.',
+    };
+  }
+
+  const orbat = await prisma.orbat.findUnique({
+    where: { id: orbatId },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      eventDate: true,
+      startTime: true,
+      endTime: true,
+      bluforCountry: true,
+      opforCountry: true,
+      indepCountry: true,
+      squads: {
+        select: {
+          id: true,
+          slots: {
+            select: {
+              id: true,
+              signups: {
+                select: { id: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!orbat) {
+    return {
+      title: 'ORBAT | Operation Not Found',
+      description: 'The requested operation could not be found.',
+    };
+  }
+
+  const squadCount = orbat.squads.length;
+  const slotCount = orbat.squads.reduce((sum, squad) => sum + squad.slots.length, 0);
+  const signupCount = orbat.squads.reduce(
+    (sum, squad) => sum + squad.slots.reduce((slotSum, slot) => slotSum + slot.signups.length, 0),
+    0
+  );
+
+  const eventDateLabel = formatEventDate(orbat.eventDate);
+  const timeRange = orbat.startTime || orbat.endTime
+    ? ` ${orbat.startTime || '??:??'}${orbat.endTime ? `-${orbat.endTime}` : ''}`
+    : '';
+  const eventPart = eventDateLabel ? ` | ${eventDateLabel}${timeRange}` : '';
+
+  const factionCountries = [orbat.bluforCountry, orbat.opforCountry, orbat.indepCountry]
+    .filter((value): value is string => Boolean(value))
+    .slice(0, 3)
+    .join(' vs ');
+  const factionPart = factionCountries ? ` | ${factionCountries}` : '';
+
+  const statsPart = `${squadCount} squads, ${slotCount} roles, ${signupCount} signups`;
+  const description = `${orbat.description?.trim() || 'Operation briefing'}${eventPart} | ${statsPart}${factionPart}`;
+  const title = `${orbat.name} | ORBAT`;
+  const urlPath = `/orbats/${orbat.id}`;
+  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+  const pageUrl = `${baseUrl}${urlPath}`;
+  const imageUrl = `${baseUrl}/orbats/${orbat.id}/opengraph-image`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: 'article',
+      url: pageUrl,
+      images: [
+        {
+          url: imageUrl,
+          width: 1200,
+          height: 630,
+          alt: `${orbat.name} ORBAT preview`,
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [imageUrl],
+    },
+  };
 }
 
 export default async function OrbatPage({ params }: OrbatPageProps) {

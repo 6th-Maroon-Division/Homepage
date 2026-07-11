@@ -164,9 +164,46 @@ export async function PATCH(
     }
 
     await prisma.$transaction(async (tx) => {
-      const existing = await tx.orbat.findUnique({ where: { id: orbatId }, select: { id: true } });
+      const existing = await tx.orbat.findUnique({
+        where: { id: orbatId },
+        select: {
+          id: true,
+          squads: {
+            select: {
+              id: true,
+              slots: {
+                select: {
+                  id: true,
+                  squadId: true,
+                },
+              },
+            },
+          },
+        },
+      });
       if (!existing) {
         throw new Error('ORBAT_NOT_FOUND');
+      }
+
+      const existingSquadIds = new Set(existing.squads.map((squad) => squad.id));
+      const existingSlotMap = new Map(
+        existing.squads
+          .flatMap((squad) => squad.slots)
+          .map((slot) => [slot.id, slot])
+      );
+
+      const invalidSquadId = body.squads.find(
+        (squad) => typeof squad.id === 'number' && !existingSquadIds.has(squad.id)
+      );
+      if (invalidSquadId) {
+        throw new Error('INVALID_SQUAD_ID');
+      }
+
+      const invalidSlotId = body.squads
+        .flatMap((squad) => squad.slots)
+        .find((slot) => typeof slot.id === 'number' && !existingSlotMap.has(slot.id));
+      if (invalidSlotId) {
+        throw new Error('INVALID_SLOT_ID');
       }
 
       await tx.orbat.update({
@@ -193,30 +230,122 @@ export async function PATCH(
         },
       });
 
-      await tx.signup.deleteMany({ where: { slot: { orbatId } } });
-      await tx.slot.deleteMany({ where: { orbatId } });
-      await tx.squad.deleteMany({ where: { orbatId } });
+      const squadIdMap = new Map<number, number>();
 
-      for (const squadInput of activeSquads) {
-        const squad = await tx.squad.create({
-          data: {
-            orbatId,
-            name: squadInput.name.trim(),
-            orderIndex: squadInput.orderIndex,
-          },
-        });
+      for (let index = 0; index < activeSquads.length; index += 1) {
+        const squadInput = activeSquads[index];
+        let persistedSquadId: number;
 
-        for (const slotInput of squadInput.slots.filter((slot) => !slot._deleted)) {
-          await tx.slot.create({
+        if (typeof squadInput.id === 'number') {
+          const updatedSquad = await tx.squad.update({
+            where: { id: squadInput.id },
+            data: {
+              name: squadInput.name.trim(),
+              orderIndex: squadInput.orderIndex,
+            },
+            select: { id: true },
+          });
+          persistedSquadId = updatedSquad.id;
+        } else {
+          const createdSquad = await tx.squad.create({
             data: {
               orbatId,
-              squadId: squad.id,
-              squadRoleId: slotInput.squadRoleId ?? null,
-              orderIndex: slotInput.orderIndex,
-              maxSignups: slotInput.maxSignups,
+              name: squadInput.name.trim(),
+              orderIndex: squadInput.orderIndex,
+            },
+            select: { id: true },
+          });
+          persistedSquadId = createdSquad.id;
+        }
+
+        squadIdMap.set(index, persistedSquadId);
+      }
+
+      const incomingSlotInputs = activeSquads.flatMap((squad, squadIndex) =>
+        squad.slots
+          .filter((slot) => !slot._deleted)
+          .map((slot) => ({ slot, squadIndex }))
+      );
+
+      const desiredSlotPlacements = incomingSlotInputs.map(({ slot, squadIndex }) => {
+        const persistedSquadId = squadIdMap.get(squadIndex);
+        if (!persistedSquadId) {
+          throw new Error('SQUAD_MAPPING_ERROR');
+        }
+
+        return {
+          slot,
+          persistedSquadId,
+          placementKey: `${persistedSquadId}:${slot.orderIndex}`,
+        };
+      });
+
+      const placementKeySet = new Set<string>();
+      for (const placement of desiredSlotPlacements) {
+        if (placementKeySet.has(placement.placementKey)) {
+          throw new Error('DUPLICATE_SLOT_ORDER');
+        }
+        placementKeySet.add(placement.placementKey);
+      }
+
+      const retainedSlotIds = new Set(
+        desiredSlotPlacements
+          .map(({ slot }) => slot.id)
+          .filter((slotId): slotId is number => typeof slotId === 'number')
+      );
+
+      const slotsToDelete = Array.from(existingSlotMap.keys()).filter((slotId) => !retainedSlotIds.has(slotId));
+
+      if (slotsToDelete.length > 0) {
+        await tx.slot.deleteMany({ where: { id: { in: slotsToDelete } } });
+      }
+
+      const existingRetainedSlotIds = Array.from(retainedSlotIds);
+      if (existingRetainedSlotIds.length > 0) {
+        // Move retained slots out of the way first so final updates do not hit (squadId, orderIndex) uniqueness.
+        await tx.slot.updateMany({
+          where: { id: { in: existingRetainedSlotIds } },
+          data: { orderIndex: { increment: 10000 } },
+        });
+      }
+
+      for (const { slot, persistedSquadId } of desiredSlotPlacements) {
+        if (typeof slot.id === 'number') {
+          await tx.slot.update({
+            where: { id: slot.id },
+            data: {
+              squadId: persistedSquadId,
+              squadRoleId: slot.squadRoleId ?? null,
+              orderIndex: slot.orderIndex,
+              maxSignups: slot.maxSignups,
             },
           });
         }
+      }
+
+      for (const { slot, persistedSquadId } of desiredSlotPlacements) {
+        if (typeof slot.id !== 'number') {
+          await tx.slot.create({
+            data: {
+              orbatId,
+              squadId: persistedSquadId,
+              squadRoleId: slot.squadRoleId ?? null,
+              orderIndex: slot.orderIndex,
+              maxSignups: slot.maxSignups,
+            },
+          });
+        }
+      }
+
+      const retainedSquadIds = new Set(
+        activeSquads
+          .map((squad) => squad.id)
+          .filter((squadId): squadId is number => typeof squadId === 'number')
+      );
+      const squadsToDelete = Array.from(existingSquadIds).filter((squadId) => !retainedSquadIds.has(squadId));
+
+      if (squadsToDelete.length > 0) {
+        await tx.squad.deleteMany({ where: { id: { in: squadsToDelete } } });
       }
 
       await tx.orbatRadioFrequency.deleteMany({ where: { orbatId } });
@@ -270,6 +399,18 @@ export async function PATCH(
   } catch (error) {
     if (error instanceof Error && error.message === 'ORBAT_NOT_FOUND') {
       return NextResponse.json({ error: 'OrbAT not found' }, { status: 404 });
+    }
+
+    if (error instanceof Error && error.message === 'INVALID_SQUAD_ID') {
+      return NextResponse.json({ error: 'One or more squads are invalid for this OrbAT.' }, { status: 400 });
+    }
+
+    if (error instanceof Error && error.message === 'INVALID_SLOT_ID') {
+      return NextResponse.json({ error: 'One or more roles are invalid for this OrbAT.' }, { status: 400 });
+    }
+
+    if (error instanceof Error && error.message === 'DUPLICATE_SLOT_ORDER') {
+      return NextResponse.json({ error: 'Two or more roles in the same squad share the same order index.' }, { status: 400 });
     }
 
     console.error('Error updating OrbAT:', error);

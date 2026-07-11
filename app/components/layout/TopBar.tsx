@@ -61,11 +61,16 @@ export default function TopBar() {
 
   return (
     <div style={{ backgroundColor: 'var(--muted)', color: 'var(--foreground)' }}>
-      <div className="p-4 flex justify-between items-center">
+      <div className="px-3 py-2 flex justify-between items-center">
         {/* Logo and Desktop Navigation */}
-        <div className="flex items-center space-x-8">
-          <Link href="/" className="text-xl font-semibold transition-colors" style={{ color: 'var(--foreground)' }}>
-            6MD {isAdminRoute && <span className="text-sm ml-2" style={{ color: 'var(--primary)' }}>Admin</span>}
+        <div className="flex items-center space-x-5">
+          <Link href="/" className="flex items-center gap-2 transition-colors" style={{ color: 'var(--foreground)' }}>
+            <img
+              src="/6MD_logo.svg"
+              alt="6MD"
+              className="h-14 w-auto"
+            />
+            {isAdminRoute && <span className="text-sm" style={{ color: 'var(--primary)' }}>Admin</span>}
           </Link>
           <nav className="hidden md:flex space-x-4">
             {navLinks.map((link) => (
