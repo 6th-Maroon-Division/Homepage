@@ -243,6 +243,13 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
   const absentNotes = attendanceNotes.filter((note) => note.status === 'absent');
   const unsureNotes = attendanceNotes.filter((note) => note.status === 'unsure');
   const lateUnsureNotes = attendanceNotes.filter((note) => note.status === 'late_unsure');
+  const hasExtraIntel = Boolean(
+    orbat.iedThreat || orbat.civilianRelationship || orbat.rulesOfEngagement || orbat.airspace || orbat.inGameTimezone || orbat.operationDay
+  );
+  const hasFactionRelations = Boolean(
+    orbat.bluforCountry || orbat.bluforRelationship || orbat.opforCountry || orbat.opforRelationship || orbat.indepCountry || orbat.indepRelationship
+  );
+  const hasBottomRightColumn = hasExtraIntel || hasFactionRelations;
 
   const refreshOrbat = useCallback(async () => {
     try {
@@ -780,13 +787,13 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
       </section>
 
       {/* Radio Frequencies and Extra Intel Section - at bottom */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className={`grid grid-cols-1 ${hasBottomRightColumn ? 'md:grid-cols-2' : ''} gap-4`}>
         {/* Radio Frequencies Box */}
         {renderFrequenciesSection(orbat.frequencies, orbat.tempFrequencies)}
 
         <div className="flex flex-col gap-4">
           {/* Extra Intel Box */}
-          {(orbat.iedThreat || orbat.civilianRelationship || orbat.rulesOfEngagement || orbat.airspace || orbat.inGameTimezone || orbat.operationDay) && (
+          {hasExtraIntel && (
             <div className="border rounded-lg p-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
               <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--foreground)' }}>Extra Intel</h2>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
@@ -831,7 +838,7 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
           )}
 
           {/* Faction Relations Box */}
-          {(orbat.bluforCountry || orbat.bluforRelationship || orbat.opforCountry || orbat.opforRelationship || orbat.indepCountry || orbat.indepRelationship) && (
+          {hasFactionRelations && (
             <div className="border rounded-lg p-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
               <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--foreground)' }}>Faction Relations</h2>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">

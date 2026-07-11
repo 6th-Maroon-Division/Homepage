@@ -406,11 +406,11 @@ export async function PATCH(
     }
 
     if (error instanceof Error && error.message === 'INVALID_SQUAD_ID') {
-      return NextResponse.json({ error: 'One or more squads are invalid for this OrbAT.' }, { status: 400 });
+      return NextResponse.json({ error: 'One or more squads are invalid for this ORBAT.' }, { status: 400 });
     }
 
     if (error instanceof Error && error.message === 'INVALID_SLOT_ID') {
-      return NextResponse.json({ error: 'One or more roles are invalid for this OrbAT.' }, { status: 400 });
+      return NextResponse.json({ error: 'One or more roles are invalid for this ORBAT.' }, { status: 400 });
     }
 
     if (error instanceof Error && error.message === 'DUPLICATE_SLOT_ORDER') {
