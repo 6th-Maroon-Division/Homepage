@@ -258,12 +258,18 @@ export default async function Image({ params }: OrbatImageProps) {
     };
   });
 
-  let logoDataUrl: string | null = null;
-  try {
-    const svgBuffer = await readFile(LOCAL_LOGO_PATH);
-    logoDataUrl = `data:image/svg+xml;base64,${svgBuffer.toString('base64')}`;
-  } catch {
-    logoDataUrl = null;
+  const cache = globalThis as typeof globalThis & { __orbatLogoDataUrl?: string | null };
+  let logoDataUrl = cache.__orbatLogoDataUrl ?? null;
+
+  if (cache.__orbatLogoDataUrl === undefined) {
+    try {
+      const svgBuffer = await readFile(LOCAL_LOGO_PATH);
+      logoDataUrl = `data:image/svg+xml;base64,${svgBuffer.toString('base64')}`;
+    } catch {
+      logoDataUrl = null;
+    }
+
+    cache.__orbatLogoDataUrl = logoDataUrl;
   }
 
   return new ImageResponse(

@@ -42,19 +42,6 @@ export async function generateMetadata({ params }: OrbatPageProps): Promise<Meta
       bluforCountry: true,
       opforCountry: true,
       indepCountry: true,
-      squads: {
-        select: {
-          id: true,
-          slots: {
-            select: {
-              id: true,
-              signups: {
-                select: { id: true },
-              },
-            },
-          },
-        },
-      },
     },
   });
 
@@ -65,12 +52,17 @@ export async function generateMetadata({ params }: OrbatPageProps): Promise<Meta
     };
   }
 
-  const squadCount = orbat.squads.length;
-  const slotCount = orbat.squads.reduce((sum, squad) => sum + squad.slots.length, 0);
-  const signupCount = orbat.squads.reduce(
-    (sum, squad) => sum + squad.slots.reduce((slotSum, slot) => slotSum + slot.signups.length, 0),
-    0
-  );
+  const [squadCount, slotCount, signupCount] = await prisma.$transaction([
+    prisma.squad.count({ where: { orbatId: orbat.id } }),
+    prisma.slot.count({ where: { orbatId: orbat.id } }),
+    prisma.signup.count({
+      where: {
+        slot: {
+          orbatId: orbat.id,
+        },
+      },
+    }),
+  ]);
 
   const eventDateLabel = formatEventDate(orbat.eventDate);
   const timeRange = orbat.startTime || orbat.endTime
