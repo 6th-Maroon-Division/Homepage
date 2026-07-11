@@ -243,6 +243,13 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
   const absentNotes = attendanceNotes.filter((note) => note.status === 'absent');
   const unsureNotes = attendanceNotes.filter((note) => note.status === 'unsure');
   const lateUnsureNotes = attendanceNotes.filter((note) => note.status === 'late_unsure');
+  const hasExtraIntel = Boolean(
+    orbat.iedThreat || orbat.civilianRelationship || orbat.rulesOfEngagement || orbat.airspace || orbat.inGameTimezone || orbat.operationDay
+  );
+  const hasFactionRelations = Boolean(
+    orbat.bluforCountry || orbat.bluforRelationship || orbat.opforCountry || orbat.opforRelationship || orbat.indepCountry || orbat.indepRelationship
+  );
+  const hasBottomRightColumn = hasExtraIntel || hasFactionRelations;
 
   const refreshOrbat = useCallback(async () => {
     try {
@@ -551,30 +558,6 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
             </div>
           </div>
 
-          {/* Factions */}
-          {(orbat.bluforCountry || orbat.opforCountry || orbat.indepCountry || 
-            orbat.bluforRelationship || orbat.opforRelationship || orbat.indepRelationship) && (
-            <div className="text-xs space-y-1 p-4 border-l" style={{ borderColor: 'var(--border)' }}>
-              {orbat.bluforCountry && (
-                <div>
-                  <p className="font-semibold" style={{ color: 'var(--foreground)' }}>BLUFOR: {orbat.bluforCountry}</p>
-                  {orbat.bluforRelationship && <p style={{ color: getRelationshipColor(orbat.bluforRelationship) }}>Support: {orbat.bluforRelationship}</p>}
-                </div>
-              )}
-              {orbat.opforCountry && (
-                <div>
-                  <p className="font-semibold" style={{ color: 'var(--foreground)' }}>OPFOR: {orbat.opforCountry}</p>
-                  {orbat.opforRelationship && <p style={{ color: getRelationshipColor(orbat.opforRelationship) }}>Rel: {orbat.opforRelationship}</p>}
-                </div>
-              )}
-              {orbat.indepCountry && (
-                <div>
-                  <p className="font-semibold" style={{ color: 'var(--foreground)' }}>Indep: {orbat.indepCountry}</p>
-                  {orbat.indepRelationship && <p style={{ color: getRelationshipColor(orbat.indepRelationship) }}>Rel: {orbat.indepRelationship}</p>}
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
 
@@ -804,15 +787,16 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
       </section>
 
       {/* Radio Frequencies and Extra Intel Section - at bottom */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className={`grid grid-cols-1 ${hasBottomRightColumn ? 'md:grid-cols-2' : ''} gap-4`}>
         {/* Radio Frequencies Box */}
         {renderFrequenciesSection(orbat.frequencies, orbat.tempFrequencies)}
 
-        {/* Extra Intel Box */}
-        {(orbat.iedThreat || orbat.civilianRelationship || orbat.rulesOfEngagement || orbat.airspace || orbat.inGameTimezone || orbat.operationDay) && (
-          <div className="border rounded-lg p-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
-            <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--foreground)' }}>Extra Intel</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+        <div className="flex flex-col gap-4">
+          {/* Extra Intel Box */}
+          {hasExtraIntel && (
+            <div className="border rounded-lg p-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+              <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--foreground)' }}>Extra Intel</h2>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
               {orbat.iedThreat && (
                 <div className="border-l-4 pl-3 py-1" style={{ borderColor: getIntelColor('iedThreat', orbat.iedThreat) }}>
                   <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>IED/Trap/Mine Threat</div>
@@ -849,9 +833,55 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
                   <div className="font-semibold text-sm" style={{ color: 'var(--foreground)' }}>{orbat.operationDay}</div>
                 </div>
               )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {/* Faction Relations Box */}
+          {hasFactionRelations && (
+            <div className="border rounded-lg p-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+              <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--foreground)' }}>Faction Relations</h2>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+                {orbat.bluforCountry && (
+                  <div className="border-l-4 pl-3 py-1" style={{ borderColor: 'var(--primary)' }}>
+                    <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>BLUFOR Country</div>
+                    <div className="font-semibold text-sm" style={{ color: 'var(--foreground)' }}>{orbat.bluforCountry}</div>
+                  </div>
+                )}
+                {orbat.bluforRelationship && (
+                  <div className="border-l-4 pl-3 py-1" style={{ borderColor: getRelationshipColor(orbat.bluforRelationship) }}>
+                    <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>BLUFOR Relationship</div>
+                    <div className="font-semibold text-sm" style={{ color: getRelationshipColor(orbat.bluforRelationship) }}>{orbat.bluforRelationship}</div>
+                  </div>
+                )}
+                {orbat.opforCountry && (
+                  <div className="border-l-4 pl-3 py-1" style={{ borderColor: 'var(--primary)' }}>
+                    <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>OPFOR Country</div>
+                    <div className="font-semibold text-sm" style={{ color: 'var(--foreground)' }}>{orbat.opforCountry}</div>
+                  </div>
+                )}
+                {orbat.opforRelationship && (
+                  <div className="border-l-4 pl-3 py-1" style={{ borderColor: getRelationshipColor(orbat.opforRelationship) }}>
+                    <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>OPFOR Relationship</div>
+                    <div className="font-semibold text-sm" style={{ color: getRelationshipColor(orbat.opforRelationship) }}>{orbat.opforRelationship}</div>
+                  </div>
+                )}
+                {orbat.indepCountry && (
+                  <div className="border-l-4 pl-3 py-1" style={{ borderColor: 'var(--primary)' }}>
+                    <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Independent Country</div>
+                    <div className="font-semibold text-sm" style={{ color: 'var(--foreground)' }}>{orbat.indepCountry}</div>
+                  </div>
+                )}
+                {orbat.indepRelationship && (
+                  <div className="border-l-4 pl-3 py-1" style={{ borderColor: getRelationshipColor(orbat.indepRelationship) }}>
+                    <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Independent Relationship</div>
+                    <div className="font-semibold text-sm" style={{ color: getRelationshipColor(orbat.indepRelationship) }}>{orbat.indepRelationship}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Move Modal */}
