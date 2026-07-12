@@ -283,13 +283,6 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
       }
     }
 
-    if (startUtc) {
-      const parsedStart = new Date(startUtc);
-      if (!Number.isNaN(parsedStart.getTime())) {
-        return parsedStart;
-      }
-    }
-
     if (!dateValue) {
       return null;
     }

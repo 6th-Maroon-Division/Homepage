@@ -254,7 +254,7 @@ export async function PATCH(
         data: {
           name: body.name.trim(),
           description: body.description?.trim() || null,
-          eventDate: startsAtUtc || eventDateUtc || (body.eventDate ? new Date(`${body.eventDate}T00:00:00`) : null),
+          eventDate: startsAtUtc || eventDateUtc || (body.eventDate ? new Date(`${body.eventDate}T00:00:00Z`) : null),
           startTime: formatUtcTime(startsAtUtc) || body.startTime || null,
           endTime: formatUtcTime(endsAtUtc) || body.endTime || null,
           startsAtUtc,

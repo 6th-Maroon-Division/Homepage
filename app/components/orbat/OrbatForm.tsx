@@ -109,7 +109,7 @@ const buildUtcDateFromLocalDate = (dateValue: string): Date | null => {
     return null;
   }
 
-  const parsed = new Date(`${dateValue}T00:00:00`);
+  const parsed = new Date(`${dateValue}T00:00:00.000Z`);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 

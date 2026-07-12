@@ -253,6 +253,8 @@ export default function DualRingTimePicker({ id, label, value, onChange, hideLab
       <button
         type="button"
         id={id}
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
         onClick={() => {
           setMode('hour');
           setIsOpen((previous) => !previous);
@@ -314,7 +316,7 @@ export default function DualRingTimePicker({ id, label, value, onChange, hideLab
             ref={dialRef}
             className="relative w-[264px] h-[264px] mx-auto touch-none cursor-crosshair"
             onPointerDown={handleDialPointerDown}
-            role="application"
+            role="group"
             aria-label={`${label} clock picker`}
           >
             <div

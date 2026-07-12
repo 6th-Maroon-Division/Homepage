@@ -99,6 +99,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Support overnight operations where end time is on the next day.
+    if (orbatEnd <= orbatStart) {
+      orbatEnd = new Date(orbatEnd.getTime() + 24 * 60 * 60 * 1000);
+    }
+
     const operationDurationMinutes = Math.max(
       0,
       Math.floor((orbatEnd.getTime() - orbatStart.getTime()) / 60000)

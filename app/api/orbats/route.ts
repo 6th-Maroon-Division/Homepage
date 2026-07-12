@@ -158,10 +158,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (!startsAtUtc && !eventDateUtc && body.eventDate) {
-      const eventDate = new Date(`${body.eventDate}T00:00:00`);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      eventDate.setHours(0, 0, 0, 0);
+      const eventDate = new Date(`${body.eventDate}T00:00:00.000Z`);
+      const now = new Date();
+      const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
       if (eventDate < today) {
         return NextResponse.json({ error: 'Cannot create operations with past dates' }, { status: 400 });
@@ -203,7 +202,7 @@ export async function POST(request: NextRequest) {
         data: {
           name: body.name.trim(),
           description: body.description?.trim() || null,
-          eventDate: startsAtUtc || eventDateUtc || (body.eventDate ? new Date(`${body.eventDate}T00:00:00`) : null),
+          eventDate: startsAtUtc || eventDateUtc || (body.eventDate ? new Date(`${body.eventDate}T00:00:00Z`) : null),
           startTime: formatUtcTime(startsAtUtc) || body.startTime || null,
           endTime: formatUtcTime(endsAtUtc) || body.endTime || null,
           startsAtUtc,
