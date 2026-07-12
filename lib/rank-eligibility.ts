@@ -17,7 +17,7 @@ export type EligibilityReason =
 export type EligibilityResult = {
   eligible: boolean;
   reason: EligibilityReason;
-  currentRank: { id: number; name: string; abbreviation: string; orderIndex: number } | null;
+  currentRank: { id: number; name: string; abbreviation: string; orderIndex: number; autoRankupEnabled: boolean; attendanceRequiredSinceLastRank: number | null } | null;
   nextRank: { id: number; name: string; abbreviation: string; orderIndex: number; autoRankupEnabled: boolean; attendanceRequiredSinceLastRank: number | null } | null;
   attendance: {
     currentAttendance: number;
@@ -133,6 +133,8 @@ export async function checkRankupEligibility(userId: number): Promise<Eligibilit
         name: userRank.currentRank.name,
         abbreviation: userRank.currentRank.abbreviation,
         orderIndex: userRank.currentRank.orderIndex,
+        autoRankupEnabled: userRank.currentRank.autoRankupEnabled,
+        attendanceRequiredSinceLastRank: userRank.currentRank.attendanceRequiredSinceLastRank,
       },
       nextRank: null,
       attendance: {
@@ -154,6 +156,8 @@ export async function checkRankupEligibility(userId: number): Promise<Eligibilit
         name: userRank.currentRank.name,
         abbreviation: userRank.currentRank.abbreviation,
         orderIndex: userRank.currentRank.orderIndex,
+        autoRankupEnabled: userRank.currentRank.autoRankupEnabled,
+        attendanceRequiredSinceLastRank: userRank.currentRank.attendanceRequiredSinceLastRank,
       },
       nextRank: null,
       attendance: {
@@ -180,6 +184,8 @@ export async function checkRankupEligibility(userId: number): Promise<Eligibilit
         name: userRank.currentRank.name,
         abbreviation: userRank.currentRank.abbreviation,
         orderIndex: userRank.currentRank.orderIndex,
+        autoRankupEnabled: userRank.currentRank.autoRankupEnabled,
+        attendanceRequiredSinceLastRank: userRank.currentRank.attendanceRequiredSinceLastRank,
       },
       nextRank: null,
       attendance: {
@@ -193,7 +199,7 @@ export async function checkRankupEligibility(userId: number): Promise<Eligibilit
   }
 
   const currentAttendance = await getCurrentAttendance(userId);
-  const requiredAttendance = nextRank.attendanceRequiredSinceLastRank ?? 0;
+  const requiredAttendance = userRank.currentRank.attendanceRequiredSinceLastRank ?? 0;
   const delta = currentAttendance - userRank.attendanceSinceLastRank;
 
   if (requiredAttendance > 0 && delta < requiredAttendance) {
@@ -205,6 +211,8 @@ export async function checkRankupEligibility(userId: number): Promise<Eligibilit
         name: userRank.currentRank.name,
         abbreviation: userRank.currentRank.abbreviation,
         orderIndex: userRank.currentRank.orderIndex,
+        autoRankupEnabled: userRank.currentRank.autoRankupEnabled,
+        attendanceRequiredSinceLastRank: userRank.currentRank.attendanceRequiredSinceLastRank,
       },
       nextRank: {
         id: nextRank.id,
@@ -248,6 +256,8 @@ export async function checkRankupEligibility(userId: number): Promise<Eligibilit
           name: userRank.currentRank.name,
           abbreviation: userRank.currentRank.abbreviation,
           orderIndex: userRank.currentRank.orderIndex,
+          autoRankupEnabled: userRank.currentRank.autoRankupEnabled,
+          attendanceRequiredSinceLastRank: userRank.currentRank.attendanceRequiredSinceLastRank,
         },
         nextRank: {
           id: nextRank.id,
@@ -278,7 +288,7 @@ export async function checkRankupEligibility(userId: number): Promise<Eligibilit
     select: { id: true },
   });
 
-  const reason: EligibilityReason = nextRank.autoRankupEnabled ? 'eligible_auto' : 'eligible_manual';
+  const reason: EligibilityReason = userRank.currentRank.autoRankupEnabled ? 'eligible_auto' : 'eligible_manual';
 
   return {
     eligible: true,
@@ -288,6 +298,8 @@ export async function checkRankupEligibility(userId: number): Promise<Eligibilit
       name: userRank.currentRank.name,
       abbreviation: userRank.currentRank.abbreviation,
       orderIndex: userRank.currentRank.orderIndex,
+      autoRankupEnabled: userRank.currentRank.autoRankupEnabled,
+      attendanceRequiredSinceLastRank: userRank.currentRank.attendanceRequiredSinceLastRank,
     },
     nextRank: {
       id: nextRank.id,

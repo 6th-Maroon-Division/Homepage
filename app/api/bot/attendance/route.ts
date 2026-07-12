@@ -2,6 +2,31 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { validateBotTokenLegacy } from '@/lib/bot-token-validation';
 
+type NoteFlagState = {
+  notedAbsent: boolean;
+  notedLateEarly: boolean;
+  notedUnsure: boolean;
+};
+
+function buildNoteFlags(note: { status: 'absent' | 'unsure' | 'late_unsure'; lateMinutes: number | null; leaveEarlyMinutes: number | null } | null): NoteFlagState {
+  if (!note) {
+    return {
+      notedAbsent: false,
+      notedLateEarly: false,
+      notedUnsure: false,
+    };
+  }
+
+  return {
+    notedAbsent: note.status === 'absent',
+    notedLateEarly:
+      note.status === 'late_unsure' ||
+      (note.lateMinutes ?? 0) > 0 ||
+      (note.leaveEarlyMinutes ?? 0) > 0,
+    notedUnsure: note.status === 'unsure' || note.status === 'late_unsure',
+  };
+}
+
 function validateBotToken(request: NextRequest): Promise<boolean> {
   return validateBotTokenLegacy(request);
 }
@@ -79,6 +104,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not signed up for this ORBAT', orbatId: targetOrbat.id }, { status: 400 });
     }
 
+    const attendanceNote = await prisma.orbatAttendanceNote.findUnique({
+      where: {
+        orbatId_userId: {
+          orbatId: targetOrbat.id,
+          userId: user.id,
+        },
+      },
+      select: {
+        status: true,
+        lateMinutes: true,
+        leaveEarlyMinutes: true,
+      },
+    });
+
+    const noteFlags = buildNoteFlags(attendanceNote ?? null);
+
     await prisma.$transaction(async (tx) => {
       let session = await tx.attendanceSession.findFirst({
         where: { userId: user.id, attendance: { signupId: signup.id } },
@@ -117,7 +158,7 @@ export async function POST(request: NextRequest) {
 
       if (!attendance) {
         attendance = await tx.attendance.create({
-          data: { signupId: signup.id, orbatId: targetOrbat.id, userId: user.id },
+          data: { signupId: signup.id, orbatId: targetOrbat.id, userId: user.id, ...noteFlags },
         });
       }
 
@@ -139,7 +180,13 @@ export async function POST(request: NextRequest) {
 
       await tx.attendance.update({
         where: { id: attendance.id },
-        data: { status, totalMinutesPresent: totalMinutes, notes: notes ? notes : null, updatedAt: new Date() },
+        data: {
+          status,
+          totalMinutesPresent: totalMinutes,
+          notes: notes ? notes : null,
+          ...noteFlags,
+          updatedAt: new Date(),
+        },
       });
 
       await tx.attendanceLog.create({

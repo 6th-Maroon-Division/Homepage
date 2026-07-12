@@ -4,6 +4,25 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 
+function buildNoteFlags(note: { status: 'absent' | 'unsure' | 'late_unsure'; lateMinutes: number | null; leaveEarlyMinutes: number | null } | null) {
+  if (!note) {
+    return {
+      notedAbsent: false,
+      notedLateEarly: false,
+      notedUnsure: false,
+    };
+  }
+
+  return {
+    notedAbsent: note.status === 'absent',
+    notedLateEarly:
+      note.status === 'late_unsure' ||
+      (note.lateMinutes ?? 0) > 0 ||
+      (note.leaveEarlyMinutes ?? 0) > 0,
+    notedUnsure: note.status === 'unsure' || note.status === 'late_unsure',
+  };
+}
+
 /**
  * GET /api/attendance/[attendanceId]
  * Fetch a single attendance record
@@ -85,6 +104,38 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const id = parseInt(attendanceId);
     const { signupId, userId, status, notes } = await request.json();
 
+    const existing = await prisma.attendance.findUnique({
+      where: { id },
+      select: {
+        orbatId: true,
+        userId: true,
+      },
+    });
+
+    if (!existing) {
+      return NextResponse.json(
+        { error: 'Attendance record not found' },
+        { status: 404 }
+      );
+    }
+
+    const finalUserId = userId || existing.userId;
+    const attendanceNote = await prisma.orbatAttendanceNote.findUnique({
+      where: {
+        orbatId_userId: {
+          orbatId: existing.orbatId,
+          userId: finalUserId,
+        },
+      },
+      select: {
+        status: true,
+        lateMinutes: true,
+        leaveEarlyMinutes: true,
+      },
+    });
+
+    const noteFlags = buildNoteFlags(attendanceNote ?? null);
+
     const updated = await prisma.attendance.update({
       where: { id },
       data: {
@@ -92,6 +143,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         ...(userId ? { user: { connect: { id: userId } } } : {}),
         status,
         notes,
+        ...noteFlags,
       },
       include: {
         signup: {

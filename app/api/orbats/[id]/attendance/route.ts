@@ -8,6 +8,31 @@ import {
   calculateTimeDifferences,
 } from '@/lib/attendance';
 
+type NoteFlagState = {
+  notedAbsent: boolean;
+  notedLateEarly: boolean;
+  notedUnsure: boolean;
+};
+
+function buildNoteFlags(note: { status: 'absent' | 'unsure' | 'late_unsure'; lateMinutes: number | null; leaveEarlyMinutes: number | null } | null): NoteFlagState {
+  if (!note) {
+    return {
+      notedAbsent: false,
+      notedLateEarly: false,
+      notedUnsure: false,
+    };
+  }
+
+  return {
+    notedAbsent: note.status === 'absent',
+    notedLateEarly:
+      note.status === 'late_unsure' ||
+      (note.lateMinutes ?? 0) > 0 ||
+      (note.leaveEarlyMinutes ?? 0) > 0,
+    notedUnsure: note.status === 'unsure' || note.status === 'late_unsure',
+  };
+}
+
 // GET /api/orbats/[id]/attendance - Get all attendance for an orbat
 export async function GET(
   request: NextRequest,
@@ -188,6 +213,22 @@ export async function POST(
     }
 
     // Create attendance record with optional session and log entry
+    const attendanceNote = await prisma.orbatAttendanceNote.findUnique({
+      where: {
+        orbatId_userId: {
+          orbatId,
+          userId: finalUserId,
+        },
+      },
+      select: {
+        status: true,
+        lateMinutes: true,
+        leaveEarlyMinutes: true,
+      },
+    });
+
+    const noteFlags = buildNoteFlags(attendanceNote ?? null);
+
     const attendance = await prisma.$transaction(async (tx) => {
       const newAttendance = await tx.attendance.create({
         data: {
@@ -196,6 +237,7 @@ export async function POST(
           userId: finalUserId,
           status: status || 'absent',
           notes,
+          ...noteFlags,
         },
       });
 
@@ -246,6 +288,7 @@ export async function POST(
             minutesGoneEarly: timeDiffs.minutesGoneEarly,
             totalMinutesMissed: timeDiffs.totalMinutesMissed,
             totalMinutesPresent: durationMinutes || 0,
+            ...noteFlags,
           },
         });
       }

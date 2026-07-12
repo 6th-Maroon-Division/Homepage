@@ -26,8 +26,12 @@ type OrbatInput = {
   name: string;
   description?: string;
   eventDate?: string | null;
+  eventDateUtc?: string | null;
   startTime?: string | null;
   endTime?: string | null;
+  startsAtUtc?: string | null;
+  endsAtUtc?: string | null;
+  timezone?: string | null;
   squads: SquadInput[];
   frequencyIds?: number[];
   tempFrequencies?: Array<{
@@ -49,6 +53,25 @@ type OrbatInput = {
   airspace?: string | null;
   inGameTimezone?: string | null;
   operationDay?: string | null;
+};
+
+const parseUtcDate = (value?: string | null): Date | null => {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const formatUtcTime = (value: Date | null): string | null => {
+  if (!value) {
+    return null;
+  }
+
+  const hour = String(value.getUTCHours()).padStart(2, '0');
+  const minute = String(value.getUTCMinutes()).padStart(2, '0');
+  return `${hour}:${minute}`;
 };
 
 export async function GET(request: NextRequest) {
@@ -110,8 +133,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'At least one slot is required' }, { status: 400 });
     }
 
-    if (body.eventDate) {
-      const eventDate = new Date(body.eventDate);
+    const startsAtUtc = parseUtcDate(body.startsAtUtc);
+    const endsAtUtc = parseUtcDate(body.endsAtUtc);
+    const eventDateUtc = parseUtcDate(body.eventDateUtc);
+
+    if (body.startsAtUtc && !startsAtUtc) {
+      return NextResponse.json({ error: 'Invalid start datetime' }, { status: 400 });
+    }
+
+    if (body.endsAtUtc && !endsAtUtc) {
+      return NextResponse.json({ error: 'Invalid end datetime' }, { status: 400 });
+    }
+
+    if (body.eventDateUtc && !eventDateUtc) {
+      return NextResponse.json({ error: 'Invalid event date' }, { status: 400 });
+    }
+
+    if (startsAtUtc && endsAtUtc && endsAtUtc <= startsAtUtc) {
+      return NextResponse.json({ error: 'End datetime must be after start datetime' }, { status: 400 });
+    }
+
+    if (startsAtUtc && startsAtUtc < new Date()) {
+      return NextResponse.json({ error: 'Cannot create operations in the past' }, { status: 400 });
+    }
+
+    if (!startsAtUtc && !eventDateUtc && body.eventDate) {
+      const eventDate = new Date(`${body.eventDate}T00:00:00`);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       eventDate.setHours(0, 0, 0, 0);
@@ -156,9 +203,12 @@ export async function POST(request: NextRequest) {
         data: {
           name: body.name.trim(),
           description: body.description?.trim() || null,
-          eventDate: body.eventDate ? new Date(body.eventDate) : null,
-          startTime: body.startTime || null,
-          endTime: body.endTime || null,
+          eventDate: startsAtUtc || eventDateUtc || (body.eventDate ? new Date(`${body.eventDate}T00:00:00`) : null),
+          startTime: formatUtcTime(startsAtUtc) || body.startTime || null,
+          endTime: formatUtcTime(endsAtUtc) || body.endTime || null,
+          startsAtUtc,
+          endsAtUtc,
+          timezone: body.timezone || null,
           bluforCountry: body.bluforCountry || null,
           bluforRelationship: body.bluforRelationship || null,
           opforCountry: body.opforCountry || null,

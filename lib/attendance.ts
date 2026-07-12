@@ -6,7 +6,7 @@ import { AttendanceStatus } from '@/generated/prisma/enums';
  * - present: Full attendance with no missing time
  * - late: Arrived after first hour
  * - gone_early: Left before last hour
- * - partial: Both late and gone_early with >= 60 mins total missed
+ * - partial: Both late and gone_early
  * - no_show: Never checked in
  * - absent: Manually marked as absent
  */
@@ -27,13 +27,11 @@ export function calculateAttendanceStatus(
     return 'no_show';
   }
 
-  // If checked in, determine partial vs late vs gone_early vs present
-  if (totalMinutesMissed >= 60) {
-    return 'partial';
-  }
-
+  // If checked in, determine partial vs late vs gone_early vs present.
+  // Missing-time values are capped at 60 elsewhere; status remains side-specific
+  // unless both late and gone_early are true.
   if (minutesLate > 0 && minutesGoneEarly > 0) {
-    return 'partial'; // Just in case total is < 60 but both conditions exist
+    return 'partial';
   }
 
   if (minutesLate > 0) {

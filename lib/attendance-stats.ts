@@ -5,11 +5,15 @@ export interface AttendanceStats {
   presentCount: number;
   lateCount: number;
   goneEarlyCount: number;
+  arrivedLateCount: number;
+  leftEarlyCount: number;
   partialCount: number;
   absentCount: number;
   noShowCount: number;
   attendancePercentage: number;
   avgMinutesMissed: number;
+  avgArrivedLatePerMonth: number;
+  avgLeftEarlyPerMonth: number;
 }
 
 /**
@@ -171,16 +175,24 @@ export async function getUserAttendanceStats(
     },
   });
 
+  const periodMonths = Math.max(1, Math.ceil(daysBack / 30));
+  const arrivedLateCount = attendances.filter(a => a.minutesLate > 0).length;
+  const leftEarlyCount = attendances.filter(a => a.minutesGoneEarly > 0).length;
+
   const stats: AttendanceStats = {
     totalEvents: attendances.length,
     presentCount: attendances.filter(a => a.status === 'present').length,
     lateCount: attendances.filter(a => a.status === 'late').length,
     goneEarlyCount: attendances.filter(a => a.status === 'gone_early').length,
+    arrivedLateCount,
+    leftEarlyCount,
     partialCount: attendances.filter(a => a.status === 'partial').length,
     absentCount: attendances.filter(a => a.status === 'absent').length,
     noShowCount: attendances.filter(a => a.status === 'no_show').length,
     attendancePercentage: 0,
     avgMinutesMissed: 0,
+    avgArrivedLatePerMonth: 0,
+    avgLeftEarlyPerMonth: 0,
   };
 
   if (stats.totalEvents > 0) {
@@ -191,6 +203,9 @@ export async function getUserAttendanceStats(
     // Calculate average minutes missed
     const totalMinuteMissed = attendances.reduce((sum, a) => sum + a.totalMinutesMissed, 0);
     stats.avgMinutesMissed = Math.round(totalMinuteMissed / stats.totalEvents);
+
+    stats.avgArrivedLatePerMonth = Number((arrivedLateCount / periodMonths).toFixed(2));
+    stats.avgLeftEarlyPerMonth = Number((leftEarlyCount / periodMonths).toFixed(2));
   }
 
   return stats;

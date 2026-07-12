@@ -145,6 +145,17 @@ export default async function AdminPage() {
             </Link>
           )}
 
+          {canAccessAttendance && (
+            <Link
+              href="/admin/attendance/statistics"
+              className="border rounded-lg p-8 transition-colors"
+              style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
+            >
+              <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>Attendance Statistics</h2>
+              <p style={{ color: 'var(--muted-foreground)' }}>View attendance averages, late arrivals, and early departures</p>
+            </Link>
+          )}
+
           {canAccessRanks && (
             <Link
               href="/admin/ranks"

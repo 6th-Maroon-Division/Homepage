@@ -67,8 +67,12 @@ export default async function EditOrbatPage({ params }: EditOrbatPageProps) {
     name: orbat.name,
     description: orbat.description || '',
     eventDate: orbat.eventDate ? orbat.eventDate.toISOString().slice(0, 10) : '',
+    eventDateUtc: orbat.eventDate ? orbat.eventDate.toISOString() : null,
     startTime: orbat.startTime || '',
     endTime: orbat.endTime || '',
+    startsAtUtc: orbat.startsAtUtc ? orbat.startsAtUtc.toISOString() : null,
+    endsAtUtc: orbat.endsAtUtc ? orbat.endsAtUtc.toISOString() : null,
+    timezone: orbat.timezone || null,
     // Faction fields
     bluforCountry: orbat.bluforCountry || '',
     bluforRelationship: orbat.bluforRelationship || '',

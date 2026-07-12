@@ -183,6 +183,9 @@ model Orbat {
   eventDate        DateTime?
   startTime        String?
   endTime          String?
+  startsAtUtc      DateTime?
+  endsAtUtc        DateTime?
+  timezone         String?
   createdBy        User      @relation("OrbatCreator", fields: [createdById], references: [id])
   createdById      Int
   createdAt        DateTime  @default(now())
@@ -363,6 +366,9 @@ model Attendance {
   minutesGoneEarly      Int              @default(0) // Minutes early in last hour (from last session)
   totalMinutesMissed    Int              @default(0) // minutesLate + minutesGoneEarly
   totalMinutesPresent   Int              @default(0) // Sum of all session durations
+  notedAbsent           Boolean          @default(false)
+  notedLateEarly        Boolean          @default(false)
+  notedUnsure           Boolean          @default(false)
   
   notes                 String?          // Optional admin notes
   createdAt             DateTime         @default(now())

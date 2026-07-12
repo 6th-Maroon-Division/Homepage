@@ -8,11 +8,15 @@ interface UserAttendanceStats {
   presentCount: number;
   lateCount: number;
   goneEarlyCount: number;
+  arrivedLateCount: number;
+  leftEarlyCount: number;
   partialCount: number;
   absentCount: number;
   noShowCount: number;
   attendancePercentage: number;
   avgMinutesMissed: number;
+  avgArrivedLatePerMonth: number;
+  avgLeftEarlyPerMonth: number;
 }
 
 interface AttendanceRecord {
@@ -125,10 +129,15 @@ export default function UserAttendanceProfile({ userId }: { userId: number }) {
         </div>
 
         <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-lg">
-          <p className="text-sm text-gray-600">Late/Early</p>
+          <p className="text-sm text-gray-600">Late Arrivals</p>
           <p className="text-3xl font-bold text-yellow-600">
-            {stats.lateCount + stats.goneEarlyCount}
+            {stats.arrivedLateCount}
           </p>
+        </div>
+
+        <div className="bg-gradient-to-br from-amber-50 to-amber-100 p-4 rounded-lg">
+          <p className="text-sm text-gray-600">Left Early</p>
+          <p className="text-3xl font-bold text-amber-600">{stats.leftEarlyCount}</p>
         </div>
 
         <div className="bg-gradient-to-br from-red-50 to-red-100 p-4 rounded-lg">
@@ -148,7 +157,17 @@ export default function UserAttendanceProfile({ userId }: { userId: number }) {
           <p className="text-3xl font-bold text-purple-600">{stats.totalEvents}</p>
         </div>
 
-        <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-lg col-span-2">
+        <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 p-4 rounded-lg">
+          <p className="text-sm text-gray-600">Late Avg / Month</p>
+          <p className="text-3xl font-bold text-cyan-700">{stats.avgArrivedLatePerMonth}</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-sky-50 to-sky-100 p-4 rounded-lg">
+          <p className="text-sm text-gray-600">Early Avg / Month</p>
+          <p className="text-3xl font-bold text-sky-700">{stats.avgLeftEarlyPerMonth}</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-lg col-span-2 md:col-span-4">
           <p className="text-sm text-gray-600">Avg Minutes Missed</p>
           <p className="text-3xl font-bold text-indigo-600">{stats.avgMinutesMissed}</p>
         </div>

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '../ui/ToastContainer';
 import LoadingSpinner from '../ui/LoadingSpinner';
+import DualRingTimePicker from '../ui/DualRingTimePicker';
 
 const logClientError = (...args: unknown[]) => {
   if (process.env.NODE_ENV === 'development') {
@@ -37,8 +38,12 @@ type OrbatData = {
   name: string;
   description: string;
   eventDate: string;
+  eventDateUtc?: string | null;
   startTime?: string;
   endTime?: string;
+  startsAtUtc?: string | null;
+  endsAtUtc?: string | null;
+  timezone?: string | null;
   slots: Slot[];
   bluforCountry?: string | null;
   bluforRelationship?: string | null;
@@ -59,6 +64,55 @@ type OrbatFormProps = {
   initialData?: OrbatData;
 };
 
+const toLocalDateInput = (utcValue?: string | null): string => {
+  if (!utcValue) {
+    return '';
+  }
+
+  const parsed = new Date(utcValue);
+  if (Number.isNaN(parsed.getTime())) {
+    return '';
+  }
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const toLocalTimeInput = (utcValue?: string | null): string => {
+  if (!utcValue) {
+    return '';
+  }
+
+  const parsed = new Date(utcValue);
+  if (Number.isNaN(parsed.getTime())) {
+    return '';
+  }
+
+  const hours = String(parsed.getHours()).padStart(2, '0');
+  const minutes = String(parsed.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
+};
+
+const buildUtcDateTime = (dateValue: string, timeValue: string): Date | null => {
+  if (!dateValue || !timeValue || !/^\d{2}:\d{2}$/.test(timeValue)) {
+    return null;
+  }
+
+  const parsed = new Date(`${dateValue}T${timeValue}:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const buildUtcDateFromLocalDate = (dateValue: string): Date | null => {
+  if (!dateValue) {
+    return null;
+  }
+
+  const parsed = new Date(`${dateValue}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
 export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
   const router = useRouter();
   const { showSuccess, showError } = useToast();
@@ -68,6 +122,8 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
   const [name, setName] = useState(initialData?.name || '');
   const [description, setDescription] = useState(initialData?.description || '');
   const [eventDate, setEventDate] = useState(() => {
+    if (initialData?.startsAtUtc) return toLocalDateInput(initialData.startsAtUtc);
+    if (initialData?.eventDateUtc) return toLocalDateInput(initialData.eventDateUtc);
     if (initialData?.eventDate) return initialData.eventDate;
     // Only try to get from searchParams if we're in create mode and it's the client
     if (typeof window !== 'undefined') {
@@ -77,6 +133,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     return '';
   });
   const [startTime, setStartTime] = useState(() => {
+    if (initialData?.startsAtUtc) return toLocalTimeInput(initialData.startsAtUtc);
     if (initialData?.startTime) return initialData.startTime;
     // Set default time if we have a date parameter
     if (typeof window !== 'undefined') {
@@ -86,6 +143,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     return '';
   });
   const [endTime, setEndTime] = useState(() => {
+    if (initialData?.endsAtUtc) return toLocalTimeInput(initialData.endsAtUtc);
     if (initialData?.endTime) return initialData.endTime;
     // Set default time if we have a date parameter
     if (typeof window !== 'undefined') {
@@ -744,13 +802,33 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
       return;
     }
 
+    const startDateTime = buildUtcDateTime(eventDate, startTime);
+    let endDateTime = buildUtcDateTime(eventDate, endTime);
+    const eventDateUtc = buildUtcDateFromLocalDate(eventDate);
+
+    if (eventDate && !eventDateUtc) {
+      setError('Invalid event date');
+      setIsSaving(false);
+      return;
+    }
+
+    if (startDateTime && endDateTime && endDateTime <= startDateTime) {
+      endDateTime.setDate(endDateTime.getDate() + 1);
+    }
+
     // Prevent creating operations in the past
-    if (mode === 'create' && eventDate) {
-      const selectedDate = new Date(eventDate);
+    if (mode === 'create' && startDateTime && startDateTime < new Date()) {
+      setError('Cannot create operations in the past');
+      setIsSaving(false);
+      return;
+    }
+
+    if (mode === 'create' && !startDateTime && eventDate) {
+      const selectedDate = new Date(`${eventDate}T00:00:00`);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       selectedDate.setHours(0, 0, 0, 0);
-      
+
       if (selectedDate < today) {
         setError('Cannot create operations with past dates');
         setIsSaving(false);
@@ -812,8 +890,12 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         name,
         description,
         eventDate: eventDate || null,
+        eventDateUtc: eventDateUtc ? eventDateUtc.toISOString() : null,
         startTime: startTime || null,
         endTime: endTime || null,
+        startsAtUtc: startDateTime ? startDateTime.toISOString() : null,
+        endsAtUtc: endDateTime ? endDateTime.toISOString() : null,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || null,
         squads: cleanSquads,
         frequencyIds: selectedFrequencyIds,
         tempFrequencies,
@@ -1004,33 +1086,27 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="startTime" className="block text-sm font-medium mb-2" style={{ color: 'var(--muted-foreground)' }}>
-              Start Time
-            </label>
-            <input
-              type="time"
+            <DualRingTimePicker
               id="startTime"
+              label="Start Time"
               value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2"
-              style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+              onChange={setStartTime}
             />
           </div>
 
           <div>
-            <label htmlFor="endTime" className="block text-sm font-medium mb-2" style={{ color: 'var(--muted-foreground)' }}>
-              End Time
-            </label>
-            <input
-              type="time"
+            <DualRingTimePicker
               id="endTime"
+              label="End Time"
               value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2"
-              style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+              onChange={setEndTime}
             />
           </div>
         </div>
+
+        <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+          Date and times are entered in your local timezone and stored in UTC.
+        </p>
       </div>
 
       {/* Factions */}
