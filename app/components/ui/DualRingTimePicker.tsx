@@ -118,17 +118,6 @@ export default function DualRingTimePicker({ id, label, value, onChange, hideLab
     onChange(`${pad2(hour)}:${pad2(minute)}`);
   };
 
-  const handleSelectHour = (hourValue: number) => {
-    setDraftHour(hourValue);
-    setMode('minute');
-  };
-
-  const handleSelectMinute = (minuteValue: number) => {
-    setDraftMinute(minuteValue);
-    applyTime(draftHour, minuteValue);
-    setIsOpen(false);
-  };
-
   const pointerPoint = useMemo(() => {
     if (mode === 'hour') {
       const index = draftHour % 12;

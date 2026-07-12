@@ -131,14 +131,14 @@ export async function POST(request: NextRequest) {
 
       if (!session && checkinDate) {
         session = await tx.attendanceSession.create({
-          data: { userId: user.id, attendanceId: 0, checkedInAt: checkinDate, sessionDate: sessionDateOnly },
+          data: { userId: user.id, attendanceId: null, checkedInAt: checkinDate, sessionDate: sessionDateOnly },
         });
       }
 
       if (checkinDate && (!session || !session.checkedInAt)) {
         await tx.attendanceSession.upsert({
           where: { id: session?.id ? session.id : 0 },
-          create: { userId: user.id, attendanceId: 0, checkedInAt: checkinDate, sessionDate: sessionDateOnly },
+          create: { userId: user.id, attendanceId: null, checkedInAt: checkinDate, sessionDate: sessionDateOnly },
           update: { checkedInAt: checkinDate },
         });
       }
@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      if (session && session.attendanceId === 0) {
+      if (session && session.attendanceId === null) {
         await tx.attendanceSession.update({
           where: { id: session.id },
           data: { attendanceId: attendance.id },

@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
             existingSession = await tx.attendanceSession.create({
               data: {
                 userId,
-                attendanceId: 0, // Placeholder - will be updated later
+                attendanceId: null,
                 checkedInAt: checkinDate,
                 sessionDate: sessionDateOnly,
               },
