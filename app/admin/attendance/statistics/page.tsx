@@ -10,6 +10,7 @@ type AttendanceStatus = 'present' | 'absent' | 'late' | 'gone_early' | 'partial'
 type OrbatWithAttendance = {
   id: number;
   name: string;
+  startsAtUtc: Date | null;
   eventDate: Date | null;
   attendances: Array<{ status: AttendanceStatus }>;
 };
@@ -86,9 +87,10 @@ export default async function AdminAttendanceStatisticsPage() {
 
   const orbats = await prisma.orbat.findMany({
     where: {
-      eventDate: {
-        not: null,
-      },
+      OR: [
+        { startsAtUtc: { not: null } },
+        { eventDate: { not: null } },
+      ],
     },
     include: {
       attendances: {
@@ -97,17 +99,22 @@ export default async function AdminAttendanceStatisticsPage() {
         },
       },
     },
-    orderBy: {
-      eventDate: 'desc',
-    },
+    orderBy: [
+      { startsAtUtc: 'desc' },
+      { eventDate: 'desc' },
+    ],
     take: 100,
   });
 
   const pastOrbats: OrbatWithAttendance[] = orbats
-    .filter((orbat) => orbat.eventDate && new Date(orbat.eventDate) < now)
+    .filter((orbat) => {
+      const date = orbat.startsAtUtc ?? orbat.eventDate;
+      return date && date < now;
+    })
     .map((orbat) => ({
       id: orbat.id,
       name: orbat.name,
+      startsAtUtc: orbat.startsAtUtc,
       eventDate: orbat.eventDate,
       attendances: orbat.attendances.map((a) => ({ status: a.status as AttendanceStatus })),
     }));
@@ -116,7 +123,10 @@ export default async function AdminAttendanceStatisticsPage() {
   last30DaysCutoff.setDate(last30DaysCutoff.getDate() - 30);
 
   const last30DaysOrbats = pastOrbats.filter(
-    (orbat) => orbat.eventDate && new Date(orbat.eventDate) >= last30DaysCutoff
+    (orbat) => {
+      const date = orbat.startsAtUtc ?? orbat.eventDate;
+      return date && date >= last30DaysCutoff;
+    }
   );
 
   const recent4Orbats = pastOrbats.slice(0, 4);
@@ -143,9 +153,9 @@ export default async function AdminAttendanceStatisticsPage() {
 
     const monthMap = new Map(months.map((month) => [month.key, month]));
     for (const orbat of pastOrbats) {
-      if (!orbat.eventDate) continue;
-      const date = new Date(orbat.eventDate);
-      const key = `${date.getFullYear()}-${date.getMonth()}`;
+      const date = orbat.startsAtUtc ?? orbat.eventDate;
+      if (!date) continue;
+      const key = `${date.getUTCFullYear()}-${date.getUTCMonth()}`;
       const bucket = monthMap.get(key);
       if (bucket) {
         bucket.ops.push(orbat);

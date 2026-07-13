@@ -28,9 +28,10 @@ export default async function AdminAttendancePage() {
   // Get recent orbats with attendance data
   const recentOrbats = await prisma.orbat.findMany({
     where: {
-      eventDate: {
-        not: null,
-      },
+      OR: [
+        { startsAtUtc: { not: null } },
+        { eventDate: { not: null } },
+      ],
     },
     include: {
       attendances: {
@@ -44,15 +45,17 @@ export default async function AdminAttendancePage() {
         },
       },
     },
-    orderBy: {
-      eventDate: 'desc',
-    },
+    orderBy: [
+      { startsAtUtc: 'desc' },
+      { eventDate: 'desc' },
+    ],
     take: 50,
   });
 
   // Serialize dates for client component
   const serializedOrbats = recentOrbats.map(orbat => ({
     ...orbat,
+    startsAtUtc: orbat.startsAtUtc ?? null,
     eventDate: orbat.eventDate,
   }));
 

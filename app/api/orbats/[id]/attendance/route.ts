@@ -5,8 +5,9 @@ import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 import {
   calculateAttendanceStatus,
-  calculateTimeDifferences,
+  calculateTimeDifferencesByWindow,
 } from '@/lib/attendance';
+import { resolveOrbatScheduleWindow } from '@/lib/orbat-schedule';
 
 type NoteFlagState = {
   notedAbsent: boolean;
@@ -173,6 +174,8 @@ export async function POST(
       );
     }
 
+    const scheduleWindow = resolveOrbatScheduleWindow(orbat);
+
     // If signupId provided, verify it exists and belongs to this orbat
     let signup = null;
     let finalUserId = userId;
@@ -263,12 +266,11 @@ export async function POST(
         });
 
         // Recalculate time differences if we have sessions
-        const timeDiffs = calculateTimeDifferences(
-          orbat.startTime,
-          orbat.endTime,
+        const timeDiffs = calculateTimeDifferencesByWindow(
+          scheduleWindow.startsAtUtc,
+          scheduleWindow.endsAtUtc,
           checkinDate,
-          checkoutDate,
-          orbat.eventDate
+          checkoutDate
         );
 
         const calculatedStatus = calculateAttendanceStatus(

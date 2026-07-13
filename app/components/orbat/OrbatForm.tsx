@@ -100,7 +100,9 @@ const buildUtcDateTime = (dateValue: string, timeValue: string): Date | null => 
     return null;
   }
 
-  const parsed = new Date(`${dateValue}T${timeValue}:00`);
+  const [year, month, day] = dateValue.split('-').map(Number);
+  const [hours, minutes] = timeValue.split(':').map(Number);
+  const parsed = new Date(year, month - 1, day, hours, minutes, 0, 0);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
@@ -109,7 +111,8 @@ const buildUtcDateFromLocalDate = (dateValue: string): Date | null => {
     return null;
   }
 
-  const parsed = new Date(`${dateValue}T00:00:00.000Z`);
+  const [year, month, day] = dateValue.split('-').map(Number);
+  const parsed = new Date(year, month - 1, day, 0, 0, 0, 0);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
@@ -824,10 +827,10 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     }
 
     if (mode === 'create' && !startDateTime && eventDate) {
-      const selectedDate = new Date(`${eventDate}T00:00:00`);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      selectedDate.setHours(0, 0, 0, 0);
+      const [year, month, day] = eventDate.split('-').map(Number);
+      const selectedDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
 
       if (selectedDate < today) {
         setError('Cannot create operations with past dates');

@@ -5,6 +5,7 @@ export async function GET() {
   try {
     const orbats = await prisma.orbat.findMany({
       orderBy: [
+        { startsAtUtc: 'asc' },
         { eventDate: 'asc' },
         { createdAt: 'asc' },
       ],
@@ -12,16 +13,17 @@ export async function GET() {
         id: true,
         name: true,
         description: true,
+        startsAtUtc: true,
         eventDate: true,
         createdAt: true,
       },
     });
 
     const items = orbats.map((orbat) => {
-      const date = orbat.eventDate ?? orbat.createdAt;
-      const year = date.getFullYear();
-      const month = `${date.getMonth() + 1}`.padStart(2, '0');
-      const day = `${date.getDate()}`.padStart(2, '0');
+      const date = orbat.startsAtUtc ?? orbat.eventDate ?? orbat.createdAt;
+      const year = date.getUTCFullYear();
+      const month = `${date.getUTCMonth() + 1}`.padStart(2, '0');
+      const day = `${date.getUTCDate()}`.padStart(2, '0');
 
       return {
         id: orbat.id,

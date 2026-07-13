@@ -275,7 +275,7 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
   const endDateTime = orbat.endsAtUtc ? new Date(orbat.endsAtUtc) : null;
   const eventDate = startDateTime || (orbat.eventDate ? new Date(orbat.eventDate) : null);
 
-  const getOperationCutoff = (endUtc?: string | null, startUtc?: string | null, dateValue?: string | null, startTime?: string | null, endTime?: string | null) => {
+  const getOperationCutoff = (endUtc?: string | null, dateValue?: string | null, startTime?: string | null, endTime?: string | null) => {
     if (endUtc) {
       const parsedEnd = new Date(endUtc);
       if (!Number.isNaN(parsedEnd.getTime())) {
@@ -303,7 +303,7 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
     return cutoff;
   };
 
-  const operationCutoff = getOperationCutoff(orbat.endsAtUtc, orbat.startsAtUtc, orbat.eventDate, orbat.startTime, orbat.endTime);
+  const operationCutoff = getOperationCutoff(orbat.endsAtUtc, orbat.eventDate, orbat.startTime, orbat.endTime);
   const isPast = !!operationCutoff && operationCutoff < new Date();
   const attendanceNotes = orbat.attendanceNotes || [];
   const absentNotes = attendanceNotes.filter((note) => note.status === 'absent');

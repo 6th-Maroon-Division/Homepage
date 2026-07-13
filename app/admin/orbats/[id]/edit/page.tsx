@@ -66,8 +66,16 @@ export default async function EditOrbatPage({ params }: EditOrbatPageProps) {
     id: orbat.id,
     name: orbat.name,
     description: orbat.description || '',
-    eventDate: orbat.eventDate ? orbat.eventDate.toISOString().slice(0, 10) : '',
-    eventDateUtc: orbat.eventDate ? orbat.eventDate.toISOString() : null,
+    eventDate: orbat.startsAtUtc
+      ? orbat.startsAtUtc.toISOString().slice(0, 10)
+      : orbat.eventDate
+        ? orbat.eventDate.toISOString().slice(0, 10)
+        : '',
+    eventDateUtc: orbat.startsAtUtc
+      ? orbat.startsAtUtc.toISOString()
+      : orbat.eventDate
+        ? orbat.eventDate.toISOString()
+        : null,
     startTime: orbat.startTime || '',
     endTime: orbat.endTime || '',
     startsAtUtc: orbat.startsAtUtc ? orbat.startsAtUtc.toISOString() : null,

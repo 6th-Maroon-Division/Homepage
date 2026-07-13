@@ -64,10 +64,36 @@ export function calculateSessionOverlap(
   const [endHour, endMinute] = orbatEndTime.split(':').map(Number);
 
   const orbatStart = new Date(orbatEventDate);
-  orbatStart.setHours(startHour, startMinute, 0, 0);
+  orbatStart.setUTCHours(startHour, startMinute, 0, 0);
 
   const orbatEnd = new Date(orbatEventDate);
-  orbatEnd.setHours(endHour, endMinute, 0, 0);
+  orbatEnd.setUTCHours(endHour, endMinute, 0, 0);
+
+  return calculateSessionOverlapByWindow(
+    sessionCheckinAt,
+    sessionCheckoutAt,
+    orbatStart,
+    orbatEnd
+  );
+}
+
+export function calculateSessionOverlapByWindow(
+  sessionCheckinAt: Date,
+  sessionCheckoutAt: Date | null,
+  orbatStart: Date,
+  orbatEnd: Date
+): {
+  countedCheckinAt: Date | null;
+  countedCheckoutAt: Date | null;
+  isWithinWindow: boolean;
+} {
+  if (orbatEnd <= orbatStart) {
+    return {
+      countedCheckinAt: null,
+      countedCheckoutAt: null,
+      isWithinWindow: false,
+    };
+  }
 
   // If session is completely outside orbat window, return null
   if (sessionCheckoutAt && sessionCheckoutAt < orbatStart) {
@@ -132,16 +158,42 @@ export function calculateTimeDifferences(
   const [endHour, endMinute] = orbatEndTime.split(':').map(Number);
 
   const startDate = new Date(orbatEventDate);
-  startDate.setHours(startHour, startMinute, 0, 0);
+  startDate.setUTCHours(startHour, startMinute, 0, 0);
 
   const endDate = new Date(orbatEventDate);
-  endDate.setHours(endHour, endMinute, 0, 0);
+  endDate.setUTCHours(endHour, endMinute, 0, 0);
 
-  const firstHourEnd = new Date(startDate);
-  firstHourEnd.setHours(firstHourEnd.getHours() + 1);
+  return calculateTimeDifferencesByWindow(
+    startDate,
+    endDate,
+    firstCountedCheckinAt,
+    lastCountedCheckoutAt
+  );
+}
 
-  const lastHourStart = new Date(endDate);
-  lastHourStart.setHours(lastHourStart.getHours() - 1);
+export function calculateTimeDifferencesByWindow(
+  orbatStart: Date | null,
+  orbatEnd: Date | null,
+  firstCountedCheckinAt: Date | null,
+  lastCountedCheckoutAt: Date | null
+): {
+  minutesLate: number;
+  minutesGoneEarly: number;
+  totalMinutesMissed: number;
+} {
+  if (!orbatStart || !orbatEnd || orbatEnd <= orbatStart) {
+    return {
+      minutesLate: 0,
+      minutesGoneEarly: 0,
+      totalMinutesMissed: 0,
+    };
+  }
+
+  const firstHourEnd = new Date(orbatStart);
+  firstHourEnd.setUTCHours(firstHourEnd.getUTCHours() + 1);
+
+  const lastHourStart = new Date(orbatEnd);
+  lastHourStart.setUTCHours(lastHourStart.getUTCHours() - 1);
 
   let minutesLate = 0;
   let minutesGoneEarly = 0;

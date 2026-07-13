@@ -77,7 +77,8 @@ export async function POST(request: NextRequest) {
 
     const sessionDate = checkinTime ? new Date(checkinTime) : new Date(checkoutTime);
     const sessionDateOnly = new Date(sessionDate);
-    sessionDateOnly.setHours(0, 0, 0, 0);
+    sessionDateOnly.setUTCHours(0, 0, 0, 0);
+    const sessionDateEnd = new Date(sessionDateOnly.getTime() + 86400000);
 
     // Find ORBAT
     let targetOrbat = null;
@@ -85,8 +86,16 @@ export async function POST(request: NextRequest) {
       targetOrbat = await prisma.orbat.findUnique({ where: { id: orbatId } });
     } else {
       targetOrbat = await prisma.orbat.findFirst({
-        where: { eventDate: { gte: sessionDateOnly, lt: new Date(sessionDateOnly.getTime() + 86400000) } },
-        orderBy: { createdAt: 'desc' },
+        where: {
+          OR: [
+            { startsAtUtc: { gte: sessionDateOnly, lt: sessionDateEnd } },
+            { startsAtUtc: null, eventDate: { gte: sessionDateOnly, lt: sessionDateEnd } },
+          ],
+        },
+        orderBy: [
+          { startsAtUtc: 'desc' },
+          { createdAt: 'desc' },
+        ],
       });
     }
 

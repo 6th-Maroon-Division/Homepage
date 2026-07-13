@@ -6,6 +6,7 @@ import Link from 'next/link';
 type OrbatWithAttendance = {
   id: number;
   name: string;
+  startsAtUtc?: Date | null;
   eventDate: Date | null;
   attendances: Array<{
     status: 'present' | 'absent' | 'late' | 'gone_early' | 'partial' | 'no_show';
@@ -27,22 +28,25 @@ export default function AttendanceOverviewClient({ orbats: initialOrbats }: Atte
 
   // Categorize orbats
   const upcomingOrbats = initialOrbats.filter(o => {
-    if (!o.eventDate) return true;
-    return new Date(o.eventDate) >= now;
+    const date = o.startsAtUtc ?? o.eventDate;
+    if (!date) return true;
+    return new Date(date) >= now;
   });
 
   const pastOrbats = initialOrbats.filter(o => {
-    if (!o.eventDate) return false;
-    return new Date(o.eventDate) < now;
+    const date = o.startsAtUtc ?? o.eventDate;
+    if (!date) return false;
+    return new Date(date) < now;
   });
 
   // Filter orbats
   const filteredOrbats = initialOrbats.filter(orbat => {
+    const date = orbat.startsAtUtc ?? orbat.eventDate;
     // Apply time filter
     if (filter === 'upcoming') {
-      if (orbat.eventDate && new Date(orbat.eventDate) < now) return false;
+      if (date && new Date(date) < now) return false;
     } else if (filter === 'past') {
-      if (!orbat.eventDate || new Date(orbat.eventDate) >= now) return false;
+      if (!date || new Date(date) >= now) return false;
     }
 
     // Apply search filter
@@ -153,8 +157,8 @@ export default function AttendanceOverviewClient({ orbats: initialOrbats }: Atte
                       className="text-sm mb-2"
                       style={{ color: 'var(--muted-foreground)' }}
                     >
-                      {orbat.eventDate
-                        ? new Date(orbat.eventDate).toLocaleDateString()
+                      {(orbat.startsAtUtc ?? orbat.eventDate)
+                        ? new Date((orbat.startsAtUtc ?? orbat.eventDate)!).toLocaleDateString()
                         : 'No date set'}
                     </p>
                     <div className="flex gap-4 text-sm">

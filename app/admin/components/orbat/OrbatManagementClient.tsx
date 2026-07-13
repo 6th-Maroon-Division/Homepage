@@ -9,6 +9,8 @@ type Orbat = {
   id: number;
   name: string;
   description: string | null;
+  startsAtUtc?: string | null;
+  endsAtUtc?: string | null;
   eventDate: string | null;
   startTime?: string | null;
   endTime?: string | null;
@@ -36,6 +38,16 @@ export default function OrbatManagementClient({ orbats: initialOrbats }: OrbatMa
   const canEditOrbat = usePermission('orbat:edit');
 
   const getOperationCutoff = (orbat: Orbat) => {
+    if (orbat.endsAtUtc) {
+      const parsed = new Date(orbat.endsAtUtc);
+      if (!Number.isNaN(parsed.getTime())) return parsed;
+    }
+
+    if (orbat.startsAtUtc) {
+      const parsed = new Date(orbat.startsAtUtc);
+      if (!Number.isNaN(parsed.getTime())) return parsed;
+    }
+
     if (!orbat.eventDate) {
       return null;
     }
@@ -48,9 +60,9 @@ export default function OrbatManagementClient({ orbats: initialOrbats }: OrbatMa
     const timeValue = orbat.endTime || orbat.startTime;
     if (timeValue && /^\d{2}:\d{2}$/.test(timeValue)) {
       const [hour, minute] = timeValue.split(':').map(Number);
-      cutoff.setHours(hour, minute, 0, 0);
+      cutoff.setUTCHours(hour, minute, 0, 0);
     } else {
-      cutoff.setHours(23, 59, 59, 999);
+      cutoff.setUTCHours(23, 59, 59, 999);
     }
 
     return cutoff;

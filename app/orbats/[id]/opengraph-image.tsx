@@ -124,6 +124,8 @@ export default async function Image({ params }: OrbatImageProps) {
       name: true,
       description: true,
       eventDate: true,
+      startsAtUtc: true,
+      endsAtUtc: true,
       startTime: true,
       endTime: true,
       bluforCountry: true,
@@ -164,8 +166,18 @@ export default async function Image({ params }: OrbatImageProps) {
 
   const eventDateLabel = formatEventDate(orbat.eventDate);
   const ukTimezone = getUkTimezoneAbbreviation(orbat.eventDate);
-  const timeRange = orbat.startTime || orbat.endTime
-    ? `${orbat.startTime || '??:??'}-${orbat.endTime || '??:??'} ${ukTimezone}`
+  const timeFormatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+
+  const previewStartTime = orbat.startsAtUtc ? timeFormatter.format(orbat.startsAtUtc) : orbat.startTime;
+  const previewEndTime = orbat.endsAtUtc ? timeFormatter.format(orbat.endsAtUtc) : orbat.endTime;
+
+  const timeRange = previewStartTime || previewEndTime
+    ? `${previewStartTime || '??:??'}-${previewEndTime || '??:??'} ${ukTimezone}`
     : 'Time TBD';
 
   const factionRows = [

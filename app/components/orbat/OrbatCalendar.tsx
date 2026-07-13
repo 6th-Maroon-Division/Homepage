@@ -7,6 +7,7 @@ type Orbat = {
   id: number;
   name: string;
   description: string | null;
+  startsAtUtc?: string | null;
   eventDate: string | null;
 };
 
@@ -26,15 +27,16 @@ export default function OrbatCalendar({ orbats }: OrbatCalendarProps) {
   const daysInMonth = lastDayOfMonth.getDate();
   const startingDayOfWeek = firstDayOfMonth.getDay(); // 0 = Sunday
 
-  // Group orbats by date
+  // Group orbats by UTC date key (YYYY-MM-DD)
   const orbatsByDate = new Map<string, Orbat[]>();
   orbats.forEach(orbat => {
-    if (orbat.eventDate) {
-      const dateKey = new Date(orbat.eventDate).toDateString();
-      if (!orbatsByDate.has(dateKey)) {
-        orbatsByDate.set(dateKey, []);
+    const raw = orbat.startsAtUtc ?? orbat.eventDate;
+    if (raw) {
+      const utcKey = new Date(raw).toISOString().slice(0, 10); // YYYY-MM-DD UTC
+      if (!orbatsByDate.has(utcKey)) {
+        orbatsByDate.set(utcKey, []);
       }
-      orbatsByDate.get(dateKey)!.push(orbat);
+      orbatsByDate.get(utcKey)!.push(orbat);
     }
   });
 
@@ -50,7 +52,8 @@ export default function OrbatCalendar({ orbats }: OrbatCalendarProps) {
     const clickedDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
     setSelectedDate(clickedDate);
     
-    const opsOnDay = orbatsByDate.get(clickedDate.toDateString()) || [];
+    const isoDate = `${clickedDate.getFullYear()}-${String(clickedDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const opsOnDay = orbatsByDate.get(isoDate) || [];
     
     if (opsOnDay.length === 0) {
       // No ops on this day, create new
@@ -86,7 +89,7 @@ export default function OrbatCalendar({ orbats }: OrbatCalendarProps) {
   // Days of the month
   for (let day = 1; day <= daysInMonth; day++) {
     const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-    const dateKey = date.toDateString();
+    const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const opsOnDay = orbatsByDate.get(dateKey) || [];
     const isToday = date.toDateString() === new Date().toDateString();
     

@@ -284,7 +284,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (orbat) {
-      const eventDate = orbat.eventDate ?? orbat.createdAt;
+      const eventDate = orbat.startsAtUtc ?? orbat.eventDate ?? orbat.createdAt;
       publishOrbatEvent({
         type: 'orbat.created',
         orbatId: orbat.id,
@@ -293,6 +293,7 @@ export async function POST(request: NextRequest) {
           id: orbat.id,
           name: orbat.name,
           description: orbat.description,
+          startsAtUtc: orbat.startsAtUtc?.toISOString() ?? null,
           eventDate: eventDate.toISOString(),
         },
       });

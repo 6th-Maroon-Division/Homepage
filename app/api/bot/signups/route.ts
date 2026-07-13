@@ -176,6 +176,7 @@ export async function POST(request: NextRequest) {
       username: user.username,
       orbatId: orbat.id,
       orbatName: orbat.name,
+      startsAtUtc: orbat.startsAtUtc?.toISOString() || null,
       eventDate: orbat.eventDate?.toISOString() || null,
       slotId: targetSlot.id,
       slotName: targetSlot.squadRole?.name || 'Unknown',

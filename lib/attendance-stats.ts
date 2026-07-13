@@ -60,7 +60,7 @@ interface LegacyAttendanceRecord {
   legacyStatus?: string;
   legacyEventDate?: Date | string;
   isLegacy: boolean;
-  orbat?: { name: string; eventDate: Date | null };
+  orbat?: { name: string; startsAtUtc?: Date | null; eventDate: Date | null };
 }
 
 /**
@@ -85,7 +85,7 @@ export async function getRecentAttendanceWithLegacy(
     take: limit,
     include: {
       orbat: {
-        select: { name: true, eventDate: true },
+        select: { name: true, startsAtUtc: true, eventDate: true },
       },
     },
   });
@@ -104,7 +104,7 @@ export async function getRecentAttendanceWithLegacy(
   const normalizedNew = newAttendance.map((a) => ({
     id: a.id,
     orbatName: a.orbat?.name || 'Unknown ORBAT',
-    orbatDate: a.orbat?.eventDate || a.createdAt,
+    orbatDate: a.orbat?.startsAtUtc ?? a.orbat?.eventDate ?? a.createdAt,
     status: a.status,
     isLegacy: false,
     createdAt: a.createdAt,

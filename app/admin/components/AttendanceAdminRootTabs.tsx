@@ -7,6 +7,7 @@ import { LegacyDataMappingClient } from './LegacyDataMappingClient';
 type OrbatSummary = {
   id: number;
   name: string;
+  startsAtUtc?: Date | null;
   eventDate: Date | null;
   attendances: Array<{ status: 'present' | 'absent' | 'late' | 'gone_early' | 'partial' | 'no_show' }>;
   _count: { attendances: number };
@@ -22,8 +23,8 @@ export function AttendanceAdminRootTabs({
   const sortedOrbats = useMemo(
     () =>
       [...orbats].sort((a, b) => {
-        const aDate = a.eventDate ? new Date(a.eventDate).getTime() : 0;
-        const bDate = b.eventDate ? new Date(b.eventDate).getTime() : 0;
+        const aDate = (a.startsAtUtc ?? a.eventDate) ? new Date((a.startsAtUtc ?? a.eventDate)!).getTime() : 0;
+        const bDate = (b.startsAtUtc ?? b.eventDate) ? new Date((b.startsAtUtc ?? b.eventDate)!).getTime() : 0;
         return bDate - aDate;
       }),
     [orbats]
@@ -33,6 +34,7 @@ export function AttendanceAdminRootTabs({
     () =>
       sortedOrbats.map((o) => ({
         ...o,
+        startsAtUtc: o.startsAtUtc ? new Date(o.startsAtUtc) : null,
         eventDate: o.eventDate ? new Date(o.eventDate) : null,
       })),
     [sortedOrbats]

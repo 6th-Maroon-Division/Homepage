@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
+import { resolveOrbatScheduleWindow } from '@/lib/orbat-schedule';
 
 type RouteParams = {
   params: Promise<{ id: string }>;
@@ -131,7 +132,7 @@ export async function POST(req: NextRequest, context: RouteParams) {
     const [orbat, user] = await Promise.all([
       prisma.orbat.findUnique({
         where: { id: orbatId },
-        select: { id: true, eventDate: true, startTime: true, endTime: true },
+        select: { id: true, startsAtUtc: true, endsAtUtc: true, eventDate: true, startTime: true, endTime: true },
       }),
       prisma.user.findUnique({ where: { id: targetUserId }, select: { id: true } }),
     ]);
@@ -141,23 +142,7 @@ export async function POST(req: NextRequest, context: RouteParams) {
     }
 
     if (!isAdminOverride) {
-      const operationCutoff = (() => {
-        if (!orbat.eventDate) {
-          return null;
-        }
-
-        const cutoff = new Date(orbat.eventDate);
-        const timeValue = orbat.endTime || orbat.startTime;
-
-        if (timeValue && /^\d{2}:\d{2}$/.test(timeValue)) {
-          const [hour, minute] = timeValue.split(':').map(Number);
-          cutoff.setHours(hour, minute, 0, 0);
-        } else {
-          cutoff.setHours(23, 59, 59, 999);
-        }
-
-        return cutoff;
-      })();
+      const operationCutoff = resolveOrbatScheduleWindow(orbat).cutoff;
 
       if (operationCutoff && operationCutoff < new Date()) {
         return NextResponse.json(
