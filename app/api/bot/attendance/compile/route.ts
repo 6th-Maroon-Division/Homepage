@@ -1,31 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { validateBotTokenLegacy } from '@/lib/bot-token-validation';
-
-type NoteFlagState = {
-  notedAbsent: boolean;
-  notedLateEarly: boolean;
-  notedUnsure: boolean;
-};
-
-function buildNoteFlags(note: { status: 'absent' | 'unsure' | 'late_unsure'; lateMinutes: number | null; leaveEarlyMinutes: number | null } | null): NoteFlagState {
-  if (!note) {
-    return {
-      notedAbsent: false,
-      notedLateEarly: false,
-      notedUnsure: false,
-    };
-  }
-
-  return {
-    notedAbsent: note.status === 'absent',
-    notedLateEarly:
-      note.status === 'late_unsure' ||
-      (note.lateMinutes ?? 0) > 0 ||
-      (note.leaveEarlyMinutes ?? 0) > 0,
-    notedUnsure: note.status === 'unsure' || note.status === 'late_unsure',
-  };
-}
+import { buildAttendanceNoteFlags } from '@/lib/attendance-note-flags';
 
 function validateBotToken(request: NextRequest): Promise<boolean> {
   return validateBotTokenLegacy(request);
@@ -240,7 +216,7 @@ export async function POST(request: NextRequest) {
         minutesGoneEarly > 0 ? 'gone_early' :
         totalMinutesPresent > 0 ? 'present' : 'absent';
 
-      const noteFlags = buildNoteFlags(noteByUserId.get(userIdNum) ?? null);
+      const noteFlags = buildAttendanceNoteFlags(noteByUserId.get(userIdNum) ?? null);
 
       // Create or update attendance record
       await prisma.attendance.upsert({

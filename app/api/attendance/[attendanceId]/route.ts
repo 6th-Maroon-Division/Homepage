@@ -3,25 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
-
-function buildNoteFlags(note: { status: 'absent' | 'unsure' | 'late_unsure'; lateMinutes: number | null; leaveEarlyMinutes: number | null } | null) {
-  if (!note) {
-    return {
-      notedAbsent: false,
-      notedLateEarly: false,
-      notedUnsure: false,
-    };
-  }
-
-  return {
-    notedAbsent: note.status === 'absent',
-    notedLateEarly:
-      note.status === 'late_unsure' ||
-      (note.lateMinutes ?? 0) > 0 ||
-      (note.leaveEarlyMinutes ?? 0) > 0,
-    notedUnsure: note.status === 'unsure' || note.status === 'late_unsure',
-  };
-}
+import { buildAttendanceNoteFlags } from '@/lib/attendance-note-flags';
 
 /**
  * GET /api/attendance/[attendanceId]
@@ -134,7 +116,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       },
     });
 
-    const noteFlags = buildNoteFlags(attendanceNote ?? null);
+    const noteFlags = buildAttendanceNoteFlags(attendanceNote ?? null);
 
     const updated = await prisma.attendance.update({
       where: { id },

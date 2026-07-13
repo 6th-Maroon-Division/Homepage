@@ -175,7 +175,7 @@ export default async function AdminAttendanceStatisticsPage() {
   })();
 
   const formatDecimal = (value: number) =>
-    value.toLocaleString('de-DE', {
+    value.toLocaleString('en-GB', {
       minimumFractionDigits: 1,
       maximumFractionDigits: 1,
     });

@@ -8,31 +8,7 @@ import {
   calculateTimeDifferencesByWindow,
 } from '@/lib/attendance';
 import { resolveOrbatScheduleWindow } from '@/lib/orbat-schedule';
-
-type NoteFlagState = {
-  notedAbsent: boolean;
-  notedLateEarly: boolean;
-  notedUnsure: boolean;
-};
-
-function buildNoteFlags(note: { status: 'absent' | 'unsure' | 'late_unsure'; lateMinutes: number | null; leaveEarlyMinutes: number | null } | null): NoteFlagState {
-  if (!note) {
-    return {
-      notedAbsent: false,
-      notedLateEarly: false,
-      notedUnsure: false,
-    };
-  }
-
-  return {
-    notedAbsent: note.status === 'absent',
-    notedLateEarly:
-      note.status === 'late_unsure' ||
-      (note.lateMinutes ?? 0) > 0 ||
-      (note.leaveEarlyMinutes ?? 0) > 0,
-    notedUnsure: note.status === 'unsure' || note.status === 'late_unsure',
-  };
-}
+import { buildAttendanceNoteFlags } from '@/lib/attendance-note-flags';
 
 // GET /api/orbats/[id]/attendance - Get all attendance for an orbat
 export async function GET(
@@ -230,7 +206,7 @@ export async function POST(
       },
     });
 
-    const noteFlags = buildNoteFlags(attendanceNote ?? null);
+    const noteFlags = buildAttendanceNoteFlags(attendanceNote ?? null);
 
     const attendance = await prisma.$transaction(async (tx) => {
       const newAttendance = await tx.attendance.create({
