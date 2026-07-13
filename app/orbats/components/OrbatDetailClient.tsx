@@ -65,6 +65,9 @@ type ClientOrbat = {
   eventDate: string | null; // ISO string or null
   startTime?: string | null;
   endTime?: string | null;
+  startsAtUtc?: string | null;
+  endsAtUtc?: string | null;
+  timezone?: string | null;
   squads: ClientSquad[];
   frequencies?: ClientFrequency[];
   attendanceNotes?: OrbatAttendanceNote[];
@@ -268,8 +271,18 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { showSuccess, showError } = useToast();
 
-  const eventDate = orbat.eventDate ? new Date(orbat.eventDate) : null;
-  const getOperationCutoff = (dateValue: string | null, startTime?: string | null, endTime?: string | null) => {
+  const startDateTime = orbat.startsAtUtc ? new Date(orbat.startsAtUtc) : null;
+  const endDateTime = orbat.endsAtUtc ? new Date(orbat.endsAtUtc) : null;
+  const eventDate = startDateTime || (orbat.eventDate ? new Date(orbat.eventDate) : null);
+
+  const getOperationCutoff = (endUtc?: string | null, dateValue?: string | null, startTime?: string | null, endTime?: string | null) => {
+    if (endUtc) {
+      const parsedEnd = new Date(endUtc);
+      if (!Number.isNaN(parsedEnd.getTime())) {
+        return parsedEnd;
+      }
+    }
+
     if (!dateValue) {
       return null;
     }
@@ -290,7 +303,7 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
     return cutoff;
   };
 
-  const operationCutoff = getOperationCutoff(orbat.eventDate, orbat.startTime, orbat.endTime);
+  const operationCutoff = getOperationCutoff(orbat.endsAtUtc, orbat.eventDate, orbat.startTime, orbat.endTime);
   const isPast = !!operationCutoff && operationCutoff < new Date();
   const attendanceNotes = orbat.attendanceNotes || [];
   const absentNotes = attendanceNotes.filter((note) => note.status === 'absent');
@@ -625,11 +638,14 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
         {eventDate && (
           <div className="text-xs mt-2" style={{ color: 'var(--muted-foreground)' }}>
             <p>
-              Event date: {eventDate.toLocaleDateString('en-GB', { dateStyle: 'medium' })}
+              Event date: {eventDate.toLocaleDateString(undefined, { dateStyle: 'medium' })}
             </p>
-            {(orbat.startTime || orbat.endTime) && (
+            {(startDateTime || endDateTime || orbat.startTime || orbat.endTime) && (
               <p>
-                Time: {orbat.startTime || '??:??'}{orbat.endTime ? ` - ${orbat.endTime}` : ''}
+                Time: {startDateTime ? startDateTime.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : (orbat.startTime || '??:??')}
+                {(endDateTime || orbat.endTime)
+                  ? ` - ${endDateTime ? endDateTime.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : orbat.endTime}`
+                  : ''}
               </p>
             )}
           </div>

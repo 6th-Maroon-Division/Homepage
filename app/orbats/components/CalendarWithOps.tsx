@@ -7,6 +7,7 @@ type UiOp = {
   id: number;
   name: string;
   description: string | null;
+  startsAtUtc?: string | null;
   eventDate: string; // ISO string
   dateKey: string;   // YYYY-MM-DD
 };
@@ -73,19 +74,20 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
   }, [ops]);
 
   useEffect(() => {
-    const appendOrbat = (payload: { id?: number; name?: string; description?: string | null; eventDate?: string }) => {
-      if (!payload.id || !payload.name || !payload.eventDate) {
+    const appendOrbat = (payload: { id?: number; name?: string; description?: string | null; startsAtUtc?: string | null; eventDate?: string }) => {
+      if (!payload.id || !payload.name || (!payload.startsAtUtc && !payload.eventDate)) {
         return;
       }
 
-      const parsedDate = new Date(payload.eventDate);
+      const rawDate = payload.startsAtUtc ?? payload.eventDate!;
+      const parsedDate = new Date(rawDate);
       if (Number.isNaN(parsedDate.getTime())) {
         return;
       }
 
-      const year = parsedDate.getFullYear();
-      const month = `${parsedDate.getMonth() + 1}`.padStart(2, '0');
-      const day = `${parsedDate.getDate()}`.padStart(2, '0');
+      const year = parsedDate.getUTCFullYear();
+      const month = `${parsedDate.getUTCMonth() + 1}`.padStart(2, '0');
+      const day = `${parsedDate.getUTCDate()}`.padStart(2, '0');
       const dateKey = `${year}-${month}-${day}`;
 
       setOpsState((previous) => {
@@ -99,12 +101,13 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
             id: payload.id!,
             name: payload.name!,
             description: payload.description ?? null,
-            eventDate: payload.eventDate!,
+            startsAtUtc: payload.startsAtUtc ?? null,
+            eventDate: rawDate,
             dateKey,
           },
         ];
 
-        return next.sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
+        return next.sort((a, b) => new Date(a.startsAtUtc ?? a.eventDate).getTime() - new Date(b.startsAtUtc ?? b.eventDate).getTime());
       });
     };
 
@@ -113,7 +116,7 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
       try {
         const data = JSON.parse(event.data) as {
           type?: string;
-          payload?: { id?: number; name?: string; description?: string | null; eventDate?: string };
+          payload?: { id?: number; name?: string; description?: string | null; startsAtUtc?: string | null; eventDate?: string };
         };
 
         if (data.type === 'orbat.created' && data.payload) {

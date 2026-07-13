@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 import { publishInboxEvent } from '@/lib/realtime/inbox-events';
 import { publishUserProfileEvent } from '@/lib/realtime/user-events';
-import { getCurrentAttendance } from '@/lib/rank-eligibility';
+import { checkRankupEligibility } from '@/lib/rank-eligibility';
 
 type PromotionResult = {
   userId: number;
@@ -43,6 +43,8 @@ export async function POST() {
             name: true,
             abbreviation: true,
             orderIndex: true,
+            attendanceRequiredSinceLastRank: true,
+            autoRankupEnabled: true,
           },
         },
       },
@@ -56,62 +58,29 @@ export async function POST() {
 
     for (const userRank of usersWithRanks) {
       try {
-        if (userRank.retired) continue;
-        if (!userRank.interviewDone) continue;
+        const eligibility = await checkRankupEligibility(userRank.userId);
 
-        const currentRank = userRank.currentRank;
-        if (!currentRank) {
-          // Skip users without ranks - don't count as error
+        if (!eligibility.eligible || eligibility.reason !== 'eligible_auto' || !eligibility.nextRank || !eligibility.currentRank) {
+          // Keep "ineligible" focused on users who are in an auto-rankup lane but short on attendance.
+          if (
+            eligibility.reason === 'ineligible_attendance' &&
+            userRank.currentRank?.autoRankupEnabled
+          ) {
+            const required = eligibility.attendance.requiredAttendance ?? 0;
+            const delta = eligibility.attendance.delta;
+            results.ineligible.push({
+              userId: userRank.userId,
+              username: userRank.user.username,
+              reason: `Need ${Math.max(required - delta, 0)} more attendance (${delta}/${required})`,
+            });
+          }
           continue;
         }
 
-        // Get next rank
-        const nextRank = await prisma.rank.findFirst({
-          where: {
-            orderIndex: { gt: currentRank.orderIndex },
-          },
-          orderBy: { orderIndex: 'asc' },
-          select: {
-            id: true,
-            name: true,
-            abbreviation: true,
-            attendanceRequiredSinceLastRank: true,
-            autoRankupEnabled: true,
-          },
-        });
-
-        if (!nextRank) {
-          // User is already at max rank
-          continue;
-        }
-
-        if (!nextRank.attendanceRequiredSinceLastRank) {
-          // Skip ranks without attendance requirements - don't count as error
-          continue;
-        }
-
-        if (!nextRank.autoRankupEnabled) {
-          // Skip ranks that require manual approval
-          continue;
-        }
-
-        // For now, skip training requirement check
-        // This will be checked through rank transition requirements when the schema is ready
-
-        // Check attendance requirement
-        const attendance = await getCurrentAttendance(userRank.userId);
-
-        const attendanceSinceLastRank = userRank.attendanceSinceLastRank;
-        const attendanceDelta = attendance - attendanceSinceLastRank;
-
-        if (attendanceDelta < nextRank.attendanceRequiredSinceLastRank) {
-          results.ineligible.push({
-            userId: userRank.userId,
-            username: userRank.user.username,
-            reason: `Need ${nextRank.attendanceRequiredSinceLastRank - attendanceDelta} more attendance`,
-          });
-          continue;
-        }
+        const currentRank = eligibility.currentRank;
+        const nextRank = eligibility.nextRank;
+        const attendance = eligibility.attendance.currentAttendance;
+        const attendanceDelta = eligibility.attendance.delta;
 
         // Promote user
         await prisma.$transaction(async (tx) => {

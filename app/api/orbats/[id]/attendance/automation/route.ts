@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import {
   calculateAttendanceStatus,
-  calculateTimeDifferences,
+  calculateTimeDifferencesByWindow,
 } from '@/lib/attendance';
+import { resolveOrbatScheduleWindow } from '@/lib/orbat-schedule';
 
 /**
  * POST /api/orbats/[id]/attendance/automation
@@ -68,6 +69,8 @@ export async function POST(
         { status: 404 }
       );
     }
+
+    const scheduleWindow = resolveOrbatScheduleWindow(orbat);
 
     // Check if user has a signup for this orbat
     const signup = await prisma.signup.findFirst({
@@ -191,12 +194,11 @@ export async function POST(
         const lastSession = allSessions[allSessions.length - 1];
 
         // Calculate time differences
-        const timeDiffs = calculateTimeDifferences(
-          orbat.startTime,
-          orbat.endTime,
+        const timeDiffs = calculateTimeDifferencesByWindow(
+          scheduleWindow.startsAtUtc,
+          scheduleWindow.endsAtUtc,
           firstSession.checkedInAt,
-          lastSession.checkedOutAt,
-          orbat.eventDate
+          lastSession.checkedOutAt
         );
 
         // Calculate total minutes present (sum of all completed sessions)

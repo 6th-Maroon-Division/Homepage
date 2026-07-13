@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { validateBotTokenLegacy } from '@/lib/bot-token-validation';
+import { buildAttendanceNoteFlags } from '@/lib/attendance-note-flags';
 
 function validateBotToken(request: NextRequest): Promise<boolean> {
   return validateBotTokenLegacy(request);
@@ -47,21 +48,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Build ORBAT start and end DateTime
+    // Prefer canonical UTC schedule fields; fallback to legacy fields for older ORBAT records.
     const orbatDate = orbat.eventDate ? new Date(orbat.eventDate) : null;
-    let orbatStart = orbatDate;
-    let orbatEnd = orbatDate;
+    const startsAtUtc = orbat.startsAtUtc ? new Date(orbat.startsAtUtc) : null;
+    const endsAtUtc = orbat.endsAtUtc ? new Date(orbat.endsAtUtc) : null;
 
-    if (orbatDate && orbat.startTime) {
+    let orbatStart = startsAtUtc || orbatDate;
+    let orbatEnd = endsAtUtc || orbatDate;
+
+    if (!startsAtUtc && orbatDate && orbat.startTime) {
       const [hours, minutes] = orbat.startTime.split(':');
       orbatStart = new Date(orbatDate);
-      orbatStart.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+      orbatStart.setUTCHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
     }
 
-    if (orbatDate && orbat.endTime) {
+    if (!endsAtUtc && orbatDate && orbat.endTime) {
       const [hours, minutes] = orbat.endTime.split(':');
       orbatEnd = new Date(orbatDate);
-      orbatEnd.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+      orbatEnd.setUTCHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
     }
 
     if (!orbatStart || !orbatEnd) {
@@ -71,16 +75,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find all events within ORBAT timeframe
+    // Support overnight operations where end time is on the next day.
+    if (orbatEnd <= orbatStart) {
+      orbatEnd = new Date(orbatEnd.getTime() + 24 * 60 * 60 * 1000);
+    }
+
+    const operationDurationMinutes = Math.max(
+      0,
+      Math.floor((orbatEnd.getTime() - orbatStart.getTime()) / 60000)
+    );
+
+    // Include nearby events so early joins and late leaves can be clamped to the ORBAT window.
+    const boundaryBufferMs = 6 * 60 * 60 * 1000;
+    const queryStart = new Date(orbatStart.getTime() - boundaryBufferMs);
+    const queryEnd = new Date(orbatEnd.getTime() + boundaryBufferMs);
+
+    // Find events around ORBAT timeframe; duration is clamped to operation bounds below.
     const events = await prisma.attendanceEvent.findMany({
       where: {
         eventTime: {
-          gte: orbatStart,
-          lte: orbatEnd,
+          gte: queryStart,
+          lte: queryEnd,
         },
       },
       orderBy: { eventTime: 'asc' },
     });
+
+    const attendanceNotes = await prisma.orbatAttendanceNote.findMany({
+      where: { orbatId: orbat.id },
+      select: {
+        userId: true,
+        status: true,
+        lateMinutes: true,
+        leaveEarlyMinutes: true,
+      },
+    });
+
+    const noteByUserId = new Map(attendanceNotes.map((note) => [note.userId, note]));
 
     // Group events by user (only include events with a userId)
     const userEvents: Record<number, { joins: Date[]; leaves: Date[] }> = {};
@@ -119,56 +150,73 @@ export async function POST(request: NextRequest) {
 
       // Calculate total minutes present
       let totalMinutesPresent = 0;
+      let minutesLate = 0;
+      let minutesGoneEarly = 0;
+      let totalMinutesMissed = 0;
 
-      // Simple calculation: if user has at least one join, they're present
-      // More sophisticated: pair join/leave events and sum durations
-      if (joins.length > 0) {
-        // If there are paired join/leave events, calculate exact duration
-        const pairedEvents = [];
-        let joinIndex = 0;
-        let leaveIndex = 0;
-        
-        while (joinIndex < joins.length && leaveIndex < leaves.length) {
-          pairedEvents.push({ type: 'join' as const, time: joins[joinIndex] });
-          joinIndex++;
-          pairedEvents.push({ type: 'leave' as const, time: leaves[leaveIndex] });
-          leaveIndex++;
-        }
-        
-        // Add any remaining events
-        while (joinIndex < joins.length) {
-          pairedEvents.push({ type: 'join' as const, time: joins[joinIndex] });
-          joinIndex++;
-        }
-        while (leaveIndex < leaves.length) {
-          pairedEvents.push({ type: 'leave' as const, time: leaves[leaveIndex] });
-          leaveIndex++;
-        }
-        
-        // Calculate duration from paired events
+      // Start-only session should count as full presence for the operation window.
+      if (joins.length > 0 && leaves.length === 0) {
+        totalMinutesPresent = operationDurationMinutes;
+      } else if (joins.length > 0) {
+        const timeline = [
+          ...joins.map((time) => ({ type: 'join' as const, time })),
+          ...leaves.map((time) => ({ type: 'leave' as const, time })),
+        ].sort((a, b) => a.time.getTime() - b.time.getTime());
+
         let checkedInAt: Date | null = null;
-        for (const event of pairedEvents) {
+        for (const event of timeline) {
           if (event.type === 'join' && !checkedInAt) {
             checkedInAt = event.time;
           } else if (event.type === 'leave' && checkedInAt) {
-            const durationMs = event.time.getTime() - checkedInAt.getTime();
-            totalMinutesPresent += Math.floor(durationMs / 60000);
+            const segmentStartMs = Math.max(checkedInAt.getTime(), orbatStart.getTime());
+            const segmentEndMs = Math.min(event.time.getTime(), orbatEnd.getTime());
+
+            if (segmentEndMs > segmentStartMs) {
+              totalMinutesPresent += Math.floor((segmentEndMs - segmentStartMs) / 60000);
+            }
+
             checkedInAt = null;
           }
         }
-        
-        // If still checked in at ORBAT end, count remaining time
+
+        // If still checked in at ORBAT end, count remaining clamped time.
         if (checkedInAt) {
-          const durationMs = orbatEnd.getTime() - checkedInAt.getTime();
-          totalMinutesPresent += Math.floor(durationMs / 60000);
+          const segmentStartMs = Math.max(checkedInAt.getTime(), orbatStart.getTime());
+          const segmentEndMs = orbatEnd.getTime();
+          if (segmentEndMs > segmentStartMs) {
+            totalMinutesPresent += Math.floor((segmentEndMs - segmentStartMs) / 60000);
+          }
+        }
+
+        const firstJoin = joins[0];
+        const lastLeave = leaves.length > 0 ? leaves[leaves.length - 1] : null;
+
+        if (firstJoin && firstJoin > orbatStart) {
+          minutesLate = Math.min(
+            60,
+            Math.ceil((firstJoin.getTime() - orbatStart.getTime()) / 60000)
+          );
+        }
+
+        if (lastLeave && lastLeave < orbatEnd) {
+          minutesGoneEarly = Math.min(
+            60,
+            Math.ceil((orbatEnd.getTime() - lastLeave.getTime()) / 60000)
+          );
         }
       }
 
+      totalMinutesMissed = minutesLate + minutesGoneEarly;
+
       // Determine status
       const status: 'present' | 'absent' | 'partial' | 'late' | 'gone_early' | 'no_show' = 
-        totalMinutesPresent >= 60 ? 'present' :
-        totalMinutesPresent > 0 ? 'partial' :
-        joins.length === 0 ? 'no_show' : 'absent';
+        joins.length === 0 ? 'no_show' :
+        minutesLate > 0 && minutesGoneEarly > 0 ? 'partial' :
+        minutesLate > 0 ? 'late' :
+        minutesGoneEarly > 0 ? 'gone_early' :
+        totalMinutesPresent > 0 ? 'present' : 'absent';
+
+      const noteFlags = buildAttendanceNoteFlags(noteByUserId.get(userIdNum) ?? null);
 
       // Create or update attendance record
       await prisma.attendance.upsert({
@@ -181,10 +229,18 @@ export async function POST(request: NextRequest) {
           userId: userIdNum,
           status: status as 'present' | 'absent' | 'partial' | 'late' | 'gone_early' | 'no_show',
           totalMinutesPresent,
+          minutesLate,
+          minutesGoneEarly,
+          totalMinutesMissed,
+          ...noteFlags,
         },
         update: {
           status: status as 'present' | 'absent' | 'partial' | 'late' | 'gone_early' | 'no_show',
           totalMinutesPresent,
+          minutesLate,
+          minutesGoneEarly,
+          totalMinutesMissed,
+          ...noteFlags,
           updatedAt: new Date(),
         },
       });
@@ -194,6 +250,10 @@ export async function POST(request: NextRequest) {
         username: signup.user.username,
         status,
         totalMinutesPresent,
+        minutesLate,
+        minutesGoneEarly,
+        totalMinutesMissed,
+        ...noteFlags,
         joinCount: joins.length,
         leaveCount: leaves.length,
       });

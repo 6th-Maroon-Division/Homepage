@@ -5,8 +5,10 @@ import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 import {
   calculateAttendanceStatus,
-  calculateTimeDifferences,
+  calculateTimeDifferencesByWindow,
 } from '@/lib/attendance';
+import { resolveOrbatScheduleWindow } from '@/lib/orbat-schedule';
+import { buildAttendanceNoteFlags } from '@/lib/attendance-note-flags';
 
 // GET /api/orbats/[id]/attendance - Get all attendance for an orbat
 export async function GET(
@@ -148,6 +150,8 @@ export async function POST(
       );
     }
 
+    const scheduleWindow = resolveOrbatScheduleWindow(orbat);
+
     // If signupId provided, verify it exists and belongs to this orbat
     let signup = null;
     let finalUserId = userId;
@@ -188,6 +192,22 @@ export async function POST(
     }
 
     // Create attendance record with optional session and log entry
+    const attendanceNote = await prisma.orbatAttendanceNote.findUnique({
+      where: {
+        orbatId_userId: {
+          orbatId,
+          userId: finalUserId,
+        },
+      },
+      select: {
+        status: true,
+        lateMinutes: true,
+        leaveEarlyMinutes: true,
+      },
+    });
+
+    const noteFlags = buildAttendanceNoteFlags(attendanceNote ?? null);
+
     const attendance = await prisma.$transaction(async (tx) => {
       const newAttendance = await tx.attendance.create({
         data: {
@@ -196,6 +216,7 @@ export async function POST(
           userId: finalUserId,
           status: status || 'absent',
           notes,
+          ...noteFlags,
         },
       });
 
@@ -221,12 +242,11 @@ export async function POST(
         });
 
         // Recalculate time differences if we have sessions
-        const timeDiffs = calculateTimeDifferences(
-          orbat.startTime,
-          orbat.endTime,
+        const timeDiffs = calculateTimeDifferencesByWindow(
+          scheduleWindow.startsAtUtc,
+          scheduleWindow.endsAtUtc,
           checkinDate,
-          checkoutDate,
-          orbat.eventDate
+          checkoutDate
         );
 
         const calculatedStatus = calculateAttendanceStatus(
@@ -246,6 +266,7 @@ export async function POST(
             minutesGoneEarly: timeDiffs.minutesGoneEarly,
             totalMinutesMissed: timeDiffs.totalMinutesMissed,
             totalMinutesPresent: durationMinutes || 0,
+            ...noteFlags,
           },
         });
       }

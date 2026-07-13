@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import {
   calculateAttendanceStatus,
-  calculateTimeDifferences,
+  calculateTimeDifferencesByWindow,
   calculateTotalMinutesPresent,
-  calculateSessionOverlap,
+  calculateSessionOverlapByWindow,
 } from '@/lib/attendance';
+import { resolveOrbatScheduleWindow } from '@/lib/orbat-schedule';
 
 /**
  * POST /api/attendance/automated
@@ -74,7 +75,8 @@ export async function POST(request: NextRequest) {
     }
 
     const sessionDateOnly = new Date(sessionDate);
-    sessionDateOnly.setHours(0, 0, 0, 0);
+    sessionDateOnly.setUTCHours(0, 0, 0, 0);
+    const sessionDateEnd = new Date(sessionDateOnly.getTime() + 24 * 60 * 60 * 1000);
 
     // Create or update the session
     await prisma.$transaction(async (tx) => {
@@ -84,9 +86,7 @@ export async function POST(request: NextRequest) {
           userId,
           sessionDate: {
             gte: sessionDateOnly,
-            lt: new Date(
-              sessionDateOnly.getTime() + 24 * 60 * 60 * 1000
-            ),
+            lt: sessionDateEnd,
           },
           attendanceId: null, // Only find unattached sessions
         },
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
             existingSession = await tx.attendanceSession.create({
               data: {
                 userId,
-                attendanceId: 0, // Placeholder - will be updated later
+                attendanceId: null,
                 checkedInAt: checkinDate,
                 sessionDate: sessionDateOnly,
               },
@@ -141,12 +141,21 @@ export async function POST(request: NextRequest) {
           userId,
           slot: {
             orbat: {
-              eventDate: {
-                gte: sessionDateOnly,
-                lt: new Date(
-                  sessionDateOnly.getTime() + 24 * 60 * 60 * 1000
-                ),
-              },
+              OR: [
+                {
+                  startsAtUtc: {
+                    gte: sessionDateOnly,
+                    lt: sessionDateEnd,
+                  },
+                },
+                {
+                  startsAtUtc: null,
+                  eventDate: {
+                    gte: sessionDateOnly,
+                    lt: sessionDateEnd,
+                  },
+                },
+              ],
             },
           },
         },
@@ -162,6 +171,11 @@ export async function POST(request: NextRequest) {
       // For each orbat signup, create/update attendance record
       for (const signup of orbatSignups) {
         const orbat = signup.slot.orbat;
+        const scheduleWindow = resolveOrbatScheduleWindow(orbat);
+
+        if (!scheduleWindow.startsAtUtc || !scheduleWindow.endsAtUtc) {
+          continue;
+        }
 
         // Find or create attendance record
         let attendance = await tx.attendance.findUnique({
@@ -192,9 +206,7 @@ export async function POST(request: NextRequest) {
             userId,
             sessionDate: {
               gte: sessionDateOnly,
-              lt: new Date(
-                sessionDateOnly.getTime() + 24 * 60 * 60 * 1000
-              ),
+              lt: sessionDateEnd,
             },
           },
           orderBy: { timestamp: 'asc' },
@@ -207,12 +219,11 @@ export async function POST(request: NextRequest) {
         let hasCheckinWithinWindow = false;
 
         for (const session of allSessions) {
-          const overlap = calculateSessionOverlap(
+          const overlap = calculateSessionOverlapByWindow(
             session.checkedInAt,
             session.checkedOutAt,
-            orbat.startTime!,
-            orbat.endTime!,
-            orbat.eventDate!
+            scheduleWindow.startsAtUtc,
+            scheduleWindow.endsAtUtc
           );
 
           if (overlap.isWithinWindow && overlap.countedCheckinAt) {
@@ -232,12 +243,11 @@ export async function POST(request: NextRequest) {
         }
 
         // Calculate metrics based on counted (overlapped) times
-        const timeDiffs = calculateTimeDifferences(
-          orbat.startTime,
-          orbat.endTime,
+        const timeDiffs = calculateTimeDifferencesByWindow(
+          scheduleWindow.startsAtUtc,
+          scheduleWindow.endsAtUtc,
           firstCountedCheckin,
-          lastCountedCheckout,
-          orbat.eventDate
+          lastCountedCheckout
         );
 
         const totalMinutesPresent = calculateTotalMinutesPresent(countedSessions);

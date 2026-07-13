@@ -38,6 +38,7 @@ export async function GET() {
       },
     },
     orderBy: [
+      { startsAtUtc: 'asc' },
       { eventDate: 'asc' },
       { createdAt: 'asc' },
     ],
@@ -54,6 +55,8 @@ export async function GET() {
       id: orbat.id,
       name: orbat.name,
       description: orbat.description,
+      startsAtUtc: orbat.startsAtUtc ? orbat.startsAtUtc.toISOString() : null,
+      endsAtUtc: orbat.endsAtUtc ? orbat.endsAtUtc.toISOString() : null,
       eventDate: orbat.eventDate ? orbat.eventDate.toISOString() : null,
       startTime: orbat.startTime || null,
       endTime: orbat.endTime || null,

@@ -57,6 +57,8 @@ export async function GET(
       id: orbat.id,
       name: orbat.name,
       description: orbat.description,
+      startsAtUtc: orbat.startsAtUtc?.toISOString() || null,
+      endsAtUtc: orbat.endsAtUtc?.toISOString() || null,
       eventDate: orbat.eventDate?.toISOString() || null,
       startTime: orbat.startTime,
       endTime: orbat.endTime,

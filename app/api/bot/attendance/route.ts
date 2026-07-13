@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { validateBotTokenLegacy } from '@/lib/bot-token-validation';
+import { buildAttendanceNoteFlags } from '@/lib/attendance-note-flags';
 
 function validateBotToken(request: NextRequest): Promise<boolean> {
   return validateBotTokenLegacy(request);
@@ -52,7 +53,8 @@ export async function POST(request: NextRequest) {
 
     const sessionDate = checkinTime ? new Date(checkinTime) : new Date(checkoutTime);
     const sessionDateOnly = new Date(sessionDate);
-    sessionDateOnly.setHours(0, 0, 0, 0);
+    sessionDateOnly.setUTCHours(0, 0, 0, 0);
+    const sessionDateEnd = new Date(sessionDateOnly.getTime() + 86400000);
 
     // Find ORBAT
     let targetOrbat = null;
@@ -60,8 +62,16 @@ export async function POST(request: NextRequest) {
       targetOrbat = await prisma.orbat.findUnique({ where: { id: orbatId } });
     } else {
       targetOrbat = await prisma.orbat.findFirst({
-        where: { eventDate: { gte: sessionDateOnly, lt: new Date(sessionDateOnly.getTime() + 86400000) } },
-        orderBy: { createdAt: 'desc' },
+        where: {
+          OR: [
+            { startsAtUtc: { gte: sessionDateOnly, lt: sessionDateEnd } },
+            { startsAtUtc: null, eventDate: { gte: sessionDateOnly, lt: sessionDateEnd } },
+          ],
+        },
+        orderBy: [
+          { startsAtUtc: 'desc' },
+          { createdAt: 'desc' },
+        ],
       });
     }
 
@@ -79,6 +89,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not signed up for this ORBAT', orbatId: targetOrbat.id }, { status: 400 });
     }
 
+    const attendanceNote = await prisma.orbatAttendanceNote.findUnique({
+      where: {
+        orbatId_userId: {
+          orbatId: targetOrbat.id,
+          userId: user.id,
+        },
+      },
+      select: {
+        status: true,
+        lateMinutes: true,
+        leaveEarlyMinutes: true,
+      },
+    });
+
+    const noteFlags = buildAttendanceNoteFlags(attendanceNote ?? null);
+
     await prisma.$transaction(async (tx) => {
       let session = await tx.attendanceSession.findFirst({
         where: { userId: user.id, attendance: { signupId: signup.id } },
@@ -90,14 +116,14 @@ export async function POST(request: NextRequest) {
 
       if (!session && checkinDate) {
         session = await tx.attendanceSession.create({
-          data: { userId: user.id, attendanceId: 0, checkedInAt: checkinDate, sessionDate: sessionDateOnly },
+          data: { userId: user.id, attendanceId: null, checkedInAt: checkinDate, sessionDate: sessionDateOnly },
         });
       }
 
       if (checkinDate && (!session || !session.checkedInAt)) {
         await tx.attendanceSession.upsert({
           where: { id: session?.id ? session.id : 0 },
-          create: { userId: user.id, attendanceId: 0, checkedInAt: checkinDate, sessionDate: sessionDateOnly },
+          create: { userId: user.id, attendanceId: null, checkedInAt: checkinDate, sessionDate: sessionDateOnly },
           update: { checkedInAt: checkinDate },
         });
       }
@@ -117,11 +143,11 @@ export async function POST(request: NextRequest) {
 
       if (!attendance) {
         attendance = await tx.attendance.create({
-          data: { signupId: signup.id, orbatId: targetOrbat.id, userId: user.id },
+          data: { signupId: signup.id, orbatId: targetOrbat.id, userId: user.id, ...noteFlags },
         });
       }
 
-      if (session && session.attendanceId === 0) {
+      if (session && session.attendanceId === null) {
         await tx.attendanceSession.update({
           where: { id: session.id },
           data: { attendanceId: attendance.id },
@@ -139,7 +165,13 @@ export async function POST(request: NextRequest) {
 
       await tx.attendance.update({
         where: { id: attendance.id },
-        data: { status, totalMinutesPresent: totalMinutes, notes: notes ? notes : null, updatedAt: new Date() },
+        data: {
+          status,
+          totalMinutesPresent: totalMinutes,
+          notes: notes ? notes : null,
+          ...noteFlags,
+          updatedAt: new Date(),
+        },
       });
 
       await tx.attendanceLog.create({

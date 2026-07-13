@@ -53,6 +53,9 @@ type ClientOrbat = {
   eventDate: string | null;
   startTime?: string | null;
   endTime?: string | null;
+  startsAtUtc?: string | null;
+  endsAtUtc?: string | null;
+  timezone?: string | null;
   squads?: ClientSquad[];
   frequencies?: ClientFrequency[];
   attendanceNotes?: OrbatAttendanceNote[];
@@ -238,7 +241,9 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { showSuccess, showError, showWarning } = useToast();
 
-  const eventDate = orbat.eventDate ? new Date(orbat.eventDate) : null;
+  const startDateTime = orbat.startsAtUtc ? new Date(orbat.startsAtUtc) : null;
+  const endDateTime = orbat.endsAtUtc ? new Date(orbat.endsAtUtc) : null;
+  const eventDate = startDateTime || (orbat.eventDate ? new Date(orbat.eventDate) : null);
   const attendanceNotes = orbat.attendanceNotes || [];
   const absentNotes = attendanceNotes.filter((note) => note.status === 'absent');
   const unsureNotes = attendanceNotes.filter((note) => note.status === 'unsure');
@@ -543,10 +548,13 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
                 )}
                 {eventDate && (
                   <div className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
-                    <p>Event date: {eventDate.toLocaleDateString('en-GB', { dateStyle: 'medium' })}</p>
-                    {(orbat.startTime || orbat.endTime) && (
+                    <p>Event date: {eventDate.toLocaleDateString(undefined, { dateStyle: 'medium' })}</p>
+                    {(startDateTime || endDateTime || orbat.startTime || orbat.endTime) && (
                       <p>
-                        Time: {orbat.startTime || '??:??'}{orbat.endTime ? ` - ${orbat.endTime}` : ''}
+                        Time: {startDateTime ? startDateTime.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : (orbat.startTime || '??:??')}
+                        {(endDateTime || orbat.endTime)
+                          ? ` - ${endDateTime ? endDateTime.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : orbat.endTime}`
+                          : ''}
                       </p>
                     )}
                   </div>

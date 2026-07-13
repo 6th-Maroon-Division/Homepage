@@ -19,6 +19,19 @@ const formatEventDate = (date: Date | null) => {
   });
 };
 
+const formatPreviewTime = (date: Date | null) => {
+  if (!date) {
+    return null;
+  }
+
+  return date.toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'Europe/London',
+  });
+};
+
 export async function generateMetadata({ params }: OrbatPageProps): Promise<Metadata> {
   const { id } = await params;
   const orbatId = Number(id);
@@ -37,8 +50,8 @@ export async function generateMetadata({ params }: OrbatPageProps): Promise<Meta
       name: true,
       description: true,
       eventDate: true,
-      startTime: true,
-      endTime: true,
+      startsAtUtc: true,
+      endsAtUtc: true,
       bluforCountry: true,
       opforCountry: true,
       indepCountry: true,
@@ -65,8 +78,10 @@ export async function generateMetadata({ params }: OrbatPageProps): Promise<Meta
   ]);
 
   const eventDateLabel = formatEventDate(orbat.eventDate);
-  const timeRange = orbat.startTime || orbat.endTime
-    ? ` ${orbat.startTime || '??:??'}${orbat.endTime ? `-${orbat.endTime}` : ''}`
+  const previewStartTime = formatPreviewTime(orbat.startsAtUtc);
+  const previewEndTime = formatPreviewTime(orbat.endsAtUtc);
+  const timeRange = previewStartTime || previewEndTime
+    ? ` ${previewStartTime || '??:??'}${previewEndTime ? `-${previewEndTime}` : ''}`
     : '';
   const eventPart = eventDateLabel ? ` | ${eventDateLabel}${timeRange}` : '';
 
@@ -234,6 +249,9 @@ export default async function OrbatPage({ params }: OrbatPageProps) {
     eventDate: orbat.eventDate ? orbat.eventDate.toISOString() : null,
     startTime: orbat.startTime || null,
     endTime: orbat.endTime || null,
+    startsAtUtc: orbat.startsAtUtc ? orbat.startsAtUtc.toISOString() : null,
+    endsAtUtc: orbat.endsAtUtc ? orbat.endsAtUtc.toISOString() : null,
+    timezone: orbat.timezone || null,
     bluforCountry: orbat.bluforCountry || null,
     bluforRelationship: orbat.bluforRelationship || null,
     opforCountry: orbat.opforCountry || null,
@@ -261,32 +279,32 @@ export default async function OrbatPage({ params }: OrbatPageProps) {
           .filter((item): item is { id: number; name: string; abbreviation: string } => Boolean(item));
 
         return {
-        id: slot.id,
-        name: slot.squadRole?.name || 'Unassigned Role',
-        orderIndex: slot.orderIndex,
-        maxSignups: slot.maxSignups ?? 9999,
-        squadRoleId: slot.squadRoleId,
-        requiredTrainings: slotRequiredTrainings,
-        requiredRanks: slotRequiredRanks,
-        requiredTraining: slotRequiredTrainings[0] || null,
-        requiredRank: slotRequiredRanks[0] || null,
-        signups: slot.signups.map((s) => ({
-          id: s.id,
-          user: s.user
-            ? {
-                id: s.user.id,
-                username: s.user.username ?? 'Unknown',
-                rankAbbreviation: s.user.userRank?.currentRank?.abbreviation ?? null,
-                rankName: s.user.userRank?.currentRank?.name ?? null,
-              }
-            : {
-                id: null,
-                username: 'Unknown',
-                rankAbbreviation: null,
-                rankName: null,
-              },
-        })),
-      };
+          id: slot.id,
+          name: slot.squadRole?.name || 'Unassigned Role',
+          orderIndex: slot.orderIndex,
+          maxSignups: slot.maxSignups ?? 9999,
+          squadRoleId: slot.squadRoleId,
+          requiredTrainings: slotRequiredTrainings,
+          requiredRanks: slotRequiredRanks,
+          requiredTraining: slotRequiredTrainings[0] || null,
+          requiredRank: slotRequiredRanks[0] || null,
+          signups: slot.signups.map((s) => ({
+            id: s.id,
+            user: s.user
+              ? {
+                  id: s.user.id,
+                  username: s.user.username ?? 'Unknown',
+                  rankAbbreviation: s.user.userRank?.currentRank?.abbreviation ?? null,
+                  rankName: s.user.userRank?.currentRank?.name ?? null,
+                }
+              : {
+                  id: null,
+                  username: 'Unknown',
+                  rankAbbreviation: null,
+                  rankName: null,
+                },
+          })),
+        };
       }),
     })),
     frequencies: orbat.frequencies,

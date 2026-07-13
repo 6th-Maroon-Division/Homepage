@@ -117,13 +117,24 @@ export async function GET(
     const trainingMap = new Map(requiredTrainings.map((training) => [training.id, training]));
     const rankMap = new Map(requiredRanks.map((rank) => [rank.id, rank]));
 
+    const fallbackEventDate = orbat.startsAtUtc ?? orbat.eventDate;
+    const fallbackStartTime = orbat.startsAtUtc
+      ? `${String(orbat.startsAtUtc.getUTCHours()).padStart(2, '0')}:${String(orbat.startsAtUtc.getUTCMinutes()).padStart(2, '0')}`
+      : orbat.startTime;
+    const fallbackEndTime = orbat.endsAtUtc
+      ? `${String(orbat.endsAtUtc.getUTCHours()).padStart(2, '0')}:${String(orbat.endsAtUtc.getUTCMinutes()).padStart(2, '0')}`
+      : orbat.endTime;
+
     const clientOrbat = {
       id: orbat.id,
       name: orbat.name,
       description: orbat.description,
-      eventDate: orbat.eventDate ? orbat.eventDate.toISOString() : null,
-      startTime: orbat.startTime || null,
-      endTime: orbat.endTime || null,
+      eventDate: fallbackEventDate ? fallbackEventDate.toISOString() : null,
+      startTime: fallbackStartTime || null,
+      endTime: fallbackEndTime || null,
+      startsAtUtc: orbat.startsAtUtc ? orbat.startsAtUtc.toISOString() : null,
+      endsAtUtc: orbat.endsAtUtc ? orbat.endsAtUtc.toISOString() : null,
+      timezone: orbat.timezone || null,
       bluforCountry: orbat.bluforCountry || null,
       bluforRelationship: orbat.bluforRelationship || null,
       opforCountry: orbat.opforCountry || null,

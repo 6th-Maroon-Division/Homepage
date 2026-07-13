@@ -17,9 +17,16 @@ export async function GET(request: NextRequest) {
     const includePast = searchParams.get('includePast') === 'true';
 
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setUTCHours(0, 0, 0, 0);
 
-    const where: { eventDate?: { gte: Date } } = !includePast ? { eventDate: { gte: today } } : {};
+    const where = !includePast
+      ? {
+          OR: [
+            { startsAtUtc: { gte: today } },
+            { startsAtUtc: null, eventDate: { gte: today } },
+          ],
+        }
+      : {};
 
     const orbats = await prisma.orbat.findMany({
       where,
@@ -46,7 +53,10 @@ export async function GET(request: NextRequest) {
           },
         },
       },
-      orderBy: { eventDate: 'asc' },
+      orderBy: [
+        { startsAtUtc: 'asc' },
+        { eventDate: 'asc' },
+      ],
       take: limit,
     });
 
@@ -54,10 +64,12 @@ export async function GET(request: NextRequest) {
       id: orbat.id,
       name: orbat.name,
       description: orbat.description,
+      startsAtUtc: orbat.startsAtUtc?.toISOString() || null,
+      endsAtUtc: orbat.endsAtUtc?.toISOString() || null,
       eventDate: orbat.eventDate?.toISOString() || null,
       startTime: orbat.startTime,
       endTime: orbat.endTime,
-      isActive: !includePast && orbat.eventDate && new Date(orbat.eventDate) >= today,
+      isActive: !includePast && ((orbat.startsAtUtc && orbat.startsAtUtc >= today) || (!orbat.startsAtUtc && orbat.eventDate && orbat.eventDate >= today)),
       squads: orbat.squads.map((squad) => ({
         id: squad.id,
         name: squad.name,

@@ -76,6 +76,10 @@ type AttendanceMetrics = {
   lastAttendanceDate: string | null;
   count30d: number;
   count90d: number;
+  arrivedLateCount90d: number;
+  leftEarlyCount90d: number;
+  avgArrivedLatePerMonth90d: number;
+  avgLeftEarlyPerMonth90d: number;
   trend: MonthlyTrend[];
   recent: AttendanceEntry[];
 };
@@ -366,10 +370,14 @@ export default function UserDetailClient({
 
       {activeTab === 'attendance' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             <InfoCard label="30-day Attendance" value={String(attendance.count30d)} />
             <InfoCard label="90-day Attendance" value={String(attendance.count90d)} />
             <InfoCard label="Since Last Rank" value={String(user.attendanceSinceLastRank)} />
+            <InfoCard label="Late Arrivals (90d)" value={String(attendance.arrivedLateCount90d)} />
+            <InfoCard label="Left Early (90d)" value={String(attendance.leftEarlyCount90d)} />
+            <InfoCard label="Late Avg / Month (90d)" value={String(attendance.avgArrivedLatePerMonth90d)} />
+            <InfoCard label="Early Avg / Month (90d)" value={String(attendance.avgLeftEarlyPerMonth90d)} />
           </div>
 
           <div className="rounded-lg border p-4" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--secondary)' }}>

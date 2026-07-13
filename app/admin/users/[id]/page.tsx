@@ -4,7 +4,7 @@ import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
-import { getTotalAttendanceWithLegacy, getRecentAttendanceWithLegacy, getSixMonthTrendWithLegacy } from '@/lib/attendance-stats';
+import { getTotalAttendanceWithLegacy, getRecentAttendanceWithLegacy, getSixMonthTrendWithLegacy, getUserAttendanceStats } from '@/lib/attendance-stats';
 import UserDetailClient from './UserDetailClient';
 
 function formatMonth(date: Date): string {
@@ -122,6 +122,7 @@ export default async function UserDetailPage({
     count90d,
     recentAttendance,
     trendRecords,
+    attendanceStats90d,
     allPermissions,
     assignedPermissions,
     ranks,
@@ -133,6 +134,7 @@ export default async function UserDetailPage({
       prisma.attendance.count({ where: { userId, createdAt: { gte: ninetyDaysAgo } } }),
       getRecentAttendanceWithLegacy(userId, 15), // Recent attendance including legacy
       getSixMonthTrendWithLegacy(userId), // 6-month trend (legacy excluded)
+      getUserAttendanceStats(userId, 90),
       prisma.permission.findMany({
         orderBy: { key: 'asc' },
         select: {
@@ -216,6 +218,10 @@ export default async function UserDetailPage({
     lastAttendanceDate: recentAttendance[0]?.createdAt.toISOString() ?? null,
     count30d,
     count90d,
+    arrivedLateCount90d: attendanceStats90d.arrivedLateCount,
+    leftEarlyCount90d: attendanceStats90d.leftEarlyCount,
+    avgArrivedLatePerMonth90d: attendanceStats90d.avgArrivedLatePerMonth,
+    avgLeftEarlyPerMonth90d: attendanceStats90d.avgLeftEarlyPerMonth,
     trend: buildLastSixMonthsTrend(trendRecords),
     recent: recentAttendance.map((entry: any) => ({
       id: entry.id,
