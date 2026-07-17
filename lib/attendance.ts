@@ -27,9 +27,12 @@ export function calculateAttendanceStatus(
     return 'no_show';
   }
 
-  // If checked in, determine partial vs late vs gone_early vs present.
-  // Missing-time values are capped at 60 elsewhere; status remains side-specific
-  // unless both late and gone_early are true.
+  // Under 60 total minutes missed → present (minor lateness/early departure ignored)
+  if (totalMinutesMissed < 60) {
+    return 'present';
+  }
+
+  // 60+ minutes missed: determine which side(s) contributed
   if (minutesLate > 0 && minutesGoneEarly > 0) {
     return 'partial';
   }
@@ -38,11 +41,7 @@ export function calculateAttendanceStatus(
     return 'late';
   }
 
-  if (minutesGoneEarly > 0) {
-    return 'gone_early';
-  }
-
-  return 'present';
+  return 'gone_early';
 }
 
 /**
