@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { validateBotTokenLegacy } from '@/lib/bot-token-validation';
 import { buildAttendanceNoteFlags } from '@/lib/attendance-note-flags';
+import { calculateAttendanceStatus } from '@/lib/attendance';
 
 function validateBotToken(request: NextRequest): Promise<boolean> {
   return validateBotTokenLegacy(request);
@@ -208,13 +209,10 @@ export async function POST(request: NextRequest) {
 
       totalMinutesMissed = minutesLate + minutesGoneEarly;
 
-      // Determine status
-      const status: 'present' | 'absent' | 'partial' | 'late' | 'gone_early' | 'no_show' = 
-        joins.length === 0 ? 'no_show' :
-        minutesLate > 0 && minutesGoneEarly > 0 ? 'partial' :
-        minutesLate > 0 ? 'late' :
-        minutesGoneEarly > 0 ? 'gone_early' :
-        totalMinutesPresent > 0 ? 'present' : 'absent';
+      // Determine status using shared logic (60-minute threshold)
+      const status = joins.length === 0
+        ? 'no_show'
+        : calculateAttendanceStatus(true, minutesLate, minutesGoneEarly, totalMinutesMissed);
 
       const noteFlags = buildAttendanceNoteFlags(noteByUserId.get(userIdNum) ?? null);
 
@@ -227,7 +225,7 @@ export async function POST(request: NextRequest) {
           signupId: signup.id,
           orbatId: orbat.id,
           userId: userIdNum,
-          status: status as 'present' | 'absent' | 'partial' | 'late' | 'gone_early' | 'no_show',
+          status,
           totalMinutesPresent,
           minutesLate,
           minutesGoneEarly,
@@ -235,7 +233,7 @@ export async function POST(request: NextRequest) {
           ...noteFlags,
         },
         update: {
-          status: status as 'present' | 'absent' | 'partial' | 'late' | 'gone_early' | 'no_show',
+          status,
           totalMinutesPresent,
           minutesLate,
           minutesGoneEarly,
