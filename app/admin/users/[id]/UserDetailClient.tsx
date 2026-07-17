@@ -305,6 +305,7 @@ export default function UserDetailClient({
                   alt={user.username || 'User'}
                   width={48}
                   height={48}
+                  unoptimized={user.avatarUrl.startsWith('/uploads/')}
                   className="rounded-full"
                 />
               )

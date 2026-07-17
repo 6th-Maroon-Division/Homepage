@@ -199,6 +199,7 @@ export default function PermissionAuditLog({ userId, username }: PermissionAudit
                         alt={log.actor.username || 'Actor'}
                         width={20}
                         height={20}
+                        unoptimized={log.actor.avatarUrl.startsWith('/uploads/')}
                         className="rounded-full"
                       />
                     )}

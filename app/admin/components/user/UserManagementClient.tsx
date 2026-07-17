@@ -575,6 +575,7 @@ export default function UserManagementClient({
                               alt={user.username || 'User'}
                               width={32}
                               height={32}
+                              unoptimized={user.avatarUrl.startsWith('/uploads/')}
                               className="rounded-full"
                             />
                           )

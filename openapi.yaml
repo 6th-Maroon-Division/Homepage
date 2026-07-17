@@ -10,13 +10,11 @@ info:
   license:
     name: Proprietary
     identifier: 6MD
-
 servers:
   - url: http://localhost:3000/api
     description: Development server
   - url: https://orbat.6md.net/api
     description: Production server
-
 tags:
   - name: Authentication
     description: Discord OAuth and Steam OpenID authentication
@@ -46,446 +44,139 @@ tags:
     description: LOA management
   - name: Bot
     description: Discord bot integration endpoints
-
 security:
   - bearerAuth: []
-
 paths:
-  /auth/{...nextauth}:
+  /admin/bot-tokens:
     get:
-      tags: [Authentication]
-      summary: NextAuth.js authentication handler
+      tags:
+        - TODO
+      summary: TODO document GET /admin/bot-tokens
       responses:
-        '302':
-          description: Redirect to authentication provider
-        '401':
-          description: Unauthorized
-
-  /auth/steam-login:
+        "200":
+          description: Success
+    post:
+      tags:
+        - TODO
+      summary: TODO document POST /admin/bot-tokens
+      responses:
+        "200":
+          description: Success
+  /admin/bot-tokens/{id}:
     get:
-      tags: [Authentication]
-      summary: Initiate Steam OpenID login
+      tags:
+        - TODO
+      summary: TODO document GET /admin/bot-tokens/{id}
       responses:
-        '302':
-          description: Redirect to Steam login
-
-  /auth/steam-callback:
+        "200":
+          description: Success
+    put:
+      tags:
+        - TODO
+      summary: TODO document PUT /admin/bot-tokens/{id}
+      responses:
+        "200":
+          description: Success
+    delete:
+      tags:
+        - TODO
+      summary: TODO document DELETE /admin/bot-tokens/{id}
+      responses:
+        "200":
+          description: Success
+  /admin/catalog/events:
     get:
-      tags: [Authentication]
-      summary: Steam OpenID callback handler
+      tags:
+        - Admin
+        - Realtime
+      summary: Admin catalog SSE stream
+      security:
+        - bearerAuth:
+            - orbat:view_all
+            - templates:view
       responses:
-        '302':
-          description: Redirect after successful authentication
-        '401':
-          description: Authentication failed
-
-  /auth/steam-signin:
-    get:
-      tags: [Authentication]
-      summary: Link Steam account to existing user
-      responses:
-        '302':
-          description: Redirect to Steam login or back to profile
-
-  /user/current:
-    get:
-      tags: [Users]
-      summary: Get current user
-      responses:
-        '200':
-          description: Current user data
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/User'
-        '401':
-          description: Unauthorized
-
-  /user/events:
-    get:
-      tags: [Users, Realtime]
-      summary: User profile SSE stream
-      responses:
-        '200':
+        "200":
           description: SSE stream
           content:
             text/event-stream:
               schema:
                 type: object
-
-  /user/avatar/refresh:
+  /admin/import/legacy-user-data:
+    get:
+      tags:
+        - Admin
+        - Import
+      summary: Get legacy user data
+      security:
+        - bearerAuth:
+            - user:import
+      responses:
+        "200":
+          description: Legacy user data
     post:
-      tags: [Users]
-      summary: Refresh user avatar
+      tags:
+        - TODO
+      summary: TODO document POST /admin/import/legacy-user-data
       responses:
-        '200':
-          description: Avatar refresh initiated
-        '401':
-          description: Unauthorized
-
-  /user/auth-providers:
-    get:
-      tags: [Users]
-      summary: Get user authentication providers
-      responses:
-        '200':
-          description: List of linked providers
-        '401':
-          description: Unauthorized
-
-  /user/update:
+        "200":
+          description: Success
+  /admin/import/legacy-user-data/apply:
     post:
-      tags: [Users]
-      summary: Update user profile
-      responses:
-        '200':
-          description: User updated
-        '401':
-          description: Unauthorized
-
-  /users:
-    get:
-      tags: [Users]
-      summary: List all users
+      tags:
+        - Admin
+        - Import
+      summary: Apply legacy user data import
       security:
-        - bearerAuth: [user:manage]
+        - bearerAuth:
+            - user:import
       responses:
-        '200':
-          description: List of users
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden
-
-  /users/{id}:
-    get:
-      tags: [Users]
-      summary: Get user by ID
-      security:
-        - bearerAuth: [user:manage]
-      responses:
-        '200':
-          description: User details
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden
-        '404':
-          description: User not found
-    delete:
-      tags: [Users]
-      summary: Delete user
-      security:
-        - bearerAuth: [user:manage]
-      responses:
-        '200':
-          description: User deleted
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden
-
-  /users/{id}/permissions:
-    get:
-      tags: [Users]
-      summary: Get user permissions
-      security:
-        - bearerAuth: [user:manage_permissions]
-      responses:
-        '200':
-          description: User permissions
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden
-    put:
-      tags: [Users]
-      summary: Update user permissions
-      security:
-        - bearerAuth: [user:manage_permissions]
-      responses:
-        '200':
-          description: Permissions updated
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden
-
-  /users/{id}/permissions/audit:
-    get:
-      tags: [Users]
-      summary: Get permission audit log
-      security:
-        - bearerAuth: [user:manage_permissions]
-      responses:
-        '200':
-          description: Permission audit log
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden
-
-  /users/{id}/rank:
-    get:
-      tags: [Users, Ranks]
-      summary: Get user rank
-      responses:
-        '200':
-          description: User rank information
-    put:
-      tags: [Users, Ranks]
-      summary: Assign rank to user
-      security:
-        - bearerAuth: [user:manage_ranks]
-      responses:
-        '200':
-          description: Rank assigned
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden
-
-  /users/{id}/rank/assign:
+        "200":
+          description: Import applied
+  /admin/import/legacy-user-data/map:
     post:
-      tags: [Users, Ranks]
-      summary: Assign rank with options
+      tags:
+        - Admin
+        - Import
+      summary: Map legacy user data
       security:
-        - bearerAuth: [user:manage_ranks]
+        - bearerAuth:
+            - user:import
       responses:
-        '200':
-          description: Rank assigned with options
-
-  /users/{id}/rank/demote:
+        "200":
+          description: Mappings saved
+  /admin/orbats/list:
+    get:
+      tags:
+        - Admin
+        - ORBATs
+      summary: Get admin ORBAT list
+      security:
+        - bearerAuth:
+            - orbat:view_all
+      responses:
+        "200":
+          description: Admin ORBAT list
+  /admin/users/bulk-interview-toggle:
     post:
-      tags: [Users, Ranks]
-      summary: Demote user
+      tags:
+        - Admin
+        - Users
+      summary: Bulk toggle interview status
       security:
-        - bearerAuth: [user:manage_ranks]
+        - bearerAuth:
+            - user:manage
       responses:
-        '200':
-          description: User demoted
-
-  /users/{id}/rank-history:
-    get:
-      tags: [Users, Ranks]
-      summary: Get user rank history
-      responses:
-        '200':
-          description: User rank history
-
-  /users/{id}/attendance:
-    get:
-      tags: [Users, Attendance]
-      summary: Get user attendance
-      responses:
-        '200':
-          description: User attendance records
-
-  /users/{id}/attendance/stats:
-    get:
-      tags: [Users, Attendance]
-      summary: Get user attendance statistics
-      responses:
-        '200':
-          description: Attendance statistics
-
-  /users/{id}/trainings:
-    get:
-      tags: [Users, Training]
-      summary: Get user trainings
-      responses:
-        '200':
-          description: User training records
-
-  /users/{id}/interview/toggle:
-    post:
-      tags: [Users]
-      summary: Toggle user interview status
-      security:
-        - bearerAuth: [user:manage]
-      responses:
-        '200':
+        "200":
           description: Interview status toggled
-
-  /users/{id}/retired/toggle:
+  /admin/users/bulk-rank-assign:
     post:
-      tags: [Users]
-      summary: Toggle user retired status
+      tags:
+        - Admin
+        - Users
+      summary: Bulk assign ranks
       security:
-        - bearerAuth: [user:manage]
-      responses:
-        '200':
-          description: Retired status toggled
-
-  /users/{id}/events:
-    get:
-      tags: [Users, Realtime]
-      summary: Admin user SSE stream
-      security:
-        - bearerAuth: [user:manage]
-      responses:
-        '200':
-          description: SSE stream
-          content:
-            text/event-stream:
-              schema:
-                type: object
-
-  /users/{id}/admin:
-    get:
-      tags: [Users]
-      summary: Get user admin information
-      security:
-        - bearerAuth: [user:manage]
-      responses:
-        '200':
-          description: User admin details
-
-  /orbats:
-    get:
-      tags: [ORBATs]
-      summary: List recent ORBATs
-      parameters:
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 5
-      responses:
-        '200':
-          description: List of ORBATs
-    post:
-      tags: [ORBATs]
-      summary: Create new ORBAT
-      security:
-        - bearerAuth: [orbat:create]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/OrbatCreateInput'
-      responses:
-        '201':
-          description: ORBAT created
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden
-
-  /orbats/calendar:
-    get:
-      tags: [ORBATs]
-      summary: Get ORBAT calendar feed
-      parameters:
-        - name: start
-          in: query
-          schema:
-            type: string
-            format: date-time
-        - name: end
-          in: query
-          schema:
-            type: string
-            format: date-time
-      responses:
-        '200':
-          description: Calendar feed data
-
-  /orbats/events:
-    get:
-      tags: [ORBATs, Realtime]
-      summary: Global ORBAT SSE stream
-      responses:
-        '200':
-          description: SSE stream
-          content:
-            text/event-stream:
-              schema:
-                type: object
-
-  /orbats/{id}:
-    get:
-      tags: [ORBATs]
-      summary: Get ORBAT by ID
-      security:
-        - bearerAuth: [orbat:edit]
-      responses:
-        '200':
-          description: ORBAT details
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden
-        '404':
-          description: ORBAT not found
-    patch:
-      tags: [ORBATs]
-      summary: Update ORBAT
-      security:
-        - bearerAuth: [orbat:edit]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/OrbatUpdateInput'
-      responses:
-        '200':
-          description: ORBAT updated
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden
-        '404':
-          description: ORBAT not found
-    delete:
-      tags: [ORBATs]
-      summary: Delete ORBAT
-      security:
-        - bearerAuth: [orbat:delete]
-      responses:
-        '200':
-          description: ORBAT deleted
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden
-        '404':
-          description: ORBAT not found
-
-  /orbats/{id}/full:
-    get:
-      tags: [ORBATs]
-      summary: Get full ORBAT with signups
-      responses:
-        '200':
-          description: Full ORBAT with signups
-        '404':
-          description: ORBAT not found
-
-  /orbats/{id}/events:
-    get:
-      tags: [ORBATs, Realtime]
-      summary: ORBAT-specific SSE stream
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: SSE stream
-          content:
-            text/event-stream:
-              schema:
-                type: object
-
-  /orbats/{id}/signups:
-    post:
-      tags: [ORBATs, Signups]
-      summary: Create signup
+        - bearerAuth:
+            - user:manage
       requestBody:
         required: true
         content:
@@ -493,783 +184,61 @@ paths:
             schema:
               type: object
               properties:
-                slotId:
-                  type: integer
-                userId:
-                  type: integer
-                position:
-                  type: string
-                notes:
-                  type: string
-      responses:
-        '201':
-          description: Signup created
-        '401':
-          description: Unauthorized
-    delete:
-      tags: [ORBATs, Signups]
-      summary: Remove signup
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                signupId:
-                  type: integer
-      responses:
-        '200':
-          description: Signup removed
-        '401':
-          description: Unauthorized
-
-  /signups/{id}/move:
-    post:
-      tags: [Signups]
-      summary: Move signup to different slot
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                targetSlotId:
-                  type: integer
-      responses:
-        '200':
-          description: Signup moved
-        '401':
-          description: Unauthorized
-
-  /orbats/{id}/attendance:
-    get:
-      tags: [ORBATs, Attendance]
-      summary: Get ORBAT attendance
-      responses:
-        '200':
-          description: ORBAT attendance records
-    post:
-      tags: [ORBATs, Attendance]
-      summary: Set ORBAT attendance
-      security:
-        - bearerAuth: [attendance:manage]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                userId:
-                  type: integer
-                status:
-                  type: string
-                  enum: [present, absent, late, gone_early, partial, no_show]
-                notes:
-                  type: string
-      responses:
-        '201':
-          description: Attendance set
-
-  /orbats/{id}/attendance/automation:
-    post:
-      tags: [ORBATs, Attendance]
-      summary: Automated attendance ingestion
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-      responses:
-        '201':
-          description: Attendance ingested
-
-  /attendance:
-    get:
-      tags: [Attendance]
-      summary: Get all attendance records
-      security:
-        - bearerAuth: [attendance:view_all]
-      responses:
-        '200':
-          description: All attendance records
-
-  /attendance/import:
-    post:
-      tags: [Attendance]
-      summary: Import attendance data
-      security:
-        - bearerAuth: [attendance:import]
-      responses:
-        '201':
-          description: Attendance imported
-
-  /attendance/automated:
-    post:
-      tags: [Attendance]
-      summary: Process automated attendance
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-      responses:
-        '201':
-          description: Automated attendance processed
-
-  /attendance/{attendanceId}:
-    get:
-      tags: [Attendance]
-      summary: Get specific attendance record
-      responses:
-        '200':
-          description: Attendance record
-    patch:
-      tags: [Attendance]
-      summary: Update attendance record
-      security:
-        - bearerAuth: [attendance:manage]
-      responses:
-        '200':
-          description: Attendance updated
-
-  /trainings:
-    get:
-      tags: [Training]
-      summary: List all trainings
-      responses:
-        '200':
-          description: List of trainings
-    post:
-      tags: [Training]
-      summary: Create training
-      security:
-        - bearerAuth: [training:create]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TrainingCreateInput'
-      responses:
-        '201':
-          description: Training created
-
-  /trainings/available:
-    get:
-      tags: [Training]
-      summary: Get available trainings for current user
-      responses:
-        '200':
-          description: Available trainings
-        '401':
-          description: Unauthorized
-
-  /trainings/{id}:
-    get:
-      tags: [Training]
-      summary: Get training by ID
-      responses:
-        '200':
-          description: Training details
-    patch:
-      tags: [Training]
-      summary: Update training
-      security:
-        - bearerAuth: [training:edit]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TrainingUpdateInput'
-      responses:
-        '200':
-          description: Training updated
-    delete:
-      tags: [Training]
-      summary: Delete training
-      security:
-        - bearerAuth: [training:delete]
-      responses:
-        '200':
-          description: Training deleted
-
-  /trainings/{id}/requirements:
-    get:
-      tags: [Training]
-      summary: Get training requirements
-      responses:
-        '200':
-          description: Training requirements
-    put:
-      tags: [Training]
-      summary: Update training requirements
-      security:
-        - bearerAuth: [training:edit]
-      responses:
-        '200':
-          description: Requirements updated
-
-  /trainings/{id}/prerequisites:
-    get:
-      tags: [Training]
-      summary: Get training prerequisites
-      responses:
-        '200':
-          description: Training prerequisites
-    post:
-      tags: [Training]
-      summary: Add prerequisite
-      security:
-        - bearerAuth: [training:edit]
-      responses:
-        '201':
-          description: Prerequisite added
-    delete:
-      tags: [Training]
-      summary: Remove prerequisite
-      security:
-        - bearerAuth: [training:edit]
-      responses:
-        '200':
-          description: Prerequisite removed
-
-  /trainings/{id}/prerequisites/{prerequisiteId}:
-    delete:
-      tags: [Training]
-      summary: Remove specific prerequisite
-      security:
-        - bearerAuth: [training:edit]
-      responses:
-        '200':
-          description: Prerequisite removed
-
-  /training-requests:
-    get:
-      tags: [Training]
-      summary: Get training requests
-      security:
-        - bearerAuth: [training:manage_requests]
-      responses:
-        '200':
-          description: List of training requests
-    post:
-      tags: [Training]
-      summary: Create training request
-      responses:
-        '201':
-          description: Training request created
-        '401':
-          description: Unauthorized
-
-  /training-requests/{id}:
-    patch:
-      tags: [Training]
-      summary: Update training request status
-      security:
-        - bearerAuth: [training:manage_requests]
-      responses:
-        '200':
-          description: Training request updated
-
-  /training-categories:
-    get:
-      tags: [Training]
-      summary: List training categories
-      responses:
-        '200':
-          description: List of training categories
-    post:
-      tags: [Training]
-      summary: Create training category
-      security:
-        - bearerAuth: [training:create]
-      responses:
-        '201':
-          description: Category created
-
-  /training-categories/{id}:
-    patch:
-      tags: [Training]
-      summary: Update training category
-      security:
-        - bearerAuth: [training:edit]
-      responses:
-        '200':
-          description: Category updated
-    delete:
-      tags: [Training]
-      summary: Delete training category
-      security:
-        - bearerAuth: [training:delete]
-      responses:
-        '200':
-          description: Category deleted
-
-  /user-trainings:
-    get:
-      tags: [Training]
-      summary: Get current user trainings
-      responses:
-        '200':
-          description: User trainings
-        '401':
-          description: Unauthorized
-
-  /user-trainings/{id}:
-    patch:
-      tags: [Training]
-      summary: Update user training
-      responses:
-        '200':
-          description: User training updated
-        '401':
-          description: Unauthorized
-    delete:
-      tags: [Training]
-      summary: Remove user training
-      responses:
-        '200':
-          description: User training removed
-        '401':
-          description: Unauthorized
-
-  /ranks:
-    get:
-      tags: [Ranks]
-      summary: List all ranks
-      responses:
-        '200':
-          description: List of ranks
-    post:
-      tags: [Ranks]
-      summary: Create rank
-      security:
-        - bearerAuth: [ranks:manage]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RankCreateInput'
-      responses:
-        '201':
-          description: Rank created
-
-  /ranks/reorder:
-    post:
-      tags: [Ranks]
-      summary: Reorder ranks
-      security:
-        - bearerAuth: [ranks:manage]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                rankIds:
+                userIds:
                   type: array
                   items:
                     type: integer
+                rankId:
+                  type: integer
       responses:
-        '200':
-          description: Ranks reordered
-
-  /ranks/{id}:
+        "200":
+          description: Ranks assigned to users
+  /admin/users/bulk-retire-toggle:
+    post:
+      tags:
+        - Admin
+        - Users
+      summary: Bulk toggle retired status
+      security:
+        - bearerAuth:
+            - user:manage
+      responses:
+        "200":
+          description: Retired status toggled
+  /admin/users/events:
     get:
-      tags: [Ranks]
-      summary: Get rank by ID
-      responses:
-        '200':
-          description: Rank details
-    patch:
-      tags: [Ranks]
-      summary: Update rank
+      tags:
+        - Admin
+        - Users
+        - Realtime
+      summary: Admin users list SSE stream
       security:
-        - bearerAuth: [ranks:manage]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RankUpdateInput'
+        - bearerAuth:
+            - user:manage
       responses:
-        '200':
-          description: Rank updated
-    delete:
-      tags: [Ranks]
-      summary: Delete rank
-      security:
-        - bearerAuth: [ranks:delete]
-      responses:
-        '200':
-          description: Rank deleted
-
-  /ranks/{id}/transitions:
-    get:
-      tags: [Ranks]
-      summary: Get rank transition requirements
-      responses:
-        '200':
-          description: Rank transition requirements
-    post:
-      tags: [Ranks]
-      summary: Set rank transition requirements
-      security:
-        - bearerAuth: [ranks:manage]
-      responses:
-        '200':
-          description: Transition requirements set
-
-  /ranks/{id}/transitions/{trainingId}:
-    delete:
-      tags: [Ranks]
-      summary: Remove training requirement from rank transition
-      security:
-        - bearerAuth: [ranks:manage]
-      responses:
-        '200':
-          description: Training requirement removed
-
-  /ranks/auto-rankup:
-    post:
-      tags: [Ranks]
-      summary: Check auto-rankup eligibility
-      responses:
-        '200':
-          description: Auto-rankup eligibility check result
-        '401':
-          description: Unauthorized
-
-  /ranks/promotions/pending:
-    get:
-      tags: [Ranks]
-      summary: Get pending promotions
-      security:
-        - bearerAuth: [ranks:manage_promotions]
-      responses:
-        '200':
-          description: List of pending promotions
-
-  /ranks/promotions/propose:
-    post:
-      tags: [Ranks]
-      summary: Propose promotion
-      security:
-        - bearerAuth: [ranks:propose_promotion]
-      responses:
-        '201':
-          description: Promotion proposed
-
-  /ranks/promotions/{id}/approve:
-    post:
-      tags: [Ranks]
-      summary: Approve promotion
-      security:
-        - bearerAuth: [ranks:approve_promotion]
-      responses:
-        '200':
-          description: Promotion approved
-
-  /ranks/promotions/{id}/decline:
-    post:
-      tags: [Ranks]
-      summary: Decline promotion
-      security:
-        - bearerAuth: [ranks:approve_promotion]
-      responses:
-        '200':
-          description: Promotion declined
-
-  /ranks/promotions/events:
-    get:
-      tags: [Ranks, Realtime]
-      summary: Promotions queue SSE stream
-      security:
-        - bearerAuth: [ranks:manage_promotions]
-      responses:
-        '200':
+        "200":
           description: SSE stream
           content:
             text/event-stream:
               schema:
                 type: object
-
-  /ranks/bot/promotions:
-    get:
-      tags: [Ranks]
-      summary: Get bot promotions
-      security:
-        - apiKey: []
-      responses:
-        '200':
-          description: Bot promotions data
+  /admin/users/merge:
     post:
-      tags: [Ranks]
-      summary: Create bot promotion
-      security:
-        - apiKey: []
+      tags:
+        - TODO
+      summary: TODO document POST /admin/users/merge
       responses:
-        '201':
-          description: Bot promotion created
-
-  /ranks/bot/promotions/{id}/decline:
-    post:
-      tags: [Ranks]
-      summary: Decline bot promotion
-      security:
-        - apiKey: []
-      responses:
-        '200':
-          description: Bot promotion declined
-
-  /ranks/migrate/preview:
-    get:
-      tags: [Ranks]
-      summary: Preview rank migration
-      security:
-        - bearerAuth: [ranks:manage]
-      responses:
-        '200':
-          description: Migration preview
-
-  /ranks/migrate/apply:
-    post:
-      tags: [Ranks]
-      summary: Apply rank migration
-      security:
-        - bearerAuth: [ranks:manage]
-      responses:
-        '200':
-          description: Migration applied
-
-  /radio-frequencies:
-    get:
-      tags: [Radio Frequencies]
-      summary: List radio frequencies
-      responses:
-        '200':
-          description: List of radio frequencies
-    post:
-      tags: [Radio Frequencies]
-      summary: Create radio frequency
-      security:
-        - bearerAuth: [radio_frequencies:manage]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RadioFrequencyCreateInput'
-      responses:
-        '201':
-          description: Radio frequency created
-
-  /radio-frequencies/{id}:
-    get:
-      tags: [Radio Frequencies]
-      summary: Get radio frequency by ID
-      responses:
-        '200':
-          description: Radio frequency details
-    patch:
-      tags: [Radio Frequencies]
-      summary: Update radio frequency
-      security:
-        - bearerAuth: [radio_frequencies:manage]
-      responses:
-        '200':
-          description: Radio frequency updated
-    delete:
-      tags: [Radio Frequencies]
-      summary: Delete radio frequency
-      security:
-        - bearerAuth: [radio_frequencies:delete]
-      responses:
-        '200':
-          description: Radio frequency deleted
-
-  /subslot-definitions:
-    get:
-      tags: [Templates]
-      summary: List subslot definitions
-      responses:
-        '200':
-          description: List of subslot definitions
-    post:
-      tags: [Templates]
-      summary: Create subslot definition
-      security:
-        - bearerAuth: [templates:manage]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SubslotDefinitionCreateInput'
-      responses:
-        '201':
-          description: Subslot definition created
-
-  /subslot-definitions/{id}:
-    get:
-      tags: [Templates]
-      summary: Get subslot definition by ID
-      responses:
-        '200':
-          description: Subslot definition details
-    patch:
-      tags: [Templates]
-      summary: Update subslot definition
-      security:
-        - bearerAuth: [templates:manage]
-      responses:
-        '200':
-          description: Subslot definition updated
-    delete:
-      tags: [Templates]
-      summary: Delete subslot definition
-      security:
-        - bearerAuth: [templates:delete]
-      responses:
-        '200':
-          description: Subslot definition deleted
-
-  /templates:
-    get:
-      tags: [Templates]
-      summary: List ORBAT templates
-      responses:
-        '200':
-          description: List of templates
-    post:
-      tags: [Templates]
-      summary: Create ORBAT template
-      security:
-        - bearerAuth: [templates:create]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TemplateCreateInput'
-      responses:
-        '201':
-          description: Template created
-
-  /templates/{id}:
-    get:
-      tags: [Templates]
-      summary: Get template by ID
-      responses:
-        '200':
-          description: Template details
-    patch:
-      tags: [Templates]
-      summary: Update template
-      security:
-        - bearerAuth: [templates:edit]
-      responses:
-        '200':
-          description: Template updated
-    delete:
-      tags: [Templates]
-      summary: Delete template
-      security:
-        - bearerAuth: [templates:delete]
-      responses:
-        '200':
-          description: Template deleted
-
-  /messaging/inbox:
-    get:
-      tags: [Messaging]
-      summary: Get user inbox
-      responses:
-        '200':
-          description: User inbox
-        '401':
-          description: Unauthorized
-
-  /messaging/events:
-    get:
-      tags: [Messaging, Realtime]
-      summary: Inbox SSE stream
-      responses:
-        '200':
-          description: SSE stream
-          content:
-            text/event-stream:
-              schema:
-                type: object
-
-  /messaging/read-all:
-    post:
-      tags: [Messaging]
-      summary: Mark all messages as read
-      responses:
-        '200':
-          description: All messages marked as read
-        '401':
-          description: Unauthorized
-
-  /messaging/send:
-    post:
-      tags: [Messaging]
-      summary: Send message
-      security:
-        - bearerAuth: [system:super_admin]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                title:
-                  type: string
-                message:
-                  type: string
-                type:
-                  type: string
-                  enum: [general, orbat, training, rankup, alert]
-                actionUrl:
-                  type: string
-                  format: uri
-                audience:
-                  type: string
-                  enum: [all, admin]
-      responses:
-        '201':
-          description: Message sent
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden
-
-  /messaging/{id}/read:
-    post:
-      tags: [Messaging]
-      summary: Mark message as read
-      responses:
-        '200':
-          description: Message marked as read
-        '401':
-          description: Unauthorized
-
+        "200":
+          description: Success
   /admin/users/unranked:
     get:
-      tags: [Admin, Users]
+      tags:
+        - Admin
+        - Users
       summary: Get unranked users
       security:
-        - bearerAuth: [user:manage]
+        - bearerAuth:
+            - user:manage
       parameters:
         - name: interview
           in: query
@@ -1287,169 +256,280 @@ paths:
             type: string
             default: all
       responses:
-        '200':
+        "200":
           description: Unranked users
-        '401':
+        "401":
           description: Unauthorized
-        '403':
+        "403":
           description: Forbidden
-
-  /admin/users/bulk-rank-assign:
-    post:
-      tags: [Admin, Users]
-      summary: Bulk assign ranks
+  /attendance:
+    get:
+      tags:
+        - Attendance
+      summary: Get all attendance records
       security:
-        - bearerAuth: [user:manage]
+        - bearerAuth:
+            - attendance:view_all
+      responses:
+        "200":
+          description: All attendance records
+  /attendance/{attendanceId}:
+    get:
+      tags:
+        - Attendance
+      summary: Get specific attendance record
+      responses:
+        "200":
+          description: Attendance record
+    patch:
+      tags:
+        - Attendance
+      summary: Update attendance record
+      security:
+        - bearerAuth:
+            - attendance:manage
+      responses:
+        "200":
+          description: Attendance updated
+    put:
+      tags:
+        - TODO
+      summary: TODO document PUT /attendance/{attendanceId}
+      responses:
+        "200":
+          description: Success
+    delete:
+      tags:
+        - TODO
+      summary: TODO document DELETE /attendance/{attendanceId}
+      responses:
+        "200":
+          description: Success
+  /attendance/automated:
+    post:
+      tags:
+        - Attendance
+      summary: Process automated attendance
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+      responses:
+        "201":
+          description: Automated attendance processed
+  /attendance/import:
+    post:
+      tags:
+        - Attendance
+      summary: Import attendance data
+      security:
+        - bearerAuth:
+            - attendance:import
+      responses:
+        "201":
+          description: Attendance imported
+  /attendance/legacy-data:
+    get:
+      tags:
+        - TODO
+      summary: TODO document GET /attendance/legacy-data
+      responses:
+        "200":
+          description: Success
+    put:
+      tags:
+        - TODO
+      summary: TODO document PUT /attendance/legacy-data
+      responses:
+        "200":
+          description: Success
+  /attendance/legacy-import:
+    post:
+      tags:
+        - TODO
+      summary: TODO document POST /attendance/legacy-import
+      responses:
+        "200":
+          description: Success
+  /attendance/legacy-import/user-data:
+    post:
+      tags:
+        - TODO
+      summary: TODO document POST /attendance/legacy-import/user-data
+      responses:
+        "200":
+          description: Success
+    get:
+      tags:
+        - TODO
+      summary: TODO document GET /attendance/legacy-import/user-data
+      responses:
+        "200":
+          description: Success
+  /attendance/legacy-import/user-data/map:
+    put:
+      tags:
+        - TODO
+      summary: TODO document PUT /attendance/legacy-import/user-data/map
+      responses:
+        "200":
+          description: Success
+  /auth/{...nextauth}:
+    get:
+      tags:
+        - Authentication
+      summary: NextAuth.js authentication handler
+      responses:
+        "302":
+          description: Redirect to authentication provider
+        "401":
+          description: Unauthorized
+  /auth/steam-callback:
+    get:
+      tags:
+        - Authentication
+      summary: Steam OpenID callback handler
+      responses:
+        "302":
+          description: Redirect after successful authentication
+        "401":
+          description: Authentication failed
+  /auth/steam-login:
+    get:
+      tags:
+        - Authentication
+      summary: Initiate Steam OpenID login
+      responses:
+        "302":
+          description: Redirect to Steam login
+  /auth/steam-signin:
+    get:
+      tags:
+        - Authentication
+      summary: Link Steam account to existing user
+      responses:
+        "302":
+          description: Redirect to Steam login or back to profile
+  /bot/attendance:
+    post:
+      tags:
+        - TODO
+      summary: TODO document POST /bot/attendance
+      responses:
+        "200":
+          description: Success
+  /bot/attendance/backfill:
+    post:
+      tags:
+        - TODO
+      summary: TODO document POST /bot/attendance/backfill
+      responses:
+        "200":
+          description: Success
+  /bot/attendance/compile:
+    post:
+      tags:
+        - Bot
+        - Attendance
+      summary: Compile attendance for an ORBAT
+      description: |
+        Compiles raw attendance events into structured attendance records for a specific ORBAT.
+        The bot should call this when it detects an ORBAT has ended (by checking endTime and server empty).
+        This matches events to the ORBAT timeframe, calculates durations, and creates/updates attendance records.
+      security:
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - orbatId
               properties:
-                userIds:
-                  type: array
-                  items:
-                    type: integer
-                rankId:
+                orbatId:
                   type: integer
+                  description: ID of the ORBAT to compile attendance for
+                  example: 123
       responses:
-        '200':
-          description: Ranks assigned to users
-
-  /admin/users/bulk-interview-toggle:
-    post:
-      tags: [Admin, Users]
-      summary: Bulk toggle interview status
-      security:
-        - bearerAuth: [user:manage]
-      responses:
-        '200':
-          description: Interview status toggled
-
-  /admin/users/bulk-retire-toggle:
-    post:
-      tags: [Admin, Users]
-      summary: Bulk toggle retired status
-      security:
-        - bearerAuth: [user:manage]
-      responses:
-        '200':
-          description: Retired status toggled
-
-  /admin/users/events:
-    get:
-      tags: [Admin, Users, Realtime]
-      summary: Admin users list SSE stream
-      security:
-        - bearerAuth: [user:manage]
-      responses:
-        '200':
-          description: SSE stream
+        "200":
+          description: Attendance compiled successfully
           content:
-            text/event-stream:
+            application/json:
               schema:
                 type: object
-
-  /admin/orbats/list:
-    get:
-      tags: [Admin, ORBATs]
-      summary: Get admin ORBAT list
-      security:
-        - bearerAuth: [orbat:view_all]
-      responses:
-        '200':
-          description: Admin ORBAT list
-
-  /admin/catalog/events:
-    get:
-      tags: [Admin, Realtime]
-      summary: Admin catalog SSE stream
-      security:
-        - bearerAuth: [orbat:view_all, templates:view]
-      responses:
-        '200':
-          description: SSE stream
-          content:
-            text/event-stream:
-              schema:
-                type: object
-
-  /admin/import/legacy-user-data:
-    get:
-      tags: [Admin, Import]
-      summary: Get legacy user data
-      security:
-        - bearerAuth: [user:import]
-      responses:
-        '200':
-          description: Legacy user data
-
-  /admin/import/legacy-user-data/map:
-    post:
-      tags: [Admin, Import]
-      summary: Map legacy user data
-      security:
-        - bearerAuth: [user:import]
-      responses:
-        '200':
-          description: Mappings saved
-
-  /admin/import/legacy-user-data/apply:
-    post:
-      tags: [Admin, Import]
-      summary: Apply legacy user data import
-      security:
-        - bearerAuth: [user:import]
-      responses:
-        '200':
-          description: Import applied
-
-  /loa:
-    get:
-      tags: [Leave of Absence]
-      summary: List all Leave of Absence requests
-      security:
-        - bearerAuth: [loa:view_all]
-      responses:
-        '200':
-          description: List of LOA requests
-    post:
-      tags: [Leave of Absence]
-      summary: Create Leave of Absence request
-      responses:
-        '201':
-          description: LOA request created
-        '401':
-          description: Unauthorized
-
-  /loa/{id}:
-    get:
-      tags: [Leave of Absence]
-      summary: Get Leave of Absence by ID
-      responses:
-        '200':
-          description: LOA details
-    patch:
-      tags: [Leave of Absence]
-      summary: Update Leave of Absence
-      responses:
-        '200':
-          description: LOA updated
-        '401':
-          description: Unauthorized
-    delete:
-      tags: [Leave of Absence]
-      summary: Delete Leave of Absence
-      responses:
-        '200':
-          description: LOA deleted
-        '401':
-          description: Unauthorized
-
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  orbatId:
+                    type: integer
+                    description: ID of the compiled ORBAT
+                    example: 123
+                  orbatName:
+                    type: string
+                    description: Name of the ORBAT
+                    example: Operation Thunder Strike
+                  eventDate:
+                    type: string
+                    format: date
+                    description: Date of the ORBAT
+                    example: 2024-01-15
+                  compiledCount:
+                    type: integer
+                    description: Number of attendance records compiled
+                    example: 42
+                  totalEventsProcessed:
+                    type: integer
+                    description: Total number of raw events processed
+                    example: 105
+                  attendance:
+                    type: array
+                    description: Compiled attendance for each user
+                    items:
+                      type: object
+                      properties:
+                        userId:
+                          type: integer
+                          example: 42
+                        username:
+                          type: string
+                          example: Soldier_John
+                        status:
+                          type: string
+                          enum:
+                            - present
+                            - absent
+                            - partial
+                            - late
+                            - gone_early
+                            - no_show
+                          example: present
+                        totalMinutesPresent:
+                          type: integer
+                          example: 180
+                        joinCount:
+                          type: integer
+                          description: Number of join events for this user
+                          example: 1
+                        leaveCount:
+                          type: integer
+                          description: Number of leave events for this user
+                          example: 1
+        "400":
+          description: Invalid request data (missing orbatId, ORBAT missing time info)
+        "401":
+          description: Unauthorized - invalid or missing bot API token
+        "404":
+          description: ORBAT not found
+        "500":
+          description: Internal server error
   /bot/events:
     post:
-      tags: [Bot]
+      tags:
+        - Bot
       summary: Record raw attendance event
       description: |
         Records a raw check-in or check-out event from the Discord bot.
@@ -1483,9 +563,9 @@ paths:
                   type: string
                   format: date-time
                   description: ISO 8601 timestamp when the event occurred
-                  example: "2024-01-15T12:30:00Z"
+                  example: 2024-01-15T12:30:00Z
       responses:
-        '201':
+        "201":
           description: Event recorded successfully
           content:
             application/json:
@@ -1506,61 +586,59 @@ paths:
                   username:
                     type: string
                     description: Username of the user
-                    example: "Soldier_John"
+                    example: Soldier_John
                   isJoin:
                     type: boolean
                     example: true
                   eventTime:
                     type: string
                     format: date-time
-                    example: "2024-01-15T12:30:00.000Z"
-        '400':
+                    example: 2024-01-15T12:30:00.000Z
+        "400":
           description: Invalid request data
-        '401':
+        "401":
           description: Unauthorized - invalid or missing bot API token
-        '404':
+        "404":
           description: User not found
-        '500':
+        "500":
           description: Internal server error
-
-  /bot/signups:
+  /bot/orbats:
+    get:
+      tags:
+        - TODO
+      summary: TODO document GET /bot/orbats
+      responses:
+        "200":
+          description: Success
+  /bot/orbats/{id}:
+    get:
+      tags:
+        - TODO
+      summary: TODO document GET /bot/orbats/{id}
+      responses:
+        "200":
+          description: Success
+  /bot/promotions/{id}/approve:
     post:
-      tags: [Bot, Signups]
-      summary: Sign up a user for an ORBAT
+      tags:
+        - Bot
+        - Ranks
+      summary: Approve a promotion
       description: |
-        Signs up a user (identified by Discord ID or Steam ID) for a specific ORBAT.
-        If no slotId is provided, the user will be signed up for the first available slot.
-        The bot can use this to automatically sign up users for operations.
+        Approves a pending promotion proposal and updates the user's rank.
+        Also creates a rank history entry and sends a notification message to the user.
       security:
         - apiKey: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - orbatId
-              properties:
-                orbatId:
-                  type: integer
-                  description: ID of the ORBAT to sign up for
-                  example: 123
-                discordUserId:
-                  type: string
-                  description: Discord user ID of the user to sign up
-                  example: "123456789012345678"
-                steamId:
-                  type: string
-                  description: Steam64 ID of the user to sign up
-                  example: "76561198000000000"
-                slotId:
-                  type: integer
-                  description: Optional - specific slot ID to sign up for. If omitted, first available slot is used.
-                  example: 456
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID of the promotion proposal to approve
       responses:
-        '201':
-          description: User signed up successfully
+        "200":
+          description: Promotion approved successfully
           content:
             application/json:
               schema:
@@ -1571,72 +649,79 @@ paths:
                     example: true
                   message:
                     type: string
-                    example: "User signed up for ORBAT"
-                  signupId:
+                    example: Promotion approved
+                  promotionId:
                     type: integer
-                    description: ID of the created signup
-                    example: 789
+                    example: 123
                   userId:
                     type: integer
-                    description: Database user ID
                     example: 42
                   username:
                     type: string
-                    description: Username of the signed up user
-                    example: "Soldier_John"
-                  orbatId:
-                    type: integer
-                    description: ORBAT ID
-                    example: 123
-                  orbatName:
+                    example: Soldier_John
+                  discordId:
                     type: string
-                    description: Name of the ORBAT
-                    example: "Operation Thunder Strike"
-                  eventDate:
-                    type: string
-                    format: date
-                    description: Date of the ORBAT
-                    example: "2024-01-15"
-                  slotId:
-                    type: integer
-                    description: ID of the slot the user was signed up for
-                    example: 456
-                  slotName:
-                    type: string
-                    description: Name of the slot/role
-                    example: "Rifleman"
-                  squadName:
-                    type: string
-                    description: Name of the squad
-                    example: "Alpha Squad"
-        '400':
-          description: Invalid request (missing orbatId, ORBAT full, slot full, user already signed up)
-        '401':
+                    nullable: true
+                    example: "123456789012345678"
+                  previousRank:
+                    type: object
+                    nullable: true
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      abbreviation:
+                        type: string
+                  newRank:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      abbreviation:
+                        type: string
+        "400":
+          description: Invalid promotion ID or promotion already processed
+        "401":
           description: Unauthorized - invalid or missing bot API token
-        '404':
-          description: User or ORBAT not found
-        '409':
-          description: User already signed up for this ORBAT
-        '500':
+        "404":
+          description: Promotion not found
+        "500":
           description: Internal server error
-    get:
-      tags: [Bot, Signups]
-      summary: List signups for an ORBAT
+  /bot/promotions/{id}/decline:
+    post:
+      tags:
+        - Bot
+        - Ranks
+      summary: Decline a promotion
       description: |
-        Returns all signups for a specific ORBAT, with user details.
-        Useful for the bot to see who is signed up.
+        Declines a pending promotion proposal and optionally records a reason.
+        Sends a notification message to the user informing them of the decline.
       security:
         - apiKey: []
       parameters:
-        - name: orbatId
-          in: query
+        - name: id
+          in: path
           required: true
           schema:
             type: integer
-          description: ID of the ORBAT to get signups for
+          description: ID of the promotion proposal to decline
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: Optional reason for declining the promotion
+                  example: Insufficient attendance
       responses:
-        '200':
-          description: List of signups for the ORBAT
+        "200":
+          description: Promotion declined successfully
           content:
             application/json:
               schema:
@@ -1645,23 +730,92 @@ paths:
                   success:
                     type: boolean
                     example: true
-                  orbatId:
+                  message:
+                    type: string
+                    example: Promotion declined
+                  promotionId:
                     type: integer
                     example: 123
-                  signups:
+                  userId:
+                    type: integer
+                    example: 42
+                  username:
+                    type: string
+                    example: Soldier_John
+                  discordId:
+                    type: string
+                    nullable: true
+                    example: "123456789012345678"
+                  proposedRank:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      abbreviation:
+                        type: string
+                  reason:
+                    type: string
+                    nullable: true
+                    example: Insufficient attendance
+        "400":
+          description: Invalid promotion ID or promotion already processed
+        "401":
+          description: Unauthorized - invalid or missing bot API token
+        "404":
+          description: Promotion not found
+        "500":
+          description: Internal server error
+  /bot/promotions/auto:
+    get:
+      tags:
+        - Bot
+        - Ranks
+      summary: Get recent auto-promotions
+      description: |
+        Returns a list of users who were automatically promoted within a specified timeframe.
+        Useful for the bot to announce promotions in Discord.
+      security:
+        - apiKey: []
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 7
+          description: Number of days to look back for auto-promotions
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+          description: Maximum number of auto-promotions to return
+      responses:
+        "200":
+          description: List of recent auto-promotions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  autoPromotions:
                     type: array
                     items:
                       type: object
                       properties:
                         id:
                           type: integer
-                          example: 789
+                          example: 456
                         userId:
                           type: integer
                           example: 42
                         username:
                           type: string
-                          example: "Soldier_John"
+                          example: Soldier_John
                         discordId:
                           type: string
                           nullable: true
@@ -1670,43 +824,47 @@ paths:
                           type: string
                           nullable: true
                           example: "76561198000000000"
-                        rank:
+                        previousRank:
                           type: object
                           nullable: true
                           properties:
+                            id:
+                              type: integer
                             name:
                               type: string
                             abbreviation:
                               type: string
-                        slotId:
-                          type: integer
-                          example: 456
-                        slotName:
-                          type: string
-                          example: "Rifleman"
-                        squadName:
-                          type: string
-                          example: "Alpha Squad"
-                        createdAt:
+                        newRank:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            name:
+                              type: string
+                            abbreviation:
+                              type: string
+                        changedAt:
                           type: string
                           format: date-time
-                          example: "2024-01-14T10:00:00.000Z"
+                          example: 2024-01-15T10:00:00.000Z
+                        reason:
+                          type: string
+                          nullable: true
                   total:
                     type: integer
-                    description: Total number of signups
-                    example: 15
-        '400':
-          description: Missing orbatId parameter
-        '401':
+                    example: 10
+                  daysBack:
+                    type: integer
+                    example: 7
+        "401":
           description: Unauthorized - invalid or missing bot API token
-        '404':
-          description: ORBAT not found
-        '500':
+        "500":
           description: Internal server error
-
   /bot/promotions/pending:
     get:
-      tags: [Bot, Ranks]
+      tags:
+        - Bot
+        - Ranks
       summary: Get pending promotions
       description: |
         Returns a list of pending promotion proposals that the bot can approve or decline.
@@ -1721,7 +879,7 @@ paths:
             default: 50
           description: Maximum number of promotions to return
       responses:
-        '200':
+        "200":
           description: List of pending promotions
           content:
             application/json:
@@ -1744,7 +902,7 @@ paths:
                           example: 42
                         username:
                           type: string
-                          example: "Soldier_John"
+                          example: Soldier_John
                         discordId:
                           type: string
                           nullable: true
@@ -1784,262 +942,24 @@ paths:
                         createdAt:
                           type: string
                           format: date-time
-                          example: "2024-01-15T10:00:00.000Z"
+                          example: 2024-01-15T10:00:00.000Z
                   total:
                     type: integer
                     example: 5
-        '401':
+        "401":
           description: Unauthorized - invalid or missing bot API token
-        '500':
+        "500":
           description: Internal server error
-
-  /bot/promotions/{id}/approve:
+  /bot/signups:
     post:
-      tags: [Bot, Ranks]
-      summary: Approve a promotion
+      tags:
+        - Bot
+        - Signups
+      summary: Sign up a user for an ORBAT
       description: |
-        Approves a pending promotion proposal and updates the user's rank.
-        Also creates a rank history entry and sends a notification message to the user.
-      security:
-        - apiKey: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-          description: ID of the promotion proposal to approve
-      responses:
-        '200':
-          description: Promotion approved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  message:
-                    type: string
-                    example: "Promotion approved"
-                  promotionId:
-                    type: integer
-                    example: 123
-                  userId:
-                    type: integer
-                    example: 42
-                  username:
-                    type: string
-                    example: "Soldier_John"
-                  discordId:
-                    type: string
-                    nullable: true
-                    example: "123456789012345678"
-                  previousRank:
-                    type: object
-                    nullable: true
-                    properties:
-                      id:
-                        type: integer
-                      name:
-                        type: string
-                      abbreviation:
-                        type: string
-                  newRank:
-                    type: object
-                    properties:
-                      id:
-                        type: integer
-                      name:
-                        type: string
-                      abbreviation:
-                        type: string
-        '400':
-          description: Invalid promotion ID or promotion already processed
-        '401':
-          description: Unauthorized - invalid or missing bot API token
-        '404':
-          description: Promotion not found
-        '500':
-          description: Internal server error
-
-  /bot/promotions/{id}/decline:
-    post:
-      tags: [Bot, Ranks]
-      summary: Decline a promotion
-      description: |
-        Declines a pending promotion proposal and optionally records a reason.
-        Sends a notification message to the user informing them of the decline.
-      security:
-        - apiKey: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-          description: ID of the promotion proposal to decline
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                reason:
-                  type: string
-                  description: Optional reason for declining the promotion
-                  example: "Insufficient attendance"
-      responses:
-        '200':
-          description: Promotion declined successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  message:
-                    type: string
-                    example: "Promotion declined"
-                  promotionId:
-                    type: integer
-                    example: 123
-                  userId:
-                    type: integer
-                    example: 42
-                  username:
-                    type: string
-                    example: "Soldier_John"
-                  discordId:
-                    type: string
-                    nullable: true
-                    example: "123456789012345678"
-                  proposedRank:
-                    type: object
-                    properties:
-                      id:
-                        type: integer
-                      name:
-                        type: string
-                      abbreviation:
-                        type: string
-                  reason:
-                    type: string
-                    nullable: true
-                    example: "Insufficient attendance"
-        '400':
-          description: Invalid promotion ID or promotion already processed
-        '401':
-          description: Unauthorized - invalid or missing bot API token
-        '404':
-          description: Promotion not found
-        '500':
-          description: Internal server error
-
-  /bot/promotions/auto:
-    get:
-      tags: [Bot, Ranks]
-      summary: Get recent auto-promotions
-      description: |
-        Returns a list of users who were automatically promoted within a specified timeframe.
-        Useful for the bot to announce promotions in Discord.
-      security:
-        - apiKey: []
-      parameters:
-        - name: days
-          in: query
-          schema:
-            type: integer
-            default: 7
-          description: Number of days to look back for auto-promotions
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 100
-          description: Maximum number of auto-promotions to return
-      responses:
-        '200':
-          description: List of recent auto-promotions
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  autoPromotions:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        id:
-                          type: integer
-                          example: 456
-                        userId:
-                          type: integer
-                          example: 42
-                        username:
-                          type: string
-                          example: "Soldier_John"
-                        discordId:
-                          type: string
-                          nullable: true
-                          example: "123456789012345678"
-                        steamId:
-                          type: string
-                          nullable: true
-                          example: "76561198000000000"
-                        previousRank:
-                          type: object
-                          nullable: true
-                          properties:
-                            id:
-                              type: integer
-                            name:
-                              type: string
-                            abbreviation:
-                              type: string
-                        newRank:
-                          type: object
-                          properties:
-                            id:
-                              type: integer
-                            name:
-                              type: string
-                            abbreviation:
-                              type: string
-                        changedAt:
-                          type: string
-                          format: date-time
-                          example: "2024-01-15T10:00:00.000Z"
-                        reason:
-                          type: string
-                          nullable: true
-                  total:
-                    type: integer
-                    example: 10
-                  daysBack:
-                    type: integer
-                    example: 7
-        '401':
-          description: Unauthorized - invalid or missing bot API token
-        '500':
-          description: Internal server error
-
-  /bot/attendance/compile:
-    post:
-      tags: [Bot, Attendance]
-      summary: Compile attendance for an ORBAT
-      description: |
-        Compiles raw attendance events into structured attendance records for a specific ORBAT.
-        The bot should call this when it detects an ORBAT has ended (by checking endTime and server empty).
-        This matches events to the ORBAT timeframe, calculates durations, and creates/updates attendance records.
+        Signs up a user (identified by Discord ID or Steam ID) for a specific ORBAT.
+        If no slotId is provided, the user will be signed up for the first available slot.
+        The bot can use this to automatically sign up users for operations.
       security:
         - apiKey: []
       requestBody:
@@ -2053,11 +973,101 @@ paths:
               properties:
                 orbatId:
                   type: integer
-                  description: ID of the ORBAT to compile attendance for
+                  description: ID of the ORBAT to sign up for
                   example: 123
+                discordUserId:
+                  type: string
+                  description: Discord user ID of the user to sign up
+                  example: "123456789012345678"
+                steamId:
+                  type: string
+                  description: Steam64 ID of the user to sign up
+                  example: "76561198000000000"
+                slotId:
+                  type: integer
+                  description: Optional - specific slot ID to sign up for. If omitted, first available slot is used.
+                  example: 456
       responses:
-        '200':
-          description: Attendance compiled successfully
+        "201":
+          description: User signed up successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: User signed up for ORBAT
+                  signupId:
+                    type: integer
+                    description: ID of the created signup
+                    example: 789
+                  userId:
+                    type: integer
+                    description: Database user ID
+                    example: 42
+                  username:
+                    type: string
+                    description: Username of the signed up user
+                    example: Soldier_John
+                  orbatId:
+                    type: integer
+                    description: ORBAT ID
+                    example: 123
+                  orbatName:
+                    type: string
+                    description: Name of the ORBAT
+                    example: Operation Thunder Strike
+                  eventDate:
+                    type: string
+                    format: date
+                    description: Date of the ORBAT
+                    example: 2024-01-15
+                  slotId:
+                    type: integer
+                    description: ID of the slot the user was signed up for
+                    example: 456
+                  slotName:
+                    type: string
+                    description: Name of the slot/role
+                    example: Rifleman
+                  squadName:
+                    type: string
+                    description: Name of the squad
+                    example: Alpha Squad
+        "400":
+          description: Invalid request (missing orbatId, ORBAT full, slot full, user already signed up)
+        "401":
+          description: Unauthorized - invalid or missing bot API token
+        "404":
+          description: User or ORBAT not found
+        "409":
+          description: User already signed up for this ORBAT
+        "500":
+          description: Internal server error
+    get:
+      tags:
+        - Bot
+        - Signups
+      summary: List signups for an ORBAT
+      description: |
+        Returns all signups for a specific ORBAT, with user details.
+        Useful for the bot to see who is signed up.
+      security:
+        - apiKey: []
+      parameters:
+        - name: orbatId
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: ID of the ORBAT to get signups for
+      responses:
+        "200":
+          description: List of signups for the ORBAT
           content:
             application/json:
               schema:
@@ -2068,61 +1078,1563 @@ paths:
                     example: true
                   orbatId:
                     type: integer
-                    description: ID of the compiled ORBAT
                     example: 123
-                  orbatName:
-                    type: string
-                    description: Name of the ORBAT
-                    example: "Operation Thunder Strike"
-                  eventDate:
-                    type: string
-                    format: date
-                    description: Date of the ORBAT
-                    example: "2024-01-15"
-                  compiledCount:
-                    type: integer
-                    description: Number of attendance records compiled
-                    example: 42
-                  totalEventsProcessed:
-                    type: integer
-                    description: Total number of raw events processed
-                    example: 105
-                  attendance:
+                  signups:
                     type: array
-                    description: Compiled attendance for each user
                     items:
                       type: object
                       properties:
+                        id:
+                          type: integer
+                          example: 789
                         userId:
                           type: integer
                           example: 42
                         username:
                           type: string
-                          example: "Soldier_John"
-                        status:
+                          example: Soldier_John
+                        discordId:
                           type: string
-                          enum: [present, absent, partial, late, gone_early, no_show]
-                          example: "present"
-                        totalMinutesPresent:
+                          nullable: true
+                          example: "123456789012345678"
+                        steamId:
+                          type: string
+                          nullable: true
+                          example: "76561198000000000"
+                        rank:
+                          type: object
+                          nullable: true
+                          properties:
+                            name:
+                              type: string
+                            abbreviation:
+                              type: string
+                        slotId:
                           type: integer
-                          example: 180
-                        joinCount:
-                          type: integer
-                          description: Number of join events for this user
-                          example: 1
-                        leaveCount:
-                          type: integer
-                          description: Number of leave events for this user
-                          example: 1
-        '400':
-          description: Invalid request data (missing orbatId, ORBAT missing time info)
-        '401':
+                          example: 456
+                        slotName:
+                          type: string
+                          example: Rifleman
+                        squadName:
+                          type: string
+                          example: Alpha Squad
+                        createdAt:
+                          type: string
+                          format: date-time
+                          example: 2024-01-14T10:00:00.000Z
+                  total:
+                    type: integer
+                    description: Total number of signups
+                    example: 15
+        "400":
+          description: Missing orbatId parameter
+        "401":
           description: Unauthorized - invalid or missing bot API token
-        '404':
+        "404":
           description: ORBAT not found
-        '500':
+        "500":
           description: Internal server error
-
+  /bot/users:
+    get:
+      tags:
+        - TODO
+      summary: TODO document GET /bot/users
+      responses:
+        "200":
+          description: Success
+  /bot/users/discord/{discordId}:
+    get:
+      tags:
+        - TODO
+      summary: TODO document GET /bot/users/discord/{discordId}
+      responses:
+        "200":
+          description: Success
+  /bot/users/steam/{steamId}:
+    get:
+      tags:
+        - TODO
+      summary: TODO document GET /bot/users/steam/{steamId}
+      responses:
+        "200":
+          description: Success
+  /loa:
+    get:
+      tags:
+        - Leave of Absence
+      summary: List all Leave of Absence requests
+      security:
+        - bearerAuth:
+            - loa:view_all
+      responses:
+        "200":
+          description: List of LOA requests
+    post:
+      tags:
+        - Leave of Absence
+      summary: Create Leave of Absence request
+      responses:
+        "201":
+          description: LOA request created
+        "401":
+          description: Unauthorized
+  /loa/{id}:
+    get:
+      tags:
+        - Leave of Absence
+      summary: Get Leave of Absence by ID
+      responses:
+        "200":
+          description: LOA details
+    patch:
+      tags:
+        - Leave of Absence
+      summary: Update Leave of Absence
+      responses:
+        "200":
+          description: LOA updated
+        "401":
+          description: Unauthorized
+    delete:
+      tags:
+        - Leave of Absence
+      summary: Delete Leave of Absence
+      responses:
+        "200":
+          description: LOA deleted
+        "401":
+          description: Unauthorized
+  /messaging/{id}/read:
+    post:
+      tags:
+        - Messaging
+      summary: Mark message as read
+      responses:
+        "200":
+          description: Message marked as read
+        "401":
+          description: Unauthorized
+    put:
+      tags:
+        - TODO
+      summary: TODO document PUT /messaging/{id}/read
+      responses:
+        "200":
+          description: Success
+  /messaging/events:
+    get:
+      tags:
+        - Messaging
+        - Realtime
+      summary: Inbox SSE stream
+      responses:
+        "200":
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: object
+  /messaging/inbox:
+    get:
+      tags:
+        - Messaging
+      summary: Get user inbox
+      responses:
+        "200":
+          description: User inbox
+        "401":
+          description: Unauthorized
+  /messaging/read-all:
+    post:
+      tags:
+        - Messaging
+      summary: Mark all messages as read
+      responses:
+        "200":
+          description: All messages marked as read
+        "401":
+          description: Unauthorized
+    put:
+      tags:
+        - TODO
+      summary: TODO document PUT /messaging/read-all
+      responses:
+        "200":
+          description: Success
+  /messaging/send:
+    post:
+      tags:
+        - Messaging
+      summary: Send message
+      security:
+        - bearerAuth:
+            - system:super_admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                message:
+                  type: string
+                type:
+                  type: string
+                  enum:
+                    - general
+                    - orbat
+                    - training
+                    - rankup
+                    - alert
+                actionUrl:
+                  type: string
+                  format: uri
+                audience:
+                  type: string
+                  enum:
+                    - all
+                    - admin
+      responses:
+        "201":
+          description: Message sent
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+  /orbats:
+    get:
+      tags:
+        - ORBATs
+      summary: List recent ORBATs
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 5
+      responses:
+        "200":
+          description: List of ORBATs
+    post:
+      tags:
+        - ORBATs
+      summary: Create new ORBAT
+      security:
+        - bearerAuth:
+            - orbat:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrbatCreateInput"
+      responses:
+        "201":
+          description: ORBAT created
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+  /orbats/{id}:
+    get:
+      tags:
+        - ORBATs
+      summary: Get ORBAT by ID
+      security:
+        - bearerAuth:
+            - orbat:edit
+      responses:
+        "200":
+          description: ORBAT details
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: ORBAT not found
+    patch:
+      tags:
+        - ORBATs
+      summary: Update ORBAT
+      security:
+        - bearerAuth:
+            - orbat:edit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrbatUpdateInput"
+      responses:
+        "200":
+          description: ORBAT updated
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: ORBAT not found
+    delete:
+      tags:
+        - ORBATs
+      summary: Delete ORBAT
+      security:
+        - bearerAuth:
+            - orbat:delete
+      responses:
+        "200":
+          description: ORBAT deleted
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: ORBAT not found
+  /orbats/{id}/attendance:
+    get:
+      tags:
+        - ORBATs
+        - Attendance
+      summary: Get ORBAT attendance
+      responses:
+        "200":
+          description: ORBAT attendance records
+    post:
+      tags:
+        - ORBATs
+        - Attendance
+      summary: Set ORBAT attendance
+      security:
+        - bearerAuth:
+            - attendance:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: integer
+                status:
+                  type: string
+                  enum:
+                    - present
+                    - absent
+                    - late
+                    - gone_early
+                    - partial
+                    - no_show
+                notes:
+                  type: string
+      responses:
+        "201":
+          description: Attendance set
+  /orbats/{id}/attendance-notes:
+    get:
+      tags:
+        - TODO
+      summary: TODO document GET /orbats/{id}/attendance-notes
+      responses:
+        "200":
+          description: Success
+    post:
+      tags:
+        - TODO
+      summary: TODO document POST /orbats/{id}/attendance-notes
+      responses:
+        "200":
+          description: Success
+  /orbats/{id}/attendance-notes/{noteId}:
+    patch:
+      tags:
+        - TODO
+      summary: TODO document PATCH /orbats/{id}/attendance-notes/{noteId}
+      responses:
+        "200":
+          description: Success
+    delete:
+      tags:
+        - TODO
+      summary: TODO document DELETE /orbats/{id}/attendance-notes/{noteId}
+      responses:
+        "200":
+          description: Success
+  /orbats/{id}/attendance/automation:
+    post:
+      tags:
+        - ORBATs
+        - Attendance
+      summary: Automated attendance ingestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "201":
+          description: Attendance ingested
+  /orbats/{id}/events:
+    get:
+      tags:
+        - ORBATs
+        - Realtime
+      summary: ORBAT-specific SSE stream
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: object
+  /orbats/{id}/full:
+    get:
+      tags:
+        - ORBATs
+      summary: Get full ORBAT with signups
+      responses:
+        "200":
+          description: Full ORBAT with signups
+        "404":
+          description: ORBAT not found
+  /orbats/{id}/signups:
+    post:
+      tags:
+        - ORBATs
+        - Signups
+      summary: Create signup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                slotId:
+                  type: integer
+                userId:
+                  type: integer
+                position:
+                  type: string
+                notes:
+                  type: string
+      responses:
+        "201":
+          description: Signup created
+        "401":
+          description: Unauthorized
+    delete:
+      tags:
+        - ORBATs
+        - Signups
+      summary: Remove signup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                signupId:
+                  type: integer
+      responses:
+        "200":
+          description: Signup removed
+        "401":
+          description: Unauthorized
+    get:
+      tags:
+        - TODO
+      summary: TODO document GET /orbats/{id}/signups
+      responses:
+        "200":
+          description: Success
+  /orbats/calendar:
+    get:
+      tags:
+        - ORBATs
+      summary: Get ORBAT calendar feed
+      parameters:
+        - name: start
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Calendar feed data
+  /orbats/events:
+    get:
+      tags:
+        - ORBATs
+        - Realtime
+      summary: Global ORBAT SSE stream
+      responses:
+        "200":
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: object
+  /radio-frequencies:
+    get:
+      tags:
+        - Radio Frequencies
+      summary: List radio frequencies
+      responses:
+        "200":
+          description: List of radio frequencies
+    post:
+      tags:
+        - Radio Frequencies
+      summary: Create radio frequency
+      security:
+        - bearerAuth:
+            - radio_frequencies:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RadioFrequencyCreateInput"
+      responses:
+        "201":
+          description: Radio frequency created
+  /radio-frequencies/{id}:
+    get:
+      tags:
+        - Radio Frequencies
+      summary: Get radio frequency by ID
+      responses:
+        "200":
+          description: Radio frequency details
+    patch:
+      tags:
+        - Radio Frequencies
+      summary: Update radio frequency
+      security:
+        - bearerAuth:
+            - radio_frequencies:manage
+      responses:
+        "200":
+          description: Radio frequency updated
+    delete:
+      tags:
+        - Radio Frequencies
+      summary: Delete radio frequency
+      security:
+        - bearerAuth:
+            - radio_frequencies:delete
+      responses:
+        "200":
+          description: Radio frequency deleted
+  /ranks:
+    get:
+      tags:
+        - Ranks
+      summary: List all ranks
+      responses:
+        "200":
+          description: List of ranks
+    post:
+      tags:
+        - Ranks
+      summary: Create rank
+      security:
+        - bearerAuth:
+            - ranks:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RankCreateInput"
+      responses:
+        "201":
+          description: Rank created
+  /ranks/{id}:
+    get:
+      tags:
+        - Ranks
+      summary: Get rank by ID
+      responses:
+        "200":
+          description: Rank details
+    patch:
+      tags:
+        - Ranks
+      summary: Update rank
+      security:
+        - bearerAuth:
+            - ranks:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RankUpdateInput"
+      responses:
+        "200":
+          description: Rank updated
+    delete:
+      tags:
+        - Ranks
+      summary: Delete rank
+      security:
+        - bearerAuth:
+            - ranks:delete
+      responses:
+        "200":
+          description: Rank deleted
+    put:
+      tags:
+        - TODO
+      summary: TODO document PUT /ranks/{id}
+      responses:
+        "200":
+          description: Success
+  /ranks/{id}/transitions:
+    get:
+      tags:
+        - Ranks
+      summary: Get rank transition requirements
+      responses:
+        "200":
+          description: Rank transition requirements
+    post:
+      tags:
+        - Ranks
+      summary: Set rank transition requirements
+      security:
+        - bearerAuth:
+            - ranks:manage
+      responses:
+        "200":
+          description: Transition requirements set
+  /ranks/{id}/transitions/{trainingId}:
+    delete:
+      tags:
+        - Ranks
+      summary: Remove training requirement from rank transition
+      security:
+        - bearerAuth:
+            - ranks:manage
+      responses:
+        "200":
+          description: Training requirement removed
+  /ranks/auto-rankup:
+    post:
+      tags:
+        - Ranks
+      summary: Check auto-rankup eligibility
+      responses:
+        "200":
+          description: Auto-rankup eligibility check result
+        "401":
+          description: Unauthorized
+  /ranks/bot/promotions:
+    get:
+      tags:
+        - Ranks
+      summary: Get bot promotions
+      security:
+        - apiKey: []
+      responses:
+        "200":
+          description: Bot promotions data
+    post:
+      tags:
+        - Ranks
+      summary: Create bot promotion
+      security:
+        - apiKey: []
+      responses:
+        "201":
+          description: Bot promotion created
+  /ranks/bot/promotions/{id}/decline:
+    post:
+      tags:
+        - Ranks
+      summary: Decline bot promotion
+      security:
+        - apiKey: []
+      responses:
+        "200":
+          description: Bot promotion declined
+  /ranks/migrate/apply:
+    post:
+      tags:
+        - Ranks
+      summary: Apply rank migration
+      security:
+        - bearerAuth:
+            - ranks:manage
+      responses:
+        "200":
+          description: Migration applied
+  /ranks/migrate/preview:
+    get:
+      tags:
+        - Ranks
+      summary: Preview rank migration
+      security:
+        - bearerAuth:
+            - ranks:manage
+      responses:
+        "200":
+          description: Migration preview
+    post:
+      tags:
+        - TODO
+      summary: TODO document POST /ranks/migrate/preview
+      responses:
+        "200":
+          description: Success
+  /ranks/promotions/{id}/approve:
+    post:
+      tags:
+        - Ranks
+      summary: Approve promotion
+      security:
+        - bearerAuth:
+            - ranks:approve_promotion
+      responses:
+        "200":
+          description: Promotion approved
+  /ranks/promotions/{id}/decline:
+    post:
+      tags:
+        - Ranks
+      summary: Decline promotion
+      security:
+        - bearerAuth:
+            - ranks:approve_promotion
+      responses:
+        "200":
+          description: Promotion declined
+  /ranks/promotions/events:
+    get:
+      tags:
+        - Ranks
+        - Realtime
+      summary: Promotions queue SSE stream
+      security:
+        - bearerAuth:
+            - ranks:manage_promotions
+      responses:
+        "200":
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: object
+  /ranks/promotions/pending:
+    get:
+      tags:
+        - Ranks
+      summary: Get pending promotions
+      security:
+        - bearerAuth:
+            - ranks:manage_promotions
+      responses:
+        "200":
+          description: List of pending promotions
+  /ranks/promotions/propose:
+    post:
+      tags:
+        - Ranks
+      summary: Propose promotion
+      security:
+        - bearerAuth:
+            - ranks:propose_promotion
+      responses:
+        "201":
+          description: Promotion proposed
+  /ranks/reorder:
+    post:
+      tags:
+        - Ranks
+      summary: Reorder ranks
+      security:
+        - bearerAuth:
+            - ranks:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rankIds:
+                  type: array
+                  items:
+                    type: integer
+      responses:
+        "200":
+          description: Ranks reordered
+    put:
+      tags:
+        - TODO
+      summary: TODO document PUT /ranks/reorder
+      responses:
+        "200":
+          description: Success
+  /signups/{id}/move:
+    post:
+      tags:
+        - Signups
+      summary: Move signup to different slot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                targetSlotId:
+                  type: integer
+      responses:
+        "200":
+          description: Signup moved
+        "401":
+          description: Unauthorized
+    patch:
+      tags:
+        - TODO
+      summary: TODO document PATCH /signups/{id}/move
+      responses:
+        "200":
+          description: Success
+  /subslot-definitions:
+    get:
+      tags:
+        - Templates
+      summary: List subslot definitions
+      responses:
+        "200":
+          description: List of subslot definitions
+    post:
+      tags:
+        - Templates
+      summary: Create subslot definition
+      security:
+        - bearerAuth:
+            - templates:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubslotDefinitionCreateInput"
+      responses:
+        "201":
+          description: Subslot definition created
+  /subslot-definitions/{id}:
+    get:
+      tags:
+        - Templates
+      summary: Get subslot definition by ID
+      responses:
+        "200":
+          description: Subslot definition details
+    patch:
+      tags:
+        - Templates
+      summary: Update subslot definition
+      security:
+        - bearerAuth:
+            - templates:manage
+      responses:
+        "200":
+          description: Subslot definition updated
+    delete:
+      tags:
+        - Templates
+      summary: Delete subslot definition
+      security:
+        - bearerAuth:
+            - templates:delete
+      responses:
+        "200":
+          description: Subslot definition deleted
+  /subslots/{id}/signup:
+    post:
+      tags:
+        - TODO
+      summary: TODO document POST /subslots/{id}/signup
+      responses:
+        "200":
+          description: Success
+    delete:
+      tags:
+        - TODO
+      summary: TODO document DELETE /subslots/{id}/signup
+      responses:
+        "200":
+          description: Success
+  /templates:
+    get:
+      tags:
+        - Templates
+      summary: List ORBAT templates
+      responses:
+        "200":
+          description: List of templates
+    post:
+      tags:
+        - Templates
+      summary: Create ORBAT template
+      security:
+        - bearerAuth:
+            - templates:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TemplateCreateInput"
+      responses:
+        "201":
+          description: Template created
+  /templates/{id}:
+    get:
+      tags:
+        - Templates
+      summary: Get template by ID
+      responses:
+        "200":
+          description: Template details
+    patch:
+      tags:
+        - Templates
+      summary: Update template
+      security:
+        - bearerAuth:
+            - templates:edit
+      responses:
+        "200":
+          description: Template updated
+    delete:
+      tags:
+        - Templates
+      summary: Delete template
+      security:
+        - bearerAuth:
+            - templates:delete
+      responses:
+        "200":
+          description: Template deleted
+    put:
+      tags:
+        - TODO
+      summary: TODO document PUT /templates/{id}
+      responses:
+        "200":
+          description: Success
+  /training-categories:
+    get:
+      tags:
+        - Training
+      summary: List training categories
+      responses:
+        "200":
+          description: List of training categories
+    post:
+      tags:
+        - Training
+      summary: Create training category
+      security:
+        - bearerAuth:
+            - training:create
+      responses:
+        "201":
+          description: Category created
+  /training-categories/{id}:
+    patch:
+      tags:
+        - Training
+      summary: Update training category
+      security:
+        - bearerAuth:
+            - training:edit
+      responses:
+        "200":
+          description: Category updated
+    delete:
+      tags:
+        - Training
+      summary: Delete training category
+      security:
+        - bearerAuth:
+            - training:delete
+      responses:
+        "200":
+          description: Category deleted
+    put:
+      tags:
+        - TODO
+      summary: TODO document PUT /training-categories/{id}
+      responses:
+        "200":
+          description: Success
+  /training-requests:
+    get:
+      tags:
+        - Training
+      summary: Get training requests
+      security:
+        - bearerAuth:
+            - training:manage_requests
+      responses:
+        "200":
+          description: List of training requests
+    post:
+      tags:
+        - Training
+      summary: Create training request
+      responses:
+        "201":
+          description: Training request created
+        "401":
+          description: Unauthorized
+  /training-requests/{id}:
+    patch:
+      tags:
+        - Training
+      summary: Update training request status
+      security:
+        - bearerAuth:
+            - training:manage_requests
+      responses:
+        "200":
+          description: Training request updated
+    put:
+      tags:
+        - TODO
+      summary: TODO document PUT /training-requests/{id}
+      responses:
+        "200":
+          description: Success
+    delete:
+      tags:
+        - TODO
+      summary: TODO document DELETE /training-requests/{id}
+      responses:
+        "200":
+          description: Success
+  /trainings:
+    get:
+      tags:
+        - Training
+      summary: List all trainings
+      responses:
+        "200":
+          description: List of trainings
+    post:
+      tags:
+        - Training
+      summary: Create training
+      security:
+        - bearerAuth:
+            - training:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrainingCreateInput"
+      responses:
+        "201":
+          description: Training created
+  /trainings/{id}:
+    get:
+      tags:
+        - Training
+      summary: Get training by ID
+      responses:
+        "200":
+          description: Training details
+    patch:
+      tags:
+        - Training
+      summary: Update training
+      security:
+        - bearerAuth:
+            - training:edit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrainingUpdateInput"
+      responses:
+        "200":
+          description: Training updated
+    delete:
+      tags:
+        - Training
+      summary: Delete training
+      security:
+        - bearerAuth:
+            - training:delete
+      responses:
+        "200":
+          description: Training deleted
+    put:
+      tags:
+        - TODO
+      summary: TODO document PUT /trainings/{id}
+      responses:
+        "200":
+          description: Success
+  /trainings/{id}/prerequisites:
+    get:
+      tags:
+        - Training
+      summary: Get training prerequisites
+      responses:
+        "200":
+          description: Training prerequisites
+    post:
+      tags:
+        - Training
+      summary: Add prerequisite
+      security:
+        - bearerAuth:
+            - training:edit
+      responses:
+        "201":
+          description: Prerequisite added
+    delete:
+      tags:
+        - Training
+      summary: Remove prerequisite
+      security:
+        - bearerAuth:
+            - training:edit
+      responses:
+        "200":
+          description: Prerequisite removed
+  /trainings/{id}/prerequisites/{prerequisiteId}:
+    delete:
+      tags:
+        - Training
+      summary: Remove specific prerequisite
+      security:
+        - bearerAuth:
+            - training:edit
+      responses:
+        "200":
+          description: Prerequisite removed
+  /trainings/{id}/requirements:
+    get:
+      tags:
+        - Training
+      summary: Get training requirements
+      responses:
+        "200":
+          description: Training requirements
+    put:
+      tags:
+        - Training
+      summary: Update training requirements
+      security:
+        - bearerAuth:
+            - training:edit
+      responses:
+        "200":
+          description: Requirements updated
+    post:
+      tags:
+        - TODO
+      summary: TODO document POST /trainings/{id}/requirements
+      responses:
+        "200":
+          description: Success
+    delete:
+      tags:
+        - TODO
+      summary: TODO document DELETE /trainings/{id}/requirements
+      responses:
+        "200":
+          description: Success
+  /trainings/available:
+    get:
+      tags:
+        - Training
+      summary: Get available trainings for current user
+      responses:
+        "200":
+          description: Available trainings
+        "401":
+          description: Unauthorized
+  /user-trainings:
+    get:
+      tags:
+        - Training
+      summary: Get current user trainings
+      responses:
+        "200":
+          description: User trainings
+        "401":
+          description: Unauthorized
+    post:
+      tags:
+        - TODO
+      summary: TODO document POST /user-trainings
+      responses:
+        "200":
+          description: Success
+  /user-trainings/{id}:
+    patch:
+      tags:
+        - Training
+      summary: Update user training
+      responses:
+        "200":
+          description: User training updated
+        "401":
+          description: Unauthorized
+    delete:
+      tags:
+        - Training
+      summary: Remove user training
+      responses:
+        "200":
+          description: User training removed
+        "401":
+          description: Unauthorized
+    put:
+      tags:
+        - TODO
+      summary: TODO document PUT /user-trainings/{id}
+      responses:
+        "200":
+          description: Success
+  /user/auth-providers:
+    get:
+      tags:
+        - Users
+      summary: Get user authentication providers
+      responses:
+        "200":
+          description: List of linked providers
+        "401":
+          description: Unauthorized
+  /user/avatar/migrate:
+    post:
+      tags:
+        - TODO
+      summary: TODO document POST /user/avatar/migrate
+      responses:
+        "200":
+          description: Success
+  /user/avatar/refresh:
+    post:
+      tags:
+        - Users
+      summary: Refresh user avatar
+      responses:
+        "200":
+          description: Avatar refresh initiated
+        "401":
+          description: Unauthorized
+  /user/avatar/upload:
+    post:
+      tags:
+        - TODO
+      summary: TODO document POST /user/avatar/upload
+      responses:
+        "200":
+          description: Success
+  /user/current:
+    get:
+      tags:
+        - Users
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+  /user/events:
+    get:
+      tags:
+        - Users
+        - Realtime
+      summary: User profile SSE stream
+      responses:
+        "200":
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: object
+  /user/update:
+    post:
+      tags:
+        - Users
+      summary: Update user profile
+      responses:
+        "200":
+          description: User updated
+        "401":
+          description: Unauthorized
+  /users:
+    get:
+      tags:
+        - Users
+      summary: List all users
+      security:
+        - bearerAuth:
+            - user:manage
+      responses:
+        "200":
+          description: List of users
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+  /users/{id}:
+    get:
+      tags:
+        - Users
+      summary: Get user by ID
+      security:
+        - bearerAuth:
+            - user:manage
+      responses:
+        "200":
+          description: User details
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: User not found
+    delete:
+      tags:
+        - Users
+      summary: Delete user
+      security:
+        - bearerAuth:
+            - user:manage
+      responses:
+        "200":
+          description: User deleted
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+    patch:
+      tags:
+        - TODO
+      summary: TODO document PATCH /users/{id}
+      responses:
+        "200":
+          description: Success
+  /users/{id}/admin:
+    get:
+      tags:
+        - Users
+      summary: Get user admin information
+      security:
+        - bearerAuth:
+            - user:manage
+      responses:
+        "200":
+          description: User admin details
+    patch:
+      tags:
+        - TODO
+      summary: TODO document PATCH /users/{id}/admin
+      responses:
+        "200":
+          description: Success
+  /users/{id}/attendance:
+    get:
+      tags:
+        - Users
+        - Attendance
+      summary: Get user attendance
+      responses:
+        "200":
+          description: User attendance records
+  /users/{id}/attendance/stats:
+    get:
+      tags:
+        - Users
+        - Attendance
+      summary: Get user attendance statistics
+      responses:
+        "200":
+          description: Attendance statistics
+  /users/{id}/events:
+    get:
+      tags:
+        - Users
+        - Realtime
+      summary: Admin user SSE stream
+      security:
+        - bearerAuth:
+            - user:manage
+      responses:
+        "200":
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: object
+  /users/{id}/interview/toggle:
+    post:
+      tags:
+        - Users
+      summary: Toggle user interview status
+      security:
+        - bearerAuth:
+            - user:manage
+      responses:
+        "200":
+          description: Interview status toggled
+  /users/{id}/permissions:
+    get:
+      tags:
+        - Users
+      summary: Get user permissions
+      security:
+        - bearerAuth:
+            - user:manage_permissions
+      responses:
+        "200":
+          description: User permissions
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+    put:
+      tags:
+        - Users
+      summary: Update user permissions
+      security:
+        - bearerAuth:
+            - user:manage_permissions
+      responses:
+        "200":
+          description: Permissions updated
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+  /users/{id}/permissions/audit:
+    get:
+      tags:
+        - Users
+      summary: Get permission audit log
+      security:
+        - bearerAuth:
+            - user:manage_permissions
+      responses:
+        "200":
+          description: Permission audit log
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+  /users/{id}/rank:
+    get:
+      tags:
+        - Users
+        - Ranks
+      summary: Get user rank
+      responses:
+        "200":
+          description: User rank information
+    put:
+      tags:
+        - Users
+        - Ranks
+      summary: Assign rank to user
+      security:
+        - bearerAuth:
+            - user:manage_ranks
+      responses:
+        "200":
+          description: Rank assigned
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+  /users/{id}/rank-history:
+    get:
+      tags:
+        - Users
+        - Ranks
+      summary: Get user rank history
+      responses:
+        "200":
+          description: User rank history
+  /users/{id}/rank/assign:
+    post:
+      tags:
+        - Users
+        - Ranks
+      summary: Assign rank with options
+      security:
+        - bearerAuth:
+            - user:manage_ranks
+      responses:
+        "200":
+          description: Rank assigned with options
+  /users/{id}/rank/demote:
+    post:
+      tags:
+        - Users
+        - Ranks
+      summary: Demote user
+      security:
+        - bearerAuth:
+            - user:manage_ranks
+      responses:
+        "200":
+          description: User demoted
+  /users/{id}/retired/toggle:
+    post:
+      tags:
+        - Users
+      summary: Toggle user retired status
+      security:
+        - bearerAuth:
+            - user:manage
+      responses:
+        "200":
+          description: Retired status toggled
+  /users/{id}/trainings:
+    get:
+      tags:
+        - Users
+        - Training
+      summary: Get user trainings
+      responses:
+        "200":
+          description: User training records
 components:
   securitySchemes:
     bearerAuth:
@@ -2135,7 +2647,6 @@ components:
       in: header
       name: X-BOT-API-TOKEN
       description: Bot API token for integration endpoints
-
   schemas:
     User:
       type: object
@@ -2158,11 +2669,12 @@ components:
           type: array
           items:
             type: string
-            enum: [discord, steam]
+            enum:
+              - discord
+              - steam
         createdAt:
           type: string
           format: date-time
-
     OrbatBasic:
       type: object
       properties:
@@ -2180,10 +2692,9 @@ components:
         createdAt:
           type: string
           format: date-time
-
     Orbat:
       allOf:
-        - $ref: '#/components/schemas/OrbatBasic'
+        - $ref: "#/components/schemas/OrbatBasic"
         - type: object
           properties:
             startTime:
@@ -2226,7 +2737,6 @@ components:
               type: array
               items:
                 type: object
-
     Training:
       type: object
       properties:
@@ -2257,7 +2767,6 @@ components:
         createdAt:
           type: string
           format: date-time
-
     Rank:
       type: object
       properties:
@@ -2277,7 +2786,6 @@ components:
         description:
           type: string
           nullable: true
-
     RadioFrequency:
       type: object
       properties:
@@ -2287,7 +2795,9 @@ components:
           type: string
         type:
           type: string
-          enum: [SR, LR]
+          enum:
+            - SR
+            - LR
         isAdditional:
           type: boolean
         channel:
@@ -2296,7 +2806,6 @@ components:
           type: string
         orderIndex:
           type: integer
-
     Template:
       type: object
       properties:
@@ -2314,7 +2823,6 @@ components:
         createdAt:
           type: string
           format: date-time
-
     Message:
       type: object
       properties:
@@ -2326,7 +2834,12 @@ components:
           type: string
         type:
           type: string
-          enum: [general, orbat, training, rankup, alert]
+          enum:
+            - general
+            - orbat
+            - training
+            - rankup
+            - alert
         actionUrl:
           type: string
           format: uri
@@ -2336,7 +2849,6 @@ components:
           format: date-time
         isRead:
           type: boolean
-
     AttendanceRecord:
       type: object
       properties:
@@ -2348,7 +2860,13 @@ components:
           type: integer
         status:
           type: string
-          enum: [present, absent, late, gone_early, partial, no_show]
+          enum:
+            - present
+            - absent
+            - late
+            - gone_early
+            - partial
+            - no_show
         checkInTime:
           type: string
           format: date-time
@@ -2365,8 +2883,9 @@ components:
           nullable: true
         source:
           type: string
-          enum: [manual, automated_system]
-
+          enum:
+            - manual
+            - automated_system
     TrainingRequest:
       type: object
       properties:
@@ -2378,15 +2897,17 @@ components:
           type: integer
         status:
           type: string
-          enum: [pending, approved, rejected, completed]
+          enum:
+            - pending
+            - approved
+            - rejected
+            - completed
         notes:
           type: string
           nullable: true
         createdAt:
           type: string
           format: date-time
-
-    # Input Schemas
     OrbatCreateInput:
       type: object
       required:
@@ -2453,7 +2974,9 @@ components:
                 type: string
               type:
                 type: string
-                enum: [SR, LR]
+                enum:
+                  - SR
+                  - LR
               isAdditional:
                 type: boolean
               channel:
@@ -2472,7 +2995,6 @@ components:
         rulesOfEngagement:
           type: string
           nullable: true
-
     OrbatUpdateInput:
       type: object
       required:
@@ -2534,7 +3056,6 @@ components:
               _deleted:
                 type: boolean
                 default: false
-
     TrainingCreateInput:
       type: object
       required:
@@ -2560,7 +3081,6 @@ components:
         minimumRankId:
           type: integer
           nullable: true
-
     TrainingUpdateInput:
       type: object
       properties:
@@ -2582,7 +3102,6 @@ components:
         minimumRankId:
           type: integer
           nullable: true
-
     RankCreateInput:
       type: object
       required:
@@ -2605,7 +3124,6 @@ components:
         description:
           type: string
           nullable: true
-
     RankUpdateInput:
       type: object
       properties:
@@ -2623,7 +3141,6 @@ components:
         description:
           type: string
           nullable: true
-
     RadioFrequencyCreateInput:
       type: object
       required:
@@ -2634,7 +3151,9 @@ components:
           type: string
         type:
           type: string
-          enum: [SR, LR]
+          enum:
+            - SR
+            - LR
         isAdditional:
           type: boolean
           default: false
@@ -2647,7 +3166,6 @@ components:
         orderIndex:
           type: integer
           default: 0
-
     RadioFrequencyUpdateInput:
       type: object
       properties:
@@ -2655,7 +3173,9 @@ components:
           type: string
         type:
           type: string
-          enum: [SR, LR]
+          enum:
+            - SR
+            - LR
         isAdditional:
           type: boolean
         channel:
@@ -2664,7 +3184,6 @@ components:
           type: string
         orderIndex:
           type: integer
-
     TemplateCreateInput:
       type: object
       required:
@@ -2717,7 +3236,6 @@ components:
           type: array
           items:
             type: object
-
     SubslotDefinitionCreateInput:
       type: object
       required:
@@ -2737,7 +3255,6 @@ components:
         orderIndex:
           type: integer
           default: 0
-
     SubslotDefinitionUpdateInput:
       type: object
       properties:
