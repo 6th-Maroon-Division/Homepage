@@ -1,99 +1,119 @@
 'use client';
 
+import { signIn } from 'next-auth/react';
 import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 
 export default function LinkAccountPrompt() {
-  const { data: session, status } = useSession();
-  const [dismissed, setDismissed] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return sessionStorage.getItem('linkAccountPromptDismissed') === 'true';
-    }
-    return false;
-  });
+  const { status } = useSession();
   const [hasSteam, setHasSteam] = useState(false);
   const [hasDiscord, setHasDiscord] = useState(false);
+  const [providersLoaded, setProvidersLoaded] = useState(false);
 
   useEffect(() => {
-    if (status === 'authenticated' && session?.user && !dismissed) {
-      // Fetch user's auth providers
-      fetch('/api/user/auth-providers')
-        .then(res => res.json())
-        .then(data => {
-          setHasSteam(data.providers.includes('steam'));
-          setHasDiscord(data.providers.includes('discord'));
-        })
-        .catch(console.error);
+    if (status !== 'authenticated') {
+      return;
     }
-  }, [status, session, dismissed]);
 
-  const handleDismiss = () => {
-    sessionStorage.setItem('linkAccountPromptDismissed', 'true');
-    setDismissed(true);
-  };
+    let cancelled = false;
 
-  // Don't show if not authenticated, dismissed, or already has both
-  if (status !== 'authenticated' || dismissed || (hasSteam && hasDiscord)) {
+    const refreshProviders = async () => {
+      try {
+        const res = await fetch('/api/user/auth-providers', { cache: 'no-store' });
+        if (!res.ok) {
+          throw new Error('Failed to fetch auth providers');
+        }
+
+        const data: { providers?: string[] } = await res.json();
+        const providers = Array.isArray(data.providers) ? data.providers : [];
+
+        if (!cancelled) {
+          setHasSteam(providers.includes('steam'));
+          setHasDiscord(providers.includes('discord'));
+        }
+      } catch {
+        if (!cancelled) {
+          setHasSteam(false);
+          setHasDiscord(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setProvidersLoaded(true);
+        }
+      }
+    };
+
+    void refreshProviders();
+
+    // Keep state fresh while user completes OAuth linking in another tab/window.
+    const intervalId = window.setInterval(() => {
+      void refreshProviders();
+    }, 3000);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshProviders();
+      }
+    };
+
+    const onWindowFocus = () => {
+      void refreshProviders();
+    };
+
+    window.addEventListener('focus', onWindowFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', onWindowFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [status]);
+
+  // Block the app for authenticated users missing either Steam or Discord.
+  if (status !== 'authenticated' || !providersLoaded || (hasSteam && hasDiscord)) {
     return null;
   }
 
   const missingProvider = !hasSteam ? 'Steam' : 'Discord';
-  const linkUrl = !hasSteam ? '/api/auth/steam-login' : '/api/auth/signin?provider=discord';
+  const linkUrl = '/api/auth/steam-login';
 
   const handleDiscordSignIn = async () => {
     if (typeof window === 'undefined') return;
-    const callbackUrl = encodeURIComponent(window.location.href);
-    window.location.assign(`/api/auth/signin/discord?callbackUrl=${callbackUrl}`);
+    await signIn('discord', { callbackUrl: window.location.href });
   };
 
   return (
-    <div className="fixed bottom-4 right-4 max-w-md bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-400 dark:border-yellow-600 rounded-lg shadow-lg p-4 z-50">
-      <div className="flex items-start gap-3">
-        <div className="shrink-0 text-yellow-600 dark:text-yellow-400">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/70 px-4">
+      <div className="w-full max-w-md rounded-lg border-2 border-yellow-400 bg-yellow-50 p-6 text-center shadow-2xl dark:border-yellow-600 dark:bg-yellow-900/20">
+        <div className="mx-auto mb-3 text-yellow-600 dark:text-yellow-400">
+          <svg className="mx-auto h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
         </div>
-        <div className="flex-1">
-          <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">
-            Link Your {missingProvider} Account
-          </h3>
-          <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
-            Some features require both Steam and Discord accounts to be linked. Link your {missingProvider} account now for full functionality.
-          </p>
-          <div className="flex gap-2">
-            {!hasSteam ? (
-              <a
-                href={linkUrl}
-                className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm font-medium transition-colors"
-              >
-                Link {missingProvider}
-              </a>
-            ) : (
-              <button
-                type="button"
-                onClick={() => void handleDiscordSignIn()}
-                className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm font-medium transition-colors"
-              >
-                Link {missingProvider}
-              </button>
-            )}
-            <button
-              onClick={handleDismiss}
-              className="px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-md text-sm font-medium transition-colors"
-            >
-              Maybe Later
-            </button>
-          </div>
-        </div>
-        <button
-          onClick={handleDismiss}
-          className="shrink-0 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+        <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
+          Account Linking Required
+        </h3>
+        <p className="mb-5 text-sm text-gray-700 dark:text-gray-300">
+          You must link both Steam and Discord accounts before continuing.
+        </p>
+        {missingProvider === 'Steam' ? (
+          <a
+            href={linkUrl}
+            className="inline-flex items-center justify-center rounded-md bg-yellow-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-yellow-700"
+          >
+            Link Steam Account
+          </a>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void handleDiscordSignIn()}
+            className="inline-flex items-center justify-center rounded-md bg-yellow-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-yellow-700"
+          >
+            Link Discord Account
+          </button>
+        )}
       </div>
     </div>
   );

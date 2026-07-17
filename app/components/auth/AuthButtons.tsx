@@ -8,8 +8,7 @@ export default function AuthButtons() {
 
   const handleDiscordSignIn = async () => {
     if (typeof window === 'undefined') return;
-    const callbackUrl = encodeURIComponent(window.location.href);
-    window.location.assign(`/api/auth/signin/discord?callbackUrl=${callbackUrl}`);
+    await signIn('discord', { callbackUrl: window.location.href });
   };
 
   return (

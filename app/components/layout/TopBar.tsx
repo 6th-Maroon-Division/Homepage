@@ -17,8 +17,7 @@ export default function TopBar() {
 
   const handleDiscordSignIn = async () => {
     if (typeof window === 'undefined') return;
-    const callbackUrl = encodeURIComponent(window.location.href);
-    window.location.assign(`/api/auth/signin/discord?callbackUrl=${callbackUrl}`);
+    await signIn('discord', { callbackUrl: window.location.href });
   };
 
   const isAdminRoute = pathname?.startsWith('/admin');
