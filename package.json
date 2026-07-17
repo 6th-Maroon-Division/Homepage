@@ -20,7 +20,9 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "db:push": "prisma db push",
-    "swagger": "node scripts/swagger.mjs"
+    "swagger": "node scripts/swagger.mjs",
+    "swagger:serve": "node scripts/swagger.mjs",
+    "openapi:refresh": "node scripts/openapi-refresh.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",

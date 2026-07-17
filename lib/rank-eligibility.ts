@@ -29,6 +29,14 @@ export type EligibilityResult = {
   proposalId?: number | null;
 };
 
+export function getRequiredAttendanceForRankup(nextRankRequiredAttendance: number | null): number {
+  return nextRankRequiredAttendance ?? 0;
+}
+
+export function getEligibilityReasonForRankupLane(nextRankAutoRankupEnabled: boolean): EligibilityReason {
+  return nextRankAutoRankupEnabled ? 'eligible_auto' : 'eligible_manual';
+}
+
 /**
  * Get current attendance count for rank eligibility, including legacy data
  * This counts only present attendance on main operations from all time periods
@@ -199,7 +207,7 @@ export async function checkRankupEligibility(userId: number): Promise<Eligibilit
   }
 
   const currentAttendance = await getCurrentAttendance(userId);
-  const requiredAttendance = userRank.currentRank.attendanceRequiredSinceLastRank ?? 0;
+  const requiredAttendance = getRequiredAttendanceForRankup(nextRank.attendanceRequiredSinceLastRank);
   const delta = currentAttendance - userRank.attendanceSinceLastRank;
 
   if (requiredAttendance > 0 && delta < requiredAttendance) {
@@ -288,7 +296,7 @@ export async function checkRankupEligibility(userId: number): Promise<Eligibilit
     select: { id: true },
   });
 
-  const reason: EligibilityReason = userRank.currentRank.autoRankupEnabled ? 'eligible_auto' : 'eligible_manual';
+  const reason = getEligibilityReasonForRankupLane(nextRank.autoRankupEnabled);
 
   return {
     eligible: true,

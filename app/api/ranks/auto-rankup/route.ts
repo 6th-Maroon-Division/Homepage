@@ -64,7 +64,7 @@ export async function POST() {
           // Keep "ineligible" focused on users who are in an auto-rankup lane but short on attendance.
           if (
             eligibility.reason === 'ineligible_attendance' &&
-            userRank.currentRank?.autoRankupEnabled
+            eligibility.nextRank?.autoRankupEnabled
           ) {
             const required = eligibility.attendance.requiredAttendance ?? 0;
             const delta = eligibility.attendance.delta;

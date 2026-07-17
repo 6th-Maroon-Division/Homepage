@@ -73,6 +73,9 @@ export async function GET(request: NextRequest) {
           userId: session.user.id,
         },
       });
+
+      // Backfill any pending raw attendance events for this Steam ID to the linked user
+      await processPendingEventsForUser(steamId, null, session.user.id);
       
       // Update user's avatar if they don't have one
       const user = await prisma.user.findUnique({ where: { id: session.user.id } });
