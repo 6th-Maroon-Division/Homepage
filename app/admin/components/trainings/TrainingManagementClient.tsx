@@ -1096,6 +1096,7 @@ export default function TrainingManagementClient({
                           alt={request.user.username || 'User'}
                           width={40}
                           height={40}
+                          unoptimized={request.user.avatarUrl.startsWith('/uploads/')}
                           className="rounded-full"
                         />
                       )}
@@ -1213,6 +1214,7 @@ export default function TrainingManagementClient({
                         alt={request.user.username || 'User'}
                         width={40}
                         height={40}
+                        unoptimized={request.user.avatarUrl.startsWith('/uploads/')}
                         className="rounded-full"
                       />
                     )}
