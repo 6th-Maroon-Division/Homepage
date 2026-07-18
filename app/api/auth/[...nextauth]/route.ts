@@ -1,6 +1,7 @@
 import NextAuth from 'next-auth';
 import type { AuthOptions, Session } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
+import { decode } from 'next-auth/jwt';
 import DiscordProvider from 'next-auth/providers/discord';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
@@ -63,20 +64,22 @@ export const authOptions: AuthOptions = {
       });
 
       // Check if we have an existing session (for account linking)
-      // We need to look up the actual database user ID, not use the provider ID
       let existingUserId: number | null = null;
-      if (user?.id) {
-        // Try to find an existing user by checking all their auth accounts
-        const existingAccount = await prisma.authAccount.findFirst({
-          where: {
-            OR: [
-              { provider: 'discord', providerUserId: user.id },
-              { provider: 'steam', providerUserId: user.id },
-            ],
-          },
-          select: { userId: true },
+      const cookieStore = await cookies();
+      const sessionToken =
+        cookieStore.get('__Secure-next-auth.session-token')?.value ||
+        cookieStore.get('next-auth.session-token')?.value;
+
+      if (sessionToken && process.env.NEXTAUTH_SECRET) {
+        const decodedToken = await decode({
+          token: sessionToken,
+          secret: process.env.NEXTAUTH_SECRET,
         });
-        existingUserId = existingAccount?.userId ?? null;
+
+        const decodedUserId = (decodedToken as ExtendedJWT | null)?.id;
+        if (typeof decodedUserId === 'number') {
+          existingUserId = decodedUserId;
+        }
       }
 
       if (!authAccount) {

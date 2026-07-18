@@ -665,14 +665,24 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
         orbat.squads.length === 2 ? 'grid-cols-1 md:grid-cols-2' :
         'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'
       }`}>
-        {orbat.squads.map((squad) => (
+        {orbat.squads.map((squad) => {
+          const squadSignupCount = squad.slots.reduce((total, slot) => total + slot.signups.length, 0);
+          const squadMaxSignups = squad.slots.reduce((total, slot) => total + slot.maxSignups, 0);
+
+          return (
           <article
             key={squad.id}
             className="rounded-lg border p-4 flex flex-col gap-3"
             style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
           >
-            <h2 className="text-lg font-semibold pb-2" style={{ color: 'var(--foreground)', borderBottom: '1px solid var(--border)' }}>
-              {squad.name}
+            <h2
+              className="text-lg font-semibold pb-2 flex items-center justify-between gap-2"
+              style={{ color: 'var(--foreground)', borderBottom: '1px solid var(--border)' }}
+            >
+              <span>{squad.name}</span>
+              <span className="text-xs font-medium" style={{ color: 'var(--muted-foreground)' }}>
+                {squadSignupCount}/{squadMaxSignups}
+              </span>
             </h2>
 
             <ul className="space-y-2">
@@ -782,7 +792,7 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
               })}
             </ul>
           </article>
-        ))}
+        );})}
       </section>
 
       {/* Absent / Late-Unsure Section */}

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
@@ -1091,12 +1090,11 @@ export default function TrainingManagementClient({
                   <div className="flex-1">
                     <div className="flex items-center gap-3">
                       {request.user.avatarUrl && (
-                        <Image
+                        <img
                           src={request.user.avatarUrl}
                           alt={request.user.username || 'User'}
                           width={40}
                           height={40}
-                          unoptimized={request.user.avatarUrl.startsWith('/uploads/')}
                           className="rounded-full"
                         />
                       )}
@@ -1209,12 +1207,11 @@ export default function TrainingManagementClient({
                 <div className="flex justify-between items-start gap-4">
                   <div className="flex items-center gap-3">
                     {request.user.avatarUrl && (
-                      <Image
+                      <img
                         src={request.user.avatarUrl}
                         alt={request.user.username || 'User'}
                         width={40}
                         height={40}
-                        unoptimized={request.user.avatarUrl.startsWith('/uploads/')}
                         className="rounded-full"
                       />
                     )}

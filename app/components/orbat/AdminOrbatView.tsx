@@ -581,14 +581,24 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
             No squads found
           </div>
         ) : (
-          orbat.squads.map((squad) => (
+          orbat.squads.map((squad) => {
+          const squadSignupCount = squad.slots.reduce((total, slot) => total + slot.signups.length, 0);
+          const squadMaxSignups = squad.slots.reduce((total, slot) => total + slot.maxSignups, 0);
+
+          return (
           <article
             key={squad.id}
             className="rounded-lg border p-4 flex flex-col gap-3"
             style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
           >
-            <h2 className="text-lg font-semibold pb-2" style={{ color: 'var(--foreground)', borderBottom: '1px solid var(--border)' }}>
-              {squad.name}
+            <h2
+              className="text-lg font-semibold pb-2 flex items-center justify-between gap-2"
+              style={{ color: 'var(--foreground)', borderBottom: '1px solid var(--border)' }}
+            >
+              <span>{squad.name}</span>
+              <span className="text-xs font-medium" style={{ color: 'var(--muted-foreground)' }}>
+                {squadSignupCount}/{squadMaxSignups}
+              </span>
             </h2>
 
             <ul className="space-y-3">
@@ -659,7 +669,7 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
               })}
             </ul>
           </article>
-        )))}
+        );}))}
       </section>
 
       {/* Absent / Late-Unsure Section */}
