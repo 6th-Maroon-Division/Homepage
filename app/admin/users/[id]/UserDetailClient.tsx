@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/components/ui/ToastContainer';
 
@@ -11,6 +11,17 @@ type UserPermission = {
   description: string;
   currentValue: number;
   maxValue: number;
+};
+
+type PermissionTemplate = {
+  id: number;
+  name: string;
+  description: string | null;
+  permissions: Array<{
+    permissionId: number;
+    key: string;
+    value: number;
+  }>;
 };
 
 type UserTraining = {
@@ -129,6 +140,10 @@ export default function UserDetailClient({
   const { showError, showSuccess } = useToast();
   const router = useRouter();
   const [permissionRows, setPermissionRows] = useState<UserPermission[]>(permissions);
+  const [permissionTemplates, setPermissionTemplates] = useState<PermissionTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number>(0);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+  const [isApplyingTemplate, setIsApplyingTemplate] = useState(false);
   const [trainingRows, setTrainingRows] = useState<UserTraining[]>(user.trainings);
   const [availableTrainingRows, setAvailableTrainingRows] = useState<AvailableTraining[]>(availableTrainings);
   const [isSavingPermissions, setIsSavingPermissions] = useState(false);
@@ -185,6 +200,57 @@ export default function UserDetailClient({
   useEffect(() => {
     setAvailableTrainingRows(availableTrainings);
   }, [availableTrainings]);
+
+  useEffect(() => {
+    if (!canViewPermissions) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadTemplates = async () => {
+      setIsLoadingTemplates(true);
+      try {
+        const res = await fetch('/api/permissions/templates', { cache: 'no-store' });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || 'Failed to load permission templates');
+        }
+
+        const data = (await res.json()) as { templates?: PermissionTemplate[] };
+        const templates = Array.isArray(data.templates) ? data.templates : [];
+
+        if (cancelled) {
+          return;
+        }
+
+        setPermissionTemplates(templates);
+        setSelectedTemplateId((prev) => {
+          if (templates.length === 0) {
+            return 0;
+          }
+          if (prev !== 0 && templates.some((template) => template.id === prev)) {
+            return prev;
+          }
+          return templates[0].id;
+        });
+      } catch (error) {
+        if (!cancelled) {
+          showError(error instanceof Error ? error.message : 'Failed to load permission templates');
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingTemplates(false);
+        }
+      }
+    };
+
+    void loadTemplates();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canViewPermissions, showError]);
 
   useEffect(() => {
     setSelectedMergeSourceId(mergeCandidates[0]?.id ?? 0);
@@ -262,7 +328,16 @@ export default function UserDetailClient({
   useEffect(() => {
     const source = new EventSource(`/api/users/${user.id}/events`);
 
-    source.onmessage = () => {
+    source.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data) as { type?: string };
+        if (data.type === 'stream.connected') {
+          return;
+        }
+      } catch {
+        // Non-JSON payloads should still trigger refresh.
+      }
+
       if (refreshTimerRef.current) {
         return;
       }
@@ -300,12 +375,11 @@ export default function UserDetailClient({
                   className="rounded-full"
                 />
               ) : (
-                <Image
+                <img
                   src={user.avatarUrl}
                   alt={user.username || 'User'}
                   width={48}
                   height={48}
-                  unoptimized={user.avatarUrl.startsWith('/uploads/')}
                   className="rounded-full"
                 />
               )
@@ -772,6 +846,88 @@ export default function UserDetailClient({
             >
               {isSavingPermissions ? 'Saving…' : 'Save'}
             </button>
+          </div>
+
+          <div className="mb-4 rounded border p-3 space-y-3" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)' }}>
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>Permission Templates</h4>
+              <Link
+                href="/admin/users?tab=permissionTemplates"
+                className="px-2 py-1 rounded text-xs font-medium"
+                style={{ backgroundColor: 'var(--muted)', color: 'var(--foreground)' }}
+              >
+                Manage Templates
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+              <div className="md:col-span-2">
+                <label className="block text-xs mb-1" style={{ color: 'var(--muted-foreground)' }}>
+                  Load Permission Template
+                </label>
+                <select
+                  value={selectedTemplateId}
+                  onChange={(event) => setSelectedTemplateId(Number(event.target.value))}
+                  disabled={isLoadingTemplates || permissionTemplates.length === 0 || !canEditPermissions || isSelfUser}
+                  className="w-full px-3 py-2 rounded border text-sm"
+                  style={{
+                    borderColor: 'var(--border)',
+                    backgroundColor: 'var(--background)',
+                    color: 'var(--foreground)',
+                  }}
+                >
+                  {permissionTemplates.length === 0 && <option value={0}>No templates yet</option>}
+                  {permissionTemplates.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {template.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                disabled={
+                  isApplyingTemplate ||
+                  permissionTemplates.length === 0 ||
+                  selectedTemplateId === 0 ||
+                  !canEditPermissions ||
+                  isSelfUser
+                }
+                onClick={() => {
+                  if (!canEditPermissions || isSelfUser || selectedTemplateId === 0) {
+                    return;
+                  }
+
+                  setIsApplyingTemplate(true);
+                  try {
+                    const selectedTemplate = permissionTemplates.find((template) => template.id === selectedTemplateId);
+                    if (!selectedTemplate) {
+                      throw new Error('Selected template not found');
+                    }
+
+                    const valueByPermissionId = new Map<number, number>(
+                      selectedTemplate.permissions.map((entry) => [entry.permissionId, entry.value])
+                    );
+
+                    setPermissionRows((prev) =>
+                      prev.map((permission) => ({
+                        ...permission,
+                        currentValue: valueByPermissionId.get(permission.id) ?? 0,
+                      }))
+                    );
+
+                    showSuccess('Template loaded. Review values below and click Save to apply.');
+                  } catch (error) {
+                    showError(error instanceof Error ? error.message : 'Failed to load template');
+                  } finally {
+                    setIsApplyingTemplate(false);
+                  }
+                }}
+                className="px-3 py-2 rounded text-sm font-medium disabled:opacity-50"
+                style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+              >
+                {isApplyingTemplate ? 'Loading…' : 'Load'}
+              </button>
+            </div>
           </div>
 
           {!canEditPermissions && (

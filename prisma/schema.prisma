@@ -129,6 +129,7 @@ model Permission {
   updatedAt       DateTime           @updatedAt
   userPermissions UserPermission[]
   auditLogs       PermissionAuditLog[]
+  templateItems   PermissionTemplateItem[]
 
   @@index([key])
 }
@@ -174,6 +175,30 @@ model PermissionAuditLog {
   @@index([permissionId])
   @@index([createdAt])
   @@index([action])
+}
+
+model PermissionTemplate {
+  id          Int                      @id @default(autoincrement())
+  name        String                   @unique
+  description String?
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  items       PermissionTemplateItem[]
+
+  @@index([createdAt])
+}
+
+model PermissionTemplateItem {
+  id           Int                @id @default(autoincrement())
+  template     PermissionTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  templateId   Int
+  permission   Permission         @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  permissionId Int
+  value        Int
+
+  @@unique([templateId, permissionId])
+  @@index([templateId])
+  @@index([permissionId])
 }
 
 model Orbat {

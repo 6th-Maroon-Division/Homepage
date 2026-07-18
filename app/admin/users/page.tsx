@@ -6,7 +6,11 @@ import { prisma } from '@/lib/prisma';
 import UserManagementClient from '../components/user/UserManagementClient';
 import { checkPermission } from '@/lib/auth-middleware';
 
-export default async function UsersManagementPage() {
+export default async function UsersManagementPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ tab?: string | string[] }>;
+}) {
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.id) {
@@ -14,14 +18,16 @@ export default async function UsersManagementPage() {
   }
   
   // Check if user can manage users or trainings on user profiles
-  const [canManageUsers, canMarkTrainings, canApproveTrainingRequests] = await Promise.all([
+  const [canManageUsers, canManagePermissions, canMarkTrainings, canApproveTrainingRequests] = await Promise.all([
     checkPermission(session.user.id, 'user:manage'),
+    checkPermission(session.user.id, 'user:manage_permissions'),
     checkPermission(session.user.id, 'training:mark'),
     checkPermission(session.user.id, 'training:approve_request'),
   ]);
   const hasPermission =
     (session.user.permissions?.['system:super_admin'] ?? 0) > 0 ||
     canManageUsers ||
+    canManagePermissions ||
     canMarkTrainings ||
     canApproveTrainingRequests;
   
@@ -132,13 +138,70 @@ export default async function UsersManagementPage() {
     };
   });
 
+  const [permissionCatalog, permissionTemplates] = canManagePermissions
+    ? await Promise.all([
+        prisma.permission.findMany({
+          orderBy: { key: 'asc' },
+          select: {
+            id: true,
+            key: true,
+            description: true,
+            maxValue: true,
+          },
+        }),
+        prisma.permissionTemplate.findMany({
+          include: {
+            items: {
+              include: {
+                permission: {
+                  select: {
+                    key: true,
+                  },
+                },
+              },
+              orderBy: {
+                permission: {
+                  key: 'asc',
+                },
+              },
+            },
+          },
+          orderBy: {
+            name: 'asc',
+          },
+        }),
+      ])
+    : [[], []];
+
+  const resolvedSearchParams = (await searchParams) ?? {};
+  const rawTab = Array.isArray(resolvedSearchParams.tab)
+    ? resolvedSearchParams.tab[0]
+    : resolvedSearchParams.tab;
+  const initialTab = rawTab === 'permissionTemplates' || rawTab === 'unranked' ? rawTab : 'all';
+
   return (
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         <UserManagementClient
           users={serializedUsers}
           currentUserId={session.user.id}
-          initialTab="all"
+          initialTab={initialTab}
+          permissionCatalog={permissionCatalog.map((permission) => ({
+            id: permission.id,
+            key: permission.key,
+            description: permission.description ?? '',
+            maxValue: permission.maxValue,
+          }))}
+          permissionTemplates={permissionTemplates.map((template) => ({
+            id: template.id,
+            name: template.name,
+            description: template.description,
+            permissions: template.items.map((item) => ({
+              permissionId: item.permissionId,
+              key: item.permission.key,
+              value: item.value,
+            })),
+          }))}
         />
       </div>
     </main>

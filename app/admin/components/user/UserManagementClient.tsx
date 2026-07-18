@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect, Fragment } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import { usePermission } from '@/app/hooks/usePermissions';
 import PermissionAuditLog from './PermissionAuditLog';
+import PermissionTemplateManagementClient from './PermissionTemplateManagementClient';
 
 const logClientError = (...args: unknown[]) => {
   if (process.env.NODE_ENV === 'development') {
@@ -47,9 +47,16 @@ type User = {
 type UserManagementClientProps = {
   users: User[];
   currentUserId: number;
-  initialTab?: 'all' | 'unranked';
+  initialTab?: 'all' | 'unranked' | 'permissionTemplates';
   showAllUsersTab?: boolean;
   showUnrankedTab?: boolean;
+  permissionCatalog?: Array<{ id: number; key: string; description: string; maxValue: number }>;
+  permissionTemplates?: Array<{
+    id: number;
+    name: string;
+    description: string | null;
+    permissions: Array<{ permissionId: number; key: string; value: number }>;
+  }>;
 };
 
 export default function UserManagementClient({
@@ -58,10 +65,12 @@ export default function UserManagementClient({
   initialTab = 'all',
   showAllUsersTab = true,
   showUnrankedTab = true,
+  permissionCatalog = [],
+  permissionTemplates = [],
 }: UserManagementClientProps) {
   const router = useRouter();
   const [users, setUsers] = useState<User[]>(initialUsers);
-  const [activeTab, setActiveTab] = useState<'all' | 'unranked'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'all' | 'unranked' | 'permissionTemplates'>(initialTab);
   const [filter, setFilter] = useState<'all' | 'admin' | 'regular'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<{ userId: number; username: string | null } | null>(null);
@@ -113,15 +122,24 @@ export default function UserManagementClient({
       }
     };
 
-    source.onmessage = () => {
+    source.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data) as { type?: string };
+        if (data.type === 'stream.connected') {
+          return;
+        }
+      } catch {
+        // Non-JSON payloads should still trigger refresh.
+      }
+
       scheduleRefresh();
     };
 
     source.onerror = () => {
-      if (!fallbackTimer) {
-        fallbackTimer = setInterval(() => {
-          router.refresh();
-        }, 30000);
+      // EventSource already auto-retries; avoid periodic full-page refresh loops in dev.
+      if (fallbackTimer) {
+        clearInterval(fallbackTimer);
+        fallbackTimer = null;
       }
     };
 
@@ -459,7 +477,28 @@ export default function UserManagementClient({
             Unranked Users
           </button>
         )}
+        {canManagePermissions && (
+          <button
+            onClick={() => setActiveTab('permissionTemplates')}
+            className="px-6 py-3 rounded-lg font-medium transition-colors"
+            style={{
+              backgroundColor: activeTab === 'permissionTemplates' ? 'var(--primary)' : 'var(--secondary)',
+              color: activeTab === 'permissionTemplates' ? 'var(--primary-foreground)' : 'var(--foreground)',
+              borderWidth: '1px',
+              borderColor: activeTab === 'permissionTemplates' ? 'var(--primary)' : 'var(--border)'
+            }}
+          >
+            Permission Templates
+          </button>
+        )}
       </div>
+
+      {activeTab === 'permissionTemplates' && canManagePermissions && (
+        <PermissionTemplateManagementClient
+          permissions={permissionCatalog}
+          templates={permissionTemplates}
+        />
+      )}
 
       {/* All Users Tab */}
       {activeTab === 'all' && (
@@ -570,12 +609,11 @@ export default function UserManagementClient({
                               className="rounded-full"
                             />
                           ) : (
-                            <Image
+                            <img
                               src={user.avatarUrl}
                               alt={user.username || 'User'}
                               width={32}
                               height={32}
-                              unoptimized={user.avatarUrl.startsWith('/uploads/')}
                               className="rounded-full"
                             />
                           )
