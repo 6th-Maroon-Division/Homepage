@@ -2,7 +2,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import Image from 'next/image';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 
@@ -194,12 +193,11 @@ export default function PermissionAuditLog({ userId, username }: PermissionAudit
                   {/* Actor */}
                   <div className="flex items-center gap-2 mt-2">
                     {log.actor.avatarUrl && (
-                      <Image
+                      <img
                         src={log.actor.avatarUrl}
                         alt={log.actor.username || 'Actor'}
                         width={20}
                         height={20}
-                        unoptimized={log.actor.avatarUrl.startsWith('/uploads/')}
                         className="rounded-full"
                       />
                     )}
