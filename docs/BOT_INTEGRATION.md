@@ -10,6 +10,7 @@ The 6MD Management Platform provides a RESTful API with **bot-specific endpoints
 - **Manage Promotions**: Approve/decline pending promotion proposals
 - **Query User Data**: Lookup users by Discord ID or Steam ID
 - **Access ORBAT Information**: Get operation details and signup lists
+- **Deliver Training Reminders**: Trigger idempotent website and Discord reminders for sessions starting within 24 hours
 
 ## Authentication
 
@@ -30,6 +31,13 @@ Authorization: Bearer YOUR_BOT_API_TOKEN
 
 2. Configure your C# bot with the same token.
 
+To send Discord DMs from the web application, also set the bot token used by
+your Discord application:
+
+```env
+DISCORD_BOT_TOKEN=your_discord_bot_token
+```
+
 ## Base URL
 
 - **Development**: `http://localhost:3000/api`
@@ -40,6 +48,39 @@ Authorization: Bearer YOUR_BOT_API_TOKEN
 ## API Endpoints
 
 ### Bot-Specific Endpoints
+
+#### Training Session Reminders
+
+**Trigger due reminders**
+
+- **Endpoint**: `POST /api/bot/training-reminders`
+- **Purpose**: Deliver website notifications and opted-in Discord DMs for scheduled training sessions starting within the next 24 hours.
+- **Body**: None.
+- **Authentication**: Normal `Authorization: Bearer YOUR_BOT_API_TOKEN` header.
+
+Call this endpoint periodically from one scheduler or the existing bot. Calls
+are safe to retry and overlap: each attendee reminder is claimed once, and a
+failed website notification releases its claim for a later retry. Rescheduling
+a session resets its attendees' reminder claims.
+
+Example:
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer $BOT_API_TOKEN" \
+  https://your-domain.com/api/bot/training-reminders
+```
+
+Successful response:
+
+```json
+{
+  "scanned": 3,
+  "delivered": 3,
+  "discordDelivered": 2,
+  "windowEndsAt": "2026-07-21T18:00:00.000Z"
+}
+```
 
 #### Attendance Tracking
 

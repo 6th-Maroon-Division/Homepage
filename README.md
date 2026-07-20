@@ -134,7 +134,8 @@ Required:
 - `STEAM_API_KEY`
 
 Optional / integration-specific:
-- `BOT_API_TOKEN` (for bot rank promotion endpoints)
+- `BOT_API_TOKEN` (for bot endpoints, including the training reminder scheduler)
+- `DISCORD_BOT_TOKEN` (delivers opted-in training chat alerts and 24-hour reminders by Discord DM)
 
 ## Prisma Notes
 
@@ -236,4 +237,3 @@ npm run build
 ## License
 
 Proprietary - 6th Maroon Division
-

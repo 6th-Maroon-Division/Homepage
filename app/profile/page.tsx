@@ -29,12 +29,19 @@ function buildLastSixMonthsTrend(dates: Date[]) {
   return months.map((m) => ({ month: m.label, count: m.count }));
 }
 
-export default async function ProfilePage() {
+export default async function ProfilePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string | string[] }>;
+}) {
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.id) {
     redirect('/');
   }
+
+  const query = await searchParams;
+  const requestedTab = Array.isArray(query.tab) ? query.tab[0] : query.tab;
 
   const userId = session.user.id;
   const user = await prisma.user.findUnique({
@@ -65,7 +72,7 @@ export default async function ProfilePage() {
             },
           },
         },
-        orderBy: { completedAt: 'desc' },
+        orderBy: { statusUpdatedAt: 'desc' },
       },
       _count: {
         select: {
@@ -105,10 +112,18 @@ export default async function ProfilePage() {
       where: { userId },
       include: {
         training: true,
-        handledByAdmin: {
-          select: {
-            id: true,
-            username: true,
+        assignedTrainer: {
+          select: { id: true, username: true },
+        },
+        sessionAttendee: {
+          include: {
+            session: {
+              include: {
+                trainer: {
+                  select: { id: true, username: true },
+                },
+              },
+            },
           },
         },
       },
@@ -153,13 +168,23 @@ export default async function ProfilePage() {
     }),
   ]);
 
-  const completedTrainingIds = new Set(user.userTrainings.map((ut) => ut.trainingId));
-  const pendingRequestTrainingIds = new Set(
-    trainingRequests.filter((request) => request.status === 'pending').map((request) => request.trainingId)
+  const completedTrainingIds = new Set(
+    user.userTrainings
+      .filter((userTraining) =>
+        userTraining.status === 'qualified'
+        || (userTraining.status === 'finished' && !userTraining.training.requiresOrbatQualification)
+      )
+      .map((userTraining) => userTraining.trainingId)
+  );
+  const existingTrainingIds = new Set(user.userTrainings.map((userTraining) => userTraining.trainingId));
+  const activeRequestTrainingIds = new Set(
+    trainingRequests
+      .filter((request) => ['pending', 'approved', 'in_training', 'needs_qualify'].includes(request.status))
+      .map((request) => request.trainingId)
   );
 
   const availableTrainings = allTrainings
-    .filter((training) => !completedTrainingIds.has(training.id))
+    .filter((training) => !existingTrainingIds.has(training.id))
     .map((training) => {
       let meetsRankRequirement = true;
       let missingRank: { id: number; name: string; abbreviation: string } | null = null;
@@ -182,23 +207,45 @@ export default async function ProfilePage() {
         description: training.description,
         duration: training.duration,
         categoryName: training.category?.name ?? null,
-        canRequest: meetsRankRequirement && missingTrainings.length === 0 && !pendingRequestTrainingIds.has(training.id),
+        requiresTrainingSession: training.requiresTrainingSession,
+        requiresOrbatQualification: training.requiresOrbatQualification,
+        qualificationNotes: training.orbatQualificationNotes,
+        canRequest: meetsRankRequirement && missingTrainings.length === 0 && !activeRequestTrainingIds.has(training.id),
         missingRank,
         missingTrainings,
       };
     });
 
-  const serializedRequests = trainingRequests.map((request) => ({
-    id: request.id,
-    trainingId: request.trainingId,
-    trainingName: request.training.name,
-    status: request.status,
-    requestMessage: request.requestMessage,
-    adminResponse: request.adminResponse,
-    requestedAt: request.requestedAt.toISOString(),
-    updatedAt: request.updatedAt.toISOString(),
-    handledByAdminUsername: request.handledByAdmin?.username ?? null,
-  }));
+  const serializedRequests = trainingRequests.map((request) => {
+    const session = request.sessionAttendee?.session ?? null;
+    const isConfirmed = Boolean(session && ['scheduled', 'in_progress', 'completed'].includes(session.status));
+    const trainer = session?.trainer ?? request.assignedTrainer;
+
+    return {
+      id: request.id,
+      trainingId: request.trainingId,
+      trainingName: request.training.name,
+      status: request.status,
+      requestMessage: request.requestMessage,
+      adminResponse: request.adminResponse,
+      requestedAt: request.requestedAt.toISOString(),
+      updatedAt: request.updatedAt.toISOString(),
+      session: isConfirmed && session
+        ? {
+            id: session.id,
+            startsAt: session.startsAt?.toISOString() ?? null,
+            endsAt: null,
+            durationMinutes: session.durationMinutes,
+            status: session.status,
+            confirmedAt: session.status === 'proposed' ? null : session.updatedAt.toISOString(),
+            instructions: session.specialInstructions,
+            trainer: trainer
+              ? { id: trainer.id, username: trainer.username, avatarUrl: null }
+              : null,
+          }
+        : null,
+    };
+  });
 
   const serializedLoaEntries = loaEntries.map((entry) => ({
     id: entry.id,
@@ -209,6 +256,22 @@ export default async function ProfilePage() {
     createdAt: entry.createdAt.toISOString(),
     updatedAt: entry.updatedAt.toISOString(),
   }));
+
+  const confirmedTrainerByTrainingId = new Map<
+    number,
+    { id: number; username: string | null }
+  >();
+  for (const request of trainingRequests) {
+    const sessionItem = request.sessionAttendee?.session;
+    if (
+      sessionItem?.trainer
+      && request.sessionAttendee?.status !== 'cancelled'
+      && ['scheduled', 'in_progress', 'completed'].includes(sessionItem.status)
+      && !confirmedTrainerByTrainingId.has(request.trainingId)
+    ) {
+      confirmedTrainerByTrainingId.set(request.trainingId, sessionItem.trainer);
+    }
+  }
 
   const userData = {
     id: user.id,
@@ -222,20 +285,32 @@ export default async function ProfilePage() {
     trainingCount: user._count.userTrainings,
     currentRank: user.userRank?.currentRank?.name ?? null,
     attendanceSinceLastRank: user.userRank?.attendanceSinceLastRank ?? 0,
-    trainings: user.userTrainings.map((ut) => ({
+    trainings: user.userTrainings.map((ut) => {
+      const confirmedTrainer = confirmedTrainerByTrainingId.get(ut.trainingId) ?? null;
+      const visibleTrainer = confirmedTrainer
+        ?? (['finished', 'needs_qualify', 'qualified', 'failed'].includes(ut.status) ? ut.trainer : null);
+      return {
       id: ut.id,
       trainingId: ut.trainingId,
       trainingName: ut.training.name,
       trainingDescription: ut.training.description,
       trainingDuration: ut.training.duration,
       trainingCategoryName: ut.training.category?.name ?? null,
+      requiresTrainingSession: ut.training.requiresTrainingSession,
+      requiresOrbatQualification: ut.training.requiresOrbatQualification,
+      qualificationNotes: ut.training.orbatQualificationNotes,
       completedAt: ut.completedAt.toISOString(),
       needsRetraining: ut.needsRetraining,
+      status: ut.status,
+      trainingSessionCompletedAt: ut.trainingSessionCompletedAt?.toISOString() ?? null,
+      orbatQualifiedAt: ut.orbatQualifiedAt?.toISOString() ?? null,
+      failedAt: ut.failedAt?.toISOString() ?? null,
       isHidden: ut.isHidden,
       notes: ut.notes,
-      trainerId: ut.trainerId,
-      trainerUsername: ut.trainer?.username ?? null,
-    })),
+      trainerId: visibleTrainer?.id ?? null,
+      trainerUsername: visibleTrainer?.username ?? null,
+    };
+    }),
   };
 
   const attendanceData = {
@@ -261,6 +336,7 @@ export default async function ProfilePage() {
           user={userData}
           attendance={attendanceData}
           availableTrainings={availableTrainings}
+          initialTab={requestedTab === 'trainings' ? 'trainings' : 'overview'}
           trainingRequests={serializedRequests}
           loaEntries={serializedLoaEntries}
         />

@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
   // Get all trainings required for new people
   const requiredTrainings = await prisma.training.findMany({
     where: { requiredForNewPeople: true },
-    select: { id: true },
+    select: { id: true, requiresOrbatQualification: true },
   });
 
   // Get users who need required trainings (missing any or needsRetraining)
@@ -42,13 +42,14 @@ export async function GET(request: NextRequest) {
 
     const userTrainings = await prisma.userTraining.findMany({
       where: { trainingId: { in: requiredTrainings.map((t) => t.id) } },
-      select: { userId: true, trainingId: true, needsRetraining: true },
+      select: { userId: true, trainingId: true, status: true },
     });
 
     // Group by userId and check if they have all required trainings completed
     const userTrainingMap = new Map<number, Set<number>>();
     userTrainings.forEach((ut) => {
-      if (!ut.needsRetraining) {
+      const requirement = requiredTrainings.find((training) => training.id === ut.trainingId);
+      if (ut.status === 'qualified' || (ut.status === 'finished' && !requirement?.requiresOrbatQualification)) {
         if (!userTrainingMap.has(ut.userId)) {
           userTrainingMap.set(ut.userId, new Set());
         }
@@ -160,13 +161,14 @@ export async function GET(request: NextRequest) {
         trainingId: { in: requiredTrainings.map((t) => t.id) },
         userId: { in: users.map((u) => u.id) },
       },
-      select: { userId: true, trainingId: true, needsRetraining: true },
+      select: { userId: true, trainingId: true, status: true },
     });
 
     // Group by userId and check if they have all required trainings completed
     const userTrainingMap = new Map<number, Set<number>>();
     userTrainings.forEach((ut) => {
-      if (!ut.needsRetraining) {
+      const requirement = requiredTrainings.find((training) => training.id === ut.trainingId);
+      if (ut.status === 'qualified' || (ut.status === 'finished' && !requirement?.requiresOrbatQualification)) {
         if (!userTrainingMap.has(ut.userId)) {
           userTrainingMap.set(ut.userId, new Set());
         }

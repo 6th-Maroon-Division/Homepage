@@ -5,6 +5,11 @@ import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 import { resolveOrbatScheduleWindow } from '@/lib/orbat-schedule';
 import { publishOrbatEvent } from '@/lib/realtime/orbat-events';
+import { runSerializableTransaction } from '@/lib/serializable-transaction';
+import {
+  formatOrbatTrainingAccessError,
+  getOrbatTrainingAccess,
+} from '@/lib/training-gating';
 
 type RouteParams = {
   params: Promise<{ id: string }>;
@@ -217,27 +222,14 @@ export async function POST(_req: NextRequest, context: RouteParams) {
 
   const requiredTrainingIds = slot.squadRole?.requiredTrainingIds || [];
   if (requiredTrainingIds.length > 0) {
-    const completedTrainings = await prisma.userTraining.findMany({
-      where: {
-        userId: currentUserId,
-        trainingId: { in: requiredTrainingIds },
-        needsRetraining: false,
-      },
-      select: { trainingId: true },
-    });
-
-    const completedIds = new Set(completedTrainings.map((training) => training.trainingId));
-    const missingTrainingIds = requiredTrainingIds.filter((trainingId) => !completedIds.has(trainingId));
-
-    if (missingTrainingIds.length > 0) {
-      const missingTrainings = await prisma.training.findMany({
-        where: { id: { in: missingTrainingIds } },
-        select: { name: true },
-        orderBy: { name: 'asc' },
-      });
-
+    const trainingAccess = await getOrbatTrainingAccess(currentUserId, requiredTrainingIds);
+    if (!trainingAccess.allowed) {
+      const accessError = formatOrbatTrainingAccessError(trainingAccess);
       return NextResponse.json(
-        { error: `This slot requires all trainings: ${missingTrainings.map((training) => training.name).join(', ')}.` },
+        {
+          ...accessError,
+          requirements: trainingAccess.blockedRequirements,
+        },
         { status: 400 }
       );
     }
@@ -286,12 +278,33 @@ export async function POST(_req: NextRequest, context: RouteParams) {
     return NextResponse.json({ error: 'This slot is already full.' }, { status: 400 });
   }
 
-  await prisma.signup.create({
-    data: {
-      slotId,
-      userId: currentUserId,
-    },
+  const signupOutcome = await runSerializableTransaction(async (tx) => {
+    const [freshSlot, freshExistingSignup] = await Promise.all([
+      tx.slot.findUnique({
+        where: { id: slotId },
+        select: { orbatId: true, maxSignups: true, _count: { select: { signups: true } } },
+      }),
+      tx.signup.findFirst({
+        where: { userId: currentUserId, slot: { orbatId: slot.orbat.id } },
+      }),
+    ]);
+    if (freshExistingSignup) {
+      return { error: 'You are already signed up for this operation.' } as const;
+    }
+    if (!freshSlot || freshSlot.orbatId !== slot.orbat.id) {
+      return { error: 'This slot is no longer available.' } as const;
+    }
+    if (freshSlot.maxSignups !== null && freshSlot._count.signups >= freshSlot.maxSignups) {
+      return { error: 'This slot is already full.' } as const;
+    }
+
+    await tx.signup.create({ data: { slotId, userId: currentUserId } });
+    return { created: true } as const;
   });
+
+  if ('error' in signupOutcome) {
+    return NextResponse.json({ error: signupOutcome.error }, { status: 409 });
+  }
 
   publishOrbatEvent({
     type: 'signup.created',

@@ -21,7 +21,7 @@ export default async function AdminOrbatsPage() {
     redirect('/');
   }
 
-  const orbats = await prisma.orbat.findMany({
+  const [orbats, trainingSessions] = await Promise.all([prisma.orbat.findMany({
     include: {
       createdBy: {
         select: {
@@ -44,7 +44,14 @@ export default async function AdminOrbatsPage() {
       { eventDate: 'asc' },
       { createdAt: 'asc' },
     ],
-  });
+  }), prisma.trainingSession.findMany({
+    where: { startsAt: { not: null } },
+    include: {
+      training: { select: { name: true } },
+      trainer: { select: { username: true } },
+    },
+    orderBy: { startsAt: 'asc' },
+  })]);
 
   // For calendar view
   const uiOps = orbats.map((orbat) => {
@@ -56,12 +63,30 @@ export default async function AdminOrbatsPage() {
 
     return {
       id: orbat.id,
+      kind: 'orbat' as const,
       name: orbat.name,
       description: orbat.description,
       eventDate: date.toISOString(),
       dateKey,
+      href: `/admin/orbats/${orbat.id}`,
     };
   });
+
+  const trainingItems = trainingSessions.map((trainingSession) => ({
+    id: trainingSession.id,
+    kind: 'training_session' as const,
+    name: `${trainingSession.training.name} Training`,
+    description: [
+      trainingSession.status.replaceAll('_', ' '),
+      trainingSession.trainer?.username ? `Trainer: ${trainingSession.trainer.username}` : null,
+      'Arma3 Training Server',
+    ].filter(Boolean).join(' · '),
+    eventDate: trainingSession.startsAt!.toISOString(),
+    dateKey: trainingSession.startsAt!.toISOString().slice(0, 10),
+    status: trainingSession.status,
+    trainerName: trainingSession.trainer?.username ?? null,
+    href: `/admin/trainings?tab=sessions&session=${trainingSession.id}`,
+  }));
 
   // For table view
   const orbatsWithCounts = orbats.map((orbat) => {
@@ -104,9 +129,9 @@ export default async function AdminOrbatsPage() {
           <CalendarWithOps 
             initialYear={initialYear} 
             initialMonth={initialMonth} 
-            ops={uiOps}
+            ops={[...uiOps, ...trainingItems]}
             isAdmin={true}
-            helpText="Click any empty day to create a new operation for that date. Click days with operations to view or manage them."
+            helpText="Operations and all training sessions share this calendar. Click an empty day to create an operation."
           />
         </div>
       </div>

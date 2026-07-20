@@ -250,9 +250,17 @@ export async function checkRankupEligibility(userId: number): Promise<Eligibilit
     const requiredIds = transitionRequirement.requiredTrainings.map((t) => t.id);
     const userTrainingIds = await prisma.userTraining.findMany({
       where: { userId },
-      select: { trainingId: true },
+      select: {
+        trainingId: true,
+        status: true,
+        training: { select: { requiresOrbatQualification: true } },
+      },
     });
-    const completed = new Set(userTrainingIds.map((t) => t.trainingId).filter((id): id is number => id !== null && id !== undefined));
+    const completed = new Set(
+      userTrainingIds
+        .filter((item) => item.status === 'qualified' || (item.status === 'finished' && !item.training.requiresOrbatQualification))
+        .map((item) => item.trainingId),
+    );
     missingTrainingIds = requiredIds.filter((id) => !completed.has(id));
 
     if (missingTrainingIds.length > 0) {
