@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { getTotalAttendanceWithLegacy, getRecentAttendanceWithLegacy, getSixMonthTrendWithLegacy } from '@/lib/attendance-stats';
 import UserSelfDetailClient from '@/app/settings/UserSelfDetailClient';
+import { canRetryFailedTraining } from '@/lib/training-retry';
 
 function formatMonth(date: Date): string {
   return date.toLocaleString('en-GB', { month: 'short' });
@@ -176,7 +177,14 @@ export default async function ProfilePage({
       )
       .map((userTraining) => userTraining.trainingId)
   );
-  const existingTrainingIds = new Set(user.userTrainings.map((userTraining) => userTraining.trainingId));
+  const nonRetryableTrainingIds = new Set(
+    user.userTrainings
+      .filter((userTraining) => (
+        userTraining.status !== 'failed'
+        || !canRetryFailedTraining(userTraining.failedAt, userTraining.statusUpdatedAt, now)
+      ))
+      .map((userTraining) => userTraining.trainingId),
+  );
   const activeRequestTrainingIds = new Set(
     trainingRequests
       .filter((request) => ['pending', 'approved', 'in_training', 'needs_qualify'].includes(request.status))
@@ -184,7 +192,7 @@ export default async function ProfilePage({
   );
 
   const availableTrainings = allTrainings
-    .filter((training) => !existingTrainingIds.has(training.id))
+    .filter((training) => !nonRetryableTrainingIds.has(training.id))
     .map((training) => {
       let meetsRankRequirement = true;
       let missingRank: { id: number; name: string; abbreviation: string } | null = null;

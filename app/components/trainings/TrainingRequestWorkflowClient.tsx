@@ -94,7 +94,10 @@ export default function TrainingRequestWorkflowClient({
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <section
+        className="flex flex-col gap-3 rounded-lg border p-5 sm:flex-row sm:items-start sm:justify-between"
+        style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
+      >
         <div>
           <Link href={isStaff ? '/admin/trainings' : '/profile'} className="text-sm" style={{ color: 'var(--primary)' }}>
             ← Back to trainings
@@ -112,7 +115,7 @@ export default function TrainingRequestWorkflowClient({
         <div className="text-sm sm:text-right" style={{ color: 'var(--muted-foreground)' }}>
           Requested {new Date(request.requestedAt).toLocaleString()}
         </div>
-      </div>
+      </section>
 
       {!isStaff && request.status === 'pending' && (
         <div className="rounded-lg border p-4" style={{ backgroundColor: 'color-mix(in srgb, var(--primary) 12%, var(--background))', borderColor: 'var(--primary)' }}>
@@ -189,6 +192,8 @@ export default function TrainingRequestWorkflowClient({
             {request.training.requiresTrainingSession ? (
               <TrainingSchedulePanel
                 requestId={request.id}
+                requestUserId={request.userId}
+                trainingId={request.training.id}
                 session={request.session}
                 defaultDurationMinutes={request.training.duration}
                 onSaved={() => loadRequest(false)}

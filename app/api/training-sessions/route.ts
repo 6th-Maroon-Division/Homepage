@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
         },
       },
     },
-    orderBy: [{ startsAt: 'asc' }, { createdAt: 'asc' }],
+    orderBy: [{ startsAt: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' }],
   });
 
   return NextResponse.json({

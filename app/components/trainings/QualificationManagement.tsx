@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import TrainingStatusBadge from './TrainingStatusBadge';
+import { getAllowedTrainingTransitions } from '@/lib/training-workflow';
 
 const USER_TRAINING_STATUSES = [
   'approved',
@@ -15,7 +16,7 @@ const USER_TRAINING_STATUSES = [
 ] as const;
 
 type UserTrainingStatus = (typeof USER_TRAINING_STATUSES)[number];
-type QualificationActionStatus = 'qualified' | 'failed' | 'needs_qualify';
+type QualificationActionStatus = UserTrainingStatus;
 
 type QualificationRecord = {
   id: number;
@@ -53,36 +54,22 @@ type QualificationAction = {
 };
 
 function getIndividualActions(record: QualificationRecord): QualificationAction[] {
-  switch (record.status) {
-    case 'approved':
-      return [
-        ...(!record.training.requiresTrainingSession && record.training.requiresOrbatQualification
-          ? [{ status: 'needs_qualify' as const, label: 'Needs qualification' }]
-          : []),
-        ...(!record.training.requiresTrainingSession && !record.training.requiresOrbatQualification
-          ? [{ status: 'qualified' as const, label: 'Qualified' }]
-          : []),
-        { status: 'failed', label: 'Failed', destructive: true },
-      ];
-    case 'in_training':
-      return [
-        ...(record.training.requiresOrbatQualification
-          ? [{ status: 'needs_qualify' as const, label: 'Needs qualification' }]
-          : []),
-        { status: 'failed', label: 'Failed', destructive: true },
-      ];
-    case 'needs_qualify':
-      return [
-        { status: 'qualified', label: 'Qualified' },
-        { status: 'failed', label: 'Failed', destructive: true },
-      ];
-    case 'failed':
-    case 'finished':
-    case 'qualified':
-      return record.training.requiresOrbatQualification
-        ? [{ status: 'needs_qualify', label: 'Needs qualification' }]
-        : [];
-  }
+  const labels: Record<UserTrainingStatus, string> = {
+    approved: 'Approved',
+    in_training: 'Start training',
+    finished: 'Finished',
+    needs_qualify: 'Needs qualification',
+    qualified: 'Qualified',
+    failed: 'Failed',
+  };
+  return getAllowedTrainingTransitions(record.status, {
+    requiresTrainingSession: record.training.requiresTrainingSession,
+    requiresOrbatQualification: record.training.requiresOrbatQualification,
+  })
+    .filter((status): status is UserTrainingStatus => (
+      (USER_TRAINING_STATUSES as readonly string[]).includes(status)
+    ))
+    .map((status) => ({ status, label: labels[status], destructive: status === 'failed' }));
 }
 
 function formatStatus(status: string) {

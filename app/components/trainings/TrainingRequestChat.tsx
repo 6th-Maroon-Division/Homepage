@@ -43,9 +43,11 @@ export default function TrainingRequestChat({
   const [draft, setDraft] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const messagesRef = useRef(initialMessages);
   const listEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    messagesRef.current = initialMessages;
     setMessages(initialMessages);
   }, [initialMessages]);
 
@@ -54,11 +56,10 @@ export default function TrainingRequestChat({
   }, [messages.length]);
 
   const updateMessages = useCallback((next: TrainingRequestMessage[]) => {
-    setMessages((current) => {
-      const merged = mergeMessages(current, next);
-      onMessagesChange?.(merged);
-      return merged;
-    });
+    const merged = mergeMessages(messagesRef.current, next);
+    messagesRef.current = merged;
+    setMessages(merged);
+    onMessagesChange?.(merged);
   }, [onMessagesChange]);
 
   const refreshMessages = useCallback(async () => {

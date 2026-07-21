@@ -223,7 +223,11 @@ export default function TrainingManagementClient({
   // Derived request collections and filters
   const pendingRequests = allRequests.filter(
     (request) => !['failed', 'finished', 'qualified', 'rejected', 'cancelled'].includes(request.status),
-  );
+  ).sort((left, right) => {
+    const leftActivity = new Date(left.lastMessage?.createdAt ?? left.requestedAt).getTime();
+    const rightActivity = new Date(right.lastMessage?.createdAt ?? right.requestedAt).getTime();
+    return rightActivity - leftActivity;
+  });
   const filteredRequests = allRequests.filter((req) => {
     const matchesStatus = statusFilter === 'all' ? true : req.status === statusFilter;
     const term = searchTerm.toLowerCase();

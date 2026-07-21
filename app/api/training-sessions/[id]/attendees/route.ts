@@ -75,6 +75,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: 'notes must be a string or null' }, { status: 400 });
   }
   const notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 4000) || null : null;
+  if (body.advanceTraining !== undefined && typeof body.advanceTraining !== 'boolean') {
+    return NextResponse.json({ error: 'advanceTraining must be a boolean' }, { status: 400 });
+  }
+  const advanceTraining = body.advanceTraining === true;
 
   try {
     const result = await prisma.$transaction(async (tx) => {
@@ -127,7 +131,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         );
       }
 
-      const linkedRequest = hasExplicitRequest
+      let linkedRequest = hasExplicitRequest
         ? trainingRequestId
           ? await tx.trainingRequest.findUnique({
               where: { id: trainingRequestId },
@@ -143,6 +147,20 @@ export async function POST(request: NextRequest, context: RouteContext) {
             include: { sessionAttendee: { select: { id: true, sessionId: true, status: true } } },
             orderBy: [{ requestedAt: 'desc' }, { id: 'desc' }],
           });
+
+      if (!linkedRequest && advanceTraining) {
+        linkedRequest = await tx.trainingRequest.create({
+          data: {
+            userId,
+            trainingId: trainingSession.trainingId,
+            status: 'pending',
+            subscriptions: {
+              create: { userId, websiteEnabled: true, discordEnabled: false },
+            },
+          },
+          include: { sessionAttendee: { select: { id: true, sessionId: true, status: true } } },
+        });
+      }
 
       if (trainingRequestId && !linkedRequest) {
         throw new AttendeeApiError('Training request not found', 404);
@@ -166,7 +184,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
             data: { trainingRequestId: null },
           });
         }
-        if (linkedRequest.status === 'pending' && trainingSession.status !== 'proposed') {
+        if (linkedRequest.status === 'pending' && trainingSession.status !== 'proposed' && !advanceTraining) {
           throw new AttendeeApiError('Approve the training request before adding it to a confirmed session', 409);
         }
       }
@@ -186,9 +204,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
       });
 
       if (linkedRequest) {
-        const startsRequest = trainingSession.status === 'in_progress'
+        const automaticStart = trainingSession.status === 'in_progress'
           && linkedRequest.status === 'approved';
-        if (trainingSession.trainerId || startsRequest) {
+        const advancedStatus = advanceTraining
+          ? linkedRequest.status === 'pending'
+            ? 'approved' as const
+            : linkedRequest.status === 'approved'
+              ? 'in_training' as const
+              : linkedRequest.status
+          : automaticStart ? 'in_training' as const : linkedRequest.status;
+        const progressesRequest = advancedStatus !== linkedRequest.status;
+        if (trainingSession.trainerId || progressesRequest) {
           const requestUpdate = await tx.trainingRequest.updateMany({
             where: {
               id: linkedRequest.id,
@@ -199,7 +225,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
               ...(trainingSession.trainerId
                 ? { assignedTrainerId: trainingSession.trainerId }
                 : {}),
-              ...(startsRequest ? { status: 'in_training' as const, handledByAdminId: actorId } : {}),
+              ...(progressesRequest ? { status: advancedStatus, handledByAdminId: actorId } : {}),
             },
           });
           if (requestUpdate.count !== 1) {
@@ -226,7 +252,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
             update: {},
           });
         }
-        if (startsRequest) {
+        if (progressesRequest) {
+          const credentialStatus = advancedStatus === 'in_training' ? 'in_training' as const : 'approved' as const;
           const progressTime = new Date();
           const previousCredential = await tx.userTraining.findUnique({
             where: {
@@ -238,7 +265,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
           });
           let userTrainingId: number;
           if (previousCredential) {
-            if (previousCredential.status === 'approved') {
+            if (credentialStatus === 'in_training' && previousCredential.status === 'approved') {
               const credentialUpdate = await tx.userTraining.updateMany({
                 where: {
                   id: previousCredential.id,
@@ -260,9 +287,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
                   409,
                 );
               }
-            } else if (previousCredential.status !== 'in_training') {
+            } else if (previousCredential.status !== credentialStatus) {
               throw new AttendeeApiError(
-                `The training record is ${previousCredential.status} and cannot be started.`,
+                `The training record is ${previousCredential.status} and cannot move to ${credentialStatus}.`,
                 409,
               );
             }
@@ -273,22 +300,22 @@ export async function POST(request: NextRequest, context: RouteContext) {
                 userId,
                 trainingId: trainingSession.trainingId,
                 trainerId: trainingSession.trainerId ?? actorId,
-                status: 'in_training',
+                status: credentialStatus,
                 needsRetraining: false,
                 statusUpdatedAt: progressTime,
               },
             });
             userTrainingId = credential.id;
           }
-          if (previousCredential?.status !== 'in_training') {
+          if (previousCredential?.status !== credentialStatus) {
             await tx.userTrainingStatusHistory.create({
               data: {
                 userTrainingId,
                 fromStatus: previousCredential?.status ?? null,
-                toStatus: 'in_training',
+                toStatus: credentialStatus,
                 changedById: actorId,
                 trainingSessionId: sessionId,
-                notes: `Added while Training Session #${sessionId} was in progress.`,
+                notes: `Advanced while being added to Training Session #${sessionId}.`,
               },
             });
           }
@@ -296,7 +323,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
             data: {
               requestId: linkedRequest.id,
               senderRole: 'SYSTEM',
-              body: 'Training is already in progress. Status changed from approved to in training.',
+              body: `Training advanced from ${linkedRequest.status} to ${advancedStatus} when added to the session.`,
             },
           });
         }
@@ -304,7 +331,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
           data: {
             requestId: linkedRequest.id,
             senderRole: 'SYSTEM',
-            body: `Added to Training Session #${sessionId} with attendance status scheduled.`,
+            body: trainingSession.startsAt
+              ? `Added to Training Session #${sessionId}, scheduled for ${trainingSession.startsAt.toLocaleString('en-GB', {
+                  timeZone: 'UTC',
+                  dateStyle: 'medium',
+                  timeStyle: 'short',
+                })} UTC, with attendance status scheduled.`
+              : `Added to Training Session #${sessionId}; the date and time are still pending.`,
           },
         });
       }

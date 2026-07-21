@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { signIn, useSession } from 'next-auth/react';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import TrainingScheduleSummary from '@/app/components/trainings/TrainingScheduleSummary';
-import TrainingRequestChat from '@/app/components/trainings/TrainingRequestChat';
 import TrainingStatusBadge from '@/app/components/trainings/TrainingStatusBadge';
 import type { TrainingRequestSession } from '@/app/components/trainings/training-request-types';
 
@@ -165,7 +164,6 @@ export default function UserSelfDetailClient({
   const [requestMessage, setRequestMessage] = useState('');
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
   const [isCancellingRequestId, setIsCancellingRequestId] = useState<number | null>(null);
-  const [openTrainingChatId, setOpenTrainingChatId] = useState<number | null>(null);
   const [profileImageUrl, setProfileImageUrl] = useState(user.avatarUrl ?? '');
   const [selectedAvatarFileName, setSelectedAvatarFileName] = useState<string | null>(null);
   const [isSavingAvatar, setIsSavingAvatar] = useState(false);
@@ -552,14 +550,13 @@ export default function UserSelfDetailClient({
                             </p>
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setOpenTrainingChatId((current) => current === request.id ? null : request.id)}
+                            <Link
+                              href={`/trainings/requests/${request.id}`}
                               className="rounded px-3 py-1 text-sm font-medium"
                               style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
                             >
-                              {openTrainingChatId === request.id ? 'Close Chat' : 'Open Chat'}
-                            </button>
+                              Open Chat
+                            </Link>
                             {request.status === 'pending' && (
                               <button
                               onClick={async () => {
@@ -595,15 +592,6 @@ export default function UserSelfDetailClient({
                             )}
                           </div>
                         </div>
-                        {openTrainingChatId === request.id && (
-                          <TrainingRequestChat
-                            requestId={request.id}
-                            currentUserId={user.id}
-                            isStaff={false}
-                            requestUsername={user.username}
-                            initialMessages={[]}
-                          />
-                        )}
                       </div>
                     ))}
                   </div>

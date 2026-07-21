@@ -8,6 +8,8 @@ import type { TrainingRequestSession, TrainingRequestUser } from './training-req
 
 type TrainingSchedulePanelProps = {
   requestId: number;
+  requestUserId: number;
+  trainingId: number;
   session: TrainingRequestSession | null;
   defaultDurationMinutes: number | null;
   onSaved: () => void | Promise<void>;
@@ -28,6 +30,8 @@ function localDateParts(value: string | null) {
 
 export default function TrainingSchedulePanel({
   requestId,
+  requestUserId,
+  trainingId,
   session,
   defaultDurationMinutes,
   onSaved,
@@ -43,6 +47,8 @@ export default function TrainingSchedulePanel({
   );
   const [instructions, setInstructions] = useState(session?.instructions ?? '');
   const [isSaving, setIsSaving] = useState(false);
+  const [existingSessions, setExistingSessions] = useState<Array<{ id: number; startsAt: string | null; status: string; trainer: TrainingRequestUser | null }>>([]);
+  const [existingSessionId, setExistingSessionId] = useState('');
 
   useEffect(() => {
     const parts = localDateParts(session?.startsAt ?? null);
@@ -81,6 +87,37 @@ export default function TrainingSchedulePanel({
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (session) return;
+    void fetch(`/api/training-sessions?trainingId=${trainingId}`, { cache: 'no-store' })
+      .then(async (response) => response.ok ? response.json() : { sessions: [] })
+      .then((payload) => setExistingSessions(
+        (Array.isArray(payload.sessions) ? payload.sessions : [])
+          .filter((item: { status?: string }) => ['proposed', 'scheduled', 'in_progress'].includes(item.status || '')),
+      ))
+      .catch(() => setExistingSessions([]));
+  }, [session, trainingId]);
+
+  const attachExistingSession = async () => {
+    if (!existingSessionId) return;
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/training-sessions/${existingSessionId}/attendees`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: requestUserId, trainingRequestId: requestId }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'Failed to assign existing session');
+      showSuccess('Existing session assigned');
+      await onSaved();
+    } catch (error) {
+      showError(error instanceof Error ? error.message : 'Failed to assign existing session');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const saveSchedule = async (confirm: boolean) => {
     if (!trainerId) {
@@ -145,6 +182,33 @@ export default function TrainingSchedulePanel({
       </div>
 
       {session && <TrainingScheduleSummary session={session} revealTrainer compact />}
+
+      {!session && existingSessions.length > 0 && (
+        <div className="space-y-2 rounded-md border p-3" style={{ borderColor: 'var(--border)' }}>
+          <label htmlFor="existing-training-session" className="block text-sm font-medium" style={{ color: 'var(--foreground)' }}>
+            Assign an already scheduled session
+          </label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <select
+              id="existing-training-session"
+              value={existingSessionId}
+              onChange={(event) => setExistingSessionId(event.target.value)}
+              className="min-w-0 flex-1 rounded-md border px-3 py-2 text-sm"
+              style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+            >
+              <option value="">Select an existing session…</option>
+              {existingSessions.map((item) => (
+                <option key={item.id} value={item.id}>
+                  Session #{item.id} · {item.startsAt ? new Date(item.startsAt).toLocaleString() : 'date pending'} · {item.trainer?.username || 'trainer pending'}
+                </option>
+              ))}
+            </select>
+            <button type="button" onClick={() => void attachExistingSession()} disabled={!existingSessionId || isSaving} className="rounded-md px-3 py-2 text-sm font-medium disabled:opacity-50" style={{ backgroundColor: 'var(--accent)', color: 'var(--accent-foreground)' }}>
+              Assign Session
+            </button>
+          </div>
+        </div>
+      )}
 
       <div>
         <label htmlFor="training-trainer" className="mb-1 block text-sm font-medium" style={{ color: 'var(--foreground)' }}>

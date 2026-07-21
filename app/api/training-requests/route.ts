@@ -8,6 +8,7 @@ import { createTrainingNotification } from '@/lib/training-notifications';
 import { publishTrainingChatEvent } from '@/lib/realtime/training-chat-events';
 import { TRAINING_REQUEST_STATUSES, type TrainingRequestWorkflowStatus } from '@/lib/training-workflow';
 import { runSerializableTransaction } from '@/lib/serializable-transaction';
+import { canRetryFailedTraining, getFailedTrainingRetryAt } from '@/lib/training-retry';
 
 const userSelect = { id: true, username: true, avatarUrl: true } as const;
 
@@ -177,11 +178,22 @@ export async function POST(request: NextRequest) {
         }),
       ]);
 
-      if (existingCredential) {
+      if (existingCredential && existingCredential.status !== 'failed') {
         return {
-          error: existingCredential.status === 'failed'
-            ? 'A trainer must reopen your qualification attempt.'
-            : 'You already have a training record for this training.',
+          error: 'You already have a training record for this training.',
+        } as const;
+      }
+      if (
+        existingCredential?.status === 'failed'
+        && !canRetryFailedTraining(existingCredential.failedAt, existingCredential.statusUpdatedAt)
+      ) {
+        const retryAt = getFailedTrainingRetryAt(
+          existingCredential.failedAt,
+          existingCredential.statusUpdatedAt,
+        );
+        return {
+          error: `You can request this training again after ${retryAt.toLocaleString()}.`,
+          retryAt: retryAt.toISOString(),
         } as const;
       }
       if (existingRequest) {
@@ -225,7 +237,10 @@ export async function POST(request: NextRequest) {
     });
 
     if ('error' in outcome) {
-      return NextResponse.json({ error: outcome.error }, { status: 409 });
+      return NextResponse.json(
+        { error: outcome.error, ...('retryAt' in outcome ? { retryAt: outcome.retryAt } : {}) },
+        { status: 409 },
+      );
     }
     const trainingRequest = outcome.created;
 

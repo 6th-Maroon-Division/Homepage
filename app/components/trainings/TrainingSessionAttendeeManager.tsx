@@ -33,6 +33,13 @@ type SessionPayload = {
   attendees: Attendee[];
 };
 
+type TrainingUser = {
+  id: number;
+  username: string | null;
+  avatarUrl?: string | null;
+  isTrainer: boolean;
+};
+
 const ATTENDANCE_OPTIONS: Array<{ value: AttendanceStatus; label: string }> = [
   { value: 'scheduled', label: 'Scheduled' },
   { value: 'attended', label: 'Attended' },
@@ -54,8 +61,9 @@ export default function TrainingSessionAttendeeManager({
 }) {
   const [trainingSession, setTrainingSession] = useState<SessionPayload | null>(null);
   const [drafts, setDrafts] = useState<Record<number, { status: AttendanceStatus; notes: string }>>({});
-  const [selectedRequestId, setSelectedRequestId] = useState('');
-  const [manualUserId, setManualUserId] = useState('');
+  const [selectedCandidate, setSelectedCandidate] = useState('');
+  const [trainingUsers, setTrainingUsers] = useState<TrainingUser[]>([]);
+  const [advanceTraining, setAdvanceTraining] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -89,6 +97,13 @@ export default function TrainingSessionAttendeeManager({
     void loadSession();
   }, [loadSession]);
 
+  useEffect(() => {
+    void fetch('/api/training-users', { cache: 'no-store' })
+      .then(async (response) => response.ok ? response.json() : { users: [] })
+      .then((payload) => setTrainingUsers(Array.isArray(payload.users) ? payload.users : []))
+      .catch(() => setTrainingUsers([]));
+  }, []);
+
   const availableRequests = useMemo(() => {
     const attendeeUserIds = new Set((trainingSession?.attendees || []).map((attendee) => attendee.userId));
     return candidateRequests
@@ -99,18 +114,31 @@ export default function TrainingSessionAttendeeManager({
       .sort((left, right) => (left.user.username || '').localeCompare(right.user.username || ''));
   }, [candidateRequests, trainingId, trainingSession]);
 
+  const groupedUsers = useMemo(() => {
+    const unavailableUserIds = new Set((trainingSession?.attendees || []).map((attendee) => attendee.userId));
+    const requestedUserIds = new Set(availableRequests.map((request) => request.userId));
+    const available = trainingUsers.filter((user) => !unavailableUserIds.has(user.id) && !requestedUserIds.has(user.id));
+    return {
+      trainers: available.filter((user) => user.isTrainer),
+      others: available.filter((user) => !user.isTrainer),
+    };
+  }, [availableRequests, trainingSession, trainingUsers]);
+  const selectedHasActiveRequest = selectedCandidate.startsWith('request:');
+
   const refreshAfterChange = async () => {
     await loadSession();
     await onChanged?.();
   };
 
   const addAttendee = async () => {
-    const selectedRequest = availableRequests.find((item) => item.id === Number(selectedRequestId));
-    const parsedManualUserId = Number(manualUserId);
-    const userId = selectedRequest?.userId
-      ?? (Number.isInteger(parsedManualUserId) && parsedManualUserId > 0 ? parsedManualUserId : null);
+    const [candidateType, candidateIdText] = selectedCandidate.split(':');
+    const candidateId = Number(candidateIdText);
+    const selectedRequest = candidateType === 'request'
+      ? availableRequests.find((item) => item.id === candidateId)
+      : null;
+    const userId = selectedRequest?.userId ?? (candidateType === 'user' ? candidateId : null);
     if (!userId) {
-      setError('Select an active request or enter a valid user ID.');
+      setError('Select a user to add.');
       return;
     }
 
@@ -124,12 +152,13 @@ export default function TrainingSessionAttendeeManager({
         body: JSON.stringify({
           userId,
           ...(selectedRequest ? { trainingRequestId: selectedRequest.id } : {}),
+          advanceTraining,
         }),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || 'Unable to add attendee');
-      setSelectedRequestId('');
-      setManualUserId('');
+      setSelectedCandidate('');
+      setAdvanceTraining(false);
       setNotice('Attendee added.');
       await refreshAfterChange();
     } catch (addError) {
@@ -311,50 +340,61 @@ export default function TrainingSessionAttendeeManager({
 
       {!['completed', 'cancelled'].includes(trainingSession?.status || '') && (
         <div className="space-y-2 border-t pt-3" style={{ borderColor: 'var(--border)' }}>
-          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_8rem_auto]">
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
             <select
-              aria-label="Active training request"
-              value={selectedRequestId}
+              aria-label="User to add to training session"
+              value={selectedCandidate}
               onChange={(event) => {
-                setSelectedRequestId(event.target.value);
-                if (event.target.value) setManualUserId('');
+                const value = event.target.value;
+                setSelectedCandidate(value);
+                if (!value.startsWith('request:')) setAdvanceTraining(false);
               }}
               className="min-w-0 rounded border px-2 py-1.5 text-xs"
               style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
             >
-              <option value="">Select active request…</option>
-              {availableRequests.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.user.username || `User ${item.userId}`} · {item.status.replaceAll('_', ' ')}
-                </option>
-              ))}
+              <option value="">Select a user…</option>
+              <optgroup label="Users with active requests">
+                {availableRequests.map((item) => (
+                  <option key={`request-${item.id}`} value={`request:${item.id}`}>
+                    {item.user.username || `User ${item.userId}`} · {item.status.replaceAll('_', ' ')}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Eligible trainers">
+                {groupedUsers.trainers.map((user) => (
+                  <option key={`trainer-${user.id}`} value={`user:${user.id}`}>{user.username || `User ${user.id}`}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Other users">
+                {groupedUsers.others.map((user) => (
+                  <option key={`user-${user.id}`} value={`user:${user.id}`}>{user.username || `User ${user.id}`}</option>
+                ))}
+              </optgroup>
             </select>
-            <input
-              type="number"
-              min={1}
-              value={manualUserId}
-              onChange={(event) => {
-                setManualUserId(event.target.value);
-                if (event.target.value) setSelectedRequestId('');
-              }}
-              placeholder="User ID"
-              aria-label="User ID without selecting a request"
-              className="rounded border px-2 py-1.5 text-xs"
-              style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
-            />
             <button
               type="button"
               onClick={() => void addAttendee()}
-              disabled={busyKey !== null || (!selectedRequestId && !manualUserId)}
+              disabled={busyKey !== null || !selectedCandidate}
               className="rounded px-3 py-1.5 text-xs font-medium disabled:opacity-50"
               style={{ backgroundColor: 'var(--accent)', color: 'var(--accent-foreground)' }}
             >
               Add
             </button>
           </div>
-          <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-            Adding an attendee does not advance their training or qualification status.
-          </p>
+          <label className="flex items-center gap-2 text-xs" style={{ color: 'var(--foreground)' }}>
+            <input
+              type="checkbox"
+              checked={advanceTraining}
+              disabled={!selectedHasActiveRequest}
+              onChange={(event) => setAdvanceTraining(event.target.checked)}
+            />
+            Advance this user&apos;s training to the next workflow step
+          </label>
+          {!selectedHasActiveRequest && selectedCandidate && (
+            <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+              Training can only be advanced when the user has an active request for this training.
+            </p>
+          )}
         </div>
       )}
     </section>
