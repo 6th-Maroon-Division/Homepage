@@ -21,11 +21,11 @@ function localDateParts(value: string | null) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return { date: '', time: '' };
 
-  const year = parsed.getFullYear();
-  const month = `${parsed.getMonth() + 1}`.padStart(2, '0');
-  const day = `${parsed.getDate()}`.padStart(2, '0');
-  const hours = `${parsed.getHours()}`.padStart(2, '0');
-  const minutes = `${parsed.getMinutes()}`.padStart(2, '0');
+  const year = parsed.getUTCFullYear();
+  const month = `${parsed.getUTCMonth() + 1}`.padStart(2, '0');
+  const day = `${parsed.getUTCDate()}`.padStart(2, '0');
+  const hours = `${parsed.getUTCHours()}`.padStart(2, '0');
+  const minutes = `${parsed.getUTCMinutes()}`.padStart(2, '0');
   return { date: `${year}-${month}-${day}`, time: `${hours}:${minutes}` };
 }
 
@@ -130,7 +130,7 @@ export default function TrainingSchedulePanel({
       return;
     }
 
-    const startsAt = new Date(`${date}T${time}`);
+    const startsAt = new Date(`${date}T${time}:00.000Z`);
     if (Number.isNaN(startsAt.getTime())) {
       showError('Choose a valid date and time');
       return;

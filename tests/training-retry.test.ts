@@ -3,7 +3,7 @@ import test from 'node:test';
 import {
   canRetryFailedTraining,
   getFailedTrainingRetryAt,
-} from '../lib/training-retry';
+} from '@/lib/training-retry';
 
 test('failed training can be requested again after one hour', () => {
   const failedAt = new Date('2026-07-21T10:00:00.000Z');
