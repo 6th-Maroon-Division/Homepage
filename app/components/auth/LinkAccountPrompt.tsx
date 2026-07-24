@@ -77,7 +77,7 @@ export default function LinkAccountPrompt() {
   }
 
   const missingProvider = !hasSteam ? 'Steam' : 'Discord';
-  const linkUrl = '/api/auth/steam-login';
+  const linkUrl = missingProvider === 'Steam' ? '/api/auth/steam-login' : undefined;
 
   const handleDiscordSignIn = async () => {
     if (typeof window === 'undefined') return;

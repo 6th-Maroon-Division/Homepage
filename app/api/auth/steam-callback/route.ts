@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { processPendingEventsForUser } from '@/lib/pending-events';
 
@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
   try {
     // Check if user is already logged in (linking account scenario)
     const session = await getServerSession(authOptions);
+    console.log('Steam callback - session:', session?.user?.id ? `User ID: ${session.user.id}` : 'No session');
     
     // Fetch Steam profile
     const apiKey = process.env.STEAM_API_KEY;
@@ -55,16 +56,21 @@ export async function GET(request: NextRequest) {
     
     if (session?.user?.id) {
       // User is logged in - link Steam account to existing user
+      console.log('Steam callback - user is logged in, userId:', session.user.id);
       if (authAccount) {
+        console.log('Steam callback - authAccount already exists, userId:', authAccount.userId);
         if (authAccount.userId === session.user.id) {
           // Already linked to this user
+          console.log('Steam callback - already linked to this user');
           return NextResponse.redirect(new URL('/profile?success=AlreadyLinked', baseUrl));
         } else {
           // Steam account already linked to another user
+          console.log('Steam callback - steam already linked to another user');
           return NextResponse.redirect(new URL('/profile?error=SteamAlreadyLinked', baseUrl));
         }
       }
       
+      console.log('Steam callback - linking steam account to user:', session.user.id);
       // Link Steam account to current user
       await prisma.authAccount.create({
         data: {
@@ -73,6 +79,7 @@ export async function GET(request: NextRequest) {
           userId: session.user.id,
         },
       });
+      console.log('Steam callback - successfully created authAccount for steam');
 
       // Backfill any pending raw attendance events for this Steam ID to the linked user
       await processPendingEventsForUser(steamId, null, session.user.id);
