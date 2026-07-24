@@ -345,6 +345,7 @@ export default async function ProfilePage({
           attendance={attendanceData}
           availableTrainings={availableTrainings}
           initialTab={requestedTab === 'trainings' ? 'trainings' : 'overview'}
+          preferInitialTab={requestedTab === 'trainings'}
           trainingRequests={serializedRequests}
           loaEntries={serializedLoaEntries}
         />

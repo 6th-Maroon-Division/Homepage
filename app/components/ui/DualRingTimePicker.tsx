@@ -10,6 +10,7 @@ type DualRingTimePickerProps = {
   value: string;
   onChange: (value: string) => void;
   hideLabel?: boolean;
+  disabled?: boolean;
 };
 
 const INNER_HOUR_VALUES = Array.from({ length: 12 }, (_, index) => index); // 0-11
@@ -78,7 +79,7 @@ const angleToStep = (angle: number, divisions: number): number => {
   return Math.round(angle / stepSize) % divisions;
 };
 
-export default function DualRingTimePicker({ id, label, value, onChange, hideLabel = false }: DualRingTimePickerProps) {
+export default function DualRingTimePicker({ id, label, value, onChange, hideLabel = false, disabled = false }: DualRingTimePickerProps) {
   const pickerRef = useRef<HTMLDivElement | null>(null);
   const dialRef = useRef<HTMLDivElement | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -255,11 +256,12 @@ export default function DualRingTimePicker({ id, label, value, onChange, hideLab
         id={id}
         aria-haspopup="dialog"
         aria-expanded={isOpen}
+        disabled={disabled}
         onClick={() => {
           setMode('hour');
           setIsOpen((previous) => !previous);
         }}
-        className="w-full px-3 py-2 border rounded-md shadow-sm text-left"
+        className="w-full px-3 py-2 border rounded-md shadow-sm text-left disabled:cursor-not-allowed disabled:opacity-60"
         style={{
           backgroundColor: 'var(--background)',
           borderColor: 'var(--border)',

@@ -111,6 +111,7 @@ type UserSelfDetailClientProps = {
   trainingRequests: TrainingRequestItem[];
   loaEntries: LoaEntry[];
   initialTab?: TabKey;
+  preferInitialTab?: boolean;
 };
 
 type RankHistoryEntry = {
@@ -148,6 +149,7 @@ export default function UserSelfDetailClient({
   trainingRequests,
   loaEntries,
   initialTab = 'overview',
+  preferInitialTab = false,
 }: UserSelfDetailClientProps) {
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
   const [requestRows, setRequestRows] = useState<TrainingRequestItem[]>(trainingRequests);
@@ -172,6 +174,7 @@ export default function UserSelfDetailClient({
   const [displayUsername, setDisplayUsername] = useState(user.username ?? 'Unknown User');
   const [isRefreshingSteamAvatar, setIsRefreshingSteamAvatar] = useState(false);
   const [trainingsViewTab, setTrainingsViewTab] = useState<'my-trainings' | 'available'>('my-trainings');
+  const [tabsRestored, setTabsRestored] = useState(false);
   const [rankHistoryRows, setRankHistoryRows] = useState<RankHistoryEntry[]>([]);
   const [rankHistoryPage, setRankHistoryPage] = useState(1);
   const [rankHistoryPagination, setRankHistoryPagination] = useState<RankHistoryPagination | null>(null);
@@ -182,6 +185,25 @@ export default function UserSelfDetailClient({
   const router = useRouter();
   const { update: updateSession } = useSession();
   const { showError, showSuccess } = useToast();
+
+  useEffect(() => {
+    const profileTabs: TabKey[] = ['overview', 'attendance', 'trainings', 'loa', 'rank-history', 'actions'];
+    const storedProfileTab = window.localStorage.getItem('profile:last-tab') as TabKey | null;
+    const storedTrainingTab = window.localStorage.getItem('profile:trainings:last-tab');
+    if (!preferInitialTab && storedProfileTab && profileTabs.includes(storedProfileTab)) {
+      setActiveTab(storedProfileTab);
+    }
+    if (storedTrainingTab === 'my-trainings' || storedTrainingTab === 'available') {
+      setTrainingsViewTab(storedTrainingTab);
+    }
+    setTabsRestored(true);
+  }, [preferInitialTab]);
+
+  useEffect(() => {
+    if (!tabsRestored) return;
+    window.localStorage.setItem('profile:last-tab', activeTab);
+    window.localStorage.setItem('profile:trainings:last-tab', trainingsViewTab);
+  }, [activeTab, tabsRestored, trainingsViewTab]);
 
 
   const fetchRankHistory = useCallback(async (pageNum: number) => {
@@ -383,12 +405,13 @@ export default function UserSelfDetailClient({
 
           {trainingsViewTab === 'my-trainings' && (
             <div className="space-y-6">
+              {user.trainings.some((training) => !['finished', 'qualified', 'failed'].includes(training.status)) && (
               <div className="p-6 rounded-lg border" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
                 <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--foreground)' }}>
-                  Training Progress
+                  Training in Progress
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {user.trainings.map((training) => (
+                  {user.trainings.filter((training) => !['finished', 'qualified', 'failed'].includes(training.status)).map((training) => (
                     <div
                       key={training.id}
                       className="p-4 rounded-lg border"
@@ -484,13 +507,60 @@ export default function UserSelfDetailClient({
                       </div>
                     </div>
                   ))}
-                  {user.trainings.length === 0 && (
-                    <p className="col-span-2 text-center py-8 opacity-60" style={{ color: 'var(--foreground)' }}>
-                      No training progress yet
-                    </p>
-                  )}
                 </div>
               </div>
+              )}
+
+              {user.trainings.some((training) => ['finished', 'qualified'].includes(training.status)) && (
+              <div className="p-6 rounded-lg border" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+                <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--foreground)' }}>
+                  Training Completed
+                </h2>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {user.trainings.filter((training) => ['finished', 'qualified'].includes(training.status)).map((training) => (
+                    <div key={training.id} className="rounded-lg border p-4" style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}>
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <h3 className="font-semibold text-lg" style={{ color: 'var(--foreground)' }}>{training.trainingName}</h3>
+                          {training.trainingDescription && <p className="mt-1 text-sm opacity-80" style={{ color: 'var(--foreground)' }}>{training.trainingDescription}</p>}
+                        </div>
+                        <span className="rounded px-2 py-1 text-xs font-medium text-white" style={{ backgroundColor: '#16a34a' }}>Completed</span>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                        {training.orbatQualifiedAt && <span>Qualified {new Date(training.orbatQualifiedAt).toLocaleDateString()}</span>}
+                        {!training.orbatQualifiedAt && training.trainingSessionCompletedAt && <span>Completed {new Date(training.trainingSessionCompletedAt).toLocaleDateString()}</span>}
+                        {training.trainerUsername && <span>Trainer: {training.trainerUsername}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              )}
+
+              {user.trainings.some((training) => training.status === 'failed') && (
+              <div className="p-6 rounded-lg border" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+                <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--foreground)' }}>
+                  Training Failed
+                </h2>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {user.trainings.filter((training) => training.status === 'failed').map((training) => (
+                    <div key={training.id} className="rounded-lg border p-4" style={{ backgroundColor: 'var(--background)', borderColor: 'var(--destructive)' }}>
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <h3 className="font-semibold text-lg" style={{ color: 'var(--foreground)' }}>{training.trainingName}</h3>
+                          {training.trainingDescription && <p className="mt-1 text-sm opacity-80" style={{ color: 'var(--foreground)' }}>{training.trainingDescription}</p>}
+                        </div>
+                        <TrainingStatusBadge status="failed" />
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                        {training.failedAt && <span>Failed {new Date(training.failedAt).toLocaleDateString()}</span>}
+                        {training.trainerUsername && <span>Trainer: {training.trainerUsername}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              )}
 
               {requestRows.some((request) => request.session) && (
                 <div className="p-6 rounded-lg border" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>

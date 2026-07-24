@@ -96,6 +96,7 @@ type TrainingManagementClientProps = {
   ranks: Rank[];
   initialView?: 'trainings' | 'sessions';
   initialSessionId?: number | null;
+  preferInitialView?: boolean;
 };
 
 export default function TrainingManagementClient({
@@ -104,6 +105,7 @@ export default function TrainingManagementClient({
   allRequests: initialRequests,
   initialView = 'trainings',
   initialSessionId = null,
+  preferInitialView = false,
 }: TrainingManagementClientProps) {
   const { showSuccess, showError } = useToast();
   const [trainings, setTrainings] = useState<Training[]>(initialTrainings);
@@ -112,6 +114,7 @@ export default function TrainingManagementClient({
   const [activeTab, setActiveTab] = useState<
     'trainings' | 'qualifications' | 'sessions' | 'categories' | 'requests' | 'allRequests'
   >(initialView);
+  const [tabRestored, setTabRestored] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -158,6 +161,19 @@ export default function TrainingManagementClient({
   const canMarkTraining = usePermission('training:mark');
   const canApproveRequests = usePermission('training:approve_request');
   const isSuperAdmin = usePermission('system:super_admin');
+
+  useEffect(() => {
+    const allowedTabs = ['trainings', 'qualifications', 'sessions', 'categories', 'requests', 'allRequests'] as const;
+    const storedTab = window.localStorage.getItem('admin:trainings:last-tab');
+    if (!preferInitialView && storedTab && (allowedTabs as readonly string[]).includes(storedTab)) {
+      setActiveTab(storedTab as typeof activeTab);
+    }
+    setTabRestored(true);
+  }, [preferInitialView]);
+
+  useEffect(() => {
+    if (tabRestored) window.localStorage.setItem('admin:trainings:last-tab', activeTab);
+  }, [activeTab, tabRestored]);
   const canManageQualifications = canMarkTraining || canApproveRequests || isSuperAdmin;
   const canManageSessions = canMarkTraining || canApproveRequests || isSuperAdmin;
 

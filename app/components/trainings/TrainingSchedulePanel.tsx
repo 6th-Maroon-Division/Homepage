@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import TrainingScheduleSummary from './TrainingScheduleSummary';
+import DualRingTimePicker from '@/app/components/ui/DualRingTimePicker';
 import type { TrainingRequestSession, TrainingRequestUser } from './training-request-types';
 
 type TrainingSchedulePanelProps = {
@@ -240,17 +241,12 @@ export default function TrainingSchedulePanel({
             style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
           />
         </div>
-        <div>
-          <label htmlFor="training-time" className="mb-1 block text-sm font-medium" style={{ color: 'var(--foreground)' }}>Time</label>
-          <input
-            id="training-time"
-            type="time"
-            value={time}
-            onChange={(event) => setTime(event.target.value)}
-            className="w-full rounded-md border px-3 py-2 text-sm"
-            style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
-          />
-        </div>
+        <DualRingTimePicker
+          id="training-time"
+          label="Time"
+          value={time}
+          onChange={setTime}
+        />
       </div>
 
       <div>

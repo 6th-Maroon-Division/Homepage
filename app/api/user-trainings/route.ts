@@ -67,6 +67,21 @@ export async function GET(request: NextRequest) {
     orderBy: [{ statusUpdatedAt: 'desc' }, { assignedAt: 'desc' }],
   });
 
+  const relatedRequests = rows.length === 0
+    ? []
+    : await prisma.trainingRequest.findMany({
+        where: {
+          OR: rows.map((row) => ({ userId: row.userId, trainingId: row.trainingId })),
+        },
+        select: { id: true, userId: true, trainingId: true, requestedAt: true },
+        orderBy: [{ requestedAt: 'desc' }, { id: 'desc' }],
+      });
+  const requestIdByTraining = new Map<string, number>();
+  for (const relatedRequest of relatedRequests) {
+    const key = `${relatedRequest.userId}:${relatedRequest.trainingId}`;
+    if (!requestIdByTraining.has(key)) requestIdByTraining.set(key, relatedRequest.id);
+  }
+
   const visibleRows = staffViewer
     ? rows
     : rows.map((row) => {
@@ -83,7 +98,10 @@ export async function GET(request: NextRequest) {
         };
       });
 
-  return NextResponse.json(visibleRows, {
+  return NextResponse.json(visibleRows.map((row) => ({
+    ...row,
+    relatedRequestId: requestIdByTraining.get(`${row.userId}:${row.trainingId}`) ?? null,
+  })), {
     headers: {
       'Cache-Control': 'private, no-cache, no-store, must-revalidate',
       Pragma: 'no-cache',

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 import TrainingSessionAttendeeManager from './TrainingSessionAttendeeManager';
+import DualRingTimePicker from '@/app/components/ui/DualRingTimePicker';
 
 const SESSION_STATUSES = [
   'proposed',
@@ -149,6 +150,20 @@ function toDateTimeLocal(value: string | null): string {
   if (Number.isNaN(parsed.getTime())) return '';
   const pad = (part: number) => String(part).padStart(2, '0');
   return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
+}
+
+function datePart(value: string): string {
+  return value.split('T')[0] ?? '';
+}
+
+function timePart(value: string): string {
+  return value.split('T')[1]?.slice(0, 5) ?? '';
+}
+
+function updateDateTimePart(value: string, next: { date?: string; time?: string }): string {
+  const date = next.date ?? datePart(value);
+  const time = next.time ?? timePart(value);
+  return date || time ? `${date}T${time}` : '';
 }
 
 function parseDuration(value: string): number | null | undefined {
@@ -320,17 +335,24 @@ function SessionEditor({
             </select>
           </label>
 
-          <label className="space-y-1 text-xs font-medium" style={{ color: 'var(--foreground)' }}>
-            <span>Start</span>
+          <div className="space-y-1 text-xs font-medium" style={{ color: 'var(--foreground)' }}>
+            <span>Start date</span>
             <input
-              type="datetime-local"
-              value={draft.startsAt}
-              onChange={(event) => setDraft((current) => ({ ...current, startsAt: event.target.value }))}
+              type="date"
+              value={datePart(draft.startsAt)}
+              onChange={(event) => setDraft((current) => ({ ...current, startsAt: updateDateTimePart(current.startsAt, { date: event.target.value }) }))}
               disabled={isTerminal || isSaving}
               className={fieldClassName}
               style={fieldStyle}
             />
-          </label>
+            <DualRingTimePicker
+              id={`training-session-${session.id}-time`}
+              label="Start time"
+              value={timePart(draft.startsAt)}
+              onChange={(time) => setDraft((current) => ({ ...current, startsAt: updateDateTimePart(current.startsAt, { time }) }))}
+              disabled={isTerminal || isSaving}
+            />
+          </div>
 
           <label className="space-y-1 text-xs font-medium" style={{ color: 'var(--foreground)' }}>
             <span>Duration (minutes)</span>
@@ -780,17 +802,24 @@ export default function TrainingSessionManagement({
                   </select>
                 </label>
 
-                <label className="space-y-1 text-xs font-medium" style={{ color: 'var(--foreground)' }}>
-                  <span>Start</span>
+                <div className="space-y-1 text-xs font-medium" style={{ color: 'var(--foreground)' }}>
+                  <span>Start date</span>
                   <input
-                    type="datetime-local"
-                    value={createDraft.startsAt}
-                    onChange={(event) => setCreateDraft((current) => ({ ...current, startsAt: event.target.value }))}
+                    type="date"
+                    value={datePart(createDraft.startsAt)}
+                    onChange={(event) => setCreateDraft((current) => ({ ...current, startsAt: updateDateTimePart(current.startsAt, { date: event.target.value }) }))}
                     disabled={isCreating}
                     className={fieldClassName}
                     style={fieldStyle}
                   />
-                </label>
+                  <DualRingTimePicker
+                    id="create-training-session-time"
+                    label="Start time"
+                    value={timePart(createDraft.startsAt)}
+                    onChange={(time) => setCreateDraft((current) => ({ ...current, startsAt: updateDateTimePart(current.startsAt, { time }) }))}
+                    disabled={isCreating}
+                  />
+                </div>
 
                 <label className="space-y-1 text-xs font-medium" style={{ color: 'var(--foreground)' }}>
                   <span>Duration (minutes)</span>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import TrainingStatusBadge from './TrainingStatusBadge';
@@ -28,6 +29,7 @@ type QualificationRecord = {
   isHidden: boolean;
   notes: string | null;
   needsRetraining: boolean;
+  relatedRequestId: number | null;
   user: {
     id: number;
     username: string | null;
@@ -192,7 +194,9 @@ export default function QualificationManagement() {
       }
 
       const updated = payload as unknown as QualificationRecord;
-      setRecords((current) => current.map((item) => item.id === record.id ? updated : item));
+      setRecords((current) => current.map((item) => item.id === record.id
+        ? { ...updated, relatedRequestId: updated.relatedRequestId ?? item.relatedRequestId }
+        : item));
       setNotesByRecordId((current) => {
         const next = { ...current };
         delete next[record.id];
@@ -502,6 +506,25 @@ export default function QualificationManagement() {
                       />
                     </label>
                     <div className="flex flex-wrap gap-2">
+                      {record.relatedRequestId ? (
+                        <Link
+                          href={`/trainings/requests/${record.relatedRequestId}`}
+                          className="inline-flex items-center rounded border px-3 py-1.5 text-sm font-medium"
+                          style={{ borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                        >
+                          Open Chat
+                        </Link>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled
+                          title="No training request exists for this record"
+                          className="inline-flex items-center rounded border px-3 py-1.5 text-sm font-medium opacity-40"
+                          style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}
+                        >
+                          Open Chat
+                        </button>
+                      )}
                       {actions.map((action) => (
                         <button
                           key={action.status}
