@@ -1,4 +1,25 @@
 import { prisma } from '@/lib/prisma';
+import {
+  evaluateOrbatTrainingAccess,
+  type OrbatTrainingAccess,
+  type OrbatTrainingRequirement,
+  type UserTrainingStatusRecord,
+} from '@/lib/orbat-training-access';
+
+export {
+  evaluateOrbatTrainingAccess,
+  formatOrbatTrainingAccessError,
+  formatOrbatTrainingAccessWarnings,
+} from '@/lib/orbat-training-access';
+export type {
+  OrbatTrainingAccess,
+  OrbatTrainingAccessError,
+  OrbatTrainingBlockReason,
+  OrbatTrainingRequirement,
+  OrbatTrainingRequirementAccess,
+  UserTrainingStatusRecord,
+  UserTrainingWorkflowStatus,
+} from '@/lib/orbat-training-access';
 
 export type TrainingRequirements = {
   minimumRank: { id: number; name: string; abbreviation: string } | null;
@@ -9,6 +30,58 @@ export type UnmetRequirements = {
   missingRank: { id: number; name: string; abbreviation: string } | null;
   missingTrainings: Array<{ id: number; name: string; categoryName: string | null }>;
 };
+
+/**
+ * Load and evaluate a user's training access for an ORBAT slot.
+ *
+ * This is intentionally separate from `getUnmetRequirements`: temporary
+ * `needs_qualify` access applies to ORBAT slots, not ordinary prerequisites.
+ */
+export async function getOrbatTrainingAccess(
+  userId: number,
+  requiredTrainingIds: number[]
+): Promise<OrbatTrainingAccess> {
+  const uniqueTrainingIds = Array.from(new Set(requiredTrainingIds));
+  if (uniqueTrainingIds.length === 0) {
+    return evaluateOrbatTrainingAccess([], []);
+  }
+
+  const [trainings, userTrainings] = await Promise.all([
+    prisma.training.findMany({
+      where: { id: { in: uniqueTrainingIds } },
+      select: {
+        id: true,
+        name: true,
+        requiresOrbatQualification: true,
+      },
+    }),
+    prisma.userTraining.findMany({
+      where: {
+        userId,
+        trainingId: { in: uniqueTrainingIds },
+      },
+      select: {
+        trainingId: true,
+        status: true,
+      },
+    }),
+  ]);
+
+  const trainingById = new Map(trainings.map((training) => [training.id, training]));
+  const orderedRequirements: OrbatTrainingRequirement[] = uniqueTrainingIds.map(
+    (trainingId) =>
+      trainingById.get(trainingId) ?? {
+        id: trainingId,
+        name: `Training #${trainingId}`,
+        requiresOrbatQualification: true,
+      }
+  );
+
+  return evaluateOrbatTrainingAccess(
+    orderedRequirements,
+    userTrainings as UserTrainingStatusRecord[]
+  );
+}
 
 /**
  * Get all requirements for a training (rank + training prerequisites)
@@ -112,12 +185,20 @@ export async function getUnmetRequirements(
       where: {
         userId,
         trainingId: { in: requirements.requiredTrainings.map((t) => t.id) },
-        needsRetraining: false,
+        status: { in: ['finished', 'qualified'] },
       },
-      select: { trainingId: true },
+      select: {
+        trainingId: true,
+        status: true,
+        training: { select: { requiresOrbatQualification: true } },
+      },
     });
 
-    const completedIds = new Set(userTrainings.map((ut) => ut.trainingId));
+    const completedIds = new Set(
+      userTrainings
+        .filter((item) => item.status === 'qualified' || !item.training.requiresOrbatQualification)
+        .map((item) => item.trainingId),
+    );
     unmet.missingTrainings = requirements.requiredTrainings.filter(
       (t) => !completedIds.has(t.id)
     );

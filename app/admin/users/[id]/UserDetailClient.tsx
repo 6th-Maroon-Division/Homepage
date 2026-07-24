@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/components/ui/ToastContainer';
+import TrainingStatusBadge from '@/app/components/trainings/TrainingStatusBadge';
 
 type UserPermission = {
   id: number;
@@ -29,12 +30,50 @@ type UserTraining = {
   trainingId: number;
   trainingName: string;
   completedAt: string;
+  status: 'approved' | 'in_training' | 'finished' | 'needs_qualify' | 'qualified' | 'failed';
+  requiresTrainingSession: boolean;
+  requiresOrbatQualification: boolean;
+  trainingSessionCompletedAt: string | null;
+  orbatQualifiedAt: string | null;
+  failedAt: string | null;
   needsRetraining: boolean;
   isHidden: boolean;
   notes: string | null;
   trainerId: number | null;
   trainerUsername: string | null;
 };
+
+function getNextTrainingStatuses(training: UserTraining) {
+  switch (training.status) {
+    case 'approved':
+      return [
+        training.requiresTrainingSession
+          ? { status: 'in_training' as const, label: 'Start Training' }
+          : training.requiresOrbatQualification
+            ? { status: 'needs_qualify' as const, label: 'Enable Qualification' }
+            : { status: 'qualified' as const, label: 'Mark Qualified' },
+        { status: 'failed' as const, label: 'Fail' },
+      ];
+    case 'in_training':
+      return [
+        training.requiresOrbatQualification
+          ? { status: 'needs_qualify' as const, label: 'Session Passed' }
+          : { status: 'finished' as const, label: 'Session Passed' },
+        { status: 'failed' as const, label: 'Session Failed' },
+      ];
+    case 'needs_qualify':
+      return [
+        { status: 'qualified' as const, label: 'Qualify' },
+        { status: 'failed' as const, label: 'Fail' },
+      ];
+    case 'failed':
+    case 'finished':
+    case 'qualified':
+      return training.requiresOrbatQualification
+        ? [{ status: 'needs_qualify' as const, label: 'New Qual Attempt' }]
+        : [];
+  }
+}
 
 type LoaEntry = {
   id: number;
@@ -600,6 +639,12 @@ export default function UserDetailClient({
                             trainingId: created.trainingId,
                             trainingName: created.training.name,
                             completedAt: created.completedAt,
+                            status: created.status,
+                            requiresTrainingSession: created.training.requiresTrainingSession,
+                            requiresOrbatQualification: created.training.requiresOrbatQualification,
+                            trainingSessionCompletedAt: created.trainingSessionCompletedAt ?? null,
+                            orbatQualifiedAt: created.orbatQualifiedAt ?? null,
+                            failedAt: created.failedAt ?? null,
                             needsRetraining: created.needsRetraining,
                             isHidden: created.isHidden,
                             notes: created.notes,
@@ -680,9 +725,23 @@ export default function UserDetailClient({
                   <div key={training.id} className="rounded border p-3" style={{ borderColor: 'var(--border)' }}>
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <div className="font-medium" style={{ color: 'var(--foreground)' }}>{training.trainingName}</div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="font-medium" style={{ color: 'var(--foreground)' }}>{training.trainingName}</div>
+                          <TrainingStatusBadge status={training.status} />
+                        </div>
                         <div className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
-                          Completed: {new Date(training.completedAt).toLocaleDateString('en-GB')}
+                          Session: {!training.requiresTrainingSession
+                            ? 'not required'
+                            : training.trainingSessionCompletedAt
+                              ? `completed ${new Date(training.trainingSessionCompletedAt).toLocaleDateString('en-GB')}`
+                              : 'not completed'}
+                        </div>
+                        <div className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
+                          ORBAT qualification: {!training.requiresOrbatQualification
+                            ? 'not required'
+                            : training.orbatQualifiedAt
+                              ? `qualified ${new Date(training.orbatQualifiedAt).toLocaleDateString('en-GB')}`
+                              : training.status === 'needs_qualify' ? 'pending' : 'not completed'}
                         </div>
                         <div className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
                           Trainer: {training.trainerUsername || 'Unknown'}
@@ -699,55 +758,60 @@ export default function UserDetailClient({
 
                       {canAssignTrainings && (
                         <div className="flex flex-wrap gap-2">
-                          <button
-                            disabled={isUpdatingTrainingById[training.id] || isRemovingTrainingById[training.id]}
-                            onClick={async () => {
-                              setIsUpdatingTrainingById((previous) => ({ ...previous, [training.id]: true }));
-                              try {
-                                const response = await fetch(`/api/user-trainings/${training.id}`, {
-                                  method: 'PUT',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({
-                                    notes: training.notes,
-                                    isHidden: training.isHidden,
-                                    needsRetraining: !training.needsRetraining,
-                                  }),
-                                });
-
-                                if (!response.ok) {
-                                  const data = await response.json().catch(() => ({}));
-                                  throw new Error(data.error || 'Failed to update training');
+                          {getNextTrainingStatuses(training).map((action) => (
+                            <button
+                              key={action.status}
+                              disabled={isUpdatingTrainingById[training.id] || isRemovingTrainingById[training.id]}
+                              onClick={async () => {
+                                if (action.status === 'failed' && !window.confirm(`Mark ${training.trainingName} as failed?`)) {
+                                  return;
                                 }
-
-                                setTrainingRows((previous) =>
-                                  previous.map((row) =>
+                                setIsUpdatingTrainingById((previous) => ({ ...previous, [training.id]: true }));
+                                try {
+                                  const response = await fetch(`/api/user-trainings/${training.id}`, {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      status: action.status,
+                                      notes: training.notes,
+                                      isHidden: training.isHidden,
+                                    }),
+                                  });
+                                  const updated = await response.json().catch(() => ({}));
+                                  if (!response.ok) {
+                                    throw new Error(updated.error || 'Failed to update training');
+                                  }
+                                  setTrainingRows((previous) => previous.map((row) =>
                                     row.id === training.id
-                                      ? { ...row, needsRetraining: !training.needsRetraining }
+                                      ? {
+                                          ...row,
+                                          status: updated.status,
+                                          needsRetraining: updated.needsRetraining,
+                                          trainingSessionCompletedAt: updated.trainingSessionCompletedAt ?? row.trainingSessionCompletedAt,
+                                          orbatQualifiedAt: updated.orbatQualifiedAt ?? null,
+                                          failedAt: updated.failedAt ?? null,
+                                          trainerId: updated.trainerId ?? row.trainerId,
+                                          trainerUsername: updated.trainer?.username ?? row.trainerUsername,
+                                        }
                                       : row
-                                  )
-                                );
-
-                                showSuccess(
-                                  !training.needsRetraining
-                                    ? 'Training marked as needing retraining'
-                                    : 'Retraining requirement cleared'
-                                );
-                                router.refresh();
-                              } catch (error) {
-                                showError(error instanceof Error ? error.message : 'Failed to update training');
-                              } finally {
-                                setIsUpdatingTrainingById((previous) => ({ ...previous, [training.id]: false }));
-                              }
-                            }}
-                            className="px-3 py-1 rounded text-xs font-medium disabled:opacity-50"
-                            style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
-                          >
-                            {isUpdatingTrainingById[training.id]
-                              ? 'Saving...'
-                              : training.needsRetraining
-                                ? 'Clear Retraining'
-                                : 'Needs Retraining'}
-                          </button>
+                                  ));
+                                  showSuccess(`Training status updated to ${action.status.replaceAll('_', ' ')}`);
+                                  router.refresh();
+                                } catch (error) {
+                                  showError(error instanceof Error ? error.message : 'Failed to update training');
+                                } finally {
+                                  setIsUpdatingTrainingById((previous) => ({ ...previous, [training.id]: false }));
+                                }
+                              }}
+                              className="px-3 py-1 rounded text-xs font-medium disabled:opacity-50"
+                              style={{
+                                backgroundColor: action.status === 'failed' ? 'var(--destructive)' : 'var(--primary)',
+                                color: action.status === 'failed' ? 'var(--destructive-foreground)' : 'var(--primary-foreground)',
+                              }}
+                            >
+                              {isUpdatingTrainingById[training.id] ? 'Saving...' : action.label}
+                            </button>
+                          ))}
 
                           <button
                             disabled={isUpdatingTrainingById[training.id] || isRemovingTrainingById[training.id]}

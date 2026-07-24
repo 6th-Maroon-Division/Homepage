@@ -1,10 +1,21 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
 import { usePermission } from '@/app/hooks/usePermissions';
+import QualificationManagement from '@/app/components/trainings/QualificationManagement';
+import TrainingSessionAttendeeManager from '@/app/components/trainings/TrainingSessionAttendeeManager';
+import TrainingSessionManagement from '@/app/components/trainings/TrainingSessionManagement';
+import TrainingStatusBadge from '@/app/components/trainings/TrainingStatusBadge';
+import {
+  normalizeTrainingMessage,
+  normalizeTrainingSession,
+  type TrainingRequestMessage,
+  type TrainingRequestSession,
+} from '@/app/components/trainings/training-request-types';
 
 const logClientError = (...args: unknown[]) => {
   if (process.env.NODE_ENV === 'development') {
@@ -25,6 +36,9 @@ type Training = {
   description: string | null;
   categoryId: number | null;
   duration: number | null;
+  requiresTrainingSession: boolean;
+  requiresOrbatQualification: boolean;
+  orbatQualificationNotes: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -71,24 +85,36 @@ type TrainingRequest = {
     updatedAt: string;
   };
   handledByAdmin: User | null;
+  assignedTrainer: User | null;
+  session: TrainingRequestSession | null;
+  lastMessage: TrainingRequestMessage | null;
 };
 
 type TrainingManagementClientProps = {
   trainings: Training[];
   allRequests: TrainingRequest[];
   ranks: Rank[];
+  initialView?: 'trainings' | 'sessions';
+  initialSessionId?: number | null;
+  preferInitialView?: boolean;
 };
 
 export default function TrainingManagementClient({
   trainings: initialTrainings,
   ranks,
   allRequests: initialRequests,
+  initialView = 'trainings',
+  initialSessionId = null,
+  preferInitialView = false,
 }: TrainingManagementClientProps) {
   const { showSuccess, showError } = useToast();
   const [trainings, setTrainings] = useState<Training[]>(initialTrainings);
   const [allRequests, setAllRequests] = useState<TrainingRequest[]>(initialRequests);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [activeTab, setActiveTab] = useState<'trainings' | 'categories' | 'requests' | 'allRequests'>('trainings');
+  const [activeTab, setActiveTab] = useState<
+    'trainings' | 'qualifications' | 'sessions' | 'categories' | 'requests' | 'allRequests'
+  >(initialView);
+  const [tabRestored, setTabRestored] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -101,11 +127,15 @@ export default function TrainingManagementClient({
     status: 'approved' | 'rejected';
   } | null>(null);
   const [adminMessage, setAdminMessage] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'completed'>('all');
+  const [statusFilter, setStatusFilter] = useState<
+    'all' | 'pending' | 'approved' | 'in_training' | 'finished' | 'needs_qualify' |
+    'qualified' | 'failed' | 'rejected' | 'completed' | 'cancelled'
+  >('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [trainingModalOpen, setTrainingModalOpen] = useState(false);
   const [trainingSearchTerm, setTrainingSearchTerm] = useState('');
   const [trainingCategoryFilter, setTrainingCategoryFilter] = useState<'all' | string>('all');
+  const [managingAttendeesForRequestId, setManagingAttendeesForRequestId] = useState<number | null>(null);
   
   // Requirements management state
   const [expandedRequirements, setExpandedRequirements] = useState<number | null>(null);
@@ -118,6 +148,9 @@ export default function TrainingManagementClient({
     description: '',
     categoryId: '',
     duration: '',
+    requiresTrainingSession: true,
+    requiresOrbatQualification: false,
+    orbatQualificationNotes: '',
     isActive: true,
   });
 
@@ -125,7 +158,24 @@ export default function TrainingManagementClient({
   const canCreateTraining = usePermission('training:create');
   const canEditTraining = usePermission('training:edit');
   const canDeleteTraining = usePermission('training:delete');
+  const canMarkTraining = usePermission('training:mark');
   const canApproveRequests = usePermission('training:approve_request');
+  const isSuperAdmin = usePermission('system:super_admin');
+
+  useEffect(() => {
+    const allowedTabs = ['trainings', 'qualifications', 'sessions', 'categories', 'requests', 'allRequests'] as const;
+    const storedTab = window.localStorage.getItem('admin:trainings:last-tab');
+    if (!preferInitialView && storedTab && (allowedTabs as readonly string[]).includes(storedTab)) {
+      setActiveTab(storedTab as typeof activeTab);
+    }
+    setTabRestored(true);
+  }, [preferInitialView]);
+
+  useEffect(() => {
+    if (tabRestored) window.localStorage.setItem('admin:trainings:last-tab', activeTab);
+  }, [activeTab, tabRestored]);
+  const canManageQualifications = canMarkTraining || canApproveRequests || isSuperAdmin;
+  const canManageSessions = canMarkTraining || canApproveRequests || isSuperAdmin;
 
   // Fetch categories on mount
   useEffect(() => {
@@ -152,20 +202,34 @@ export default function TrainingManagementClient({
       const response = await fetch('/api/trainings');
       if (response.ok) {
         const data = await response.json();
-        setTrainings(data);
+        if (Array.isArray(data)) {
+          setTrainings((current) => data.map((row) => {
+            const previous = current.find((training) => training.id === row.id);
+            return {
+              ...row,
+              minimumRank: previous?.minimumRank ?? null,
+              requiredTrainings: previous?.requiredTrainings ?? [],
+            };
+          }));
+        }
       }
     } catch (error) {
       logClientError('Error refreshing trainings:', error);
     }
   };
 
-  const refreshAllRequests = async (status?: string) => {
+  const refreshAllRequests = async (_status?: string) => {
     try {
-      const query = status && status !== 'all' ? `?status=${status}` : '';
-      const response = await fetch(`/api/training-requests${query}`, { cache: 'no-store' });
+      const response = await fetch('/api/training-requests', { cache: 'no-store' });
       if (response.ok) {
         const data = await response.json();
-        setAllRequests(data);
+        if (Array.isArray(data)) {
+          setAllRequests(data.map((row) => ({
+            ...row,
+            lastMessage: normalizeTrainingMessage(row.lastMessage),
+            session: normalizeTrainingSession(row.session),
+          })));
+        }
       }
     } catch (error) {
       logClientError('Error refreshing requests:', error);
@@ -173,7 +237,13 @@ export default function TrainingManagementClient({
   };
 
   // Derived request collections and filters
-  const pendingRequests = allRequests.filter((req) => req.status === 'pending');
+  const pendingRequests = allRequests.filter(
+    (request) => !['failed', 'finished', 'qualified', 'rejected', 'cancelled'].includes(request.status),
+  ).sort((left, right) => {
+    const leftActivity = new Date(left.lastMessage?.createdAt ?? left.requestedAt).getTime();
+    const rightActivity = new Date(right.lastMessage?.createdAt ?? right.requestedAt).getTime();
+    return rightActivity - leftActivity;
+  });
   const filteredRequests = allRequests.filter((req) => {
     const matchesStatus = statusFilter === 'all' ? true : req.status === statusFilter;
     const term = searchTerm.toLowerCase();
@@ -255,6 +325,9 @@ export default function TrainingManagementClient({
       description: training.description || '',
       categoryId: training.categoryId?.toString() || '',
       duration: training.duration?.toString() || '',
+      requiresTrainingSession: training.requiresTrainingSession,
+      requiresOrbatQualification: training.requiresOrbatQualification,
+      orbatQualificationNotes: training.orbatQualificationNotes || '',
       isActive: training.isActive,
     });
     setEditingId(training.id);
@@ -276,7 +349,8 @@ export default function TrainingManagementClient({
         await refreshTrainings();
         setDeleteId(null);
       } else {
-        showError('Failed to delete training');
+        const payload = await response.json().catch(() => ({}));
+        showError(payload.error || 'Failed to delete training');
       }
     } catch (error) {
       logClientError('Error deleting training:', error);
@@ -292,6 +366,9 @@ export default function TrainingManagementClient({
       description: '',
       categoryId: '',
       duration: '',
+      requiresTrainingSession: true,
+      requiresOrbatQualification: false,
+      orbatQualificationNotes: '',
       isActive: true,
     });
     setEditingId(null);
@@ -565,7 +642,7 @@ export default function TrainingManagementClient({
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-2 border-b" style={{ borderColor: 'var(--border)' }}>
+      <div className="flex flex-wrap gap-2 border-b" style={{ borderColor: 'var(--border)' }}>
         <button
           onClick={() => setActiveTab('trainings')}
           className={`px-4 py-2 font-medium transition-colors ${
@@ -580,6 +657,38 @@ export default function TrainingManagementClient({
         >
           Trainings ({trainings.length})
         </button>
+        {canManageQualifications && (
+          <button
+            onClick={() => setActiveTab('qualifications')}
+            className={`px-4 py-2 font-medium transition-colors ${
+              activeTab === 'qualifications'
+                ? 'border-b-2'
+                : 'opacity-60 hover:opacity-100'
+            }`}
+            style={{
+              borderColor: activeTab === 'qualifications' ? 'var(--primary)' : 'transparent',
+              color: 'var(--foreground)',
+            }}
+          >
+            Qualifications
+          </button>
+        )}
+        {canManageSessions && (
+          <button
+            onClick={() => setActiveTab('sessions')}
+            className={`px-4 py-2 font-medium transition-colors ${
+              activeTab === 'sessions'
+                ? 'border-b-2'
+                : 'opacity-60 hover:opacity-100'
+            }`}
+            style={{
+              borderColor: activeTab === 'sessions' ? 'var(--primary)' : 'transparent',
+              color: 'var(--foreground)',
+            }}
+          >
+            Sessions
+          </button>
+        )}
         <button
           onClick={() => setActiveTab('categories')}
           className={`px-4 py-2 font-medium transition-colors ${
@@ -710,6 +819,25 @@ export default function TrainingManagementClient({
                       </span>
                       {training.duration && <span>Duration: {training.duration}min</span>}
                     </div>
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                      <span
+                        className="rounded-full px-2.5 py-1"
+                        style={{ backgroundColor: 'var(--muted)', color: 'var(--muted-foreground)' }}
+                      >
+                        Session {training.requiresTrainingSession ? 'required' : 'not required'}
+                      </span>
+                      <span
+                        className="rounded-full px-2.5 py-1"
+                        style={{ backgroundColor: 'var(--muted)', color: 'var(--muted-foreground)' }}
+                      >
+                        ORBAT qualification {training.requiresOrbatQualification ? 'required' : 'not required'}
+                      </span>
+                    </div>
+                    {training.requiresOrbatQualification && training.orbatQualificationNotes && (
+                      <p className="mt-2 text-sm" style={{ color: 'var(--muted-foreground)' }}>
+                        Qualification notes: {training.orbatQualificationNotes}
+                      </p>
+                    )}
                     <div className="flex gap-4 mt-2 text-sm opacity-70" style={{ color: 'var(--foreground)' }}>
                       <span>{training._count.userTrainings} users trained</span>
                       <span>{training._count.trainingRequests} requests</span>
@@ -885,6 +1013,18 @@ export default function TrainingManagementClient({
             )}
           </div>
         </div>
+      )}
+
+      {activeTab === 'qualifications' && canManageQualifications && (
+        <QualificationManagement />
+      )}
+
+      {activeTab === 'sessions' && canManageSessions && (
+        <TrainingSessionManagement
+          trainings={trainings}
+          candidateRequests={allRequests}
+          initialSessionId={initialSessionId}
+        />
       )}
 
       {/* Categories Tab */}
@@ -1086,7 +1226,7 @@ export default function TrainingManagementClient({
                 className="p-4 rounded-lg border"
                 style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
               >
-                <div className="flex justify-between items-start">
+                <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
                   <div className="flex-1">
                     <div className="flex items-center gap-3">
                       {request.user.avatarUrl && (
@@ -1105,6 +1245,7 @@ export default function TrainingManagementClient({
                         <p className="text-sm opacity-70" style={{ color: 'var(--foreground)' }}>
                           Requested: {request.training.name}
                         </p>
+                        <TrainingStatusBadge status={request.status} />
                       </div>
                     </div>
                     {request.requestMessage && (
@@ -1115,9 +1256,25 @@ export default function TrainingManagementClient({
                     <p className="text-xs mt-2 opacity-60" style={{ color: 'var(--foreground)' }}>
                       Requested: {new Date(request.requestedAt).toLocaleDateString()}
                     </p>
+                    {request.lastMessage && (
+                      <p className="mt-3 line-clamp-2 rounded-md border p-2 text-sm" style={{ borderColor: 'var(--border)', color: 'var(--foreground)' }}>
+                        <span className="font-medium">
+                          {request.lastMessage.senderRole === 'user' ? 'Latest from user' : 'Latest message'}:
+                        </span>{' '}
+                        {request.lastMessage.content}
+                      </p>
+                    )}
                   </div>
-                  {canApproveRequests && (
-                    <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    <Link
+                      href={`/trainings/requests/${request.id}`}
+                      className="rounded px-4 py-2 text-sm font-medium transition-colors"
+                      style={{ backgroundColor: 'var(--accent)', color: 'var(--accent-foreground)' }}
+                    >
+                      Open Chat
+                    </Link>
+                    {canApproveRequests && request.status === 'pending' && (
+                      <>
                       <button
                         onClick={() => setRequestActionModal({ requestId: request.id, status: 'approved' })}
                         disabled={isSaving}
@@ -1140,8 +1297,9 @@ export default function TrainingManagementClient({
                       >
                         Reject
                       </button>
-                    </div>
-                  )}
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -1179,8 +1337,14 @@ export default function TrainingManagementClient({
                 <option value="all">All statuses</option>
                 <option value="pending">Pending</option>
                 <option value="approved">Approved</option>
+                <option value="in_training">In Training</option>
+                <option value="finished">Finished</option>
+                <option value="needs_qualify">Needs Qualification</option>
+                <option value="qualified">Qualified</option>
+                <option value="failed">Failed</option>
                 <option value="rejected">Rejected</option>
                 <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
               </select>
               <input
                 type="text"
@@ -1227,19 +1391,7 @@ export default function TrainingManagementClient({
                       </p>
                     </div>
                   </div>
-                  <span
-                    className={`text-xs px-2 py-1 rounded ${
-                      request.status === 'pending'
-                        ? 'bg-yellow-500 text-white'
-                        : request.status === 'approved'
-                        ? 'bg-green-500 text-white'
-                        : request.status === 'rejected'
-                        ? 'bg-red-500 text-white'
-                        : 'bg-blue-500 text-white'
-                    }`}
-                  >
-                    {request.status.toUpperCase()}
-                  </span>
+                  <TrainingStatusBadge status={request.status} />
                 </div>
 
                 {request.requestMessage && (
@@ -1257,6 +1409,56 @@ export default function TrainingManagementClient({
                     Handled by: {request.handledByAdmin.username || `Admin ${request.handledByAdmin.id}`}
                   </p>
                 )}
+                {request.session && (
+                  <p className="mt-2 text-sm" style={{ color: 'var(--foreground)' }}>
+                    Session: {request.session.startsAt
+                      ? new Date(request.session.startsAt).toLocaleString()
+                      : 'date not set'}
+                    {request.session.durationMinutes ? ` · ${request.session.durationMinutes} min` : ''}
+                    {request.session.trainer?.username
+                      ? ` · ${request.session.trainer.username}`
+                      : request.assignedTrainer?.username
+                        ? ` · ${request.assignedTrainer.username}`
+                        : ''}
+                  </p>
+                )}
+                {request.lastMessage && (
+                  <p className="mt-3 line-clamp-2 rounded-md border p-2 text-sm" style={{ borderColor: 'var(--border)', color: 'var(--foreground)' }}>
+                    <span className="font-medium">
+                      {request.lastMessage.sender?.username || (request.lastMessage.senderRole === 'system' ? 'System' : request.lastMessage.senderRole === 'staff' ? 'Staff' : 'User')}:
+                    </span>{' '}
+                    {request.lastMessage.content}
+                  </p>
+                )}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link
+                    href={`/trainings/requests/${request.id}`}
+                    className="inline-flex rounded px-3 py-1.5 text-sm font-medium"
+                    style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                  >
+                    View Chat &amp; Schedule
+                  </Link>
+                  {request.session && canManageSessions && (
+                    <button
+                      type="button"
+                      onClick={() => setManagingAttendeesForRequestId((current) => current === request.id ? null : request.id)}
+                      className="rounded border px-3 py-1.5 text-sm font-medium"
+                      style={{ borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                    >
+                      {managingAttendeesForRequestId === request.id ? 'Close Attendees' : 'Manage Attendees'}
+                    </button>
+                  )}
+                </div>
+                {request.session && managingAttendeesForRequestId === request.id && canManageSessions && (
+                  <div className="mt-3">
+                    <TrainingSessionAttendeeManager
+                      sessionId={request.session.id}
+                      trainingId={request.trainingId}
+                      candidateRequests={allRequests}
+                      onChanged={() => refreshAllRequests(statusFilter)}
+                    />
+                  </div>
+                )}
               </div>
             ))}
 
@@ -1273,7 +1475,7 @@ export default function TrainingManagementClient({
       <ConfirmModal
         isOpen={deleteId !== null}
         title="Delete Training"
-        message="Are you sure you want to delete this training? This will also remove all user training records and requests associated with it."
+        message="Delete this unused training? Trainings with request, session, or qualification history are retained for audit and must be deactivated instead."
         onConfirm={handleDelete}
         onCancel={() => setDeleteId(null)}
         confirmLabel="Delete"
@@ -1284,7 +1486,7 @@ export default function TrainingManagementClient({
       {trainingModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
           <div
-            className="rounded-lg p-6 w-full max-w-xl border"
+            className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-lg border p-6"
             style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}
           >
             <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--foreground)' }}>
@@ -1368,6 +1570,63 @@ export default function TrainingManagementClient({
                   />
                 </div>
               </div>
+
+              <fieldset className="space-y-3 rounded-lg border p-4" style={{ borderColor: 'var(--border)' }}>
+                <legend className="px-1 text-sm font-medium" style={{ color: 'var(--foreground)' }}>
+                  Completion requirements
+                </legend>
+                <label className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={formData.requiresTrainingSession}
+                    onChange={(e) => setFormData({ ...formData, requiresTrainingSession: e.target.checked })}
+                    className="mt-0.5 h-4 w-4"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium" style={{ color: 'var(--foreground)' }}>
+                      Requires a training session
+                    </span>
+                    <span className="block text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                      Staff must schedule and complete the training-server session.
+                    </span>
+                  </span>
+                </label>
+                <label className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={formData.requiresOrbatQualification}
+                    onChange={(e) => setFormData({ ...formData, requiresOrbatQualification: e.target.checked })}
+                    className="mt-0.5 h-4 w-4"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium" style={{ color: 'var(--foreground)' }}>
+                      Requires ORBAT qualification
+                    </span>
+                    <span className="block text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                      Completion grants temporary access until practical qualification is recorded.
+                    </span>
+                  </span>
+                </label>
+                {formData.requiresOrbatQualification && (
+                  <div>
+                    <label className="mb-1 block text-sm font-medium" style={{ color: 'var(--foreground)' }}>
+                      Qualification notes
+                    </label>
+                    <textarea
+                      value={formData.orbatQualificationNotes}
+                      onChange={(e) => setFormData({ ...formData, orbatQualificationNotes: e.target.value })}
+                      rows={3}
+                      placeholder="Explain what the trainee must demonstrate in an ORBAT slot."
+                      className="w-full rounded border px-3 py-2"
+                      style={{
+                        backgroundColor: 'var(--background)',
+                        borderColor: 'var(--border)',
+                        color: 'var(--foreground)',
+                      }}
+                    />
+                  </div>
+                )}
+              </fieldset>
 
               <div className="flex items-center gap-2">
                 <input

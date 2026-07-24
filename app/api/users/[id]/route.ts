@@ -136,8 +136,27 @@ export async function DELETE(
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Delete user (cascade will handle auth accounts and signups)
-    // Note: OrbATs are NOT deleted due to the relation constraint
+    const [trainingAuditReferences, authoredTrainingMessages] = await Promise.all([
+      prisma.trainingRequest.count({
+        where: {
+          OR: [
+            { userId },
+            { handledByAdminId: userId },
+            { assignedTrainerId: userId },
+          ],
+        },
+      }),
+      prisma.trainingRequestMessage.count({ where: { senderId: userId } }),
+    ]);
+    if (trainingAuditReferences > 0 || authoredTrainingMessages > 0) {
+      return NextResponse.json(
+        { error: 'This user has training audit records. Merge the account instead of deleting it.' },
+        { status: 409 },
+      );
+    }
+
+    // Delete users only when no durable training audit would be lost.
+    // Note: ORBATs are NOT deleted due to the relation constraint.
     await prisma.user.delete({
       where: { id: userId },
     });

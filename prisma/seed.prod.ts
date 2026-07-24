@@ -14,6 +14,12 @@ async function main() {
   await prisma.attendanceLog.deleteMany();
   await prisma.attendanceSession.deleteMany();
   await prisma.attendance.deleteMany();
+  await prisma.trainingRequestReadState.deleteMany();
+  await prisma.trainingRequestSubscription.deleteMany();
+  await prisma.trainingRequestMessage.deleteMany();
+  await prisma.userTrainingStatusHistory.deleteMany();
+  await prisma.trainingSessionAttendee.deleteMany();
+  await prisma.trainingSession.deleteMany();
   await prisma.messageRecipient.deleteMany();
   await prisma.message.deleteMany();
   await prisma.trainingRequest.deleteMany();
@@ -217,4 +223,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-

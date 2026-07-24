@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { validateBotTokenLegacy } from '@/lib/bot-token-validation';
+import {
+  formatOrbatTrainingAccessError,
+  getOrbatTrainingAccess,
+} from '@/lib/training-gating';
+import { resolveOrbatScheduleWindow } from '@/lib/orbat-schedule';
+import { runSerializableTransaction } from '@/lib/serializable-transaction';
 
 function validateBotToken(request: NextRequest): Promise<boolean> {
   return validateBotTokenLegacy(request);
@@ -13,14 +19,21 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { discordUserId, steamId, orbatId, slotId } = body;
+    const discordUserId = typeof body.discordUserId === 'string' ? body.discordUserId.trim() : '';
+    const steamId = typeof body.steamId === 'string' ? body.steamId.trim() : '';
+    const orbatId = Number(body.orbatId);
+    const slotId = body.slotId === undefined || body.slotId === null ? null : Number(body.slotId);
 
     // Validate required fields
-    if (!orbatId) {
+    if (!Number.isInteger(orbatId) || orbatId <= 0) {
       return NextResponse.json(
         { error: 'orbatId is required' },
         { status: 400 }
       );
+    }
+
+    if (slotId !== null && (!Number.isInteger(slotId) || slotId <= 0)) {
+      return NextResponse.json({ error: 'slotId must be a positive integer' }, { status: 400 });
     }
 
     if (!discordUserId && !steamId) {
@@ -64,7 +77,13 @@ export async function POST(request: NextRequest) {
             slots: {
               include: { 
                 signups: true,
-                squadRole: { select: { name: true } },
+                squadRole: {
+                  select: {
+                    name: true,
+                    requiredTrainingIds: true,
+                    requiredRankIds: true,
+                  },
+                },
               },
               orderBy: { orderIndex: 'asc' },
             },
@@ -81,12 +100,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const operationCutoff = resolveOrbatScheduleWindow(orbat).cutoff;
+    if (operationCutoff && operationCutoff < new Date()) {
+      return NextResponse.json(
+        { error: 'Operation is in the past. Signups are closed.' },
+        { status: 409 },
+      );
+    }
+
+    const absentNote = await prisma.orbatAttendanceNote.findUnique({
+      where: { orbatId_userId: { orbatId, userId: user.id } },
+      select: { status: true },
+    });
+    if (absentNote?.status === 'absent') {
+      return NextResponse.json(
+        { error: 'User is marked absent for this operation.' },
+        { status: 409 },
+      );
+    }
+
     // Find available slot
     let targetSlot = null;
     let targetSquad = null;
     
     // If specific slotId provided, use that
-    if (slotId) {
+    if (slotId !== null) {
       for (const squad of orbat.squads) {
         targetSlot = squad.slots.find(slot => slot.id === slotId);
         if (targetSlot) {
@@ -103,8 +141,7 @@ export async function POST(request: NextRequest) {
       }
       
       // Check if slot has capacity
-      const maxSignups = targetSlot.maxSignups || 1;
-      if (targetSlot.signups.length >= maxSignups) {
+      if (targetSlot.maxSignups !== null && targetSlot.signups.length >= targetSlot.maxSignups) {
         return NextResponse.json(
           { error: 'Slot is full', slotId },
           { status: 400 }
@@ -114,8 +151,7 @@ export async function POST(request: NextRequest) {
       // Find first available slot
       for (const squad of orbat.squads) {
         for (const slot of squad.slots) {
-          const maxSignups = slot.maxSignups || 1;
-          if (slot.signups.length < maxSignups) {
+          if (slot.maxSignups === null || slot.signups.length < slot.maxSignups) {
             targetSlot = slot;
             targetSquad = squad;
             break;
@@ -132,41 +168,96 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Check if user is already signed up
-    const existingSignup = await prisma.signup.findFirst({
-      where: {
-        userId: user.id,
-        slot: { orbatId: orbat.id },
-      },
-    });
-
-    if (existingSignup) {
-      return NextResponse.json(
-        { 
-          error: 'User already signed up for this ORBAT',
-          signupId: existingSignup.id,
-          slotId: existingSignup.slotId,
-          orbatId: orbat.id
-        },
-        { status: 409 }
-      );
+    const requiredTrainingIds = targetSlot.squadRole?.requiredTrainingIds || [];
+    let temporaryAccess = false;
+    if (requiredTrainingIds.length > 0) {
+      const trainingAccess = await getOrbatTrainingAccess(user.id, requiredTrainingIds);
+      if (!trainingAccess.allowed) {
+        const accessError = formatOrbatTrainingAccessError(trainingAccess);
+        return NextResponse.json(
+          {
+            ...accessError,
+            requirements: trainingAccess.blockedRequirements,
+          },
+          { status: 400 }
+        );
+      }
+      temporaryAccess = trainingAccess.hasTemporaryAccess;
     }
 
-    // Create signup
-    const signup = await prisma.signup.create({
-      data: {
-        userId: user.id,
-        slotId: targetSlot.id,
-      },
-      include: {
-        slot: {
-          include: {
-            squad: true,
+    const requiredRankIds = targetSlot.squadRole?.requiredRankIds || [];
+    if (requiredRankIds.length > 0) {
+      const [userRank, requiredRanks] = await Promise.all([
+        prisma.userRank.findUnique({
+          where: { userId: user.id },
+          select: { currentRank: { select: { orderIndex: true } } },
+        }),
+        prisma.rank.findMany({
+          where: { id: { in: requiredRankIds } },
+          select: { id: true, name: true, abbreviation: true, orderIndex: true },
+        }),
+      ]);
+      if (requiredRanks.length !== requiredRankIds.length) {
+        return NextResponse.json({ error: 'Slot rank prerequisite is invalid.' }, { status: 409 });
+      }
+      const userOrderIndex = userRank?.currentRank?.orderIndex;
+      const unmetRanks = requiredRanks.filter(
+        (rank) => typeof userOrderIndex !== 'number' || userOrderIndex < rank.orderIndex,
+      );
+      if (unmetRanks.length > 0) {
+        return NextResponse.json(
+          {
+            error: `Slot requires ${unmetRanks
+              .sort((a, b) => a.orderIndex - b.orderIndex)
+              .map((rank) => `[${rank.abbreviation}] ${rank.name}`)
+              .join(', ')} or higher.`,
           },
-        },
-        user: true,
-      },
+          { status: 409 },
+        );
+      }
+    }
+
+    const signupOutcome = await runSerializableTransaction(async (tx) => {
+      const [freshSlot, existingSignup] = await Promise.all([
+        tx.slot.findUnique({
+          where: { id: targetSlot.id },
+          select: { orbatId: true, maxSignups: true, _count: { select: { signups: true } } },
+        }),
+        tx.signup.findFirst({ where: { userId: user.id, slot: { orbatId: orbat.id } } }),
+      ]);
+      if (existingSignup) {
+        return {
+          error: 'User already signed up for this ORBAT',
+          signupId: existingSignup.id,
+          existingSlotId: existingSignup.slotId,
+        } as const;
+      }
+      if (!freshSlot || freshSlot.orbatId !== orbat.id) {
+        return { error: 'Slot is no longer part of this ORBAT' } as const;
+      }
+      if (freshSlot.maxSignups !== null && freshSlot._count.signups >= freshSlot.maxSignups) {
+        return { error: 'Slot is full' } as const;
+      }
+
+      const signup = await tx.signup.create({
+        data: { userId: user.id, slotId: targetSlot.id },
+        include: { slot: { include: { squad: true } }, user: true },
+      });
+      return { signup } as const;
     });
+
+    if ('error' in signupOutcome) {
+      return NextResponse.json(
+        {
+          error: signupOutcome.error,
+          ...('signupId' in signupOutcome
+            ? { signupId: signupOutcome.signupId, slotId: signupOutcome.existingSlotId, orbatId: orbat.id }
+            : {}),
+        },
+        { status: 409 },
+      );
+    }
+    const signup = signupOutcome.signup;
 
     return NextResponse.json({
       success: true,
@@ -181,6 +272,7 @@ export async function POST(request: NextRequest) {
       slotId: targetSlot.id,
       slotName: targetSlot.squadRole?.name || 'Unknown',
       squadName: targetSquad!.name,
+      temporaryTrainingAccess: temporaryAccess,
     });
   } catch (error) {
     console.error('Bot signup error:', error);

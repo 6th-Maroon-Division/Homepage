@@ -5,11 +5,15 @@ import { useRouter } from 'next/navigation';
 
 type UiOp = {
   id: number;
+  kind?: 'orbat' | 'training_session';
   name: string;
   description: string | null;
   startsAtUtc?: string | null;
   eventDate: string; // ISO string
   dateKey: string;   // YYYY-MM-DD
+  href?: string;
+  status?: string;
+  trainerName?: string | null;
 };
 
 type CalendarWithOpsProps = {
@@ -59,6 +63,14 @@ function formatHumanDate(date: Date) {
   });
 }
 
+function calendarItemKey(item: UiOp) {
+  return `${item.kind ?? 'orbat'}-${item.id}`;
+}
+
+function calendarItemHref(item: UiOp, isAdmin: boolean) {
+  return item.href ?? (isAdmin ? `/admin/orbats/${item.id}` : `/orbats/${item.id}`);
+}
+
 export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmin = false, helpText }: CalendarWithOpsProps) {
   const router = useRouter();
 
@@ -91,7 +103,7 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
       const dateKey = `${year}-${month}-${day}`;
 
       setOpsState((previous) => {
-        if (previous.some((item) => item.id === payload.id)) {
+        if (previous.some((item) => (item.kind ?? 'orbat') === 'orbat' && item.id === payload.id)) {
           return previous;
         }
 
@@ -99,6 +111,7 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
           ...previous,
           {
             id: payload.id!,
+            kind: 'orbat',
             name: payload.name!,
             description: payload.description ?? null,
             startsAtUtc: payload.startsAtUtc ?? null,
@@ -112,6 +125,19 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
     };
 
     const source = new EventSource('/api/orbats/events');
+    const refreshCalendar = async () => {
+      try {
+        const res = await fetch('/api/orbats/calendar');
+        if (!res.ok) return;
+        const latest = (await res.json()) as UiOp[];
+        setOpsState(latest);
+      } catch {
+        // Keep the last successfully loaded calendar.
+      }
+    };
+    // The SSE event bus is process-local; polling also covers multi-instance
+    // deployments and training-session changes that use a different event bus.
+    fallbackTimerRef.current = setInterval(() => void refreshCalendar(), 30000);
     source.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data) as {
@@ -127,35 +153,7 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
       }
     };
 
-    source.onerror = () => {
-      if (!fallbackTimerRef.current) {
-        fallbackTimerRef.current = setInterval(async () => {
-          try {
-            const res = await fetch('/api/orbats/calendar');
-            if (!res.ok) {
-              return;
-            }
-
-            const latest = (await res.json()) as UiOp[];
-            setOpsState((previous) => {
-              const existingIds = new Set(previous.map((item) => item.id));
-              const additions = latest.filter((item) => !existingIds.has(item.id));
-
-              return additions.length > 0 ? [...previous, ...additions] : previous;
-            });
-          } catch {
-            // keep waiting for stream recovery
-          }
-        }, 30000);
-      }
-    };
-
-    source.onopen = () => {
-      if (fallbackTimerRef.current) {
-        clearInterval(fallbackTimerRef.current);
-        fallbackTimerRef.current = null;
-      }
-    };
+    source.onerror = () => undefined;
 
     return () => {
       source.close();
@@ -216,7 +214,7 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
       setShowDayModal(true);
     } else if (dayOps.length === 1) {
       // Public view: single op navigates directly
-      router.push(`/orbats/${dayOps[0].id}`);
+      router.push(calendarItemHref(dayOps[0], isAdmin));
     } else {
       // Public view: multiple ops show modal
       setSelectedDateKey(dateKey);
@@ -324,6 +322,8 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
               const dateKey = `${yearStr}-${monthStr}-${dayStr}`;
               const dayOps = opsByDate.get(dateKey) ?? [];
               const hasOps = dayOps.length > 0;
+              const hasTrainingSession = dayOps.some((item) => item.kind === 'training_session');
+              const hasOrbat = dayOps.some((item) => (item.kind ?? 'orbat') === 'orbat');
               const isSelected = selectedDateKey === dateKey;
               
               // Check if date is in the past
@@ -348,7 +348,7 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
                       ? 'var(--secondary)' 
                       : 'var(--background)',
                     borderColor: hasOps
-                      ? 'var(--primary)'
+                      ? hasTrainingSession && !hasOrbat ? 'var(--accent)' : 'var(--primary)'
                       : 'var(--border)',
                     borderWidth: hasOps ? '2px' : '1px',
                     color: 'var(--foreground)',
@@ -360,7 +360,10 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
                 >
                   <span className="text-sm font-semibold">{day}</span>
                   {hasOps && (
-                    <span className="mt-0.5 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--primary)' }} />
+                    <span className="mt-0.5 flex gap-0.5">
+                      {hasOrbat && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--primary)' }} />}
+                      {hasTrainingSession && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--accent)' }} />}
+                    </span>
                   )}
                 </button>
               );
@@ -369,8 +372,8 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
         </div>
 
         <p className="text-xs mt-3" style={{ color: 'var(--muted-foreground)' }}>
-          Click a day with a green dot to view its operations. If only one exists, you&apos;ll
-          go straight to it. If multiple exist, you can pick one below.
+          Click a marked day to view its operations and training sessions. If only one exists,
+          you&apos;ll go straight to it. If multiple exist, you can pick one below.
           {isAdmin && ' As an admin, you can click any empty day to create a new operation.'}
         </p>
 
@@ -387,19 +390,25 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
               </h3>
               
               <div className="space-y-3 mb-4">
-                <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>{selectedOps.length === 1 ? 'Operation on this day:' : 'Operations on this day:'}</p>
+                <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>{selectedOps.length === 1 ? 'Event on this day:' : 'Events on this day:'}</p>
                 {selectedOps.map((op) => (
                   <button
-                    key={op.id}
+                    key={calendarItemKey(op)}
                     onClick={() => {
-                      const route = isAdmin ? `/admin/orbats/${op.id}` : `/orbats/${op.id}`;
-                      router.push(route);
+                      router.push(calendarItemHref(op, isAdmin));
                       setShowDayModal(false);
                     }}
                     className="w-full text-left p-3 rounded-md transition-colors"
                     style={{ backgroundColor: 'var(--muted)', color: 'var(--foreground)' }}
                   >
-                    <div className="font-semibold">{op.name}</div>
+                    <div className="font-semibold flex items-center gap-2">
+                      <span>{op.name}</span>
+                      {op.kind === 'training_session' && (
+                        <span className="text-[10px] uppercase px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--accent)', color: 'var(--accent-foreground)' }}>
+                          Training
+                        </span>
+                      )}
+                    </div>
                     {op.description && (
                       <div className="text-sm mt-1 line-clamp-2" style={{ color: 'var(--muted-foreground)' }}>{op.description}</div>
                     )}
@@ -444,7 +453,7 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
           <div className="mt-4 pt-3 space-y-2" style={{ borderTopWidth: '1px', borderColor: 'var(--border)' }}>
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
-                Operations on{' '}
+                Events on{' '}
                 {formatHumanDate(new Date(selectedOps[0].eventDate))}
               </h3>
               <button
@@ -459,12 +468,12 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
 
             <ul className="space-y-1">
               {selectedOps.map((op) => (
-                <li key={op.id}>
+                <li key={calendarItemKey(op)}>
                   <button
                     type="button"
                     className="w-full text-left text-xs sm:text-sm rounded-md px-2 py-1 border"
                     style={{ backgroundColor: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
-                    onClick={() => router.push(`/orbats/${op.id}`)}
+                    onClick={() => router.push(calendarItemHref(op, isAdmin))}
                   >
                     <span className="font-medium">{op.name}</span>
                     {op.description && (
@@ -480,30 +489,30 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
         )}
       </section>
 
-      {/* List of all ops - only show for public view */}
+      {/* List of all calendar items - only show for public view */}
       {!isAdmin && (
         <section className="rounded-lg border p-4 space-y-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
-          <h2 className="text-lg font-semibold" style={{ color: 'var(--foreground)' }}>All operations</h2>
+          <h2 className="text-lg font-semibold" style={{ color: 'var(--foreground)' }}>All events</h2>
 
           {opsState.length === 0 && (
-            <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>No operations yet.</p>
+            <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>No events yet.</p>
           )}
 
           <ul className="space-y-3">
             {opsState.map((op) => (
               <li
-                key={op.id}
+                key={calendarItemKey(op)}
                 className="rounded-md border px-3 py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
                 style={{ backgroundColor: 'var(--muted)', borderColor: 'var(--border)' }}
               >
                 <div>
                   <button
                     type="button"
-                    onClick={() => router.push(`/orbats/${op.id}`)}
+                    onClick={() => router.push(calendarItemHref(op, isAdmin))}
                     className="text-sm sm:text-base font-medium hover:underline"
                     style={{ color: 'var(--foreground)' }}
                   >
-                    {op.name}
+                    {op.name}{op.kind === 'training_session' ? ' · Training' : ''}
                   </button>
                   {op.description && (
                     <p className="text-xs line-clamp-2" style={{ color: 'var(--muted-foreground)' }}>

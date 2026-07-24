@@ -5,6 +5,10 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 import { publishOrbatEvent } from '@/lib/realtime/orbat-events';
+import {
+  formatOrbatTrainingAccessWarnings,
+  getOrbatTrainingAccess,
+} from '@/lib/training-gating';
 
 export async function PATCH(
   request: NextRequest,
@@ -100,27 +104,11 @@ export async function PATCH(
         : [];
 
       if (requiredTrainingIds.length > 0) {
-        const completedTrainings = await prisma.userTraining.findMany({
-          where: {
-            userId: signup.userId,
-            trainingId: { in: requiredTrainingIds },
-            needsRetraining: false,
-          },
-          select: { trainingId: true },
-        });
-
-        const completedIds = new Set(completedTrainings.map((training) => training.trainingId));
-        const missingTrainingIds = requiredTrainingIds.filter((trainingId) => !completedIds.has(trainingId));
-
-        if (missingTrainingIds.length > 0) {
-          const missingTrainings = await prisma.training.findMany({
-            where: { id: { in: missingTrainingIds } },
-            select: { name: true },
-            orderBy: { name: 'asc' },
-          });
-
-          warnings.push(`User is missing required trainings: ${missingTrainings.map((training) => training.name).join(', ')}`);
-        }
+        const trainingAccess = await getOrbatTrainingAccess(
+          signup.userId,
+          requiredTrainingIds
+        );
+        warnings.push(...formatOrbatTrainingAccessWarnings(trainingAccess));
       }
 
       const requiredRankIds = targetSlot.squadRole.requiredRankIds?.length

@@ -1,9 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signIn, useSession } from 'next-auth/react';
 import { useToast } from '@/app/components/ui/ToastContainer';
+import TrainingScheduleSummary from '@/app/components/trainings/TrainingScheduleSummary';
+import TrainingStatusBadge from '@/app/components/trainings/TrainingStatusBadge';
+import type { TrainingRequestSession } from '@/app/components/trainings/training-request-types';
 
 type UserTraining = {
   id: number;
@@ -12,8 +16,15 @@ type UserTraining = {
   trainingDescription: string | null;
   trainingDuration: number | null;
   trainingCategoryName: string | null;
+  requiresTrainingSession: boolean;
+  requiresOrbatQualification: boolean;
+  qualificationNotes: string | null;
   completedAt: string;
   needsRetraining: boolean;
+  status: string;
+  trainingSessionCompletedAt: string | null;
+  orbatQualifiedAt: string | null;
+  failedAt: string | null;
   isHidden: boolean;
   notes: string | null;
   trainerId: number | null;
@@ -26,6 +37,9 @@ type AvailableTraining = {
   description: string | null;
   duration: number | null;
   categoryName: string | null;
+  requiresTrainingSession: boolean;
+  requiresOrbatQualification: boolean;
+  qualificationNotes: string | null;
   canRequest: boolean;
   missingRank: { id: number; name: string; abbreviation: string } | null;
   missingTrainings: Array<{ id: number; name: string }>;
@@ -40,7 +54,7 @@ type TrainingRequestItem = {
   adminResponse: string | null;
   requestedAt: string;
   updatedAt: string;
-  handledByAdminUsername: string | null;
+  session: TrainingRequestSession | null;
 };
 
 type LoaEntry = {
@@ -96,6 +110,8 @@ type UserSelfDetailClientProps = {
   availableTrainings: AvailableTraining[];
   trainingRequests: TrainingRequestItem[];
   loaEntries: LoaEntry[];
+  initialTab?: TabKey;
+  preferInitialTab?: boolean;
 };
 
 type RankHistoryEntry = {
@@ -119,8 +135,23 @@ type RankHistoryPagination = {
 
 type TabKey = 'overview' | 'attendance' | 'trainings' | 'loa' | 'rank-history' | 'actions';
 
-export default function UserSelfDetailClient({ user, attendance, availableTrainings, trainingRequests, loaEntries }: UserSelfDetailClientProps) {
-  const [activeTab, setActiveTab] = useState<TabKey>('overview');
+const ACTIVE_TRAINING_REQUEST_STATUSES = new Set([
+  'pending',
+  'approved',
+  'in_training',
+  'needs_qualify',
+]);
+
+export default function UserSelfDetailClient({
+  user,
+  attendance,
+  availableTrainings,
+  trainingRequests,
+  loaEntries,
+  initialTab = 'overview',
+  preferInitialTab = false,
+}: UserSelfDetailClientProps) {
+  const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
   const [requestRows, setRequestRows] = useState<TrainingRequestItem[]>(trainingRequests);
   const [loaRows, setLoaRows] = useState<LoaEntry[]>(loaEntries);
   const [loaStartDate, setLoaStartDate] = useState('');
@@ -143,6 +174,7 @@ export default function UserSelfDetailClient({ user, attendance, availableTraini
   const [displayUsername, setDisplayUsername] = useState(user.username ?? 'Unknown User');
   const [isRefreshingSteamAvatar, setIsRefreshingSteamAvatar] = useState(false);
   const [trainingsViewTab, setTrainingsViewTab] = useState<'my-trainings' | 'available'>('my-trainings');
+  const [tabsRestored, setTabsRestored] = useState(false);
   const [rankHistoryRows, setRankHistoryRows] = useState<RankHistoryEntry[]>([]);
   const [rankHistoryPage, setRankHistoryPage] = useState(1);
   const [rankHistoryPagination, setRankHistoryPagination] = useState<RankHistoryPagination | null>(null);
@@ -153,6 +185,25 @@ export default function UserSelfDetailClient({ user, attendance, availableTraini
   const router = useRouter();
   const { update: updateSession } = useSession();
   const { showError, showSuccess } = useToast();
+
+  useEffect(() => {
+    const profileTabs: TabKey[] = ['overview', 'attendance', 'trainings', 'loa', 'rank-history', 'actions'];
+    const storedProfileTab = window.localStorage.getItem('profile:last-tab') as TabKey | null;
+    const storedTrainingTab = window.localStorage.getItem('profile:trainings:last-tab');
+    if (!preferInitialTab && storedProfileTab && profileTabs.includes(storedProfileTab)) {
+      setActiveTab(storedProfileTab);
+    }
+    if (storedTrainingTab === 'my-trainings' || storedTrainingTab === 'available') {
+      setTrainingsViewTab(storedTrainingTab);
+    }
+    setTabsRestored(true);
+  }, [preferInitialTab]);
+
+  useEffect(() => {
+    if (!tabsRestored) return;
+    window.localStorage.setItem('profile:last-tab', activeTab);
+    window.localStorage.setItem('profile:trainings:last-tab', trainingsViewTab);
+  }, [activeTab, tabsRestored, trainingsViewTab]);
 
 
   const fetchRankHistory = useCallback(async (pageNum: number) => {
@@ -354,19 +405,21 @@ export default function UserSelfDetailClient({ user, attendance, availableTraini
 
           {trainingsViewTab === 'my-trainings' && (
             <div className="space-y-6">
+              {user.trainings.some((training) => !['finished', 'qualified', 'failed'].includes(training.status)) && (
               <div className="p-6 rounded-lg border" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
                 <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--foreground)' }}>
-                  Completed Trainings
+                  Training in Progress
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {user.trainings.map((training) => (
+                  {user.trainings.filter((training) => !['finished', 'qualified', 'failed'].includes(training.status)).map((training) => (
                     <div
                       key={training.id}
                       className="p-4 rounded-lg border"
                       style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div>
                           <h3 className="font-semibold text-lg" style={{ color: 'var(--foreground)' }}>
                             {training.trainingName}
                           </h3>
@@ -375,7 +428,11 @@ export default function UserSelfDetailClient({ user, attendance, availableTraini
                               {training.trainingDescription}
                             </p>
                           )}
-                          <div className="flex flex-wrap gap-2 mt-2">
+                          </div>
+                          <TrainingStatusBadge status={training.status} />
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
                             {training.trainingCategoryName && (
                               <span
                                 className="text-xs px-2 py-1 rounded"
@@ -397,65 +454,156 @@ export default function UserSelfDetailClient({ user, attendance, availableTraini
                                 Retraining Required
                               </span>
                             )}
-                          </div>
-                          <p className="text-xs mt-2 opacity-60" style={{ color: 'var(--foreground)' }}>
-                            Completed: {new Date(training.completedAt).toLocaleDateString()}
-                          </p>
-                          <p className="text-xs opacity-60" style={{ color: 'var(--foreground)' }}>
-                            Trainer: {training.trainerUsername || 'Unknown'}
-                          </p>
                         </div>
-                        <div className="ml-2">
-                          <svg className="w-8 h-8" fill="var(--primary)" viewBox="0 0 20 20">
-                            <path
-                              fillRule="evenodd"
-                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
+
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div className="rounded-md border p-2" style={{ borderColor: 'var(--border)' }}>
+                            <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Training session</div>
+                            <div className="font-medium" style={{ color: 'var(--foreground)' }}>
+                              {!training.requiresTrainingSession
+                                ? 'Not required'
+                                : training.trainingSessionCompletedAt || ['finished', 'needs_qualify', 'qualified'].includes(training.status)
+                                  ? '✓ Completed'
+                                  : training.status === 'failed'
+                                    ? '✕ Failed'
+                                    : 'Pending'}
+                            </div>
+                          </div>
+                          <div className="rounded-md border p-2" style={{ borderColor: 'var(--border)' }}>
+                            <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>ORBAT qualification</div>
+                            <div className="font-medium" style={{ color: 'var(--foreground)' }}>
+                              {!training.requiresOrbatQualification
+                                ? 'Not required'
+                                : training.status === 'qualified'
+                                  ? '✓ Qualified'
+                                  : training.status === 'needs_qualify'
+                                    ? '⏳ Pending'
+                                    : training.status === 'failed'
+                                      ? '✕ Failed'
+                                      : 'Not started'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {training.status === 'needs_qualify' && (
+                          <p className="rounded-md p-3 text-sm" style={{ backgroundColor: 'rgba(234, 88, 12, 0.12)', color: 'var(--foreground)' }}>
+                            Qualification pending — you have temporary ORBAT slot access to demonstrate your skills.
+                          </p>
+                        )}
+                        {training.qualificationNotes && training.requiresOrbatQualification && (
+                          <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
+                            {training.qualificationNotes}
+                          </p>
+                        )}
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                          {training.trainingSessionCompletedAt && (
+                            <span>Session completed {new Date(training.trainingSessionCompletedAt).toLocaleDateString()}</span>
+                          )}
+                          {training.orbatQualifiedAt && (
+                            <span>Qualified {new Date(training.orbatQualifiedAt).toLocaleDateString()}</span>
+                          )}
+                          {training.trainerUsername && <span>Trainer: {training.trainerUsername}</span>}
                         </div>
                       </div>
                     </div>
                   ))}
-                  {user.trainings.length === 0 && (
-                    <p className="col-span-2 text-center py-8 opacity-60" style={{ color: 'var(--foreground)' }}>
-                      No completed trainings yet
-                    </p>
-                  )}
                 </div>
               </div>
+              )}
 
-              {requestRows.length > 0 && (
+              {user.trainings.some((training) => ['finished', 'qualified'].includes(training.status)) && (
+              <div className="p-6 rounded-lg border" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+                <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--foreground)' }}>
+                  Training Completed
+                </h2>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {user.trainings.filter((training) => ['finished', 'qualified'].includes(training.status)).map((training) => (
+                    <div key={training.id} className="rounded-lg border p-4" style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}>
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <h3 className="font-semibold text-lg" style={{ color: 'var(--foreground)' }}>{training.trainingName}</h3>
+                          {training.trainingDescription && <p className="mt-1 text-sm opacity-80" style={{ color: 'var(--foreground)' }}>{training.trainingDescription}</p>}
+                        </div>
+                        <span className="rounded px-2 py-1 text-xs font-medium text-white" style={{ backgroundColor: '#16a34a' }}>Completed</span>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                        {training.orbatQualifiedAt && <span>Qualified {new Date(training.orbatQualifiedAt).toLocaleDateString()}</span>}
+                        {!training.orbatQualifiedAt && training.trainingSessionCompletedAt && <span>Completed {new Date(training.trainingSessionCompletedAt).toLocaleDateString()}</span>}
+                        {training.trainerUsername && <span>Trainer: {training.trainerUsername}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              )}
+
+              {user.trainings.some((training) => training.status === 'failed') && (
+              <div className="p-6 rounded-lg border" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+                <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--foreground)' }}>
+                  Training Failed
+                </h2>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {user.trainings.filter((training) => training.status === 'failed').map((training) => (
+                    <div key={training.id} className="rounded-lg border p-4" style={{ backgroundColor: 'var(--background)', borderColor: 'var(--destructive)' }}>
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <h3 className="font-semibold text-lg" style={{ color: 'var(--foreground)' }}>{training.trainingName}</h3>
+                          {training.trainingDescription && <p className="mt-1 text-sm opacity-80" style={{ color: 'var(--foreground)' }}>{training.trainingDescription}</p>}
+                        </div>
+                        <TrainingStatusBadge status="failed" />
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                        {training.failedAt && <span>Failed {new Date(training.failedAt).toLocaleDateString()}</span>}
+                        {training.trainerUsername && <span>Trainer: {training.trainerUsername}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              )}
+
+              {requestRows.some((request) => request.session) && (
                 <div className="p-6 rounded-lg border" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
                   <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--foreground)' }}>
-                    Training Requests
+                    Upcoming Training Sessions
+                  </h2>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    {requestRows.filter((request) => request.session).map((request) => (
+                      <div key={request.id} className="space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold" style={{ color: 'var(--foreground)' }}>{request.trainingName}</span>
+                          <Link href={`/trainings/requests/${request.id}`} className="text-sm" style={{ color: 'var(--primary)' }}>
+                            View Chat
+                          </Link>
+                        </div>
+                        <TrainingScheduleSummary session={request.session!} revealTrainer compact />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {requestRows.some((request) => ACTIVE_TRAINING_REQUEST_STATUSES.has(request.status)) && (
+                <div className="p-6 rounded-lg border" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+                  <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--foreground)' }}>
+                    Pending Training Requests
                   </h2>
                   <div className="space-y-3">
-                    {requestRows.map((request) => (
+                    {requestRows.filter((request) => ACTIVE_TRAINING_REQUEST_STATUSES.has(request.status)).map((request) => (
                       <div
                         key={request.id}
-                        className="p-4 rounded-lg border"
-                        style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}
+                        className="space-y-3"
                       >
-                        <div className="flex justify-between items-start">
+                        <div
+                          className="flex flex-col justify-between gap-3 rounded-lg border p-4 sm:flex-row sm:items-start"
+                          style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}
+                        >
                           <div className="flex-1">
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <h3 className="font-semibold" style={{ color: 'var(--foreground)' }}>
                                 {request.trainingName}
                               </h3>
-                              <span
-                                className={`text-xs px-2 py-1 rounded ${
-                                  request.status === 'pending'
-                                    ? 'bg-yellow-500 text-white'
-                                    : request.status === 'approved'
-                                    ? 'bg-green-500 text-white'
-                                    : request.status === 'rejected'
-                                    ? 'bg-red-500 text-white'
-                                    : 'bg-blue-500 text-white'
-                                }`}
-                              >
-                                {request.status.toUpperCase()}
-                              </span>
+                              <TrainingStatusBadge status={request.status} />
                             </div>
                             {request.requestMessage && (
                               <p className="text-sm mt-1" style={{ color: 'var(--foreground)' }}>
@@ -471,8 +619,16 @@ export default function UserSelfDetailClient({ user, attendance, availableTraini
                               Requested: {new Date(request.requestedAt).toLocaleDateString()}
                             </p>
                           </div>
-                          {request.status === 'pending' && (
-                            <button
+                          <div className="flex flex-wrap gap-2">
+                            <Link
+                              href={`/trainings/requests/${request.id}`}
+                              className="rounded px-3 py-1 text-sm font-medium"
+                              style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                            >
+                              Open Chat
+                            </Link>
+                            {request.status === 'pending' && (
+                              <button
                               onClick={async () => {
                                 setIsCancellingRequestId(request.id);
                                 try {
@@ -502,8 +658,35 @@ export default function UserSelfDetailClient({ user, attendance, availableTraini
                               }}
                             >
                               {isCancellingRequestId === request.id ? 'Cancelling…' : 'Cancel'}
-                            </button>
-                          )}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {requestRows.some((request) => !ACTIVE_TRAINING_REQUEST_STATUSES.has(request.status)) && (
+                <div className="p-6 rounded-lg border" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+                  <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--foreground)' }}>
+                    Training Request History
+                  </h2>
+                  <div className="space-y-2">
+                    {requestRows.filter((request) => !ACTIVE_TRAINING_REQUEST_STATUSES.has(request.status)).map((request) => (
+                      <div key={request.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3" style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}>
+                        <div>
+                          <div className="font-semibold" style={{ color: 'var(--foreground)' }}>{request.trainingName}</div>
+                          <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                            Requested {new Date(request.requestedAt).toLocaleDateString()}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <TrainingStatusBadge status={request.status} />
+                          <Link href={`/trainings/requests/${request.id}`} className="text-sm" style={{ color: 'var(--primary)' }}>
+                            View record
+                          </Link>
                         </div>
                       </div>
                     ))}
@@ -563,6 +746,20 @@ export default function UserSelfDetailClient({ user, attendance, availableTraini
                           )}
                         </div>
 
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                          <span className="rounded px-2 py-1" style={{ backgroundColor: 'var(--muted)', color: 'var(--muted-foreground)' }}>
+                            Session: {training.requiresTrainingSession ? 'required' : 'not required'}
+                          </span>
+                          <span className="rounded px-2 py-1" style={{ backgroundColor: 'var(--muted)', color: 'var(--muted-foreground)' }}>
+                            ORBAT qualification: {training.requiresOrbatQualification ? 'required' : 'not required'}
+                          </span>
+                        </div>
+                        {training.qualificationNotes && (
+                          <p className="mt-2 text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                            {training.qualificationNotes}
+                          </p>
+                        )}
+
                         {training.missingRank && (
                           <p className="text-xs mt-2" style={{ color: 'var(--destructive)' }}>
                             Requires rank: {training.missingRank.abbreviation} ({training.missingRank.name})
@@ -620,15 +817,15 @@ export default function UserSelfDetailClient({ user, attendance, availableTraini
                                         adminResponse: created.adminResponse,
                                         requestedAt: created.requestedAt,
                                         updatedAt: created.updatedAt,
-                                        handledByAdminUsername: null,
+                                        session: null,
                                       },
                                       ...prev,
                                     ]);
 
                                     setSelectedTrainingId(0);
                                     setRequestMessage('');
-                                    showSuccess('Training request submitted');
-                                    router.refresh();
+                                    showSuccess('Your request has been received. Staff will contact you to schedule.');
+                                    router.push(`/trainings/requests/${created.id}`);
                                   } catch (error) {
                                     showError(error instanceof Error ? error.message : 'Failed to submit request');
                                   } finally {

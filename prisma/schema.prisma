@@ -18,40 +18,48 @@ enum FrequencyType {
 }
 
 model User {
-  id                Int                @id @default(autoincrement())
-  username          String?
-  email             String?
-  avatarUrl         String?
-  createdAt         DateTime           @default(now())
-  accounts          AuthAccount[]
-  orbats            Orbat[]            @relation("OrbatCreator")
-  signups           Signup[]
-  orbatTemplates    OrbatTemplate[]
-  userTrainings     UserTraining[]
-  trainingsGiven    UserTraining[]   @relation("UserTrainingTrainer")
-  trainingRequests  TrainingRequest[]
-  handledRequests   TrainingRequest[]  @relation("TrainingRequestHandledBy")
-  attendances       Attendance[]
-  attendanceLogs    AttendanceLog[]
-  attendanceSessions AttendanceSession[]
-  attendanceEvents  AttendanceEvent[]
-  legacyAttendanceData LegacyAttendanceData[]
-  legacyUserData    LegacyUserData[]
-  createdMessages   Message[]          @relation("MessageCreator")
-  messageRecipients MessageRecipient[]
+  id                           Int                           @id @default(autoincrement())
+  username                     String?
+  email                        String?
+  avatarUrl                    String?
+  createdAt                    DateTime                      @default(now())
+  accounts                     AuthAccount[]
+  orbats                       Orbat[]                       @relation("OrbatCreator")
+  signups                      Signup[]
+  orbatTemplates               OrbatTemplate[]
+  userTrainings                UserTraining[]
+  trainingsGiven               UserTraining[]                @relation("UserTrainingTrainer")
+  trainingStatusChanges        UserTrainingStatusHistory[]   @relation("UserTrainingStatusChangedBy")
+  trainingRequests             TrainingRequest[]
+  handledRequests              TrainingRequest[]             @relation("TrainingRequestHandledBy")
+  assignedTrainingRequests     TrainingRequest[]             @relation("TrainingRequestAssignedTrainer")
+  trainingSessionsAsTrainer    TrainingSession[]             @relation("TrainingSessionTrainer")
+  trainingSessionsCreated      TrainingSession[]             @relation("TrainingSessionCreator")
+  trainingSessionAttendances   TrainingSessionAttendee[]
+  trainingRequestMessages      TrainingRequestMessage[]
+  trainingRequestReadStates    TrainingRequestReadState[]
+  trainingRequestSubscriptions TrainingRequestSubscription[]
+  attendances                  Attendance[]
+  attendanceLogs               AttendanceLog[]
+  attendanceSessions           AttendanceSession[]
+  attendanceEvents             AttendanceEvent[]
+  legacyAttendanceData         LegacyAttendanceData[]
+  legacyUserData               LegacyUserData[]
+  createdMessages              Message[]                     @relation("MessageCreator")
+  messageRecipients            MessageRecipient[]
   // Rank system
-  userRank          UserRank?
-  rankHistory       RankHistory[]
-  promotionProposals PromotionProposal[]
+  userRank                     UserRank?
+  rankHistory                  RankHistory[]
+  promotionProposals           PromotionProposal[]
   // Permissions system
-  userPermissions   UserPermission[]
-  permissionChangesActor  PermissionAuditLog[] @relation("PermissionActor")
-  permissionChangesTarget PermissionAuditLog[] @relation("PermissionTarget")
+  userPermissions              UserPermission[]
+  permissionChangesActor       PermissionAuditLog[]          @relation("PermissionActor")
+  permissionChangesTarget      PermissionAuditLog[]          @relation("PermissionTarget")
   // Squad role audit logs
-  squadRoleAuditLogs SquadRoleAuditLog[]
-  leaveOfAbsences   LeaveOfAbsence[]
-  botTokens        BotToken[]
-  orbatAttendanceNotes OrbatAttendanceNote[]
+  squadRoleAuditLogs           SquadRoleAuditLog[]
+  leaveOfAbsences              LeaveOfAbsence[]
+  botTokens                    BotToken[]
+  orbatAttendanceNotes         OrbatAttendanceNote[]
 }
 
 enum MessageType {
@@ -63,45 +71,45 @@ enum MessageType {
 }
 
 enum AudienceType {
-  user      // Direct to user
-  rank      // To all users with specific rank
-  all       // Broadcast to all users
-  admin     // Admin-only alerts
+  user // Direct to user
+  rank // To all users with specific rank
+  all // Broadcast to all users
+  admin // Admin-only alerts
 }
 
 enum DeliveryChannel {
   web
-  discord   // Future: Discord DM or channel delivery
+  discord // Future: Discord DM or channel delivery
 }
 
 model Message {
-  id           Int       @id @default(autoincrement())
-  title        String
-  body         String    @db.Text
-  type         MessageType @default(general)
-  actionUrl    String?
-  createdBy    User?     @relation("MessageCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  createdById  Int?
-  createdAt    DateTime  @default(now())
-  recipients   MessageRecipient[]
+  id          Int                @id @default(autoincrement())
+  title       String
+  body        String             @db.Text
+  type        MessageType        @default(general)
+  actionUrl   String?
+  createdBy   User?              @relation("MessageCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdById Int?
+  createdAt   DateTime           @default(now())
+  recipients  MessageRecipient[]
 
   @@index([type])
   @@index([createdAt])
 }
 
 model MessageRecipient {
-  id            Int       @id @default(autoincrement())
-  message       Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  id            Int             @id @default(autoincrement())
+  message       Message         @relation(fields: [messageId], references: [id], onDelete: Cascade)
   messageId     Int
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId        Int
   audienceType  AudienceType
-  audienceValue String?   // e.g., rankId for rank-based, null for all/user/admin
-  isRead        Boolean   @default(false)
+  audienceValue String? // e.g., rankId for rank-based, null for all/user/admin
+  isRead        Boolean         @default(false)
   readAt        DateTime?
-  deliveredAt   DateTime  @default(now())
+  deliveredAt   DateTime        @default(now())
   channel       DeliveryChannel @default(web)
-  metadata      Json?     // Flexible storage for future delivery-specific data
+  metadata      Json? // Flexible storage for future delivery-specific data
 
   @@unique([messageId, userId])
   @@index([userId, isRead])
@@ -120,13 +128,13 @@ model AuthAccount {
 }
 
 model Permission {
-  id              Int                @id @default(autoincrement())
-  key             String             @unique // e.g., "user:edit", "training:mark", "orbat:delete"
+  id              Int                      @id @default(autoincrement())
+  key             String                   @unique // e.g., "user:edit", "training:mark", "orbat:delete"
   description     String?
-  defaultValue    Int                @default(0) // Default value for new users (0-255)
-  maxValue        Int                @default(255)
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  defaultValue    Int                      @default(0) // Default value for new users (0-255)
+  maxValue        Int                      @default(255)
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
   userPermissions UserPermission[]
   auditLogs       PermissionAuditLog[]
   templateItems   PermissionTemplateItem[]
@@ -135,14 +143,14 @@ model Permission {
 }
 
 model UserPermission {
-  id              Int         @id @default(autoincrement())
-  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId          Int
-  permission      Permission  @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-  permissionId    Int
-  value           Int         // 0-255, where higher value = more permissions
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id           Int        @id @default(autoincrement())
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       Int
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  permissionId Int
+  value        Int // 0-255, where higher value = more permissions
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
   @@unique([userId, permissionId])
   @@index([userId])
@@ -150,25 +158,25 @@ model UserPermission {
 }
 
 enum PermissionAction {
-  GRANT    // New permission granted (0 -> X)
-  REVOKE   // Permission removed (X -> 0)
-  MODIFY   // Permission value changed (X -> Y)
+  GRANT // New permission granted (0 -> X)
+  REVOKE // Permission removed (X -> 0)
+  MODIFY // Permission value changed (X -> Y)
 }
 
 model PermissionAuditLog {
-  id              Int               @id @default(autoincrement())
-  actor           User              @relation("PermissionActor", fields: [actorId], references: [id], onDelete: Cascade)
-  actorId         Int               // Who made the change
-  targetUser      User              @relation("PermissionTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
-  targetUserId    Int               // Whose permissions changed
-  permission      Permission        @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-  permissionId    Int               // Which permission was modified
-  action          PermissionAction  // Type of change
-  oldValue        Int?              // Previous value (null if newly granted)
-  newValue        Int?              // New value (null if revoked)
-  reason          String?           // Optional reason for the change
-  metadata        Json?             // Additional context (IP address, user agent, etc.)
-  createdAt       DateTime          @default(now())
+  id           Int              @id @default(autoincrement())
+  actor        User             @relation("PermissionActor", fields: [actorId], references: [id], onDelete: Cascade)
+  actorId      Int // Who made the change
+  targetUser   User             @relation("PermissionTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  targetUserId Int // Whose permissions changed
+  permission   Permission       @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  permissionId Int // Which permission was modified
+  action       PermissionAction // Type of change
+  oldValue     Int? // Previous value (null if newly granted)
+  newValue     Int? // New value (null if revoked)
+  reason       String? // Optional reason for the change
+  metadata     Json? // Additional context (IP address, user agent, etc.)
+  createdAt    DateTime         @default(now())
 
   @@index([actorId])
   @@index([targetUserId])
@@ -202,41 +210,42 @@ model PermissionTemplateItem {
 }
 
 model Orbat {
-  id               Int       @id @default(autoincrement())
-  name             String
-  description      String?
-  eventDate        DateTime?
-  startTime        String?
-  endTime          String?
-  startsAtUtc      DateTime?
-  endsAtUtc        DateTime?
-  timezone         String?
-  createdBy        User      @relation("OrbatCreator", fields: [createdById], references: [id])
-  createdById      Int
-  createdAt        DateTime  @default(now())
-  isMainOp         Boolean   @default(false)
-  squads           Squad[]           // Renamed from slots
-  frequencies      OrbatRadioFrequency[]
-  attendances      Attendance[]
-  slots            Slot[]            // New: per-orbat role instances
-  tempFrequencies  Json?     @default("[]") // Store temporary frequencies as JSON array
+  id                    Int                         @id @default(autoincrement())
+  name                  String
+  description           String?
+  eventDate             DateTime?
+  startTime             String?
+  endTime               String?
+  startsAtUtc           DateTime?
+  endsAtUtc             DateTime?
+  timezone              String?
+  createdBy             User                        @relation("OrbatCreator", fields: [createdById], references: [id])
+  createdById           Int
+  createdAt             DateTime                    @default(now())
+  isMainOp              Boolean                     @default(false)
+  squads                Squad[] // Renamed from slots
+  frequencies           OrbatRadioFrequency[]
+  attendances           Attendance[]
+  slots                 Slot[] // New: per-orbat role instances
+  tempFrequencies       Json?                       @default("[]") // Store temporary frequencies as JSON array
   // BLUFOR faction
-  bluforCountry    String?
-  bluforRelationship String?
+  bluforCountry         String?
+  bluforRelationship    String?
   // OPFOR faction
-  opforCountry     String?
-  opforRelationship String?
+  opforCountry          String?
+  opforRelationship     String?
   // Independent faction
-  indepCountry     String?
-  indepRelationship String?
+  indepCountry          String?
+  indepRelationship     String?
   // Extra Intel
-  iedThreat        String?   // IED/Trap/Mine Threat
-  civilianRelationship String? // Civilian Relationship
-  rulesOfEngagement String?  // Rules of Engagement
-  airspace         String?   // Airspace
-  inGameTimezone   String?   // In Game Timezone
-  operationDay     String?   // Operation Day
-  attendanceNotes  OrbatAttendanceNote[]
+  iedThreat             String? // IED/Trap/Mine Threat
+  civilianRelationship  String? // Civilian Relationship
+  rulesOfEngagement     String? // Rules of Engagement
+  airspace              String? // Airspace
+  inGameTimezone        String? // In Game Timezone
+  operationDay          String? // Operation Day
+  attendanceNotes       OrbatAttendanceNote[]
+  trainingStatusChanges UserTrainingStatusHistory[]
 }
 
 enum OrbatAttendanceNoteStatus {
@@ -246,17 +255,17 @@ enum OrbatAttendanceNoteStatus {
 }
 
 model OrbatAttendanceNote {
-  id               Int                      @id @default(autoincrement())
-  orbat            Orbat                    @relation(fields: [orbatId], references: [id], onDelete: Cascade)
-  orbatId          Int
-  user             User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId           Int
-  status           OrbatAttendanceNoteStatus
-  reason           String?
-  lateMinutes      Int?
+  id                Int                       @id @default(autoincrement())
+  orbat             Orbat                     @relation(fields: [orbatId], references: [id], onDelete: Cascade)
+  orbatId           Int
+  user              User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId            Int
+  status            OrbatAttendanceNoteStatus
+  reason            String?
+  lateMinutes       Int?
   leaveEarlyMinutes Int?
-  createdAt        DateTime                 @default(now())
-  updatedAt        DateTime                 @updatedAt
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
 
   @@unique([orbatId, userId])
   @@index([orbatId])
@@ -265,37 +274,37 @@ model OrbatAttendanceNote {
 
 // Global role definition
 model SquadRole {
-  id                  Int    @id @default(autoincrement())
-  name                String @unique
-  category            String?                     // e.g., "Heavy Weapons", "Support", "Leadership"
+  id                  Int      @id @default(autoincrement())
+  name                String   @unique
+  category            String? // e.g., "Heavy Weapons", "Support", "Leadership"
   description         String?
-  tags                String?                     // Comma-separated filter tags
-  requiredTrainingIds Int[]  @default([])
-  requiredRankIds     Int[]  @default([])
-  isRetired           Boolean @default(false)
+  tags                String? // Comma-separated filter tags
+  requiredTrainingIds Int[]    @default([])
+  requiredRankIds     Int[]    @default([])
+  isRetired           Boolean  @default(false)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
-  
+
   // Relations
-  slots               Slot[]                      // All per-orbat instances of this role
-  auditLogs           SquadRoleAuditLog[]
+  slots     Slot[] // All per-orbat instances of this role
+  auditLogs SquadRoleAuditLog[]
 
   @@index([category])
 }
 
 // Audit log for SquadRole changes
 model SquadRoleAuditLog {
-  id              Int         @id @default(autoincrement())
-  squadRole       SquadRole   @relation(fields: [squadRoleId], references: [id], onDelete: Cascade)
-  squadRoleId     Int
-  action          String      // "created", "updated", "deleted"
-  changedBy       User?       @relation(fields: [changedById], references: [id], onDelete: SetNull)
-  changedById     Int?
-  previousValue   Json?       // Previous state for updates
-  newValue        Json?       // New state
-  reason          String?     // Optional reason
-  createdAt       DateTime    @default(now())
-  
+  id            Int       @id @default(autoincrement())
+  squadRole     SquadRole @relation(fields: [squadRoleId], references: [id], onDelete: Cascade)
+  squadRoleId   Int
+  action        String // "created", "updated", "deleted"
+  changedBy     User?     @relation(fields: [changedById], references: [id], onDelete: SetNull)
+  changedById   Int?
+  previousValue Json? // Previous state for updates
+  newValue      Json? // New state
+  reason        String? // Optional reason
+  createdAt     DateTime  @default(now())
+
   @@index([squadRoleId])
   @@index([changedById])
   @@index([createdAt])
@@ -306,38 +315,38 @@ model Squad {
   id         Int    @id @default(autoincrement())
   orbat      Orbat  @relation(fields: [orbatId], references: [id], onDelete: Cascade)
   orbatId    Int
-  name       String                             // "Squad A", "Squad B", etc
-  orderIndex Int                                 // Order within orbat
-  slots      Slot[]                             // Positions in this squad
-  
+  name       String // "Squad A", "Squad B", etc
+  orderIndex Int // Order within orbat
+  slots      Slot[] // Positions in this squad
+
   @@index([orbatId])
 }
 
 // Per-orbat role instance (position in a squad)
 model Slot {
-  id           Int      @id @default(autoincrement())
-  squad        Squad    @relation(fields: [squadId], references: [id], onDelete: Cascade)
-  squadId      Int
-  orbat        Orbat    @relation(fields: [orbatId], references: [id], onDelete: Cascade)
-  orbatId      Int
-  squadRole    SquadRole? @relation(fields: [squadRoleId], references: [id], onDelete: SetNull)
-  squadRoleId  Int?                             // Link to global role (SetNull if role deleted)
-  orderIndex   Int                               // Order within squad
-  maxSignups   Int?      @default(1)            // null = unlimited, positive int = max capacity
-  signups      Signup[]
-  
+  id          Int        @id @default(autoincrement())
+  squad       Squad      @relation(fields: [squadId], references: [id], onDelete: Cascade)
+  squadId     Int
+  orbat       Orbat      @relation(fields: [orbatId], references: [id], onDelete: Cascade)
+  orbatId     Int
+  squadRole   SquadRole? @relation(fields: [squadRoleId], references: [id], onDelete: SetNull)
+  squadRoleId Int? // Link to global role (SetNull if role deleted)
+  orderIndex  Int // Order within squad
+  maxSignups  Int?       @default(1) // null = unlimited, positive int = max capacity
+  signups     Signup[]
+
   @@unique([squadId, orderIndex])
   @@index([squadRoleId])
   @@index([orbatId])
 }
 
 model Signup {
-  id        Int      @id @default(autoincrement())
-  slot      Slot     @relation(fields: [slotId], references: [id], onDelete: Cascade)
-  slotId    Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    Int
-  createdAt DateTime @default(now())
+  id         Int         @id @default(autoincrement())
+  slot       Slot        @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  slotId     Int
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     Int
+  createdAt  DateTime    @default(now())
   attendance Attendance?
 
   @@unique([slotId, userId])
@@ -345,21 +354,21 @@ model Signup {
 }
 
 model RadioFrequency {
-  id           Int       @id @default(autoincrement())
-  frequency    String    @unique // e.g., "70.0"
+  id           Int                   @id @default(autoincrement())
+  frequency    String                @unique // e.g., "70.0"
   type         FrequencyType // SR or LR
-  isAdditional Boolean   @default(false) // True for ASR (Additional Short Range), etc
-  channel      String?   // e.g., "SR Channel 1", "LR Channel 1"
-  callsign     String?   // Optional callsign
-  createdAt    DateTime  @default(now())
+  isAdditional Boolean               @default(false) // True for ASR (Additional Short Range), etc
+  channel      String? // e.g., "SR Channel 1", "LR Channel 1"
+  callsign     String? // Optional callsign
+  createdAt    DateTime              @default(now())
   orbats       OrbatRadioFrequency[]
 }
 
 model OrbatRadioFrequency {
-  id              Int      @id @default(autoincrement())
-  orbat           Orbat    @relation(fields: [orbatId], references: [id], onDelete: Cascade)
-  orbatId         Int
-  radioFrequency  RadioFrequency @relation(fields: [radioFrequencyId], references: [id], onDelete: Cascade)
+  id               Int            @id @default(autoincrement())
+  orbat            Orbat          @relation(fields: [orbatId], references: [id], onDelete: Cascade)
+  orbatId          Int
+  radioFrequency   RadioFrequency @relation(fields: [radioFrequencyId], references: [id], onDelete: Cascade)
   radioFrequencyId Int
 
   @@unique([orbatId, radioFrequencyId])
@@ -367,38 +376,38 @@ model OrbatRadioFrequency {
 }
 
 enum AttendanceStatus {
-  present      // Full attendance
-  absent       // Manually marked absent
-  late         // Arrived after first hour
-  gone_early   // Left before last hour
-  partial      // Both late and gone_early with >=60 mins total missed
-  no_show      // Never checked in
+  present // Full attendance
+  absent // Manually marked absent
+  late // Arrived after first hour
+  gone_early // Left before last hour
+  partial // Both late and gone_early with >=60 mins total missed
+  no_show // Never checked in
 }
 
 model Attendance {
-  id                    Int              @id @default(autoincrement())
-  signup                Signup?          @relation(fields: [signupId], references: [id], onDelete: Cascade)
-  signupId              Int?             @unique
-  orbat                 Orbat            @relation(fields: [orbatId], references: [id], onDelete: Cascade)
-  orbatId               Int
-  user                  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId                Int
-  status                AttendanceStatus @default(absent)
-  
+  id       Int              @id @default(autoincrement())
+  signup   Signup?          @relation(fields: [signupId], references: [id], onDelete: Cascade)
+  signupId Int?             @unique
+  orbat    Orbat            @relation(fields: [orbatId], references: [id], onDelete: Cascade)
+  orbatId  Int
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId   Int
+  status   AttendanceStatus @default(absent)
+
   // Time tracking - individual sessions for multiple check-in/check-outs
-  sessions              AttendanceSession[]
-  minutesLate           Int              @default(0) // Minutes late in first hour (from first session)
-  minutesGoneEarly      Int              @default(0) // Minutes early in last hour (from last session)
-  totalMinutesMissed    Int              @default(0) // minutesLate + minutesGoneEarly
-  totalMinutesPresent   Int              @default(0) // Sum of all session durations
-  notedAbsent           Boolean          @default(false)
-  notedLateEarly        Boolean          @default(false)
-  notedUnsure           Boolean          @default(false)
-  
-  notes                 String?          // Optional admin notes
-  createdAt             DateTime         @default(now())
-  updatedAt             DateTime         @updatedAt
-  logs                  AttendanceLog[]
+  sessions            AttendanceSession[]
+  minutesLate         Int                 @default(0) // Minutes late in first hour (from first session)
+  minutesGoneEarly    Int                 @default(0) // Minutes early in last hour (from last session)
+  totalMinutesMissed  Int                 @default(0) // minutesLate + minutesGoneEarly
+  totalMinutesPresent Int                 @default(0) // Sum of all session durations
+  notedAbsent         Boolean             @default(false)
+  notedLateEarly      Boolean             @default(false)
+  notedUnsure         Boolean             @default(false)
+
+  notes     String? // Optional admin notes
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  logs      AttendanceLog[]
 
   @@index([orbatId])
   @@index([userId])
@@ -406,16 +415,16 @@ model Attendance {
 }
 
 model AttendanceSession {
-  id              Int       @id @default(autoincrement())
+  id              Int         @id @default(autoincrement())
   attendance      Attendance? @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
   attendanceId    Int?
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId          Int
   checkedInAt     DateTime
   checkedOutAt    DateTime?
-  durationMinutes Int?      // Calculated when checked out: (checkedOutAt - checkedInAt) in minutes
-  sessionDate     DateTime  // Date of the session (for querying by date)
-  timestamp       DateTime  @default(now())
+  durationMinutes Int? // Calculated when checked out: (checkedOutAt - checkedInAt) in minutes
+  sessionDate     DateTime // Date of the session (for querying by date)
+  timestamp       DateTime    @default(now())
 
   @@index([userId])
   @@index([sessionDate])
@@ -424,16 +433,16 @@ model AttendanceSession {
 }
 
 model AttendanceLog {
-  id              Int      @id @default(autoincrement())
-  attendance      Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
-  attendanceId    Int
-  action          String   // "created", "status_changed", "notes_updated", "time_updated", "deleted"
-  source          String   @default("manual") // "manual" or "automated_system"
-  changedBy       User?    @relation(fields: [changedById], references: [id], onDelete: SetNull)
-  changedById     Int?
-  previousValue   Json?    // Previous state (for updates)
-  newValue        Json?    // New state (for updates)
-  timestamp       DateTime @default(now())
+  id            Int        @id @default(autoincrement())
+  attendance    Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  attendanceId  Int
+  action        String // "created", "status_changed", "notes_updated", "time_updated", "deleted"
+  source        String     @default("manual") // "manual" or "automated_system"
+  changedBy     User?      @relation(fields: [changedById], references: [id], onDelete: SetNull)
+  changedById   Int?
+  previousValue Json? // Previous state (for updates)
+  newValue      Json? // New state (for updates)
+  timestamp     DateTime   @default(now())
 
   @@index([attendanceId])
   @@index([changedById])
@@ -443,14 +452,14 @@ model AttendanceLog {
 
 // Raw attendance events from bot - ORBAT-agnostic
 model AttendanceEvent {
-  id           Int      @id @default(autoincrement())
-  user         User?    @relation(fields: [userId], references: [id])
-  userId       Int?
-  steamId      String?  // Original Steam ID for events before user was created
-  discordId    String?  // Original Discord ID for events before user was created
-  isJoin      Boolean  // true = check-in/join, false = check-out/leave
-  eventTime    DateTime
-  processed    Boolean  @default(false) // true = event was matched to user, false = pending
+  id        Int      @id @default(autoincrement())
+  user      User?    @relation(fields: [userId], references: [id])
+  userId    Int?
+  steamId   String? // Original Steam ID for events before user was created
+  discordId String? // Original Discord ID for events before user was created
+  isJoin    Boolean // true = check-in/join, false = check-out/leave
+  eventTime DateTime
+  processed Boolean  @default(false) // true = event was matched to user, false = pending
 
   @@index([userId])
   @@index([steamId])
@@ -460,40 +469,40 @@ model AttendanceEvent {
 }
 
 model OrbatTemplate {
-  id                    Int       @id @default(autoincrement())
-  name                  String    @unique
-  description           String?
-  category              String?   // "Combat", "Training", "Transport", "Garrison", etc
-  tagsJson              String?   // Comma-separated tags for filtering
-  
+  id          Int     @id @default(autoincrement())
+  name        String  @unique
+  description String?
+  category    String? // "Combat", "Training", "Transport", "Garrison", etc
+  tagsJson    String? // Comma-separated tags for filtering
+
   // Full ORBAT structure as JSON
-  slotsJson             Json      // [{name, orderIndex, subslots: [{name, orderIndex, maxSignups}]}]
-  frequencyIds          Int[]     // Array of RadioFrequency IDs
-  
+  slotsJson    Json // [{name, orderIndex, subslots: [{name, orderIndex, maxSignups}]}]
+  frequencyIds Int[] // Array of RadioFrequency IDs
+
   // Optional faction/intel defaults
-  bluforCountry         String?
-  bluforRelationship    String?
-  opforCountry          String?
-  opforRelationship     String?
-  indepCountry          String?
-  indepRelationship     String?
-  iedThreat             String?
-  civilianRelationship  String?
-  rulesOfEngagement     String?
-  airspace              String?
-  inGameTimezone        String?
-  operationDay          String?
-  startTime             String?   // Default HH:MM format
-  endTime               String?   // Default HH:MM format
-  
+  bluforCountry        String?
+  bluforRelationship   String?
+  opforCountry         String?
+  opforRelationship    String?
+  indepCountry         String?
+  indepRelationship    String?
+  iedThreat            String?
+  civilianRelationship String?
+  rulesOfEngagement    String?
+  airspace             String?
+  inGameTimezone       String?
+  operationDay         String?
+  startTime            String? // Default HH:MM format
+  endTime              String? // Default HH:MM format
+
   // Admin metadata
-  createdBy             User      @relation(fields: [createdById], references: [id])
-  createdById           Int
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-  
-  usageCount            Int       @default(0)
-  isActive              Boolean   @default(true)
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdById Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  usageCount Int     @default(0)
+  isActive   Boolean @default(true)
 }
 
 enum TrainingRequestStatus {
@@ -501,88 +510,260 @@ enum TrainingRequestStatus {
   approved
   rejected
   completed
+  in_training
+  finished
+  failed
+  needs_qualify
+  qualified
+  cancelled
+}
+
+enum UserTrainingStatus {
+  approved
+  in_training
+  finished
+  needs_qualify
+  qualified
+  failed
+}
+
+enum TrainingSessionStatus {
+  proposed
+  scheduled
+  in_progress
+  completed
+  cancelled
+}
+
+enum TrainingSessionAttendeeStatus {
+  scheduled
+  attended
+  completed
+  absent
+  cancelled
+}
+
+enum TrainingRequestMessageSenderRole {
+  USER
+  STAFF
+  SYSTEM
 }
 
 model Training {
-  id                Int                @id @default(autoincrement())
-  name              String
-  description       String?
-  category          TrainingCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  categoryId        Int?               // Foreign key to TrainingCategory
-  duration          Int?               // Duration in minutes
+  id                         Int                           @id @default(autoincrement())
+  name                       String
+  description                String?
+  category                   TrainingCategory?             @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId                 Int? // Foreign key to TrainingCategory
+  duration                   Int? // Duration in minutes
+  requiresTrainingSession    Boolean                       @default(true)
+  requiresOrbatQualification Boolean                       @default(false)
+  orbatQualificationNotes    String?                       @db.Text
   // Rank/training prerequisites
-  requiredForNewPeople Boolean         @default(false)
-  isActive          Boolean            @default(true)
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  userTrainings     UserTraining[]
-  trainingRequests  TrainingRequest[]
+  requiredForNewPeople       Boolean                       @default(false)
+  isActive                   Boolean                       @default(true)
+  createdAt                  DateTime                      @default(now())
+  updatedAt                  DateTime                      @updatedAt
+  userTrainings              UserTraining[]
+  trainingRequests           TrainingRequest[]
+  trainingSessions           TrainingSession[]
   // Relations for prerequisites and rank transitions
-  rankRequirement   TrainingRankRequirement?
-  requiresTrainings TrainingTrainingRequirement[] @relation("RequiresTutorial")
-  requiredByTrainings TrainingTrainingRequirement[] @relation("RequiredBy")
-  rankTransitions   RankTransitionRequirement[] @relation("RankTransitionRequirement")
+  rankRequirement            TrainingRankRequirement?
+  requiresTrainings          TrainingTrainingRequirement[] @relation("RequiresTutorial")
+  requiredByTrainings        TrainingTrainingRequirement[] @relation("RequiredBy")
+  rankTransitions            RankTransitionRequirement[]   @relation("RankTransitionRequirement")
 }
 
 model TrainingCategory {
-  id        Int         @id @default(autoincrement())
-  name      String      @unique
+  id         Int        @id @default(autoincrement())
+  name       String     @unique
   orderIndex Int        @default(0)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  trainings Training[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  trainings  Training[]
 }
 
 model UserTraining {
-  id              Int       @id @default(autoincrement())
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId          Int
-  trainer         User?     @relation("UserTrainingTrainer", fields: [trainerId], references: [id], onDelete: SetNull)
-  trainerId       Int?
-  training        Training  @relation(fields: [trainingId], references: [id], onDelete: Cascade)
-  trainingId      Int
-  completedAt     DateTime  @default(now())
-  needsRetraining Boolean   @default(false) // Flag to indicate retraining is needed
-  isHidden        Boolean   @default(false) // Admin can hide this training from user view
-  notes           String?   // Admin notes about completion
-  assignedAt      DateTime  @default(now())
+  id                         Int                         @id @default(autoincrement())
+  user                       User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                     Int
+  trainer                    User?                       @relation("UserTrainingTrainer", fields: [trainerId], references: [id], onDelete: SetNull)
+  trainerId                  Int?
+  training                   Training                    @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  trainingId                 Int
+  completedAt                DateTime                    @default(now())
+  needsRetraining            Boolean                     @default(false) // Flag to indicate retraining is needed
+  status                     UserTrainingStatus          @default(qualified)
+  trainingSessionCompletedAt DateTime?
+  orbatQualifiedAt           DateTime?
+  failedAt                   DateTime?
+  statusUpdatedAt            DateTime                    @default(now())
+  isHidden                   Boolean                     @default(false) // Admin can hide this training from user view
+  notes                      String? // Admin notes about completion
+  assignedAt                 DateTime                    @default(now())
+  statusHistory              UserTrainingStatusHistory[]
 
   @@unique([userId, trainingId])
   @@index([userId])
   @@index([trainingId])
   @@index([trainerId])
+  @@index([status])
+}
+
+model UserTrainingStatusHistory {
+  id                Int                 @id @default(autoincrement())
+  userTraining      UserTraining        @relation(fields: [userTrainingId], references: [id], onDelete: Cascade)
+  userTrainingId    Int
+  fromStatus        UserTrainingStatus?
+  toStatus          UserTrainingStatus
+  changedBy         User?               @relation("UserTrainingStatusChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+  changedById       Int?
+  trainingSession   TrainingSession?    @relation(fields: [trainingSessionId], references: [id], onDelete: SetNull)
+  trainingSessionId Int?
+  orbat             Orbat?              @relation(fields: [orbatId], references: [id], onDelete: SetNull)
+  orbatId           Int?
+  notes             String?             @db.Text
+  createdAt         DateTime            @default(now())
+
+  @@index([userTrainingId, createdAt])
+  @@index([changedById])
+  @@index([trainingSessionId])
+  @@index([orbatId])
+  @@index([toStatus])
 }
 
 model TrainingRequest {
-  id              Int                   @id @default(autoincrement())
-  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId          Int
-  training        Training              @relation(fields: [trainingId], references: [id], onDelete: Cascade)
-  trainingId      Int
-  status          TrainingRequestStatus @default(pending)
-  requestMessage  String?               // User's message/reason for requesting
-  adminResponse   String?               // Admin's response or notes
-  handledByAdmin  User?                 @relation("TrainingRequestHandledBy", fields: [handledByAdminId], references: [id])
-  handledByAdminId Int?
-  requestedAt     DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
+  id                Int                           @id @default(autoincrement())
+  user              User                          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  userId            Int
+  training          Training                      @relation(fields: [trainingId], references: [id], onDelete: Restrict)
+  trainingId        Int
+  status            TrainingRequestStatus         @default(pending)
+  requestMessage    String? // User's message/reason for requesting
+  adminResponse     String? // Admin's response or notes
+  handledByAdmin    User?                         @relation("TrainingRequestHandledBy", fields: [handledByAdminId], references: [id])
+  handledByAdminId  Int?
+  assignedTrainer   User?                         @relation("TrainingRequestAssignedTrainer", fields: [assignedTrainerId], references: [id], onDelete: SetNull)
+  assignedTrainerId Int?
+  requestedAt       DateTime                      @default(now())
+  updatedAt         DateTime                      @updatedAt
+  messages          TrainingRequestMessage[]
+  readStates        TrainingRequestReadState[]
+  subscriptions     TrainingRequestSubscription[]
+  sessionAttendee   TrainingSessionAttendee?
 
   @@index([userId])
   @@index([trainingId])
   @@index([status])
   @@index([handledByAdminId])
+  @@index([assignedTrainerId])
+}
+
+model TrainingSession {
+  id                  Int                         @id @default(autoincrement())
+  training            Training                    @relation(fields: [trainingId], references: [id], onDelete: Restrict)
+  trainingId          Int
+  trainer             User?                       @relation("TrainingSessionTrainer", fields: [trainerId], references: [id], onDelete: SetNull)
+  trainerId           Int?
+  createdBy           User?                       @relation("TrainingSessionCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdById         Int?
+  startsAt            DateTime?
+  durationMinutes     Int?
+  status              TrainingSessionStatus       @default(proposed)
+  specialInstructions String?                     @db.Text
+  cancelledAt         DateTime?
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+  attendees           TrainingSessionAttendee[]
+  statusHistory       UserTrainingStatusHistory[]
+
+  @@index([trainingId])
+  @@index([trainerId])
+  @@index([createdById])
+  @@index([startsAt])
+  @@index([status])
+}
+
+model TrainingSessionAttendee {
+  id                Int                           @id @default(autoincrement())
+  session           TrainingSession               @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId         Int
+  user              User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId            Int
+  trainingRequest   TrainingRequest?              @relation(fields: [trainingRequestId], references: [id], onDelete: SetNull)
+  trainingRequestId Int?                          @unique
+  status            TrainingSessionAttendeeStatus @default(scheduled)
+  attendedAt        DateTime?
+  completedAt       DateTime?
+  reminder24hSentAt DateTime?
+  notes             String?                       @db.Text
+  createdAt         DateTime                      @default(now())
+  updatedAt         DateTime                      @updatedAt
+
+  @@unique([sessionId, userId])
+  @@index([sessionId])
+  @@index([userId])
+  @@index([status])
+}
+
+model TrainingRequestMessage {
+  id         Int                              @id @default(autoincrement())
+  request    TrainingRequest                  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  requestId  Int
+  sender     User?                            @relation(fields: [senderId], references: [id], onDelete: SetNull)
+  senderId   Int?
+  senderRole TrainingRequestMessageSenderRole
+  body       String                           @db.Text
+  createdAt  DateTime                         @default(now())
+  editedAt   DateTime?
+  readStates TrainingRequestReadState[]       @relation("TrainingRequestLastReadMessage")
+
+  @@index([requestId, createdAt])
+  @@index([senderId])
+}
+
+model TrainingRequestReadState {
+  id                Int                     @id @default(autoincrement())
+  request           TrainingRequest         @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  requestId         Int
+  user              User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId            Int
+  lastReadMessage   TrainingRequestMessage? @relation("TrainingRequestLastReadMessage", fields: [lastReadMessageId], references: [id], onDelete: SetNull)
+  lastReadMessageId Int?
+  lastReadAt        DateTime?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  @@unique([requestId, userId])
+  @@index([userId])
+  @@index([lastReadMessageId])
+}
+
+model TrainingRequestSubscription {
+  id             Int             @id @default(autoincrement())
+  request        TrainingRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  requestId      Int
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         Int
+  websiteEnabled Boolean         @default(false)
+  discordEnabled Boolean         @default(false)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@unique([requestId, userId])
+  @@index([userId])
 }
 
 model LeaveOfAbsence {
-  id            Int       @id @default(autoincrement())
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId        Int
-  startDate     DateTime
-  returnDate    DateTime?
-  cancelledAt   DateTime?
-  reason        String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id          Int       @id @default(autoincrement())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      Int
+  startDate   DateTime
+  returnDate  DateTime?
+  cancelledAt DateTime?
+  reason      String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([userId])
   @@index([startDate])
@@ -592,22 +773,22 @@ model LeaveOfAbsence {
 
 // Legacy data tables for import process - stays as legacy only
 model LegacyAttendanceData {
-  id              Int              @id @default(autoincrement())
-  legacyName      String           // Discord username + rank from old system (e.g., "Maj Stas")
-  legacyUserId    String?          // User ID from legacy CSV (e.g., "12345") - used to match records across imports
-  legacyStatus    String           // Original status code: P, A, NA, LOA, NO, EO
-  legacyNotes     String?          // Notes from original data
-  legacyEventDate DateTime?        // Event date from legacy system (e.g., "9-Jan-2025")
-  
+  id              Int       @id @default(autoincrement())
+  legacyName      String // Discord username + rank from old system (e.g., "Maj Stas")
+  legacyUserId    String? // User ID from legacy CSV (e.g., "12345") - used to match records across imports
+  legacyStatus    String // Original status code: P, A, NA, LOA, NO, EO
+  legacyNotes     String? // Notes from original data
+  legacyEventDate DateTime? // Event date from legacy system (e.g., "9-Jan-2025")
+
   // Mapping to actual system (user only, no signup/orbat)
-  mappedUser      User?            @relation(fields: [mappedUserId], references: [id], onDelete: SetNull)
-  mappedUserId    Int?             // Link to actual user in system after mapping
-  
+  mappedUser   User? @relation(fields: [mappedUserId], references: [id], onDelete: SetNull)
+  mappedUserId Int? // Link to actual user in system after mapping
+
   // Status tracking
-  isMapped        Boolean          @default(false)
-  
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  isMapped Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([isMapped])
   @@index([legacyUserId])
@@ -620,64 +801,64 @@ model LegacyAttendanceData {
 // =====================
 
 model Rank {
-  id                              Int       @id @default(autoincrement())
-  name                            String    @unique
-  abbreviation                    String    @unique
-  orderIndex                      Int
+  id           Int    @id @default(autoincrement())
+  name         String @unique
+  abbreviation String @unique
+  orderIndex   Int
 
   attendanceRequiredSinceLastRank Int?
-  autoRankupEnabled               Boolean   @default(false)
+  autoRankupEnabled               Boolean @default(false)
 
   // Relations
-  userRanks                       UserRank[]
-  trainingRequirementsMin         TrainingRankRequirement[]
-  transitionRequirementsTarget    RankTransitionRequirement[]
+  userRanks                    UserRank[]
+  trainingRequirementsMin      TrainingRankRequirement[]
+  transitionRequirementsTarget RankTransitionRequirement[]
 
-  createdAt                       DateTime  @default(now())
-  updatedAt                       DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model UserRank {
-  id                      Int       @id @default(autoincrement())
-  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId                  Int       @unique
+  id     Int  @id @default(autoincrement())
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int  @unique
 
-  currentRank             Rank?     @relation(fields: [currentRankId], references: [id], onDelete: SetNull)
-  currentRankId           Int?
+  currentRank   Rank? @relation(fields: [currentRankId], references: [id], onDelete: SetNull)
+  currentRankId Int?
 
-  lastRankedUpAt          DateTime  @default(now())
-  attendanceSinceLastRank Int       @default(0)
+  lastRankedUpAt          DateTime @default(now())
+  attendanceSinceLastRank Int      @default(0)
 
-  retired                 Boolean   @default(false)
-  interviewDone           Boolean   @default(false)
+  retired       Boolean @default(false)
+  interviewDone Boolean @default(false)
 
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
   @@index([currentRankId])
 }
 
 model RankHistory {
-  id                           Int       @id @default(autoincrement())
-  user                         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId                       Int
+  id     Int  @id @default(autoincrement())
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int
 
-  previousRankName             String?
-  newRankName                  String
+  previousRankName String?
+  newRankName      String
 
   attendanceTotalAtChange      Int
   attendanceDeltaSinceLastRank Int
 
-  triggeredBy                  String    @db.VarChar(20)
-  triggeredByUserId            Int?
-  triggeredByDiscordId         String?
+  triggeredBy          String  @db.VarChar(20)
+  triggeredByUserId    Int?
+  triggeredByDiscordId String?
 
-  outcome                      String?   @db.VarChar(20)
-  declineReason                String?
-  note                         String?
+  outcome       String? @db.VarChar(20)
+  declineReason String?
+  note          String?
 
-  createdAt                    DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([createdAt])
@@ -685,27 +866,27 @@ model RankHistory {
 }
 
 model RankTransitionRequirement {
-  id                Int       @id @default(autoincrement())
-  targetRank        Rank      @relation(fields: [targetRankId], references: [id], onDelete: Cascade)
-  targetRankId      Int
+  id           Int  @id @default(autoincrement())
+  targetRank   Rank @relation(fields: [targetRankId], references: [id], onDelete: Cascade)
+  targetRankId Int
 
   requiredTrainings Training[] @relation("RankTransitionRequirement")
 
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([targetRankId])
   @@index([targetRankId])
 }
 
 model TrainingRankRequirement {
-  id              Int       @id @default(autoincrement())
-  training        Training  @relation(fields: [trainingId], references: [id], onDelete: Cascade)
-  trainingId      Int
-  minimumRank     Rank?     @relation(fields: [minimumRankId], references: [id], onDelete: SetNull)
-  minimumRankId   Int?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id            Int      @id @default(autoincrement())
+  training      Training @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  trainingId    Int
+  minimumRank   Rank?    @relation(fields: [minimumRankId], references: [id], onDelete: SetNull)
+  minimumRankId Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@unique([trainingId])
   @@index([trainingId])
@@ -713,13 +894,13 @@ model TrainingRankRequirement {
 }
 
 model TrainingTrainingRequirement {
-  id                   Int       @id @default(autoincrement())
-  training             Training  @relation("RequiresTutorial", fields: [trainingId], references: [id], onDelete: Cascade)
-  trainingId           Int
-  requiredTraining     Training  @relation("RequiredBy", fields: [requiredTrainingId], references: [id], onDelete: Cascade)
-  requiredTrainingId   Int
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  id                 Int      @id @default(autoincrement())
+  training           Training @relation("RequiresTutorial", fields: [trainingId], references: [id], onDelete: Cascade)
+  trainingId         Int
+  requiredTraining   Training @relation("RequiredBy", fields: [requiredTrainingId], references: [id], onDelete: Cascade)
+  requiredTrainingId Int
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   @@unique([trainingId, requiredTrainingId])
   @@index([trainingId])
@@ -727,16 +908,16 @@ model TrainingTrainingRequirement {
 }
 
 model PromotionProposal {
-  id                           Int       @id @default(autoincrement())
-  user                         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                           Int      @id @default(autoincrement())
+  user                         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId                       Int
   currentRankId                Int
   nextRankId                   Int
   attendanceTotalAtProposal    Int
   attendanceDeltaSinceLastRank Int
-  status                       String    @db.VarChar(20)
-  createdAt                    DateTime  @default(now())
-  updatedAt                    DateTime  @updatedAt
+  status                       String   @db.VarChar(20)
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
 
   @@unique([userId, nextRankId])
   @@index([userId])
@@ -744,20 +925,20 @@ model PromotionProposal {
 }
 
 model LegacyUserData {
-  id                    Int       @id @default(autoincrement())
-  legacyId              String    // ID from CSV
-  discordUsername       String    // NAME from CSV
-  rankName              String    // Rank from CSV
-  dateJoined            String?   // Date Joined from CSV (string as dates vary in format)
-  tigSinceLastPromo     Int       // TIG Since Last Promo from CSV - becomes attendanceSinceLastRank
-  totalTig              Int       // TOTAL TIG from CSV (appears unused but stored)
-  oldData               Int       // Old Data from CSV - historical attendance to preserve
-  mappedUser            User?     @relation(fields: [mappedUserId], references: [id], onDelete: SetNull)
-  mappedUserId          Int?
-  isMapped              Boolean   @default(false)
-  isApplied             Boolean   @default(false) // Whether this legacy data has been applied to UserRank
-  importedAt            DateTime  @default(now())
-  notes                 String?   // For tracking import issues or manual adjustments
+  id                Int      @id @default(autoincrement())
+  legacyId          String // ID from CSV
+  discordUsername   String // NAME from CSV
+  rankName          String // Rank from CSV
+  dateJoined        String? // Date Joined from CSV (string as dates vary in format)
+  tigSinceLastPromo Int // TIG Since Last Promo from CSV - becomes attendanceSinceLastRank
+  totalTig          Int // TOTAL TIG from CSV (appears unused but stored)
+  oldData           Int // Old Data from CSV - historical attendance to preserve
+  mappedUser        User?    @relation(fields: [mappedUserId], references: [id], onDelete: SetNull)
+  mappedUserId      Int?
+  isMapped          Boolean  @default(false)
+  isApplied         Boolean  @default(false) // Whether this legacy data has been applied to UserRank
+  importedAt        DateTime @default(now())
+  notes             String? // For tracking import issues or manual adjustments
 
   @@index([discordUsername])
   @@index([isMapped])
@@ -767,17 +948,15 @@ model LegacyUserData {
 }
 
 model BotToken {
-  id          Int      @id @default(autoincrement())
-  name        String   // Token name/identifier (e.g., "Main Bot", "Backup Bot")
-  token       String   @unique // The actual token value
-  isActive    Boolean  @default(true) // Allow enabling/disabling tokens
-  createdAt   DateTime @default(now())
+  id          Int       @id @default(autoincrement())
+  name        String // Token name/identifier (e.g., "Main Bot", "Backup Bot")
+  token       String    @unique // The actual token value
+  isActive    Boolean   @default(true) // Allow enabling/disabling tokens
+  createdAt   DateTime  @default(now())
   lastUsedAt  DateTime? // Track when token was last used
-  createdBy   User?    @relation(fields: [createdById], references: [id])
+  createdBy   User?     @relation(fields: [createdById], references: [id])
   createdById Int?
 
   @@index([token])
   @@index([isActive])
 }
-
-

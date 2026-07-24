@@ -24,17 +24,6 @@ type MergeSummary = {
   remainingSourceReferences: number;
 };
 
-type UserForeignKeyReference = {
-  tableName: string;
-  columnName: string;
-};
-
-type RemainingReference = {
-  tableName: string;
-  columnName: string;
-  rowCount: bigint;
-};
-
 function getCsrfCookieToken(request: NextRequest) {
   const cookieValue =
     request.cookies.get('__Host-next-auth.csrf-token')?.value ??
@@ -67,86 +56,6 @@ function hasValidCsrfToken(request: NextRequest) {
   }
 
   return diff === 0;
-}
-
-function quoteIdentifier(identifier: string) {
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(identifier)) {
-    throw new Error(`Unsafe identifier: ${identifier}`);
-  }
-
-  return `"${identifier}"`;
-}
-
-async function getUserForeignKeyReferences(tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) {
-  const rows = await tx.$queryRaw<Array<UserForeignKeyReference>>`
-    SELECT
-      tc.table_name AS "tableName",
-      kcu.column_name AS "columnName"
-    FROM information_schema.table_constraints tc
-    JOIN information_schema.key_column_usage kcu
-      ON tc.constraint_name = kcu.constraint_name
-      AND tc.table_schema = kcu.table_schema
-    JOIN information_schema.constraint_column_usage ccu
-      ON tc.constraint_name = ccu.constraint_name
-      AND tc.table_schema = ccu.table_schema
-    WHERE tc.constraint_type = 'FOREIGN KEY'
-      AND tc.table_schema = 'public'
-      AND ccu.table_schema = 'public'
-      AND ccu.table_name = 'User'
-      AND ccu.column_name = 'id'
-  `;
-
-  return rows.filter((row) => row.tableName !== 'User');
-}
-
-async function moveAllUserReferences(
-  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
-  references: UserForeignKeyReference[],
-  sourceUserId: number,
-  targetUserId: number
-) {
-  let movedReferenceRows = 0;
-
-  for (const reference of references) {
-    const tableName = quoteIdentifier(reference.tableName);
-    const columnName = quoteIdentifier(reference.columnName);
-    const updatedRows = await tx.$executeRawUnsafe(
-      `UPDATE ${tableName} SET ${columnName} = $1 WHERE ${columnName} = $2`,
-      targetUserId,
-      sourceUserId
-    );
-    movedReferenceRows += Number(updatedRows);
-  }
-
-  return movedReferenceRows;
-}
-
-async function countRemainingSourceReferences(
-  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
-  references: UserForeignKeyReference[],
-  sourceUserId: number
-) {
-  const remaining: RemainingReference[] = [];
-
-  for (const reference of references) {
-    const tableName = quoteIdentifier(reference.tableName);
-    const columnName = quoteIdentifier(reference.columnName);
-    const rows = await tx.$queryRawUnsafe<Array<{ rowCount: bigint }>>(
-      `SELECT COUNT(*)::bigint AS "rowCount" FROM ${tableName} WHERE ${columnName} = $1`,
-      sourceUserId
-    );
-
-    const rowCount = rows[0]?.rowCount ?? BigInt(0);
-    if (rowCount > BigInt(0)) {
-      remaining.push({
-        tableName: reference.tableName,
-        columnName: reference.columnName,
-        rowCount,
-      });
-    }
-  }
-
-  return remaining;
 }
 
 export async function POST(request: NextRequest) {
@@ -210,9 +119,6 @@ export async function POST(request: NextRequest) {
         remainingSourceReferences: 0,
       };
 
-      const userForeignKeyReferences = await getUserForeignKeyReferences(tx);
-      result.updatedReferenceColumns = userForeignKeyReferences.length;
-
       const [sourceAccounts, targetAccounts] = await Promise.all([
         tx.authAccount.findMany({ where: { userId: sourceUserId } }),
         tx.authAccount.findMany({ where: { userId: targetUserId } }),
@@ -241,13 +147,19 @@ export async function POST(request: NextRequest) {
         targetPromotionProposals,
         targetAttendanceNotes,
         targetMessageRecipients,
+        targetTrainingSessionAttendances,
+        targetTrainingReadStates,
+        targetTrainingSubscriptions,
       ] = await Promise.all([
         tx.signup.findMany({ where: { userId: targetUserId }, select: { slotId: true } }),
-        tx.userTraining.findMany({ where: { userId: targetUserId }, select: { trainingId: true } }),
+        tx.userTraining.findMany({ where: { userId: targetUserId } }),
         tx.userPermission.findMany({ where: { userId: targetUserId }, select: { permissionId: true } }),
         tx.promotionProposal.findMany({ where: { userId: targetUserId }, select: { nextRankId: true } }),
         tx.orbatAttendanceNote.findMany({ where: { userId: targetUserId }, select: { orbatId: true } }),
         tx.messageRecipient.findMany({ where: { userId: targetUserId }, select: { messageId: true } }),
+        tx.trainingSessionAttendee.findMany({ where: { userId: targetUserId } }),
+        tx.trainingRequestReadState.findMany({ where: { userId: targetUserId } }),
+        tx.trainingRequestSubscription.findMany({ where: { userId: targetUserId } }),
       ]);
 
       if (targetSignups.length > 0) {
@@ -271,12 +183,118 @@ export async function POST(request: NextRequest) {
             userId: sourceUserId,
             trainingId: { in: targetTrainings.map((row) => row.trainingId) },
           },
-          select: { id: true },
         });
 
         if (duplicateRows.length > 0) {
-          await tx.userTraining.deleteMany({ where: { id: { in: duplicateRows.map((row) => row.id) } } });
+          const statusPriority = {
+            failed: 0,
+            approved: 1,
+            in_training: 2,
+            finished: 3,
+            needs_qualify: 4,
+            qualified: 5,
+          } as const;
+
+          for (const sourceTraining of duplicateRows) {
+            const targetTraining = targetTrainings.find(
+              (row) => row.trainingId === sourceTraining.trainingId,
+            );
+            if (!targetTraining) continue;
+
+            if (statusPriority[sourceTraining.status] > statusPriority[targetTraining.status]) {
+              await tx.userTraining.update({
+                where: { id: targetTraining.id },
+                data: {
+                  status: sourceTraining.status,
+                  trainerId: sourceTraining.trainerId ?? targetTraining.trainerId,
+                  completedAt: sourceTraining.completedAt,
+                  needsRetraining: sourceTraining.needsRetraining,
+                  isHidden: targetTraining.isHidden && sourceTraining.isHidden,
+                  notes: sourceTraining.notes ?? targetTraining.notes,
+                  trainingSessionCompletedAt: sourceTraining.trainingSessionCompletedAt ?? targetTraining.trainingSessionCompletedAt,
+                  orbatQualifiedAt: sourceTraining.orbatQualifiedAt ?? targetTraining.orbatQualifiedAt,
+                  failedAt: sourceTraining.failedAt ?? targetTraining.failedAt,
+                  statusUpdatedAt: sourceTraining.statusUpdatedAt,
+                },
+              });
+            }
+
+            await tx.userTrainingStatusHistory.updateMany({
+              where: { userTrainingId: sourceTraining.id },
+              data: { userTrainingId: targetTraining.id },
+            });
+            await tx.userTraining.delete({ where: { id: sourceTraining.id } });
+          }
           result.droppedDuplicateTrainings = duplicateRows.length;
+        }
+      }
+
+      if (targetTrainingSessionAttendances.length > 0) {
+        const sourceRows = await tx.trainingSessionAttendee.findMany({
+          where: {
+            userId: sourceUserId,
+            sessionId: { in: targetTrainingSessionAttendances.map((row) => row.sessionId) },
+          },
+        });
+        const attendeePriority = { cancelled: 0, scheduled: 1, absent: 1, attended: 2, completed: 3 } as const;
+        for (const sourceRow of sourceRows) {
+          const targetRow = targetTrainingSessionAttendances.find((row) => row.sessionId === sourceRow.sessionId);
+          if (!targetRow) continue;
+          await tx.trainingSessionAttendee.update({
+            where: { id: targetRow.id },
+            data: {
+              status: attendeePriority[sourceRow.status] > attendeePriority[targetRow.status] ? sourceRow.status : targetRow.status,
+              attendedAt: targetRow.attendedAt ?? sourceRow.attendedAt,
+              completedAt: targetRow.completedAt ?? sourceRow.completedAt,
+              notes: targetRow.notes ?? sourceRow.notes,
+              trainingRequestId: targetRow.trainingRequestId ?? sourceRow.trainingRequestId,
+            },
+          });
+          await tx.trainingSessionAttendee.delete({ where: { id: sourceRow.id } });
+        }
+      }
+
+      if (targetTrainingReadStates.length > 0) {
+        const sourceRows = await tx.trainingRequestReadState.findMany({
+          where: {
+            userId: sourceUserId,
+            requestId: { in: targetTrainingReadStates.map((row) => row.requestId) },
+          },
+        });
+        for (const sourceRow of sourceRows) {
+          const targetRow = targetTrainingReadStates.find((row) => row.requestId === sourceRow.requestId);
+          if (!targetRow) continue;
+          const useSource = Boolean(
+            sourceRow.lastReadAt && (!targetRow.lastReadAt || sourceRow.lastReadAt > targetRow.lastReadAt),
+          );
+          if (useSource) {
+            await tx.trainingRequestReadState.update({
+              where: { id: targetRow.id },
+              data: { lastReadAt: sourceRow.lastReadAt, lastReadMessageId: sourceRow.lastReadMessageId },
+            });
+          }
+          await tx.trainingRequestReadState.delete({ where: { id: sourceRow.id } });
+        }
+      }
+
+      if (targetTrainingSubscriptions.length > 0) {
+        const sourceRows = await tx.trainingRequestSubscription.findMany({
+          where: {
+            userId: sourceUserId,
+            requestId: { in: targetTrainingSubscriptions.map((row) => row.requestId) },
+          },
+        });
+        for (const sourceRow of sourceRows) {
+          const targetRow = targetTrainingSubscriptions.find((row) => row.requestId === sourceRow.requestId);
+          if (!targetRow) continue;
+          await tx.trainingRequestSubscription.update({
+            where: { id: targetRow.id },
+            data: {
+              websiteEnabled: targetRow.websiteEnabled || sourceRow.websiteEnabled,
+              discordEnabled: targetRow.discordEnabled || sourceRow.discordEnabled,
+            },
+          });
+          await tx.trainingRequestSubscription.delete({ where: { id: sourceRow.id } });
         }
       }
 
@@ -370,25 +388,42 @@ export async function POST(request: NextRequest) {
         await tx.userRank.delete({ where: { id: sourceRank.id } });
       }
 
-      result.movedReferenceRows = await moveAllUserReferences(
-        tx,
-        userForeignKeyReferences,
-        sourceUserId,
-        targetUserId
-      );
-
-      const remainingReferences = await countRemainingSourceReferences(tx, userForeignKeyReferences, sourceUserId);
-      result.remainingSourceReferences = remainingReferences.reduce(
-        (total, reference) => total + Number(reference.rowCount),
-        0
-      );
-
-      if (remainingReferences.length > 0) {
-        const details = remainingReferences
-          .map((reference) => `${reference.tableName}.${reference.columnName}=${reference.rowCount.toString()}`)
-          .join(', ');
-        throw new Error(`Unable to migrate all user references: ${details}`);
-      }
+      const movedReferences = await Promise.all([
+        tx.orbat.updateMany({ where: { createdById: sourceUserId }, data: { createdById: targetUserId } }),
+        tx.orbatTemplate.updateMany({ where: { createdById: sourceUserId }, data: { createdById: targetUserId } }),
+        tx.signup.updateMany({ where: { userId: sourceUserId }, data: { userId: targetUserId } }),
+        tx.userTraining.updateMany({ where: { userId: sourceUserId }, data: { userId: targetUserId } }),
+        tx.userTraining.updateMany({ where: { trainerId: sourceUserId }, data: { trainerId: targetUserId } }),
+        tx.userTrainingStatusHistory.updateMany({ where: { changedById: sourceUserId }, data: { changedById: targetUserId } }),
+        tx.trainingRequest.updateMany({ where: { userId: sourceUserId }, data: { userId: targetUserId } }),
+        tx.trainingRequest.updateMany({ where: { handledByAdminId: sourceUserId }, data: { handledByAdminId: targetUserId } }),
+        tx.trainingRequest.updateMany({ where: { assignedTrainerId: sourceUserId }, data: { assignedTrainerId: targetUserId } }),
+        tx.trainingSession.updateMany({ where: { trainerId: sourceUserId }, data: { trainerId: targetUserId } }),
+        tx.trainingSession.updateMany({ where: { createdById: sourceUserId }, data: { createdById: targetUserId } }),
+        tx.trainingSessionAttendee.updateMany({ where: { userId: sourceUserId }, data: { userId: targetUserId } }),
+        tx.trainingRequestMessage.updateMany({ where: { senderId: sourceUserId }, data: { senderId: targetUserId } }),
+        tx.trainingRequestReadState.updateMany({ where: { userId: sourceUserId }, data: { userId: targetUserId } }),
+        tx.trainingRequestSubscription.updateMany({ where: { userId: sourceUserId }, data: { userId: targetUserId } }),
+        tx.attendance.updateMany({ where: { userId: sourceUserId }, data: { userId: targetUserId } }),
+        tx.attendanceSession.updateMany({ where: { userId: sourceUserId }, data: { userId: targetUserId } }),
+        tx.attendanceLog.updateMany({ where: { changedById: sourceUserId }, data: { changedById: targetUserId } }),
+        tx.attendanceEvent.updateMany({ where: { userId: sourceUserId }, data: { userId: targetUserId } }),
+        tx.legacyAttendanceData.updateMany({ where: { mappedUserId: sourceUserId }, data: { mappedUserId: targetUserId } }),
+        tx.legacyUserData.updateMany({ where: { mappedUserId: sourceUserId }, data: { mappedUserId: targetUserId } }),
+        tx.message.updateMany({ where: { createdById: sourceUserId }, data: { createdById: targetUserId } }),
+        tx.messageRecipient.updateMany({ where: { userId: sourceUserId }, data: { userId: targetUserId } }),
+        tx.rankHistory.updateMany({ where: { userId: sourceUserId }, data: { userId: targetUserId } }),
+        tx.promotionProposal.updateMany({ where: { userId: sourceUserId }, data: { userId: targetUserId } }),
+        tx.userPermission.updateMany({ where: { userId: sourceUserId }, data: { userId: targetUserId } }),
+        tx.permissionAuditLog.updateMany({ where: { actorId: sourceUserId }, data: { actorId: targetUserId } }),
+        tx.permissionAuditLog.updateMany({ where: { targetUserId: sourceUserId }, data: { targetUserId } }),
+        tx.squadRoleAuditLog.updateMany({ where: { changedById: sourceUserId }, data: { changedById: targetUserId } }),
+        tx.leaveOfAbsence.updateMany({ where: { userId: sourceUserId }, data: { userId: targetUserId } }),
+        tx.botToken.updateMany({ where: { createdById: sourceUserId }, data: { createdById: targetUserId } }),
+        tx.orbatAttendanceNote.updateMany({ where: { userId: sourceUserId }, data: { userId: targetUserId } }),
+      ]);
+      result.updatedReferenceColumns = movedReferences.length;
+      result.movedReferenceRows = movedReferences.reduce((total, update) => total + update.count, 0);
 
       await tx.user.delete({ where: { id: sourceUserId } });
 

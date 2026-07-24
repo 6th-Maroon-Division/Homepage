@@ -22,6 +22,12 @@ async function main() {
   await prisma.squadRoleAuditLog.deleteMany();
   await prisma.permissionAuditLog.deleteMany();
   await prisma.userPermission.deleteMany();
+  await prisma.trainingRequestReadState.deleteMany();
+  await prisma.trainingRequestSubscription.deleteMany();
+  await prisma.trainingRequestMessage.deleteMany();
+  await prisma.userTrainingStatusHistory.deleteMany();
+  await prisma.trainingSessionAttendee.deleteMany();
+  await prisma.trainingSession.deleteMany();
   await prisma.messageRecipient.deleteMany();
   await prisma.message.deleteMany();
   await prisma.attendanceLog.deleteMany();
@@ -127,17 +133,98 @@ async function main() {
     }),
   ]);
 
+  const seededTrainingCompletionAt = new Date();
+
   await prisma.userTraining.createMany({
     data: [
-      { userId: alice.id, trainingId: basicCombat.id, trainerId: admin.id, notes: 'Qualified on rifle drills' },
-      { userId: bob.id, trainingId: basicCombat.id, trainerId: admin.id },
-      { userId: charlie.id, trainingId: basicCombat.id, trainerId: admin.id },
-      { userId: diana.id, trainingId: basicCombat.id, trainerId: admin.id },
-      { userId: diana.id, trainingId: leadershipTraining.id, trainerId: admin.id },
-      { userId: diana.id, trainingId: medicalTraining.id, trainerId: admin.id },
-      { userId: ethan.id, trainingId: basicCombat.id, trainerId: diana.id },
-      { userId: ethan.id, trainingId: sniperTraining.id, trainerId: diana.id },
-      { userId: farah.id, trainingId: basicCombat.id, trainerId: diana.id, needsRetraining: true },
+      {
+        userId: alice.id,
+        trainingId: basicCombat.id,
+        trainerId: admin.id,
+        status: 'qualified',
+        needsRetraining: false,
+        trainingSessionCompletedAt: seededTrainingCompletionAt,
+        notes: 'Qualified on rifle drills',
+      },
+      {
+        userId: bob.id,
+        trainingId: basicCombat.id,
+        trainerId: admin.id,
+        status: 'qualified',
+        needsRetraining: false,
+        trainingSessionCompletedAt: seededTrainingCompletionAt,
+      },
+      {
+        userId: charlie.id,
+        trainingId: basicCombat.id,
+        trainerId: admin.id,
+        status: 'qualified',
+        needsRetraining: false,
+        trainingSessionCompletedAt: seededTrainingCompletionAt,
+      },
+      {
+        userId: diana.id,
+        trainingId: basicCombat.id,
+        trainerId: admin.id,
+        status: 'qualified',
+        needsRetraining: false,
+        trainingSessionCompletedAt: seededTrainingCompletionAt,
+      },
+      {
+        userId: diana.id,
+        trainingId: leadershipTraining.id,
+        trainerId: admin.id,
+        status: 'qualified',
+        needsRetraining: false,
+        trainingSessionCompletedAt: seededTrainingCompletionAt,
+      },
+      {
+        userId: diana.id,
+        trainingId: medicalTraining.id,
+        trainerId: admin.id,
+        status: 'qualified',
+        needsRetraining: false,
+        trainingSessionCompletedAt: seededTrainingCompletionAt,
+      },
+      {
+        userId: ethan.id,
+        trainingId: basicCombat.id,
+        trainerId: diana.id,
+        status: 'qualified',
+        needsRetraining: false,
+        trainingSessionCompletedAt: seededTrainingCompletionAt,
+      },
+      {
+        userId: ethan.id,
+        trainingId: sniperTraining.id,
+        trainerId: diana.id,
+        status: 'qualified',
+        needsRetraining: false,
+        trainingSessionCompletedAt: seededTrainingCompletionAt,
+      },
+      {
+        userId: farah.id,
+        trainingId: basicCombat.id,
+        trainerId: diana.id,
+        status: 'failed',
+        needsRetraining: true,
+        failedAt: seededTrainingCompletionAt,
+      },
+      {
+        userId: farah.id,
+        trainingId: medicalTraining.id,
+        trainerId: admin.id,
+        status: 'approved',
+        needsRetraining: false,
+      },
+      {
+        userId: bob.id,
+        trainingId: medicalTraining.id,
+        trainerId: admin.id,
+        status: 'qualified',
+        needsRetraining: false,
+        trainingSessionCompletedAt: seededTrainingCompletionAt,
+      },
     ],
     skipDuplicates: true,
   });
@@ -633,9 +720,9 @@ async function main() {
       {
         userId: bob.id,
         trainingId: medicalTraining.id,
-        status: 'completed',
+        status: 'qualified',
         requestMessage: 'Completed practical exam last week.',
-        adminResponse: 'Recorded as completed.',
+        adminResponse: 'Recorded as qualified.',
         handledByAdminId: admin.id,
       },
     ],

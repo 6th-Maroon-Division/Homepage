@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
+import OrbatQualificationPanel from '@/app/components/trainings/OrbatQualificationPanel';
 
 type ClientSignup = {
   id: number;
@@ -41,6 +42,14 @@ type ClientSquad = {
   name: string;
   orderIndex: number;
   slots: ClientSlot[];
+};
+
+type ClientSlotEligibility = {
+  allowed: boolean;
+  temporary: boolean;
+  temporaryTrainings: { id: number; name: string }[];
+  error: string | null;
+  code: string | null;
 };
 
 type ClientFrequency = {
@@ -261,6 +270,7 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
   const [orbat, setOrbat] = useState<ClientOrbat>(initialOrbat);
   const [loadingSubslotId, setLoadingSubslotId] = useState<number | null>(null);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [slotEligibility, setSlotEligibility] = useState<Record<number, ClientSlotEligibility>>({});
   const [isStreamConnected, setIsStreamConnected] = useState(false);
   const [noteStatus, setNoteStatus] = useState<'absent' | 'unsure' | 'late_unsure'>('absent');
   const [noteReason, setNoteReason] = useState('');
@@ -332,6 +342,17 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
         // Ignore error - user might not be logged in
       });
   }, []);
+
+  useEffect(() => {
+    fetch(`/api/orbats/${initialOrbat.id}/eligibility`, { cache: 'no-store' })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: { eligibility?: Record<number, ClientSlotEligibility> } | null) => {
+        if (payload?.eligibility) setSlotEligibility(payload.eligibility);
+      })
+      .catch(() => {
+        // Anonymous visitors and transient failures simply get the normal slot UI.
+      });
+  }, [initialOrbat.id]);
 
   useEffect(() => {
     if (!myAttendanceNote) {
@@ -701,6 +722,11 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
                   .map((rank) => `[${rank.abbreviation}] ${rank.name}`)
                   .join(', ');
                 const hasPrerequisites = !!(trainingNames || rankNames);
+                const eligibility = slotEligibility[slot.id];
+                const temporaryTrainingNames = eligibility?.temporaryTrainings.map((training) => training.name) ?? [];
+                const temporaryAccessTooltip = eligibility?.allowed && eligibility.temporary
+                  ? 'You have temporary access. Demonstrate skills during ORBAT for full qualification.'
+                  : undefined;
 
                 return (
                   <li
@@ -737,6 +763,16 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
                         </div>
                       )}
 
+                      {temporaryAccessTooltip && (
+                        <div
+                          className="mt-1 text-xs font-semibold"
+                          style={{ color: '#ea580c' }}
+                          title={temporaryAccessTooltip}
+                        >
+                          Qualification Pending — temporary access for {temporaryTrainingNames.join(', ')}
+                        </div>
+                      )}
+
                       {/* Show full/unfull status */}
                       {isFull && (
                         <div className="text-xs mt-1 font-semibold" style={{ color: '#f59e0b' }}>
@@ -755,6 +791,7 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
                         type="button"
                         onClick={() => handleSignup(slot.id)}
                         disabled={loadingSubslotId === slot.id}
+                        title={temporaryAccessTooltip}
                         className="mt-1 sm:mt-0 inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
                         style={{ borderColor: 'var(--border)', color: 'var(--foreground)' }}
                       >
@@ -794,6 +831,8 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
           </article>
         );})}
       </section>
+
+      <OrbatQualificationPanel orbatId={orbat.id} />
 
       {/* Absent / Late-Unsure Section */}
       <section className="rounded-lg border p-4 space-y-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
