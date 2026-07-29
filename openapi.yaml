@@ -1134,6 +1134,14 @@ paths:
           description: ORBAT not found
         "500":
           description: Internal server error
+  /bot/training-reminders:
+    post:
+      tags:
+        - TODO
+      summary: TODO document POST /bot/training-reminders
+      responses:
+        "200":
+          description: Success
   /bot/users:
     get:
       tags:
@@ -1477,6 +1485,14 @@ paths:
       responses:
         "201":
           description: Attendance ingested
+  /orbats/{id}/eligibility:
+    get:
+      tags:
+        - TODO
+      summary: TODO document GET /orbats/{id}/eligibility
+      responses:
+        "200":
+          description: Success
   /orbats/{id}/events:
     get:
       tags:
@@ -1506,6 +1522,29 @@ paths:
           description: Full ORBAT with signups
         "404":
           description: ORBAT not found
+  /orbats/{id}/qualifications:
+    get:
+      tags:
+        - TODO
+      summary: TODO document GET /orbats/{id}/qualifications
+      responses:
+        "200":
+          description: Success
+    put:
+      tags:
+        - TODO
+      summary: TODO document PUT /orbats/{id}/qualifications
+      responses:
+        "200":
+          description: Success
+  /orbats/{id}/qualifications/assign:
+    post:
+      tags:
+        - TODO
+      summary: TODO document POST /orbats/{id}/qualifications/assign
+      responses:
+        "200":
+          description: Success
   /orbats/{id}/signups:
     post:
       tags:
@@ -1590,6 +1629,36 @@ paths:
             text/event-stream:
               schema:
                 type: object
+  /permissions/templates:
+    get:
+      tags:
+        - TODO
+      summary: TODO document GET /permissions/templates
+      responses:
+        "200":
+          description: Success
+    post:
+      tags:
+        - TODO
+      summary: TODO document POST /permissions/templates
+      responses:
+        "200":
+          description: Success
+  /permissions/templates/{id}:
+    put:
+      tags:
+        - TODO
+      summary: TODO document PUT /permissions/templates/{id}
+      responses:
+        "200":
+          description: Success
+    delete:
+      tags:
+        - TODO
+      summary: TODO document DELETE /permissions/templates/{id}
+      responses:
+        "200":
+          description: Success
   /radio-frequencies:
     get:
       tags:
@@ -2136,6 +2205,128 @@ paths:
       responses:
         "200":
           description: Success
+    get:
+      tags:
+        - TODO
+      summary: TODO document GET /training-requests/{id}
+      responses:
+        "200":
+          description: Success
+  /training-requests/{id}/events:
+    get:
+      tags:
+        - TODO
+      summary: TODO document GET /training-requests/{id}/events
+      responses:
+        "200":
+          description: Success
+  /training-requests/{id}/messages:
+    get:
+      tags:
+        - TODO
+      summary: TODO document GET /training-requests/{id}/messages
+      responses:
+        "200":
+          description: Success
+    post:
+      tags:
+        - TODO
+      summary: TODO document POST /training-requests/{id}/messages
+      responses:
+        "200":
+          description: Success
+  /training-requests/{id}/schedule:
+    put:
+      tags:
+        - TODO
+      summary: TODO document PUT /training-requests/{id}/schedule
+      responses:
+        "200":
+          description: Success
+  /training-requests/{id}/subscription:
+    get:
+      tags:
+        - TODO
+      summary: TODO document GET /training-requests/{id}/subscription
+      responses:
+        "200":
+          description: Success
+    put:
+      tags:
+        - TODO
+      summary: TODO document PUT /training-requests/{id}/subscription
+      responses:
+        "200":
+          description: Success
+  /training-sessions:
+    get:
+      tags:
+        - TODO
+      summary: TODO document GET /training-sessions
+      responses:
+        "200":
+          description: Success
+    post:
+      tags:
+        - TODO
+      summary: TODO document POST /training-sessions
+      responses:
+        "200":
+          description: Success
+  /training-sessions/{id}:
+    get:
+      tags:
+        - TODO
+      summary: TODO document GET /training-sessions/{id}
+      responses:
+        "200":
+          description: Success
+    put:
+      tags:
+        - TODO
+      summary: TODO document PUT /training-sessions/{id}
+      responses:
+        "200":
+          description: Success
+  /training-sessions/{id}/attendees:
+    post:
+      tags:
+        - TODO
+      summary: TODO document POST /training-sessions/{id}/attendees
+      responses:
+        "200":
+          description: Success
+  /training-sessions/{id}/attendees/{attendeeId}:
+    put:
+      tags:
+        - TODO
+      summary: TODO document PUT /training-sessions/{id}/attendees/{attendeeId}
+      responses:
+        "200":
+          description: Success
+    delete:
+      tags:
+        - TODO
+      summary: TODO document DELETE /training-sessions/{id}/attendees/{attendeeId}
+      responses:
+        "200":
+          description: Success
+  /training-staff:
+    get:
+      tags:
+        - TODO
+      summary: TODO document GET /training-staff
+      responses:
+        "200":
+          description: Success
+  /training-users:
+    get:
+      tags:
+        - TODO
+      summary: TODO document GET /training-users
+      responses:
+        "200":
+          description: Success
   /trainings:
     get:
       tags:
@@ -2322,6 +2513,14 @@ paths:
       tags:
         - TODO
       summary: TODO document PUT /user-trainings/{id}
+      responses:
+        "200":
+          description: Success
+  /user-trainings/bulk-status:
+    post:
+      tags:
+        - TODO
+      summary: TODO document POST /user-trainings/bulk-status
       responses:
         "200":
           description: Success
