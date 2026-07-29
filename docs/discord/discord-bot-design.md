@@ -1,722 +1,497 @@
-# 6MD Discord Bot Design Document
+# 6MD Discord Bot Design
 
-## Overview
+## 1. Document purpose
 
-This document describes the design for a C# .NET 10 Discord bot that integrates with the 6MD Management Platform API to provide automated announcements, user management, and attendance tracking for the 6th Maroon Division Discord server.
+This document is the implementation specification for the 6MD Discord bot. It defines product behavior, system ownership, Discord interactions, background processing, failure handling, security, and deployment.
 
-### Purpose
+API availability and required web-platform changes are tracked separately in [API gaps and contracts](./api-missing-features.md). That document is authoritative for whether an endpoint exists today.
 
-The bot serves as the primary integration point between the Discord server and the web application, providing:
-- Automated ORBAT announcements
-- User signup management for operation slots
-- Attendance compilation
-- Training and promotion notifications
-- Discord nickname synchronization with web ranks and usernames
+### Goals
 
-### Target Environment
+The bot integrates one Discord guild with the 6MD Management Platform and provides:
 
-- **Language**: C# .NET 10
-- **Platform**: External application (not part of the web app)
-- **Deployment**: Single production server + test server for development
-- **Discord Library**: Discord.NET (recommended)
+- ORBAT announcements with website links and interactive signup
+- Signup creation, change, and cancellation against the website database
+- Operation availability notes such as absent, unsure, late, and leaving early
+- Attendance compilation scheduling
+- Training and ORBAT notification preferences
+- Administrator approval of non-automatic promotions
+- Promotion announcements
+- Discord nickname and rank-role reconciliation
 
-### Clarification
-As per user specification: "another information the updating of the username should be done in discord" - this means the bot should update the Discord server **nickname** (display name within the server), not the Discord username (which users control themselves).
+### Non-goals
 
-**Additional Requirements:**
-1. Admins should approve non-auto promotions in an admin-only channel; if declined, reset attendance counter to current attendance (using existing implementation)
-2. Interactive signup button that shows a private message with slot selection buttons
-3. Attendance status buttons (absent, late, goes early, unsure)
-4. Training notification settings (toggle Discord notifications)
-5. Discord role synchronization - when promotion is applied (both auto and manual), assign new rank role and remove old rank role
-6. Nickname should update synchronously when promotion is applied (both auto and manual)
-7. ORBAT announcements must include a direct link to the ORBAT on the website
-8. Prevent double signups - Discord signups must update website signups (and vice versa) to maintain a single source of truth
-9. Rank-to-Discord-role mapping is managed in the web application (not in bot config), bot fetches mappings from `/bot/ranks/discord-roles`
+- The bot does not change a Discord account username. It only changes the member's guild nickname.
+- The bot is not the source of truth for users, ranks, signups, attendance, notification preferences, or rank-role mappings.
+- The bot does not independently decide promotion eligibility.
+- The bot does not infer final attendance outcomes from availability buttons. The web platform compiles attendance.
 
----
+## 2. Architecture decisions
 
-## Architecture
+### 2.1 Sources of truth
 
-### Component Diagram
+| Data | Authoritative owner | Bot storage |
+|---|---|---|
+| Users, linked Discord IDs, ranks | Web platform | Read-through cache only |
+| ORBATs, slots, signups | Web platform | Message references and cache only |
+| Attendance notes and compiled attendance | Web platform | None |
+| Notification preferences | Web platform | Cache only |
+| Rank-to-Discord-role mappings | Web platform | One-hour cache |
+| Discord message IDs and interaction state | Bot | Durable SQLite database |
+| Event cursor and processed event IDs | Bot | Durable SQLite database |
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      Discord Bot Application                        │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐     │
-│  │  Schedulers  │    │   Commands   │    │   Services   │     │
-│  │              │    │              │    │              │     │
-│  │ - ORBAT      │    │ - signup     │    │ - API        │     │
-│  │   Announce   │    │ - training   │    │   Client     │     │
-│  │ - Attendance │    │ - notify    │    │ - User      │     │
-│  │   Compile   │    │ - nickname   │    │   Sync       │     │
-│  │ - Training   │    │              │    │ - Message    │     │
-│  │   Reminder  │    │              │    │   Handler    │     │
-│  └──────────────┘    └──────────────┘    └──────────────┘     │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │                    Discord.NET Client                        ││
-│  └─────────────────────────────────────────────────────────────┘│
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                 6MD Management Platform API                        │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐               │
-│  │  /bot/*     │  │  /orbats    │  │ /ranks/p... │               │
-│  │  /users    │  │  /signups   │  │ /promotions │               │
-│  │  /events   │  │  /attendance│  │             │               │
-│  └─────────────┘  └─────────────┘  └─────────────┘               │
-└─────────────────────────────────────────────────────────────────┘
-```
+SQLite is operational bot state, not an alternative business-data store. A temporary workaround that stores business data in SQLite must be explicitly approved and recorded in the API gap tracker.
 
-### Project Structure
+### 2.2 Event delivery
 
-```
-6MD-DiscordBot/
-├── src/
-│   ├── Config/
-│   │   ├── AppConfig.cs          # Configuration model
-│   │   └── ConfigLoader.cs       # Configuration loading
-│   ├── Services/
-│   │   ├── ApiClient.cs          # API client wrapper
-│   │   ├── OrbatService.cs       # ORBAT-related operations
-│   │   ├── SignupService.cs      # Signup management
-│   │   ├── AttendanceService.cs  # Attendance compilation
-│   │   ├── PromotionService.cs   # Promotion handling
-│   │   ├── TrainingService.cs     # Training notifications
-│   │   ├── UserSyncService.cs    # Discord-Web user sync
-│   │   └── NotificationService.cs# Notification management
-│   ├── Schedulers/
-│   │   ├── OrbatAnnouncementScheduler.cs
-│   │   ├── AttendanceCompilationScheduler.cs
-│   │   └── TrainingReminderScheduler.cs
-│   ├── Commands/
-│   │   ├── SignupCommands.cs
-│   │   ├── TrainingCommands.cs
-│   │   ├── PromotionCommands.cs
-│   │   └── AdminCommands.cs
-│   ├── Handlers/
-│   │   ├── MessageHandler.cs     # Message response handling
-│   │   └── TrainingResponseHandler.cs
-│   ├── Models/
-│   │   ├── ApiModels/            # API request/response models
-│   │   └── BotModels/            # Bot-specific models
-│   └── Program.cs                # Entry point
-├── appsettings.json
-├── appsettings.Development.json
-└── 6MD-DiscordBot.csproj
+The target event model is:
+
+- A bot-authenticated SSE stream is the primary near-real-time delivery mechanism.
+- Scheduled polling is the recovery and reconciliation mechanism.
+- Event handlers are idempotent and persist their last processed event ID.
+- The design does not require webhooks. Webhooks may be reconsidered if the bot later runs behind a stable public HTTPS endpoint.
+
+SSE is delivery-at-least-once, not exactly-once. Every event must have a stable ID, type, occurrence time, and payload. Reprocessing the same event must be safe.
+
+### 2.3 Consistency model
+
+Discord changes cannot participate in a database transaction with the web platform. “Immediate” or “near-real-time” means that the bot attempts the Discord update as soon as it receives the applied event. It does not mean atomic or guaranteed synchronous completion.
+
+The web-platform change remains authoritative if Discord is unavailable. Failed Discord changes enter a retry queue and are corrected by periodic reconciliation.
+
+### 2.4 Discord interaction model
+
+Slash commands and message components are the primary interface. Prefix commands may be retained temporarily for compatibility, but new functionality should use application commands because they provide typed parameters, discovery, and native ephemeral responses.
+
+## 3. System overview
+
+```text
+Discord member
+    |
+    v
+Discord application commands, buttons, and modals
+    |
+    v
+6MD bot
+    |-- interaction handlers
+    |-- API client
+    |-- SSE consumers
+    |-- scheduled reconciliation
+    |-- SQLite operational state
+    |
+    v
+6MD Management Platform API and database
 ```
 
----
+### Suggested bot project structure
 
-## Configuration
+```text
+6MD.DiscordBot/
+|-- Commands/
+|-- Components/
+|-- Configuration/
+|-- Events/
+|-- Jobs/
+|-- Models/
+|-- Persistence/
+|-- Services/
+|-- Program.cs
+`-- 6MD.DiscordBot.csproj
+```
 
-**IMPORTANT:** The bot API token can ONLY be created by a user with `system:super_admin` permission in the web application. All `/bot/*` endpoints require this token for authentication.
+Recommended services include `PlatformApiClient`, `OrbatAnnouncementService`, `SignupService`, `AttendanceService`, `PromotionService`, `NotificationService`, `DiscordUserSyncService`, and `ReconciliationService`.
 
-### Required Configuration Values
+## 4. Configuration
+
+Secrets must be supplied through environment variables or a deployment secret store. Snowflake IDs may be supplied through normal configuration.
 
 ```json
 {
   "Discord": {
-    "Token": "<discord-bot-token>",
-    "GuildId": "<main-server-id>",
-    "TestGuildId": "<test-server-id>",
-    "CommandPrefix": "!",
+    "GuildId": "<guild-id>",
     "AdminRoleId": "<admin-role-id>",
-    "AdminChannelId": "<admin-only-channel-id>",
-    "TrainingChatChannelId": "<training-chat-channel-id>",
-    "AnnouncementChannelId": "<announcements-channel-id>"
+    "AdminChannelId": "<admin-channel-id>",
+    "AnnouncementChannelId": "<announcement-channel-id>",
+    "TrainingChannelId": "<training-channel-id>"
   },
-  "Api": {
-    "BaseUrl": "https://orbat.6md.net/api",
-    "BotToken": "<bot-api-token-from-admin>",
+  "Platform": {
+    "ApiBaseUrl": "https://orbat.6md.net/api",
+    "WebsiteBaseUrl": "https://orbat.6md.net",
     "TimeoutSeconds": 30
   },
-  "Schedulers": {
-    "AttendanceCompileTime": "01:00:00"
+  "Jobs": {
+    "AttendanceCompileTimeUtc": "01:00:00",
+    "ReconciliationIntervalMinutes": 60,
+    "PromotionFallbackPollMinutes": 5,
+    "OrbatFallbackPollMinutes": 60
   },
-  "FeatureFlags": {
-    "EnableAutoNicknameSync": true,
-    "EnableTrainingNotifications": true,
-    "EnablePromotionAnnouncements": true
+  "Features": {
+    "NicknameSync": true,
+    "RankRoleSync": true,
+    "TrainingNotifications": true,
+    "PromotionAnnouncements": true
   }
 }
 ```
 
-### Environment Variables
+Required secret environment variables:
 
-- `DISCORD_TOKEN`: Discord bot token
-- `API_BASE_URL`: Base URL for the 6MD API
-- `BOT_API_TOKEN`: Bot API token (from admin panel) - **Must be created by a user with `system:super_admin` permission**
-- `ENVIRONMENT`: Production or Development
+- `DISCORD_TOKEN`
+- `BOT_API_TOKEN`
 
----
+Optional environment variables may override non-secret settings, but the implementation must document its exact configuration precedence.
 
-## Features and Implementation
+## 5. Authentication and authorization
 
-### 0. Admin Promotion Approval
+### Platform API authentication
 
-**Requirement:** Admins should be asked for promotions that are NOT marked as auto in a separate Discord channel that only users with the admin role can see. If approved, promote the user. If not approved, reset the attendance counter to current attendance (user must accumulate full requirement from new baseline).
+Bot endpoints use:
 
-**Implementation:**
-- Bot listens for pending promotions via `/bot/promotions/pending`
-- Sends notification to **admin-only channel** with approve/decline buttons
-- Channel is restricted to users with Discord admin role
-- On approve: calls `/bot/promotions/{id}/approve`
-- On decline: calls `/bot/promotions/{id}/decline` AND increments attendance counter
-
-**Configuration:**
-```json
-{
-  "Discord": {
-    "AdminChannelId": "<admin-only-channel-id>",
-    "AdminRoleId": "<admin-role-id>"
-  }
-}
+```http
+Authorization: Bearer <BOT_API_TOKEN>
 ```
 
-**API Endpoints Used:**
-- `GET /bot/promotions/pending` - List pending promotions
-- `POST /bot/promotions/{id}/approve` - Approve promotion
-- `POST /bot/promotions/{id}/decline` - Decline promotion
+Bot tokens are created and revoked in the web application by a user with `system:super_admin`. The bot must not log the token or include it in user-facing error messages.
 
-**Attendance Counter Behavior on Decline:**
-- Attendance counter reset on promotion decline is implemented on the website side via API
-- Bot simply calls `/bot/promotions/{id}/decline` and the website resets `attendanceSinceLastRank` to current attendance
-- User must then accumulate the full rank requirement from this new baseline
-
-**Discord Role Synchronization:**
-- When promotion is applied (auto or manual), bot assigns new Discord role and removes old rank role
-- Rank-to-Discord-role mapping is managed in the web application, NOT in bot configuration
-- Bot fetches role mappings from the API via `/bot/ranks/discord-roles` endpoint
+On `401`, the bot must stop retrying the individual request, mark platform authentication unhealthy, and alert operators. On `403`, it must log the endpoint and missing permission context without exposing secrets.
 
-**Discord Integration:**
-- Admin-only channel with restricted permissions
-- Notification message with action buttons visible only to admins
-- On approve: 
-  - Calls `/bot/promotions/{id}/approve` API
-  - **Synchronously** updates user nickname with new rank
-  - **Synchronously** assigns new Discord role for the rank
-  - **Synchronously** removes old rank role
-- On decline: calls `/bot/promotions/{id}/decline` (website resets attendance counter to current attendance)
-- Confirmation message on action
-- Error handling for non-admin users attempting to interact
+### Discord authorization
 
-**Synchronous Update Flow (for BOTH auto and manual promotions):**
-```
-User promoted on website (auto or manual) → API event triggered → Bot receives notification → 
-Bot updates Discord nickname → Bot assigns new role → Bot removes old role
-```
+Authorization is checked at interaction time, not only through channel visibility:
 
-**Note:** The attendance counter reset on decline is already implemented on the website side, so the bot only needs to call the decline endpoint.
+- Promotion approval requires the configured admin role.
+- Bulk synchronization and diagnostic commands require the admin role.
+- User actions use the invoking Discord user ID and may only modify that linked user.
+- Component custom IDs must not be trusted as authorization. The handler revalidates the actor and current platform state.
 
----
+## 6. User identity
 
-### 1. ORBAT Announcements
+Every user-facing action resolves the caller through their Discord snowflake using `GET /bot/users/discord/{discordId}`.
 
-**Requirement:** Announce new ORBATs on Monday when one is already created or as soon as a new ORBAT for that week is available. The announcement must include a direct link to the ORBAT on the website.
+If no linked platform user exists, the bot returns an ephemeral message with a website account-linking URL. It must not create shadow users.
 
-**Implementation:**
-- Scheduler checks for new ORBATs on Monday at configured time
-- Also listens to SSE stream `/orbats/events` for immediate announcements
-- Falls back to polling every hour
-- Tracks announced ORBATs to avoid duplicates
-- Constructs website URL for each ORBAT (e.g., `https://orbat.6md.net/orbats/{orbatId}`)
+Discord snowflakes are serialized as strings in API JSON and configuration to avoid numeric precision loss.
 
-**API Endpoints Used:**
-- `GET /bot/orbats?includePast=false&limit=10`
-- SSE: `/orbats/events` (for real-time notifications)
+## 7. ORBAT announcements
 
----
+### Triggering rules
 
-### 2. User Signup for Slots
+An ORBAT is announced when either condition is met:
 
-**Requirement:** Allow users to signup for each slot using Discord commands with their Discord ID. Must prevent double signups by synchronizing with website signups.
+1. A new eligible ORBAT is created for the current operation week.
+2. The Monday reconciliation job finds an eligible ORBAT that has not been announced.
 
-**Command:** `!signup <orbat-id> [slot-id]`
+The operation week is Monday 00:00 through Sunday 23:59:59 UTC unless the platform later defines a different unit timezone. The announcement target and eligibility rules must be based on normalized platform timestamps.
 
-**Implementation:**
-- Validates user has linked Discord account on website
-- Checks if user is already signed up for this ORBAT via `/bot/orbats/{id}/signups` or `/bot/users/discord/{discordId}/signups`
-- If not already signed up: calls `/bot/signups` to create signup on website
-- If already signed up: informs user and provides option to change slot or cancel
-- Provides confirmation or error feedback
-- Discord signup automatically updates website signup (single source of truth)
+### Delivery behavior
 
-**Preventing Double Signups:**
-- Bot checks website for existing signup before creating new one
-- All signups (Discord and website) are stored in the same database via the API
-- Discord commands and website signup form use the same `/bot/signups` endpoint
-- Bot tracks Discord signups and website signups as the same entity
+An announcement contains:
 
-**API Endpoints Used:**
-- `POST /bot/signups` - Create signup (used by both Discord bot and website)
-- `GET /bot/orbats/{id}/signups` - Get all signups for an ORBAT (to check for duplicates)
-- `GET /bot/users/discord/{discordId}` - Get user info and validate Discord link
-- `GET /bot/orbats/{id}` - Get ORBAT details
+- ORBAT name and description
+- Start and end time in Discord timestamp format
+- Current signup count or summarized availability
+- A link button to `{WebsiteBaseUrl}/orbats/{orbatId}`
+- A `Sign up` button
+- An optional `Availability` button
 
----
+The bot stores `(guildId, orbatId, discordMessageId, announcedAt, contentVersion)` with a unique constraint on `(guildId, orbatId)`. Event and scheduler paths call the same idempotent announce operation.
 
-### 3. Attendance Compilation
+If a relevant ORBAT changes, the bot edits the existing announcement where possible. Deleted or cancelled ORBAT behavior must be carried by the event contract; the bot disables interaction components and marks the announcement cancelled.
 
-**Requirement:** Run compile attendance at 1am UTC from the previous day.
+## 8. Signup flow
 
-**Implementation:**
-- Scheduler runs daily at 01:00 UTC
-- Queries for ORBATs from previous day
-- Calls `/bot/attendance/compile` for each relevant ORBAT
-- Handles errors gracefully
+### Interactive flow
 
-**API Endpoints Used:**
-- `POST /bot/attendance/compile`
-- `GET /bot/orbats?includePast=true&limit=100`
+1. The member selects `Sign up` on an ORBAT announcement or runs `/signup`.
+2. The bot resolves the linked platform user.
+3. The bot requests user-specific available slots from the platform.
+4. The bot returns an ephemeral select menu. Select menus are preferred over one button per slot because Discord component rows have limited capacity.
+5. The member selects a slot.
+6. The bot calls the authoritative signup mutation.
+7. The bot returns confirmation and refreshes the public announcement asynchronously.
 
----
+If the member already has a signup, the ephemeral response shows the current slot and offers `Change slot` and `Cancel signup` actions.
 
-### 4. Training and ORBAT Notifications
+### Server-side guarantees
 
-**Requirement:** Send notifications for training and ORBATs when user subscribes. Announce when user selects to receive Discord notifications.
+The API, not the bot, is responsible for atomically enforcing:
 
-**Implementation:**
-- Users opt-in via `!notify <type> on/off` command
-- Bot maintains notification preferences in SQLite database
-- Sends DMs or channel mentions based on preference
-- Announces subscription changes
+- one signup per user per ORBAT
+- slot capacity
+- ORBAT signup cutoff
+- absence-note restrictions
+- training and rank prerequisites
+- slot membership in the requested ORBAT
 
-**API Endpoints Used:**
-- None (bot maintains own preference store)
-- Training data from `/trainings` for content
+The bot may display eligibility information, but it must handle a later `409` because state can change between display and mutation.
 
----
+### Interaction retries
 
-### 5. Training Announcement Responses
+Discord can deliver duplicate interactions and users can double-click. Signup mutations should accept an idempotency key derived from the Discord interaction ID. Until supported, the bot serializes active signup mutations per `(orbatId, userId)` and treats an API response describing the already-desired state as success.
 
-**Requirement:** Allow users to answer to training announcements, with responses redirected to the training chat.
+## 9. Availability and attendance
 
-**Implementation:**
-- Bot tracks which messages are training announcements
-- Listens for replies to those messages
-- Redirects reply content to training chat channel
-- Optionally deletes original response
+### Availability notes
 
-**API Endpoints Used:**
-- None (pure Discord functionality)
+User-selected availability is distinct from compiled attendance. Supported input states are:
 
----
+- `absent`
+- `unsure`
+- `late_unsure`, optionally with expected late minutes
+- `late_unsure`, optionally with expected leave-early minutes
 
-### 6. Discord Nickname Synchronization
+The current platform data model uses one note plus `lateMinutes` and `leaveEarlyMinutes`. The Discord UI should therefore offer:
 
-**Requirement:** Update Discord server **nickname** with rank prefix and website username.
+- `Absent`
+- `Unsure`
+- `Late / leave early`, followed by a modal for minute estimates
+- `Clear note`
 
-**Implementation:**
-- Periodic sync (hourly) for all users
-- Sync on user join
-- Uses format: `[RankAbbreviation] Username`
-- Requires `ManageNicknames` permission
+“Present” and “no show” are compiled outcomes and are not user availability buttons.
 
-**API Endpoints Used:**
-- `GET /bot/users/discord/{discordId}`
-- `GET /bot/users`
+When a user marks themselves absent while signed up, the platform contract must define whether the signup is automatically cancelled or the request is rejected pending explicit cancellation. The bot must not guess. This decision is tracked as an API blocker.
 
----
+### Attendance compilation
 
-### 7. Promotion Announcements
+At 01:00 UTC, the bot requests compilation for ORBATs whose effective end time falls in the previous UTC day interval:
 
-**Requirement:** Announce promotions to users (both auto and manual).
-
-**Implementation:**
-- Periodic check (every 5 minutes) for new promotions
-- Uses `/bot/promotions/auto` for auto-promotions
-- Uses `/bot/promotions/pending` for manual promotions (handled via admin approval in separate admin-only channel)
-- Tracks announced promotions to avoid duplicates
-- Posts rich embed in announcements channel
-- **For both auto and manual promotions:** Triggers synchronous Discord nickname and role update
-
-**API Endpoints Used:**
-- `GET /bot/promotions/auto?days=1`
-- `GET /bot/promotions/pending`
-
-**Note:** Both auto and manual promotions trigger the same synchronous Discord update (nickname + role).
-
----
-
-### 8. Interactive Signup System
-
-**Requirement:** Users should have a button that shows "signup" when pressed, it gives the user a message that only they can see in the channel with more buttons to signup for each slot they are allowed to signup for. Must prevent double signups.
-
-**Implementation:**
-- ORBAT announcement includes "Signup" button (with direct link to website ORBAT)
-- Clicking button shows ephemeral message with available slot buttons
-- Bot first checks `/bot/orbats/{id}/signups` to see if user is already signed up
-- If already signed up: shows current signup and offers change/cancel options
-- If not signed up: bot filters slots based on user eligibility (training, rank, capacity)
-- Each slot button signs user up via `/bot/signups` when clicked
-- Signup is stored in the same database used by the website (single source of truth)
-
-**API Endpoints Used:**
-- `POST /bot/signups` - Sign up for slot (shared with website)
-- `GET /bot/orbats/{id}/signups` - Check existing signups for ORBAT
-- `GET /bot/orbats/{id}` - Get ORBAT details
-- `GET /bot/users/discord/{discordId}` - Get user info and verify eligibility
-
-**Workaround:** Bot filters slots client-side using data from existing endpoints. Double signup prevention via checking existing signups before creating new ones.
-
----
-
-### 9. Attendance Status Buttons
-
-**Requirement:** User should be able to note if they are absent, late, goes early, or if they are unsure if they attend.
-
-**Implementation:**
-- Command: `!attendance <orbat-id>`
-- Shows ephemeral message with status buttons (Present, Absent, Late, Leave Early, Unsure)
-- Bot stores status in its own database (until API endpoint is available)
-- Status is used for attendance tracking
-
-**API Endpoints Used:**
-- None currently (workaround uses bot's own database)
-
-**Future:** When `/bot/orbats/{orbatId}/attendance` endpoint is available, bot will use it.
-
----
-
-### 10. Training Notification Settings
-
-**Requirement:** Users should be able to turn on/off Discord notifications for training.
-
-**Implementation:**
-- Command: `!notify training on|off`
-- Bot updates notification preference in database
-- Uses TrainingRequestSubscription for request-specific notifications
-- Uses bot's own tracking for general training notifications
-
-**API Endpoints Used:**
-- `GET /bot/users/discord/{discordId}` - Get user info
-- `GET/POST /training-requests/{id}/subscription` - For request-specific notifications
-
----
-
-## Service Design
-
-### API Client (IApiClient)
-
-Wrapper for all API communications with error handling, retries, and logging.
-
-**Key Methods:**
-```csharp
-Task<Orbat> GetOrbatByIdAsync(int orbatId)
-Task<SignupResult> SignupForOrbatAsync(int orbatId, string discordUserId, int? slotId)
-Task<AttendanceCompilationResult> CompileAttendanceAsync(int orbatId)
-Task<User> GetUserByDiscordIdAsync(string discordUserId)
-Task<AutoPromotionResult> GetAutoPromotionsAsync(int days, int limit)
-Task<Dictionary<int, ulong>> GetDiscordRankRoleMappingsAsync()  // Fetches rank-to-Discord-role mappings from web app
+```text
+[previous day 00:00:00 UTC, current day 00:00:00 UTC)
 ```
 
-### Notification Service
+Compilation must be idempotent. The bot records each attempted ORBAT and result, retries transient failures, and runs a startup catch-up for uncompiled eligible ORBATs within a configurable lookback period.
 
-Manages notification preferences and delivery.
+The bot does not manufacture check-in/check-out times from availability notes.
 
-**Features:**
-- Toggle notification types (training, orbat, promotion)
-- Send DMs or channel mentions
-- Track preferences in SQLite
+## 10. Notification preferences and delivery
 
-### User Sync Service
+Notification preferences are stored in the web platform and can be changed from Discord or the website.
 
-Synchronizes Discord nicknames and roles with web data.
+Initial preference types:
 
-**Features:**
-- Periodic bulk sync (hourly)
-- Sync on user join
-- Sync on promotion (immediate, for both auto and manual promotions)
-- Format: `[Rank] Username` for nickname
-- Assigns Discord role based on rank
-- Removes old rank role when promoted (both auto and manual)
+- ORBAT announcements
+- Training scheduled, updated, and cancelled
+- Training reminders
+- Promotion announcements
 
-**Implementation:**
-```csharp
-public class UserSyncService : BackgroundService
-{
-    private readonly IApiClient _apiClient;
-    private readonly IDiscordClient _discordClient;
-    private readonly IConfiguration _config;
-    private Dictionary<int, ulong> _rankRoleMappings;
-    private DateTime _lastRoleMappingSync = DateTime.MinValue;
-    private readonly TimeSpan _roleMappingCacheDuration = TimeSpan.FromHours(1);
-    
-    public UserSyncService(IApiClient apiClient, IDiscordClient discordClient, IConfiguration config)
-    {
-        _apiClient = apiClient;
-        _discordClient = discordClient;
-        _config = config;
-    }
-    
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            await SyncAllUsers();
-            await Task.Delay(TimeSpan.FromHours(1), stoppingToken);
-        }
-    }
-    
-    // Fetch rank-to-Discord-role mappings from the web API
-    private async Task<Dictionary<int, ulong>> GetRankRoleMappingsAsync()
-    {
-        // Use cached mappings if still valid
-        if (DateTime.UtcNow - _lastRoleMappingSync < _roleMappingCacheDuration && _rankRoleMappings != null)
-        {
-            return _rankRoleMappings;
-        }
-        
-        // Fetch fresh mappings from API
-        _rankRoleMappings = await _apiClient.GetDiscordRankRoleMappingsAsync();
-        _lastRoleMappingSync = DateTime.UtcNow;
-        return _rankRoleMappings;
-    }
-    
-    public async Task SyncUserAsync(ulong discordUserId)
-    {
-        var webUser = await _apiClient.GetUserByDiscordId(discordUserId.ToString());
-        if (webUser == null || webUser.CurrentRank == null) return;
-        
-        var guild = await _discordClient.GetGuildAsync(ulong.Parse(_config["Discord:GuildId"]));
-        var member = await guild.GetUserAsync(discordUserId);
-        
-        if (member != null)
-        {
-            // Update nickname
-            var nickname = $"[{webUser.CurrentRank.Abbreviation}] {webUser.Username}";
-            await member.ModifyAsync(m => m.Nickname = nickname);
-            
-            // Update roles - fetch mappings from API
-            var roleMappings = await GetRankRoleMappingsAsync();
-            await UpdateRankRole(member, webUser.CurrentRank.Id, roleMappings);
-        }
-    }
-    
-    private async Task UpdateRankRole(IGuildUser member, int newRankId, Dictionary<int, ulong> roleMappings)
-    {
-        // Get all rank roles from API mappings
-        var allRankRoleIds = roleMappings.Values.ToList();
-        
-        // Remove all existing rank roles from user
-        var rolesToRemove = member.RoleIds.Where(r => allRankRoleIds.Contains(r)).ToList();
-        if (rolesToRemove.Any())
-        {
-            await member.RemoveRolesAsync(rolesToRemove.Select(r => guild.GetRole(r)));
-        }
-        
-        // Add new rank role if mapping exists
-        if (roleMappings.TryGetValue(newRankId, out var newRoleId))
-        {
-            var role = guild.GetRole(newRoleId);
-            if (role != null)
-            {
-                await member.AddRoleAsync(role);
-            }
-        }
-    }
-    
-    // Called when promotion is applied (auto or manual)
-    public async Task SyncUserAfterPromotionAsync(ulong discordUserId, int oldRankId, int newRankId)
-    {
-        var guild = await _discordClient.GetGuildAsync(ulong.Parse(_config["Discord:GuildId"]));
-        var member = await guild.GetUserAsync(discordUserId);
-        
-        if (member != null)
-        {
-            var webUser = await _apiClient.GetUserByDiscordId(discordUserId.ToString());
-            if (webUser != null && webUser.CurrentRank != null)
-            {
-                // Update nickname with new rank
-                var nickname = $"[{webUser.CurrentRank.Abbreviation}] {webUser.Username}";
-                await member.ModifyAsync(m => m.Nickname = nickname);
-                
-                // Fetch fresh role mappings and update roles
-                var roleMappings = await GetRankRoleMappingsAsync();
-                await UpdateRankRole(member, newRankId, roleMappings);
-            }
-        }
-    }
-}
+Delivery settings include DM enabled and channel mention enabled. Defaults are opt-out unless product owners explicitly choose opt-in and record the privacy rationale.
+
+If a DM fails because the user blocks DMs, the bot records the delivery failure and provides guidance the next time that user changes settings. It must not silently switch to a public mention unless the user enabled channel mentions.
+
+The `/notifications` command displays current preferences and updates them through bot-authenticated platform endpoints.
+
+## 11. Training announcements and responses
+
+Training announcements use a consistent embed and include an `Open training chat` link or button.
+
+Reply redirection is not the preferred interaction because forwarding user-authored content creates privacy and moderation ambiguity. If product owners require it, the final behavior must define:
+
+- whether the original reply is deleted
+- whether author identity, attachments, embeds, and mentions are preserved
+- how users are informed before forwarding
+- retention and moderation behavior
+
+Until those decisions are made, the bot should direct users to the configured training channel instead of copying messages.
+
+## 12. Promotions
+
+### Manual promotion approval
+
+The bot polls or consumes a pending-promotion event and posts one message per proposal in the admin-only channel. The message includes the user, current rank, proposed rank, attendance evidence, and `Approve` and `Decline` buttons.
+
+On interaction the bot:
+
+1. Verifies the actor has the configured admin role.
+2. Fetches or submits against current proposal state.
+3. Calls `POST /bot/promotions/{id}/approve` or `POST /bot/promotions/{id}/decline`.
+4. Disables the buttons and records the actor, decision, and timestamp in the Discord message.
+
+The platform performs the promotion transaction. On decline, it resets `attendanceSinceLastRank` to current attendance. The bot does not increment or reset counters itself.
+
+Concurrent decisions must be safe: an already-resolved proposal returns a conflict or its current state, which the bot displays rather than overwriting.
+
+### Applied promotions
+
+An applied-promotion event covers automatic promotions, approved proposals, demotions, and administrative rank corrections. The bot uses the same reconciliation path for all rank changes.
+
+Promotion announcements are deduplicated by rank-history or event ID. Announcement failure does not roll back the platform promotion.
+
+## 13. Nickname and rank-role reconciliation
+
+### Nickname format
+
+The default format is:
+
+```text
+[RankAbbreviation] WebsiteUsername
 ```
 
-### Schedulers
+The bot truncates safely to Discord's nickname limit. Empty abbreviations, retired users, and exempt administrators require explicit platform metadata or configuration; they must not be inferred from role names.
 
-Background services for time-based operations:
-- `OrbatAnnouncementScheduler` - Monday announcements + real-time
-- `AttendanceCompilationScheduler` - Daily at 01:00 UTC
-- `PromotionAnnouncementScheduler` - Every 5 minutes
+### Role update algorithm
 
----
+1. Fetch the platform user and current rank.
+2. Load active rank-role mappings for the configured guild.
+3. Validate that the desired Discord role exists and is below the bot's highest role.
+4. Add the desired role if absent.
+5. Remove other mapped rank roles only after the desired role is confirmed.
+6. Update the nickname.
+7. Persist success or enqueue retry for failed steps.
 
-## Database (Bot-Specific)
+If no desired mapping exists, the bot leaves existing roles unchanged and alerts operators. It must never remove all rank roles merely because the mapping API is unavailable or stale.
 
-SQLite database for bot state:
+### Reconciliation triggers
 
-```csharp
-// User notification preferences
-public class UserPreference
-{
-    [Key] public ulong DiscordUserId { get; set; }
-    public bool TrainingNotifications { get; set; }
-    public bool OrbatNotifications { get; set; }
-    public bool PromotionNotifications { get; set; }
-}
+- Applied-rank event: immediate attempt
+- Guild member join: reconcile that member
+- Hourly job: reconcile all linked active members
+- `/admin sync-user`: reconcile one member
+- `/admin sync-all`: enqueue a rate-limited bulk reconciliation
 
-// Track announced ORBATs
-public class AnnouncedOrbat
-{
-    [Key] public int OrbatId { get; set; }
-    public DateTime AnnouncedAt { get; set; }
-}
+Discord hierarchy errors, missing permissions, absent guild members, and deleted roles are reported separately. A user absent from the guild is not an error requiring retries.
 
-// Track announced promotions
-public class AnnouncedPromotion
-{
-    [Key] public int PromotionId { get; set; }
-    public DateTime AnnouncedAt { get; set; }
-}
-```
+## 14. Commands and components
 
----
+| Interaction | Audience | Purpose |
+|---|---|---|
+| `/orbats` | Members | List upcoming ORBATs |
+| `/signup` | Members | Create, change, or cancel own signup |
+| `/availability` | Members | Set or clear own availability note |
+| `/notifications` | Members | View and change notification preferences |
+| `/whois` | Members | Show non-sensitive linked-user information |
+| `/admin sync-user` | Admins | Reconcile one Discord member |
+| `/admin sync-all` | Admins | Enqueue full guild reconciliation |
+| Promotion buttons | Admins | Approve or decline a proposal |
+| ORBAT signup component | Members | Open ephemeral slot selection |
 
-## Discord Integration
+All user-facing failures receive a concise ephemeral explanation and correlation ID. Detailed exceptions are logged only for operators.
 
-### Commands
+## 15. Bot persistence
 
-| Command | Description | Example |
-|---------|-------------|---------|
-| `!signup <orbat> [slot]` | Sign up for ORBAT | `!signup 123` |
-| `!signup list <orbat>` | List ORBAT slots | `!signup list 123` |
-| `!orbats [limit]` | List upcoming ORBATs | `!orbats 5` |
-| `!notify <type> on\|off` | Toggle notifications | `!notify training on` |
-| `!attendance <orbat>` | Set attendance status | `!attendance 123` |
-| `!promotions` | List pending promotions | `!promotions` |
-| `!whois [user]` | Get user info | `!whois @User` |
-| `!help [cmd]` | Show help | `!help signup` |
+Suggested SQLite entities:
 
-**Admin Commands:**
-| Command | Description | Example |
-|---------|-------------|---------|
-| `!admin sync` | Sync all nicknames | `!admin sync` |
-| `!admin promote approve <id>` | Approve promotion | `!admin promote approve 456` |
-| `!admin promote decline <id>` | Decline promotion | `!admin promote decline 456` |
+- `DiscordMessageReference`: guild, platform entity type/ID, Discord channel/message IDs, content version
+- `ProcessedEvent`: event source, event ID, processed time, result
+- `EventCursor`: stream name and last event ID
+- `PendingDiscordAction`: action type, target, attempt count, next attempt time, last error
+- `JobExecution`: job name, logical interval, start/end time, outcome
+- `InteractionReceipt`: Discord interaction ID and final result for deduplication
 
-### Required Permissions
+Apply uniqueness constraints for natural idempotency keys. Define retention jobs for processed events, interaction receipts, and successful executions. Failed actions remain until resolved or manually dismissed.
 
-**Bot Permissions:**
+## 16. Failure handling and observability
+
+### Retry policy
+
+- Retry network failures, `408`, `429`, and most `5xx` responses with exponential backoff and jitter.
+- Honor `Retry-After`.
+- Do not automatically retry validation failures or authorization failures.
+- Bound retries and move exhausted Discord operations to the durable retry queue.
+- Use a circuit breaker when the platform API is persistently unavailable.
+
+### Health and metrics
+
+Expose or log enough information to monitor:
+
+- Discord gateway connection state
+- Platform API authentication and latency
+- SSE connection and last event time
+- Pending and failed Discord actions
+- Scheduler last success time
+- Announcement, signup, attendance compile, and synchronization outcomes
+- Discord and platform rate-limit events
+
+Use structured logs with correlation IDs. Never log bot tokens, full authorization headers, or unnecessary message content.
+
+## 17. Discord permissions and intents
+
+Required bot permissions:
+
+- View Channels
 - Send Messages
 - Embed Links
 - Read Message History
 - Manage Nicknames
-- Use External Emojis
-- Add Reactions
-- Read Messages
+- Manage Roles
+- Use Application Commands
 
-**Intents:**
+Optional permissions depend on final features:
+
+- Manage Messages, only if reply redirection deletes messages
+- Attach Files, if generated or forwarded attachments are required
+- Use External Emojis, only if announcement designs use them
+
+Required gateway intents:
+
 - Guilds
-- GuildMessages
-- GuildMessageReactions
 - GuildMembers
 
----
+GuildMessages and MessageContent are only required if reply-based training forwarding or legacy prefix commands remain. Avoid privileged MessageContent intent when components and slash commands cover the product behavior.
 
-## Deployment
+The bot's highest Discord role must be above every managed rank role and below roles it should never modify.
 
-### Production
-- Build: `dotnet publish -c Release`
-- Deploy to server with .NET 10 runtime
-- Configure as systemd service
-- Set environment variables
+## 18. Security and privacy
 
-### Development
-- Run locally: `dotnet run`
-- Use test Discord guild
-- Use development API endpoint
+- Validate all Discord IDs, guild IDs, ORBAT IDs, and proposal IDs server-side.
+- Escape or disable unwanted mentions in platform-provided text.
+- Restrict the bot to the configured guild.
+- Minimize user data returned by bot APIs.
+- Do not forward private message content without explicit product approval and user notice.
+- Rotate Discord and platform tokens through deployment secrets.
+- Record administrative promotion decisions in the platform audit log and identify the Discord actor.
+- Rate-limit user-triggered mutations and admin bulk operations.
 
-### Docker
+## 19. Deployment and operations
 
-```dockerfile
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
-WORKDIR /src
-COPY . .
-RUN dotnet publish -c Release -o /app
-FROM mcr.microsoft.com/dotnet/aspnet:10.0
-WORKDIR /app
-COPY --from=build /app .
-ENTRYPOINT ["dotnet", "6MD-DiscordBot.dll"]
-```
+Target runtime: C# on .NET 10 using Discord.NET.
 
----
+The production bot runs as one active instance. Running multiple instances requires distributed interaction deduplication, job leadership, and event cursors; SQLite alone is not sufficient for active-active deployment.
 
-## Dependencies
+The process must:
 
-**NuGet Packages:**
-- Discord.Net.Core
-- Discord.Net.Commands
-- Discord.Net.Rest
-- Microsoft.Extensions.DependencyInjection
-- Microsoft.Extensions.Http
-- Microsoft.Extensions.Logging
-- Microsoft.EntityFrameworkCore
-- Microsoft.EntityFrameworkCore.Sqlite
+- use graceful shutdown cancellation tokens
+- close SSE and Discord connections cleanly
+- finish or persist in-flight operations
+- apply SQLite migrations before accepting interactions
+- register guild-scoped commands in development and production-scoped commands according to the release process
+- run under systemd or a container restart policy
 
----
+Development uses a separate Discord guild, platform database, bot token, and Discord application token.
 
-## Error Handling
+## 20. Acceptance criteria
 
-- API errors: Retry with exponential backoff
-- Discord errors: Handle rate limits, reconnect
-- Bot errors: Log, notify, restart services
-- Graceful degradation for partial failures
+The first production release is ready when:
 
----
+- Duplicate events and interactions do not create duplicate announcements or signups.
+- Signup create/change/cancel operations use the website database and handle conflicts.
+- Availability notes round-trip through the platform API.
+- Attendance compilation catches up safely after downtime.
+- Notification preferences are visible and editable from both Discord and the website.
+- Manual promotion buttons are authorization checked and concurrency safe.
+- Every applied rank change is eventually reflected in nickname and rank role or produces an actionable operator alert.
+- Missing role mappings never cause destructive role removal.
+- Authentication, rate limits, retries, and health signals are covered by integration tests.
 
-## Security
+## 21. Delivery phases
 
-- Store tokens securely (environment variables)
-- Never commit secrets to source control
-- Use HTTPS for API communications
-- Respect user privacy preferences
-- Comply with Discord data policies
-- **Bot API tokens can ONLY be created by users with `system:super_admin` permission**
+### Phase 1: platform contracts
 
----
+Implement and document the blocking endpoints and event contracts identified in the API gap tracker.
 
-## Message Formats
+### Phase 2: core Discord experience
 
-### ORBAT Announcement
-```
-:loudspeaker: NEW ORBAT: {Name} :loudspeaker:
+Deliver ORBAT announcements, signup management, availability notes, notification settings, and manual promotion approval.
 
-Date: {Date}
-Time: {StartTime} - {EndTime} UTC
-View on website: https://orbat.6md.net/orbats/{OrbatId}
-Signups: !signup {OrbatId}
+### Phase 3: reconciliation and operations
 
-{Description}
+Deliver applied-rank events, nickname/role reconciliation, catch-up jobs, durable retries, metrics, and operator commands.
 
-Available Slots: {SlotInfo}
-```
+### Phase 4: optional enhancements
 
-### Promotion Announcement
-```
-:tada: PROMOTION: {Username} :tada:
-
-From: {PreviousRank}
-To: {NewRank}
-
-Congratulations! :clap:
-```
+Evaluate training reply forwarding, richer notification routing, and multi-instance deployment only after the core system is stable.
 
 ---
 
-*Document Version: 1.2*
-*Last Updated: 2026-07-29*
-*Author: 6MD Development Team*
+Document version: 2.0
+
+Last updated: 2026-07-29
