@@ -2,8 +2,50 @@ openapi: 3.1.0
 info:
   title: 6MD Management Platform API
   description: |
-    Web application API for managing Arma 3 unit operations, signups, attendance, ranks, 
-    training progression, and admin workflows for the 6th Maroon Division.
+    API for the 6th Maroon Division management platform.
+
+    The platform manages member identities, Discord and Steam account links, ORBATs,
+    slot signups, availability notes, attendance, training workflows, ranks and
+    promotions, notifications, leave of absence, templates, radio frequencies, and
+    administrative configuration.
+
+    ## Current API structure
+
+    Most routes under `/api` are used by the website and authenticate with a NextAuth
+    user session. Authorization for administrative operations is enforced through the
+    platform permission system. Public read routes and authentication callbacks are
+    documented without session security where applicable.
+
+    Routes under `/api/bot` are intended for the Discord bot and other trusted bot
+    integrations. They authenticate with `Authorization: Bearer <token>`. The bearer
+    value must match an active token in the database-backed `BotToken` table; legacy
+    environment-only tokens and the old `X-BOT-API-TOKEN` header are not accepted.
+
+    Bot-facing functionality includes user reconciliation, ORBAT and signup access,
+    availability notes shared with the website, attendance ingestion and compilation,
+    notification preferences, guild-specific rank-role mappings, promotion actions,
+    training reminders, and durable cursor-based event feeds.
+
+    ## Realtime and replay
+
+    Website realtime routes use Server-Sent Events for live UI updates. Bot event feeds
+    for ranks, ORBATs, and training are database-backed and support JSON polling or SSE.
+    Consumers can resume using `Last-Event-ID` or the `cursor` query parameter. Durable
+    bot events are retained for 30 days.
+
+    ## Compatibility status
+
+    The repository contains APIs introduced across several generations of the platform.
+    New bot contracts use structured error objects with stable machine-readable codes,
+    but some older website and bot routes still return the legacy `{ "error": "message" }`
+    shape. A broader route consolidation and error-standardization refactor is planned
+    separately. Until that work is completed, clients should follow the response schema
+    documented for each individual operation rather than assuming one global error shape.
+
+    Routes are not removed merely because the website has no direct caller; schedulers,
+    the Discord bot, operational scripts, and external integrations may also consume the
+    API. Some operations provide baseline descriptions while their exhaustive field-level
+    request and response schemas remain candidates for later expansion.
   version: 1.0.0
   contact:
     name: 6th Maroon Division
@@ -50,40 +92,45 @@ paths:
   /admin/bot-tokens:
     get:
       tags:
-        - TODO
-      summary: TODO document GET /admin/bot-tokens
+        - Admin
+      summary: List managed bot tokens
       responses:
         "200":
           description: Success
+      description: List managed bot tokens. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
     post:
       tags:
-        - TODO
-      summary: TODO document POST /admin/bot-tokens
+        - Admin
+      summary: Create a bot token
       responses:
         "200":
           description: Success
+      description: Create a bot token. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /admin/bot-tokens/{id}:
     get:
       tags:
-        - TODO
-      summary: TODO document GET /admin/bot-tokens/{id}
+        - Admin
+      summary: Get bot token metadata
       responses:
         "200":
           description: Success
+      description: Get bot token metadata. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
     put:
       tags:
-        - TODO
-      summary: TODO document PUT /admin/bot-tokens/{id}
+        - Admin
+      summary: Update a bot token
       responses:
         "200":
           description: Success
+      description: Update a bot token. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
     delete:
       tags:
-        - TODO
-      summary: TODO document DELETE /admin/bot-tokens/{id}
+        - Admin
+      summary: Delete a bot token
       responses:
         "200":
           description: Success
+      description: Delete a bot token. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /admin/catalog/events:
     get:
       tags:
@@ -115,11 +162,13 @@ paths:
           description: Legacy user data
     post:
       tags:
-        - TODO
-      summary: TODO document POST /admin/import/legacy-user-data
+        - Admin
+        - Users
+      summary: Import legacy user data for review
       responses:
         "200":
           description: Success
+      description: Import legacy user data for review. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /admin/import/legacy-user-data/apply:
     post:
       tags:
@@ -159,26 +208,32 @@ paths:
   /admin/ranks/{rankId}/discord-role:
     put:
       tags:
-        - TODO
-      summary: TODO document PUT /admin/ranks/{rankId}/discord-role
+        - Admin
+        - Ranks
+      summary: Create or update a Discord rank-role mapping
       responses:
         "200":
           description: Success
+      description: Create or update a Discord rank-role mapping. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
     delete:
       tags:
-        - TODO
-      summary: TODO document DELETE /admin/ranks/{rankId}/discord-role
+        - Admin
+        - Ranks
+      summary: Delete a Discord rank-role mapping
       responses:
         "200":
           description: Success
+      description: Delete a Discord rank-role mapping. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /admin/ranks/discord-roles:
     get:
       tags:
-        - TODO
-      summary: TODO document GET /admin/ranks/discord-roles
+        - Admin
+        - Ranks
+      summary: List Discord rank-role mappings for a guild
       responses:
         "200":
           description: Success
+      description: List Discord rank-role mappings for a guild. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /admin/users/bulk-interview-toggle:
     post:
       tags:
@@ -248,11 +303,13 @@ paths:
   /admin/users/merge:
     post:
       tags:
-        - TODO
-      summary: TODO document POST /admin/users/merge
+        - Admin
+        - Users
+      summary: Merge one user account into another
       responses:
         "200":
           description: Success
+      description: Merge one user account into another. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /admin/users/unranked:
     get:
       tags:
@@ -316,18 +373,20 @@ paths:
           description: Attendance updated
     put:
       tags:
-        - TODO
-      summary: TODO document PUT /attendance/{attendanceId}
+        - Attendance
+      summary: Update an attendance record
       responses:
         "200":
           description: Success
+      description: Update an attendance record. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
     delete:
       tags:
-        - TODO
-      summary: TODO document DELETE /attendance/{attendanceId}
+        - Attendance
+      summary: Delete an attendance record
       responses:
         "200":
           description: Success
+      description: Delete an attendance record. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /attendance/automated:
     post:
       tags:
@@ -356,49 +415,55 @@ paths:
   /attendance/legacy-data:
     get:
       tags:
-        - TODO
-      summary: TODO document GET /attendance/legacy-data
+        - Attendance
+      summary: List legacy attendance data
       responses:
         "200":
           description: Success
+      description: List legacy attendance data. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
     put:
       tags:
-        - TODO
-      summary: TODO document PUT /attendance/legacy-data
+        - Attendance
+      summary: Update legacy attendance mappings
       responses:
         "200":
           description: Success
+      description: Update legacy attendance mappings. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /attendance/legacy-import:
     post:
       tags:
-        - TODO
-      summary: TODO document POST /attendance/legacy-import
+        - Attendance
+      summary: Import legacy attendance records
       responses:
         "200":
           description: Success
+      description: Import legacy attendance records. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /attendance/legacy-import/user-data:
     post:
       tags:
-        - TODO
-      summary: TODO document POST /attendance/legacy-import/user-data
+        - Attendance
+      summary: Import legacy attendance user data
       responses:
         "200":
           description: Success
+      description: Import legacy attendance user data. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
     get:
       tags:
-        - TODO
-      summary: TODO document GET /attendance/legacy-import/user-data
+        - Attendance
+      summary: List imported legacy attendance users
       responses:
         "200":
           description: Success
+      description: List imported legacy attendance users. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /attendance/legacy-import/user-data/map:
     put:
       tags:
-        - TODO
-      summary: TODO document PUT /attendance/legacy-import/user-data/map
+        - Attendance
+      summary: Map a legacy attendance user
       responses:
         "200":
           description: Success
+      description: Map a legacy attendance user. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /auth/{...nextauth}:
     get:
       tags:
@@ -438,19 +503,27 @@ paths:
   /bot/attendance:
     post:
       tags:
-        - TODO
-      summary: TODO document POST /bot/attendance
+        - Bot
+        - Attendance
+      summary: Submit a bot attendance check-in or check-out
       responses:
         "200":
           description: Success
+      description: Submit a bot attendance check-in or check-out. Requires an active database-backed bot bearer token. This description reflects the currently implemented route; broader response and error standardization is deferred.
+      security:
+        - apiKey: []
   /bot/attendance/backfill:
     post:
       tags:
-        - TODO
-      summary: TODO document POST /bot/attendance/backfill
+        - Bot
+        - Attendance
+      summary: Backfill pending bot attendance events
       responses:
         "200":
           description: Success
+      description: Backfill pending bot attendance events. Requires an active database-backed bot bearer token. This description reflects the currently implemented route; broader response and error standardization is deferred.
+      security:
+        - apiKey: []
   /bot/attendance/compile:
     post:
       tags:
@@ -673,19 +746,27 @@ paths:
   /bot/orbats:
     get:
       tags:
-        - TODO
-      summary: TODO document GET /bot/orbats
+        - Bot
+        - ORBATs
+      summary: List ORBATs for bot reconciliation
       responses:
         "200":
           description: Success
+      description: List ORBATs for bot reconciliation. Requires an active database-backed bot bearer token. This description reflects the currently implemented route; broader response and error standardization is deferred.
+      security:
+        - apiKey: []
   /bot/orbats/{id}:
     get:
       tags:
-        - TODO
-      summary: TODO document GET /bot/orbats/{id}
+        - Bot
+        - ORBATs
+      summary: Get an ORBAT for bot reconciliation
       responses:
         "200":
           description: Success
+      description: Get an ORBAT for bot reconciliation. Requires an active database-backed bot bearer token. This description reflects the currently implemented route; broader response and error standardization is deferred.
+      security:
+        - apiKey: []
   /bot/orbats/{id}/availability/{discordId}:
     get:
       tags:
@@ -1304,35 +1385,51 @@ paths:
   /bot/training-reminders:
     post:
       tags:
-        - TODO
-      summary: TODO document POST /bot/training-reminders
+        - Bot
+        - Training
+      summary: Deliver due training reminders
       responses:
         "200":
           description: Success
+      description: Deliver due training reminders. Requires an active database-backed bot bearer token. This description reflects the currently implemented route; broader response and error standardization is deferred.
+      security:
+        - apiKey: []
   /bot/users:
     get:
       tags:
-        - TODO
-      summary: TODO document GET /bot/users
+        - Bot
+        - Users
+      summary: List users for bot reconciliation
       responses:
         "200":
           description: Success
+      description: List users for bot reconciliation. Requires an active database-backed bot bearer token. This description reflects the currently implemented route; broader response and error standardization is deferred.
+      security:
+        - apiKey: []
   /bot/users/{userId}/rank-history:
     get:
       tags:
-        - TODO
-      summary: TODO document GET /bot/users/{userId}/rank-history
+        - Bot
+        - Ranks
+      summary: List a user’s rank history for the bot
       responses:
         "200":
           description: Success
+      description: List a user’s rank history for the bot. Requires an active database-backed bot bearer token. This description reflects the currently implemented route; broader response and error standardization is deferred.
+      security:
+        - apiKey: []
   /bot/users/discord/{discordId}:
     get:
       tags:
-        - TODO
-      summary: TODO document GET /bot/users/discord/{discordId}
+        - Bot
+        - Users
+      summary: Resolve a user by Discord ID
       responses:
         "200":
           description: Success
+      description: Resolve a user by Discord ID. Requires an active database-backed bot bearer token. This description reflects the currently implemented route; broader response and error standardization is deferred.
+      security:
+        - apiKey: []
   /bot/users/discord/{discordId}/notification-preferences:
     get:
       tags:
@@ -1369,11 +1466,15 @@ paths:
   /bot/users/steam/{steamId}:
     get:
       tags:
-        - TODO
-      summary: TODO document GET /bot/users/steam/{steamId}
+        - Bot
+        - Users
+      summary: Resolve a user by Steam ID
       responses:
         "200":
           description: Success
+      description: Resolve a user by Steam ID. Requires an active database-backed bot bearer token. This description reflects the currently implemented route; broader response and error standardization is deferred.
+      security:
+        - apiKey: []
   /loa:
     get:
       tags:
@@ -1432,11 +1533,12 @@ paths:
           description: Unauthorized
     put:
       tags:
-        - TODO
-      summary: TODO document PUT /messaging/{id}/read
+        - Messaging
+      summary: Mark a message as read
       responses:
         "200":
           description: Success
+      description: Mark a message as read. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /messaging/events:
     get:
       tags:
@@ -1472,11 +1574,12 @@ paths:
           description: Unauthorized
     put:
       tags:
-        - TODO
-      summary: TODO document PUT /messaging/read-all
+        - Messaging
+      summary: Mark all messages as read
       responses:
         "200":
           description: Success
+      description: Mark all messages as read. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /messaging/send:
     post:
       tags:
@@ -1651,33 +1754,37 @@ paths:
   /orbats/{id}/attendance-notes:
     get:
       tags:
-        - TODO
-      summary: TODO document GET /orbats/{id}/attendance-notes
+        - Attendance
+      summary: List ORBAT availability notes
       responses:
         "200":
           description: Success
+      description: List ORBAT availability notes. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
     post:
       tags:
-        - TODO
-      summary: TODO document POST /orbats/{id}/attendance-notes
+        - Attendance
+      summary: Create or replace an ORBAT availability note
       responses:
         "200":
           description: Success
+      description: Create or replace an ORBAT availability note. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /orbats/{id}/attendance-notes/{noteId}:
     patch:
       tags:
-        - TODO
-      summary: TODO document PATCH /orbats/{id}/attendance-notes/{noteId}
+        - Attendance
+      summary: Update an ORBAT availability note
       responses:
         "200":
           description: Success
+      description: Update an ORBAT availability note. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
     delete:
       tags:
-        - TODO
-      summary: TODO document DELETE /orbats/{id}/attendance-notes/{noteId}
+        - Attendance
+      summary: Delete an ORBAT availability note
       responses:
         "200":
           description: Success
+      description: Delete an ORBAT availability note. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /orbats/{id}/attendance/automation:
     post:
       tags:
@@ -1696,11 +1803,12 @@ paths:
   /orbats/{id}/eligibility:
     get:
       tags:
-        - TODO
-      summary: TODO document GET /orbats/{id}/eligibility
+        - ORBATs
+      summary: Get ORBAT slot eligibility
       responses:
         "200":
           description: Success
+      description: Get ORBAT slot eligibility. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /orbats/{id}/events:
     get:
       tags:
@@ -1733,26 +1841,29 @@ paths:
   /orbats/{id}/qualifications:
     get:
       tags:
-        - TODO
-      summary: TODO document GET /orbats/{id}/qualifications
+        - ORBATs
+      summary: List ORBAT qualification state
       responses:
         "200":
           description: Success
+      description: List ORBAT qualification state. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
     put:
       tags:
-        - TODO
-      summary: TODO document PUT /orbats/{id}/qualifications
+        - ORBATs
+      summary: Update ORBAT qualification state
       responses:
         "200":
           description: Success
+      description: Update ORBAT qualification state. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /orbats/{id}/qualifications/assign:
     post:
       tags:
-        - TODO
-      summary: TODO document POST /orbats/{id}/qualifications/assign
+        - ORBATs
+      summary: Assign an ORBAT qualification
       responses:
         "200":
           description: Success
+      description: Assign an ORBAT qualification. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /orbats/{id}/signups:
     post:
       tags:
@@ -1800,11 +1911,12 @@ paths:
           description: Unauthorized
     get:
       tags:
-        - TODO
-      summary: TODO document GET /orbats/{id}/signups
+        - Signups
+      summary: List ORBAT signups for the website
       responses:
         "200":
           description: Success
+      description: List ORBAT signups for the website. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /orbats/calendar:
     get:
       tags:
@@ -1840,33 +1952,37 @@ paths:
   /permissions/templates:
     get:
       tags:
-        - TODO
-      summary: TODO document GET /permissions/templates
+        - Admin
+      summary: List permission templates
       responses:
         "200":
           description: Success
+      description: List permission templates. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
     post:
       tags:
-        - TODO
-      summary: TODO document POST /permissions/templates
+        - Admin
+      summary: Create a permission template
       responses:
         "200":
           description: Success
+      description: Create a permission template. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /permissions/templates/{id}:
     put:
       tags:
-        - TODO
-      summary: TODO document PUT /permissions/templates/{id}
+        - Admin
+      summary: Update a permission template
       responses:
         "200":
           description: Success
+      description: Update a permission template. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
     delete:
       tags:
-        - TODO
-      summary: TODO document DELETE /permissions/templates/{id}
+        - Admin
+      summary: Delete a permission template
       responses:
         "200":
           description: Success
+      description: Delete a permission template. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /radio-frequencies:
     get:
       tags:
@@ -1979,11 +2095,12 @@ paths:
           description: Rank deleted
     put:
       tags:
-        - TODO
-      summary: TODO document PUT /ranks/{id}
+        - Ranks
+      summary: Update a rank
       responses:
         "200":
           description: Success
+      description: Update a rank. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /ranks/{id}/transitions:
     get:
       tags:
@@ -2076,11 +2193,12 @@ paths:
           description: Migration preview
     post:
       tags:
-        - TODO
-      summary: TODO document POST /ranks/migrate/preview
+        - Ranks
+      summary: Preview a rank migration
       responses:
         "200":
           description: Success
+      description: Preview a rank migration. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /ranks/promotions/{id}/approve:
     post:
       tags:
@@ -2165,11 +2283,12 @@ paths:
           description: Ranks reordered
     put:
       tags:
-        - TODO
-      summary: TODO document PUT /ranks/reorder
+        - Ranks
+      summary: Reorder ranks
       responses:
         "200":
           description: Success
+      description: Reorder ranks. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /signups/{id}/move:
     post:
       tags:
@@ -2191,11 +2310,12 @@ paths:
           description: Unauthorized
     patch:
       tags:
-        - TODO
-      summary: TODO document PATCH /signups/{id}/move
+        - Signups
+      summary: Move a signup to another slot
       responses:
         "200":
           description: Success
+      description: Move a signup to another slot. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /subslot-definitions:
     get:
       tags:
@@ -2251,18 +2371,20 @@ paths:
   /subslots/{id}/signup:
     post:
       tags:
-        - TODO
-      summary: TODO document POST /subslots/{id}/signup
+        - Signups
+      summary: Create a signup in a slot
       responses:
         "200":
           description: Success
+      description: Create a signup in a slot. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
     delete:
       tags:
-        - TODO
-      summary: TODO document DELETE /subslots/{id}/signup
+        - Signups
+      summary: Remove a signup from a slot
       responses:
         "200":
           description: Success
+      description: Remove a signup from a slot. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /templates:
     get:
       tags:
@@ -2317,11 +2439,12 @@ paths:
           description: Template deleted
     put:
       tags:
-        - TODO
-      summary: TODO document PUT /templates/{id}
+        - Templates
+      summary: Update an ORBAT template
       responses:
         "200":
           description: Success
+      description: Update an ORBAT template. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /training-categories:
     get:
       tags:
@@ -2363,11 +2486,12 @@ paths:
           description: Category deleted
     put:
       tags:
-        - TODO
-      summary: TODO document PUT /training-categories/{id}
+        - Training
+      summary: Update a training category
       responses:
         "200":
           description: Success
+      description: Update a training category. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /training-requests:
     get:
       tags:
@@ -2401,140 +2525,158 @@ paths:
           description: Training request updated
     put:
       tags:
-        - TODO
-      summary: TODO document PUT /training-requests/{id}
+        - Training
+      summary: Update a training request
       responses:
         "200":
           description: Success
+      description: Update a training request. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
     delete:
       tags:
-        - TODO
-      summary: TODO document DELETE /training-requests/{id}
+        - Training
+      summary: Cancel a training request
       responses:
         "200":
           description: Success
+      description: Cancel a training request. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
     get:
       tags:
-        - TODO
-      summary: TODO document GET /training-requests/{id}
+        - Training
+      summary: Get a training request
       responses:
         "200":
           description: Success
+      description: Get a training request. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /training-requests/{id}/events:
     get:
       tags:
-        - TODO
-      summary: TODO document GET /training-requests/{id}/events
+        - Training
+      summary: Stream training request events
       responses:
         "200":
           description: Success
+      description: Stream training request events. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /training-requests/{id}/messages:
     get:
       tags:
-        - TODO
-      summary: TODO document GET /training-requests/{id}/messages
+        - Training
+      summary: List training request messages
       responses:
         "200":
           description: Success
+      description: List training request messages. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
     post:
       tags:
-        - TODO
-      summary: TODO document POST /training-requests/{id}/messages
+        - Training
+      summary: Send a training request message
       responses:
         "200":
           description: Success
+      description: Send a training request message. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /training-requests/{id}/schedule:
     put:
       tags:
-        - TODO
-      summary: TODO document PUT /training-requests/{id}/schedule
+        - Training
+      summary: Schedule a training request
       responses:
         "200":
           description: Success
+      description: Schedule a training request. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /training-requests/{id}/subscription:
     get:
       tags:
-        - TODO
-      summary: TODO document GET /training-requests/{id}/subscription
+        - Training
+      summary: Get a training chat subscription
       responses:
         "200":
           description: Success
+      description: Get a training chat subscription. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
     put:
       tags:
-        - TODO
-      summary: TODO document PUT /training-requests/{id}/subscription
+        - Training
+      summary: Update a training chat subscription
       responses:
         "200":
           description: Success
+      description: Update a training chat subscription. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /training-sessions:
     get:
       tags:
-        - TODO
-      summary: TODO document GET /training-sessions
+        - Training
+      summary: List training sessions
       responses:
         "200":
           description: Success
+      description: List training sessions. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
     post:
       tags:
-        - TODO
-      summary: TODO document POST /training-sessions
+        - Training
+      summary: Create a training session
       responses:
         "200":
           description: Success
+      description: Create a training session. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /training-sessions/{id}:
     get:
       tags:
-        - TODO
-      summary: TODO document GET /training-sessions/{id}
+        - Training
+      summary: Get a training session
       responses:
         "200":
           description: Success
+      description: Get a training session. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
     put:
       tags:
-        - TODO
-      summary: TODO document PUT /training-sessions/{id}
+        - Training
+      summary: Update a training session
       responses:
         "200":
           description: Success
+      description: Update a training session. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /training-sessions/{id}/attendees:
     post:
       tags:
-        - TODO
-      summary: TODO document POST /training-sessions/{id}/attendees
+        - Training
+      summary: Add an attendee to a training session
       responses:
         "200":
           description: Success
+      description: Add an attendee to a training session. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /training-sessions/{id}/attendees/{attendeeId}:
     put:
       tags:
-        - TODO
-      summary: TODO document PUT /training-sessions/{id}/attendees/{attendeeId}
+        - Training
+      summary: Update a training session attendee
       responses:
         "200":
           description: Success
+      description: Update a training session attendee. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
     delete:
       tags:
-        - TODO
-      summary: TODO document DELETE /training-sessions/{id}/attendees/{attendeeId}
+        - Training
+      summary: Remove a training session attendee
       responses:
         "200":
           description: Success
+      description: Remove a training session attendee. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /training-staff:
     get:
       tags:
-        - TODO
-      summary: TODO document GET /training-staff
+        - Training
+      summary: List eligible training staff
       responses:
         "200":
           description: Success
+      description: List eligible training staff. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /training-users:
     get:
       tags:
-        - TODO
-      summary: TODO document GET /training-users
+        - Training
+      summary: List users for training administration
       responses:
         "200":
           description: Success
+      description: List users for training administration. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /trainings:
     get:
       tags:
@@ -2595,11 +2737,12 @@ paths:
           description: Training deleted
     put:
       tags:
-        - TODO
-      summary: TODO document PUT /trainings/{id}
+        - Training
+      summary: Update a training definition
       responses:
         "200":
           description: Success
+      description: Update a training definition. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /trainings/{id}/prerequisites:
     get:
       tags:
@@ -2659,18 +2802,20 @@ paths:
           description: Requirements updated
     post:
       tags:
-        - TODO
-      summary: TODO document POST /trainings/{id}/requirements
+        - Training
+      summary: Add a training rank requirement
       responses:
         "200":
           description: Success
+      description: Add a training rank requirement. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
     delete:
       tags:
-        - TODO
-      summary: TODO document DELETE /trainings/{id}/requirements
+        - Training
+      summary: Remove a training rank requirement
       responses:
         "200":
           description: Success
+      description: Remove a training rank requirement. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /trainings/available:
     get:
       tags:
@@ -2693,11 +2838,12 @@ paths:
           description: Unauthorized
     post:
       tags:
-        - TODO
-      summary: TODO document POST /user-trainings
+        - Training
+      summary: Create a user training record
       responses:
         "200":
           description: Success
+      description: Create a user training record. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /user-trainings/{id}:
     patch:
       tags:
@@ -2719,19 +2865,21 @@ paths:
           description: Unauthorized
     put:
       tags:
-        - TODO
-      summary: TODO document PUT /user-trainings/{id}
+        - Training
+      summary: Update a user training record
       responses:
         "200":
           description: Success
+      description: Update a user training record. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /user-trainings/bulk-status:
     post:
       tags:
-        - TODO
-      summary: TODO document POST /user-trainings/bulk-status
+        - Training
+      summary: Update multiple user training statuses
       responses:
         "200":
           description: Success
+      description: Update multiple user training statuses. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /user/auth-providers:
     get:
       tags:
@@ -2745,11 +2893,12 @@ paths:
   /user/avatar/migrate:
     post:
       tags:
-        - TODO
-      summary: TODO document POST /user/avatar/migrate
+        - Users
+      summary: Migrate the current user’s legacy avatar
       responses:
         "200":
           description: Success
+      description: Migrate the current user’s legacy avatar. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /user/avatar/refresh:
     post:
       tags:
@@ -2763,11 +2912,12 @@ paths:
   /user/avatar/upload:
     post:
       tags:
-        - TODO
-      summary: TODO document POST /user/avatar/upload
+        - Users
+      summary: Upload the current user’s avatar
       responses:
         "200":
           description: Success
+      description: Upload the current user’s avatar. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /user/current:
     get:
       tags:
@@ -2853,11 +3003,12 @@ paths:
           description: Forbidden
     patch:
       tags:
-        - TODO
-      summary: TODO document PATCH /users/{id}
+        - Users
+      summary: Update a user profile
       responses:
         "200":
           description: Success
+      description: Update a user profile. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /users/{id}/admin:
     get:
       tags:
@@ -2871,11 +3022,12 @@ paths:
           description: User admin details
     patch:
       tags:
-        - TODO
-      summary: TODO document PATCH /users/{id}/admin
+        - Users
+      summary: Update a user’s legacy administrator state
       responses:
         "200":
           description: Success
+      description: Update a user’s legacy administrator state. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
   /users/{id}/attendance:
     get:
       tags:
@@ -3045,18 +3197,20 @@ paths:
   /users/me/notification-preferences:
     get:
       tags:
-        - TODO
-      summary: TODO document GET /users/me/notification-preferences
+        - Messaging
+      summary: Get current-user notification preferences
       responses:
         "200":
           description: Success
+      description: Get current-user notification preferences. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
     patch:
       tags:
-        - TODO
-      summary: TODO document PATCH /users/me/notification-preferences
+        - Messaging
+      summary: Update current-user notification preferences
       responses:
         "200":
           description: Success
+      description: Update current-user notification preferences. Uses the current website session and the route’s permission checks unless documented otherwise. This description reflects the currently implemented route; broader response and error standardization is deferred.
 components:
   securitySchemes:
     bearerAuth:
