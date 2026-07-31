@@ -130,24 +130,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Compile attendance for each user
+    // Compile every signup so users without any events receive a deterministic no_show.
     const compiledAttendance = [];
-    for (const [userId, { joins, leaves }] of Object.entries(userEvents)) {
-      const userIdNum = parseInt(userId);
-
-      // Find signed up users for this ORBAT
-      const signup = await prisma.signup.findFirst({
-        where: {
-          userId: userIdNum,
-          slot: { orbatId: orbat.id },
-        },
-        include: { slot: true, user: true },
-      });
-
-      if (!signup) {
-        console.warn(`User ${userIdNum} has events but no signup for ORBAT ${orbat.id}`);
-        continue;
-      }
+    const signups = orbat.squads.flatMap((squad) => squad.slots.flatMap((slot) =>
+      slot.signups.map((signup) => ({ ...signup, slot })),
+    ));
+    for (const signup of signups) {
+      const userIdNum = signup.userId;
+      const { joins, leaves } = userEvents[userIdNum] ?? { joins: [], leaves: [] };
 
       // Calculate total minutes present
       let totalMinutesPresent = 0;
@@ -259,6 +249,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      idempotent: true,
+      compiledAt: new Date().toISOString(),
       orbatId: orbat.id,
       orbatName: orbat.name,
       eventDate: orbat.eventDate?.toISOString() || null,

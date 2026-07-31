@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 import { publishUserProfileEvent } from '@/lib/realtime/user-events';
 import { getCurrentAttendance } from '@/lib/rank-eligibility';
+import { appendBotEvent } from '@/lib/bot-events';
 
 export async function POST(
   request: NextRequest,
@@ -44,17 +45,11 @@ export async function POST(
       return NextResponse.json({ error: 'User has no rank to demote from' }, { status: 400 });
     }
 
-    await prisma.userRank.update({
-      where: { userId },
-      data: {
-        currentRankId: rank.id,
-        lastRankedUpAt: new Date(),
-        attendanceSinceLastRank: attendanceTotal,
-      },
-    });
-
-    await prisma.rankHistory.create({
-      data: {
+    await prisma.$transaction(async (tx) => {
+      await tx.userRank.update({
+        where: { userId }, data: { currentRankId: rank.id, lastRankedUpAt: new Date(), attendanceSinceLastRank: attendanceTotal },
+      });
+      const history = await tx.rankHistory.create({ data: {
         userId,
         previousRankName: previousRankName,
         newRankName: rank.name,
@@ -64,7 +59,12 @@ export async function POST(
         triggeredByUserId: session.user.id,
         outcome: 'approved',
         note: reason || null,
-      },
+      } });
+      const discord = await tx.authAccount.findFirst({ where: { userId, provider: 'discord' }, select: { providerUserId: true } });
+      await appendBotEvent({ type: 'user.rank_changed', aggregate: 'rank', aggregateId: history.id, payload: {
+        rankHistoryId: history.id, userId, discordUserId: discord?.providerUserId ?? null,
+        oldRankId: existing.currentRankId, newRankId: rank.id, changeType: 'demotion', source: 'direct_assignment',
+      } }, tx);
     });
 
     publishUserProfileEvent(userId, {

@@ -13,7 +13,11 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit') || '50');
+    const limit = Math.min(Math.max(Number(searchParams.get('limit')) || 50, 1), 100);
+    const cursor = searchParams.get('cursor') ? Number(searchParams.get('cursor')) : null;
+    if (cursor !== null && (!Number.isInteger(cursor) || cursor <= 0)) {
+      return NextResponse.json({ error: 'cursor must be a positive proposal id' }, { status: 400 });
+    }
 
     const pendingPromotions = await prisma.promotionProposal.findMany({
       where: {
@@ -27,7 +31,8 @@ export async function GET(request: NextRequest) {
           },
         },
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       take: limit,
     });
 
@@ -60,6 +65,7 @@ export async function GET(request: NextRequest) {
       success: true,
       pendingPromotions: formatted,
       total: formatted.length,
+      nextCursor: formatted.length === limit ? String(formatted.at(-1)!.id) : null,
     });
   } catch (error) {
     console.error('Bot promotions pending error:', error);

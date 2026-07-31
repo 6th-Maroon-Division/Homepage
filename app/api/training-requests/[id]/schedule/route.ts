@@ -6,6 +6,7 @@ import { assertEligibleTrainingStaff, isTrainingStaff } from '@/lib/training-sta
 import { createTrainingNotification } from '@/lib/training-notifications';
 import { publishTrainingChatEvent } from '@/lib/realtime/training-chat-events';
 import { publishUserProfileEvent } from '@/lib/realtime/user-events';
+import { appendBotEvent } from '@/lib/bot-events';
 import { Prisma } from '@/generated/prisma/client';
 
 const trainerSelect = { id: true, username: true, avatarUrl: true } as const;
@@ -308,6 +309,14 @@ export async function PUT(
     source: 'training-session.updated',
     sessionId: result.id,
   });
+  if (confirmed && desiredStartsAt) {
+    await appendBotEvent({ type: priorAttendance ? 'training.updated' : 'training.scheduled', aggregate: 'training', aggregateId: result.id, payload: {
+      trainingId: trainingRequest.trainingId, sessionId: result.id, title: trainingRequest.training.name,
+      startsAt: desiredStartsAt.toISOString(),
+      endsAt: desiredDurationMinutes === null ? null : new Date(desiredStartsAt.getTime() + desiredDurationMinutes * 60_000).toISOString(),
+      websiteUrl: `/trainings/requests/${requestId}`, version: result.updatedAt.toISOString(),
+    } });
+  }
 
   return NextResponse.json({
     session: {

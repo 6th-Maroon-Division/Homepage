@@ -4,6 +4,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 import { publishOrbatEvent } from '@/lib/realtime/orbat-events';
+import { appendBotEvent } from '@/lib/bot-events';
 import { publishAdminCatalogEvent } from '@/lib/realtime/admin-catalog-events';
 
 type SlotInput = {
@@ -405,6 +406,9 @@ export async function PATCH(
           skipDuplicates: true,
         });
       }
+      await appendBotEvent({ type: 'orbat.updated', aggregate: 'orbat', aggregateId: orbatId, payload: {
+        orbatId, version: new Date().toISOString(),
+      } }, tx);
     });
 
     const updatedOrbat = await prisma.orbat.findUnique({
@@ -500,7 +504,12 @@ export async function DELETE(
       return NextResponse.json({ error: 'OrbAT not found' }, { status: 404 });
     }
 
-    await prisma.orbat.delete({ where: { id: orbatId } });
+    await prisma.$transaction(async (tx) => {
+      await tx.orbat.delete({ where: { id: orbatId } });
+      await appendBotEvent({ type: 'orbat.deleted', aggregate: 'orbat', aggregateId: orbatId, payload: {
+        orbatId, version: new Date().toISOString(),
+      } }, tx);
+    });
 
     publishOrbatEvent({
       type: 'orbat.deleted',

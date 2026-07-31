@@ -60,6 +60,7 @@ model User {
   leaveOfAbsences              LeaveOfAbsence[]
   botTokens                    BotToken[]
   orbatAttendanceNotes         OrbatAttendanceNote[]
+  notificationPreference       UserNotificationPreference?
 }
 
 enum MessageType {
@@ -351,6 +352,22 @@ model Signup {
 
   @@unique([slotId, userId])
   @@index([userId])
+}
+
+model UserNotificationPreference {
+  id                     Int      @id @default(autoincrement())
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                 Int      @unique
+  orbatAnnouncements     Boolean  @default(false)
+  trainingScheduled      Boolean  @default(false)
+  trainingUpdated        Boolean  @default(false)
+  trainingCancelled      Boolean  @default(false)
+  trainingReminders      Boolean  @default(false)
+  promotionAnnouncements Boolean  @default(false)
+  dmEnabled              Boolean  @default(true)
+  channelMentionsEnabled Boolean  @default(false)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 }
 
 model RadioFrequency {
@@ -813,9 +830,24 @@ model Rank {
   userRanks                    UserRank[]
   trainingRequirementsMin      TrainingRankRequirement[]
   transitionRequirementsTarget RankTransitionRequirement[]
+  discordRoles                 RankDiscordRole[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model RankDiscordRole {
+  id            Int      @id @default(autoincrement())
+  rank          Rank     @relation(fields: [rankId], references: [id], onDelete: Cascade)
+  rankId        Int
+  guildId       String
+  discordRoleId String
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([rankId, guildId])
+  @@index([guildId, isActive])
 }
 
 model UserRank {
@@ -959,4 +991,30 @@ model BotToken {
 
   @@index([token])
   @@index([isActive])
+}
+
+model BotIdempotencyReceipt {
+  id             Int      @id @default(autoincrement())
+  idempotencyKey String   @unique
+  operation      String
+  requestHash    String
+  responseStatus Int
+  responseBody   Json
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime
+
+  @@index([expiresAt])
+}
+
+model BotEvent {
+  id          BigInt   @id @default(autoincrement())
+  type        String
+  aggregate   String
+  aggregateId String?
+  payload     Json
+  occurredAt  DateTime @default(now())
+
+  @@index([aggregate, id])
+  @@index([type, id])
+  @@index([occurredAt])
 }

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkRankupEligibility } from '@/lib/rank-eligibility';
+import { appendBotEvent } from '@/lib/bot-events';
 import { checkPermission } from '@/lib/auth-middleware';
 import { getSuperAdminUserIds } from '@/lib/permission-utils';
 import { publishInboxEvents } from '@/lib/realtime/inbox-events';
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        await tx.rankHistory.create({
+        const history = await tx.rankHistory.create({
           data: {
             userId: Number(userId),
             previousRankName: eligibility.currentRank?.name || null,
@@ -87,6 +88,11 @@ export async function POST(request: NextRequest) {
             outcome: 'approved',
           },
         });
+        const discord = await tx.authAccount.findFirst({ where: { userId: Number(userId), provider: 'discord' }, select: { providerUserId: true } });
+        await appendBotEvent({ type: 'user.rank_changed', aggregate: 'rank', aggregateId: history.id, payload: {
+          rankHistoryId: history.id, userId: Number(userId), discordUserId: discord?.providerUserId ?? null,
+          oldRankId: existingRank?.currentRankId ?? null, newRankId: eligibility.nextRank!.id, changeType: 'promotion', source: 'automatic',
+        } }, tx);
       });
 
       return NextResponse.json({ success: true, autoRanked: true, nextRank: eligibility.nextRank });

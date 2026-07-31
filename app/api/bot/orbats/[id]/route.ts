@@ -31,7 +31,7 @@ export async function GET(
             slots: {
               orderBy: { orderIndex: 'asc' },
               include: {
-                squadRole: { select: { name: true } },
+                squadRole: { select: { name: true, requiredTrainingIds: true, requiredRankIds: true } },
                 signups: {
                   include: {
                     user: {
@@ -68,6 +68,8 @@ export async function GET(
         slots: squad.slots.map((slot) => ({
           id: slot.id,
           name: slot.squadRole?.name || 'Unknown',
+          requiredTrainingIds: slot.squadRole?.requiredTrainingIds ?? [],
+          requiredRankIds: slot.squadRole?.requiredRankIds ?? [],
           maxSignups: slot.maxSignups || 1,
           available: (slot.maxSignups || 1) - slot.signups.length,
           signups: slot.signups.map((s) => ({

@@ -14,7 +14,11 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const days = parseInt(searchParams.get('days') || '7');
-    const limit = parseInt(searchParams.get('limit') || '100');
+    const limit = Math.min(Math.max(Number(searchParams.get('limit')) || 100, 1), 100);
+    const cursor = searchParams.get('cursor') ? Number(searchParams.get('cursor')) : null;
+    if (cursor !== null && (!Number.isInteger(cursor) || cursor <= 0)) {
+      return NextResponse.json({ error: 'cursor must be a positive rank-history id' }, { status: 400 });
+    }
 
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
@@ -33,7 +37,8 @@ export async function GET(request: NextRequest) {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       take: limit,
     });
 
@@ -67,6 +72,7 @@ export async function GET(request: NextRequest) {
       autoPromotions: formatted,
       total: formatted.length,
       daysBack: days,
+      nextCursor: formatted.length === limit ? String(formatted.at(-1)!.id) : null,
     });
   } catch (error) {
     console.error('Bot promotions auto error:', error);

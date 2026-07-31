@@ -7,6 +7,8 @@ import {
 } from '@/lib/training-gating';
 import { resolveOrbatScheduleWindow } from '@/lib/orbat-schedule';
 import { runSerializableTransaction } from '@/lib/serializable-transaction';
+import { requestHash } from '@/lib/bot-api';
+import { appendBotEvent } from '@/lib/bot-events';
 
 function validateBotToken(request: NextRequest): Promise<boolean> {
   return validateBotTokenLegacy(request);
@@ -23,6 +25,20 @@ export async function POST(request: NextRequest) {
     const steamId = typeof body.steamId === 'string' ? body.steamId.trim() : '';
     const orbatId = Number(body.orbatId);
     const slotId = body.slotId === undefined || body.slotId === null ? null : Number(body.slotId);
+    const idempotencyKey = request.headers.get('idempotency-key')?.trim() || null;
+    if (idempotencyKey && idempotencyKey.length > 200) {
+      return NextResponse.json({ error: 'Idempotency-Key is too long' }, { status: 400 });
+    }
+    const payloadHash = requestHash({ discordUserId, steamId, orbatId, slotId });
+    if (idempotencyKey) {
+      const receipt = await prisma.botIdempotencyReceipt.findUnique({ where: { idempotencyKey } });
+      if (receipt && receipt.expiresAt > new Date()) {
+        if (receipt.operation !== 'signup.create' || receipt.requestHash !== payloadHash) {
+          return NextResponse.json({ error: 'Idempotency key was already used for a different request' }, { status: 409 });
+        }
+        return NextResponse.json(receipt.responseBody, { status: receipt.responseStatus });
+      }
+    }
 
     // Validate required fields
     if (!Number.isInteger(orbatId) || orbatId <= 0) {
@@ -247,6 +263,34 @@ export async function POST(request: NextRequest) {
     });
 
     if ('error' in signupOutcome) {
+      if (
+        idempotencyKey &&
+        'signupId' in signupOutcome &&
+        signupOutcome.existingSlotId === targetSlot.id
+      ) {
+        const replayBody = {
+          success: true,
+          message: 'User signed up for ORBAT',
+          signupId: signupOutcome.signupId,
+          userId: user.id,
+          username: user.username,
+          orbatId: orbat.id,
+          orbatName: orbat.name,
+          startsAtUtc: orbat.startsAtUtc?.toISOString() || null,
+          eventDate: orbat.eventDate?.toISOString() || null,
+          slotId: targetSlot.id,
+          slotName: targetSlot.squadRole?.name || 'Unknown',
+          squadName: targetSquad!.name,
+          temporaryTrainingAccess: temporaryAccess,
+        };
+        await prisma.botIdempotencyReceipt.upsert({
+          where: { idempotencyKey }, update: {}, create: {
+            idempotencyKey, operation: 'signup.create', requestHash: payloadHash,
+            responseStatus: 200, responseBody: replayBody, expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          },
+        });
+        return NextResponse.json(replayBody);
+      }
       return NextResponse.json(
         {
           error: signupOutcome.error,
@@ -259,7 +303,7 @@ export async function POST(request: NextRequest) {
     }
     const signup = signupOutcome.signup;
 
-    return NextResponse.json({
+    const responseBody = {
       success: true,
       message: 'User signed up for ORBAT',
       signupId: signup.id,
@@ -273,7 +317,24 @@ export async function POST(request: NextRequest) {
       slotName: targetSlot.squadRole?.name || 'Unknown',
       squadName: targetSquad!.name,
       temporaryTrainingAccess: temporaryAccess,
+    };
+    await prisma.$transaction(async (tx) => {
+      await appendBotEvent({
+        type: 'orbat.signup_changed', aggregate: 'orbat', aggregateId: orbat.id,
+        payload: { orbatId: orbat.id, signupId: signup.id, userId: user.id, discordUserId: discordUserId || null, oldSlotId: null, slotId: targetSlot.id },
+      }, tx);
+      if (idempotencyKey) {
+        await tx.botIdempotencyReceipt.upsert({
+          where: { idempotencyKey },
+          update: {},
+          create: {
+            idempotencyKey, operation: 'signup.create', requestHash: payloadHash,
+            responseStatus: 200, responseBody, expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          },
+        });
+      }
     });
+    return NextResponse.json(responseBody);
   } catch (error) {
     console.error('Bot signup error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

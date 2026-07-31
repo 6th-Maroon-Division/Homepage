@@ -35,7 +35,9 @@ Bot tokens may only be administered by users with `system:super_admin`. New endp
 | `GET /bot/users/discord/{discordId}` | Available | Resolve linked user | Response contract needs OpenAPI coverage |
 | `GET /bot/users/steam/{steamId}` | Available | Resolve linked user | Not required for normal Discord actions |
 | `GET /bot/orbats` | Available | Upcoming/past ORBAT polling | Only `includePast` and `limit`; no date range or cursor |
-| `GET /bot/orbats/{id}` | Partial | ORBAT, slots, embedded signups | Does not expose rank/training requirements |
+| `GET /bot/orbats/{id}` | Available | ORBAT, slots, requirements, embedded signups | Dedicated signup route is preferred for reconciliation |
+| `GET /bot/orbats/{id}/signups` | Available | Paginated ORBAT signup reconciliation | Dedicated bot-authenticated signup view |
+| `GET /bot/users/discord/{discordId}/signups` | Available | Paginated user signup lookup | Upcoming-only by default; supports `includePast=true` |
 | `POST /bot/signups` | Partial | Create signup | No bot update/cancel route or idempotency key |
 | `POST /bot/attendance` | Available | Check-in/check-out submission | Not an availability-note endpoint |
 | `POST /bot/attendance/compile` | Available | Compile an ORBAT | Contract must guarantee idempotency |
@@ -49,7 +51,7 @@ Bot tokens may only be administered by users with `system:super_admin`. New endp
 | `GET /orbats/events` | Available | Public ORBAT SSE | In-process delivery limitations must be assessed for deployment |
 | `GET /ranks/promotions/events` | Partial | Promotion queue SSE | Uses web-session authorization and only emits queue updates |
 
-The following routes referenced in older bot documentation do not currently exist:
+The routes referenced in older bot documentation are now available:
 
 - `GET /bot/orbats/{id}/signups`
 - `GET /bot/users/discord/{discordId}/signups`
@@ -58,27 +60,27 @@ The following routes referenced in older bot documentation do not currently exis
 - bot availability-note routes
 - a bot-authenticated applied-rank event stream
 
-Signup data can currently be read from `GET /bot/orbats/{id}`, but that is not a substitute for mutation routes or user-specific eligibility.
+Embedded signup data remains available from `GET /bot/orbats/{id}`, while the dedicated routes provide pagination and user-specific lookup.
 
 ## 4. Priority summary
 
 | Priority | Contract | Status | Blocks |
 |---|---|---|---|
-| P0 | Signup availability plus update/cancel | Planned | Complete interactive signup |
-| P0 | Availability-note get/upsert/delete | Decision required / Planned | Attendance buttons and single source of truth |
-| P0 | Rank-role mapping management and bot read | Planned | Safe Discord role sync |
-| P0 | Notification preference get/update | Planned | Cross-platform notification settings |
-| P0 | Applied-rank event feed | Planned | Reliable near-real-time nickname/role sync |
-| P1 | ORBAT date filtering | Planned | Efficient compile and Monday reconciliation |
-| P1 | Bot-authenticated event replay/cursor | Planned | Downtime recovery |
-| P1 | Training events | Planned | Scheduled/updated/cancelled notifications |
+| P0 | Signup availability plus update/cancel | Available | Complete interactive signup |
+| P0 | Availability-note get/upsert/delete | Available | Attendance buttons and single source of truth |
+| P0 | Rank-role mapping management and bot read | Available | Safe Discord role sync |
+| P0 | Notification preference get/update | Available | Cross-platform notification settings |
+| P0 | Applied-rank event feed | Available | Reliable near-real-time nickname/role sync |
+| P1 | ORBAT date filtering | Available | Efficient compile and Monday reconciliation |
+| P1 | Bot-authenticated event replay/cursor | Available | Downtime recovery |
+| P1 | Training events | Available | Scheduled/updated/cancelled notifications |
 | P1 | API schema and error standardization | Partial | Robust bot client |
-| P2 | User rank-history lookup | Planned | Diagnostics and historical views |
+| P2 | User rank-history lookup | Available | Diagnostics and historical views |
 | P2 | Training announcement metadata | Deferred | Reply redirection, if retained |
 
 ## 5. P0 contract: available slots
 
-### Proposed endpoint
+### Available endpoint
 
 ```http
 GET /bot/orbats/{orbatId}/available-slots?discordUserId={discordId}
@@ -139,7 +141,7 @@ Content-Type: application/json
 
 The current implementation already revalidates the ORBAT, cutoff, absence note, capacity, training, rank, and duplicate signup inside platform logic. Add explicit idempotency-key support and document its response schema.
 
-### Proposed change endpoint
+### Available change endpoint
 
 ```http
 PUT /bot/signups/{signupId}
@@ -150,7 +152,7 @@ PUT /bot/signups/{signupId}
 }
 ```
 
-### Proposed cancellation endpoint
+### Available cancellation endpoint
 
 ```http
 DELETE /bot/signups/{signupId}
@@ -170,19 +172,19 @@ Mutation requirements:
 
 ## 7. P0 contract: availability notes
 
-### Domain decision required
+### Shared website behavior
 
-The existing `OrbatAttendanceNote` model supports `absent`, `unsure`, and `late_unsure`, plus `lateMinutes` and `leaveEarlyMinutes`. Before implementing the bot endpoint, decide:
+Discord uses the existing `OrbatAttendanceNote` row directly. There is no Discord-specific note table or source flag. The bot contract mirrors the website behavior:
 
-1. If a signed-up member marks `absent`, should the platform atomically cancel the signup, reject the note, or allow both?
-2. May a non-signed-up member record a note?
-3. Are late and leave-early estimates optional, and what are their valid ranges?
-4. At what cutoff can notes no longer be edited?
-5. Who may view the reason text?
+1. A signed-up member may mark `absent`; the signup is retained.
+2. A non-signed-up member may record a note.
+3. Minute estimates are non-negative integers; `late_unsure` requires at least one estimate.
+4. Member edits close at the effective ORBAT cutoff/end.
+5. Reason visibility is unchanged from the website ORBAT view.
 
 Do not expand the note enum to include compiled outcomes such as `present` or `no_show`.
 
-### Proposed endpoints
+### Available endpoints
 
 ```http
 GET /bot/orbats/{orbatId}/availability/{discordUserId}
@@ -244,7 +246,7 @@ PATCH /bot/users/discord/{discordId}/notification-preferences
 
 `PATCH` accepts only the fields being changed and returns the complete resulting preferences. Website settings must read and write the same row.
 
-Open product decision: confirm whether defaults are opt-in or opt-out. The bot design currently specifies opt-out pending an explicit decision.
+Defaults are opt-out for announcement/reminder categories. Discord DMs are an allowed delivery channel by default, but no DM is sent until the user enables at least one category; channel mentions remain disabled by default.
 
 ## 9. P0 contract: Discord rank-role mappings
 
@@ -341,7 +343,7 @@ Requirements:
 - Cover auto promotions, approved proposals, demotions, direct assignments, and corrections.
 - Use a durable event/outbox store. An in-memory event hub cannot replay downtime.
 - Support `Last-Event-ID` or provide a cursor-based recent-events endpoint.
-- Retain events for a documented interval.
+- Retain events for 30 days. Event writes opportunistically prune older rows.
 - Do not require a web user session.
 
 Fallback polling should query rank changes by durable cursor, not infer manual approvals from disappearance from the pending queue.
@@ -422,15 +424,13 @@ List endpoints must document maximum page size and use stable cursor pagination.
 
 ## 14. P1 contract: attendance compilation
 
-`POST /bot/attendance/compile` exists. Confirm and document:
+`POST /bot/attendance/compile` accepts `{ "orbatId": number }` and returns the ORBAT identity, compilation timestamp, event count, and the complete calculated attendance rows. Its behavior is:
 
-- exact request and response schemas
-- whether repeated calls are idempotent
-- behavior when the ORBAT has already been compiled
-- whether changed attendance events cause recompilation
-- concurrency behavior
-- stable error codes
-- audit-log behavior
+- Repeated calls are idempotent upserts keyed by signup and return `idempotent: true`.
+- An already compiled ORBAT is recalculated from the current attendance events and note flags.
+- Concurrent calls converge on the signup's unique attendance row and do not duplicate attendance or rank effects.
+- Every signup is compiled; a signup without matching events receives `no_show`.
+- Compilation does not create `AttendanceLog` rows; it updates the automated attendance result itself.
 
 If compilation is idempotent, repeat calls should return the current compilation result rather than duplicate attendance or rank effects.
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { validateBotTokenLegacy } from '@/lib/bot-token-validation';
+import { appendBotEvent } from '@/lib/bot-events';
 
 function validateBotToken(request: NextRequest): Promise<boolean> {
   return validateBotTokenLegacy(request);
@@ -62,24 +63,15 @@ export async function POST(
       );
     }
 
-    // Update promotion status
-    await prisma.promotionProposal.update({
-      where: { id: promotionId },
-      data: { status: 'approved' },
-    });
-
-    // Update user's rank
-    await prisma.userRank.update({
-      where: { userId: promotion.user.id },
-      data: {
-        currentRankId: promotion.nextRankId,
-        lastRankedUpAt: new Date(),
-      },
-    });
-
-    // Create rank history entry
-    await prisma.rankHistory.create({
-      data: {
+    await prisma.$transaction(async (tx) => {
+      const claimed = await tx.promotionProposal.updateMany({
+        where: { id: promotionId, status: 'pending' }, data: { status: 'approved' },
+      });
+      if (claimed.count !== 1) throw new Error('PROMOTION_ALREADY_HANDLED');
+      await tx.userRank.update({
+        where: { userId: promotion.user.id }, data: { currentRankId: promotion.nextRankId, lastRankedUpAt: new Date() },
+      });
+      const history = await tx.rankHistory.create({ data: {
         userId: promotion.user.id,
         previousRankName: currentRank?.name || null,
         newRankName: nextRank.name,
@@ -88,7 +80,12 @@ export async function POST(
         triggeredBy: 'bot',
         triggeredByDiscordId: null,
         outcome: 'approved',
-      },
+      } });
+      const discordUserId = promotion.user.accounts.find((account) => account.provider === 'discord')?.providerUserId ?? null;
+      await appendBotEvent({ type: 'user.rank_changed', aggregate: 'rank', aggregateId: history.id, payload: {
+        rankHistoryId: history.id, userId: promotion.user.id, discordUserId,
+        oldRankId: promotion.currentRankId, newRankId: promotion.nextRankId, changeType: 'promotion', source: 'manual_approval',
+      } }, tx);
     });
 
     // Create message for user

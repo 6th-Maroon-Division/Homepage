@@ -4,6 +4,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 import { resolveOrbatScheduleWindow } from '@/lib/orbat-schedule';
+import { appendBotEvent } from '@/lib/bot-events';
 
 type RouteParams = {
   params: Promise<{ id: string; noteId: string }>;
@@ -115,7 +116,8 @@ export async function PATCH(req: NextRequest, context: RouteParams) {
       );
     }
 
-    const updated = await prisma.orbatAttendanceNote.update({
+    const updated = await prisma.$transaction(async (tx) => {
+      const saved = await tx.orbatAttendanceNote.update({
       where: { id: parsedNoteId },
       data: {
         status,
@@ -138,6 +140,11 @@ export async function PATCH(req: NextRequest, context: RouteParams) {
           },
         },
       },
+      });
+      await appendBotEvent({ type: 'orbat.availability_changed', aggregate: 'orbat', aggregateId: orbatId, payload: {
+        orbatId, userId: existing.userId, status: saved.status,
+      } }, tx);
+      return saved;
     });
 
     return NextResponse.json(updated);
@@ -200,7 +207,12 @@ export async function DELETE(_req: NextRequest, context: RouteParams) {
       }
     }
 
-    await prisma.orbatAttendanceNote.delete({ where: { id: parsedNoteId } });
+    await prisma.$transaction(async (tx) => {
+      await tx.orbatAttendanceNote.delete({ where: { id: parsedNoteId } });
+      await appendBotEvent({ type: 'orbat.availability_changed', aggregate: 'orbat', aggregateId: orbatId, payload: {
+        orbatId, userId: existing.userId, status: null,
+      } }, tx);
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

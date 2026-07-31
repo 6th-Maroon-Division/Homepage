@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { validateBotTokenLegacy } from '@/lib/bot-token-validation';
+import { appendBotEvent } from '@/lib/bot-events';
 
 /**
  * Bot Authentication Middleware
@@ -128,7 +129,7 @@ export async function POST(request: NextRequest) {
       ]);
 
       // Create rank history entry
-      await tx.rankHistory.create({
+      const history = await tx.rankHistory.create({
         data: {
           userId: proposal.userId,
           previousRankName: currentRank?.name || 'Unknown',
@@ -140,6 +141,11 @@ export async function POST(request: NextRequest) {
           triggeredByDiscordId: discordActorId || null,
         },
       });
+      const discord = await tx.authAccount.findFirst({ where: { userId: proposal.userId, provider: 'discord' }, select: { providerUserId: true } });
+      await appendBotEvent({ type: 'user.rank_changed', aggregate: 'rank', aggregateId: history.id, payload: {
+        rankHistoryId: history.id, userId: proposal.userId, discordUserId: discord?.providerUserId ?? null,
+        oldRankId: proposal.currentRankId, newRankId: proposal.nextRankId, changeType: 'promotion', source: 'manual_approval',
+      } }, tx);
 
       // Create notification for user
       const message = await tx.message.create({

@@ -4,6 +4,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 import { publishOrbatEvent } from '@/lib/realtime/orbat-events';
+import { appendBotEvent } from '@/lib/bot-events';
 import { publishAdminCatalogEvent } from '@/lib/realtime/admin-catalog-events';
 
 type SlotInput = {
@@ -260,6 +261,10 @@ export async function POST(request: NextRequest) {
           skipDuplicates: true,
         });
       }
+
+      await appendBotEvent({ type: 'orbat.created', aggregate: 'orbat', aggregateId: newOrbat.id, payload: {
+        orbatId: newOrbat.id, version: newOrbat.createdAt.toISOString(), name: newOrbat.name,
+      } }, tx);
 
       return tx.orbat.findUnique({
         where: { id: newOrbat.id },

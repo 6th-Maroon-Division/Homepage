@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 import { publishUserProfileEvent } from '@/lib/realtime/user-events';
 import { getCurrentAttendance } from '@/lib/rank-eligibility';
+import { appendBotEvent } from '@/lib/bot-events';
 
 export async function POST(
   request: NextRequest,
@@ -40,8 +41,9 @@ export async function POST(
       ? (await prisma.rank.findUnique({ where: { id: existing.currentRankId } }))?.name || null
       : null;
 
-    if (existing) {
-      await prisma.userRank.update({
+    await prisma.$transaction(async (tx) => {
+      if (existing) {
+        await tx.userRank.update({
         where: { userId },
         data: {
           currentRankId: rank.id,
@@ -49,8 +51,8 @@ export async function POST(
           attendanceSinceLastRank: attendanceTotal,
         },
       });
-    } else {
-      await prisma.userRank.create({
+      } else {
+        await tx.userRank.create({
         data: {
           userId,
           currentRankId: rank.id,
@@ -58,9 +60,9 @@ export async function POST(
           attendanceSinceLastRank: attendanceTotal,
         },
       });
-    }
+      }
 
-    await prisma.rankHistory.create({
+      const history = await tx.rankHistory.create({
       data: {
         userId,
         previousRankName: previousRankName,
@@ -71,6 +73,12 @@ export async function POST(
         triggeredByUserId: session.user.id,
         outcome: 'approved',
       },
+      });
+      const discord = await tx.authAccount.findFirst({ where: { userId, provider: 'discord' }, select: { providerUserId: true } });
+      await appendBotEvent({ type: 'user.rank_changed', aggregate: 'rank', aggregateId: history.id, payload: {
+        rankHistoryId: history.id, userId, discordUserId: discord?.providerUserId ?? null,
+        oldRankId: existing?.currentRankId ?? null, newRankId: rank.id, changeType: 'assignment', source: 'direct_assignment',
+      } }, tx);
     });
 
     publishUserProfileEvent(userId, {

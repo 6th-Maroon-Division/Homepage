@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 import { publishInboxEvent } from '@/lib/realtime/inbox-events';
 import { publishUserProfileEvent } from '@/lib/realtime/user-events';
+import { appendBotEvent } from '@/lib/bot-events';
 import { checkRankupEligibility } from '@/lib/rank-eligibility';
 
 type PromotionResult = {
@@ -95,7 +96,7 @@ export async function POST() {
           });
 
           // Create rank history entry
-          await tx.rankHistory.create({
+          const history = await tx.rankHistory.create({
             data: {
               userId: userRank.userId,
               previousRankName: currentRank.name,
@@ -106,6 +107,11 @@ export async function POST() {
               outcome: 'approved',
             },
           });
+          const discord = await tx.authAccount.findFirst({ where: { userId: userRank.userId, provider: 'discord' }, select: { providerUserId: true } });
+          await appendBotEvent({ type: 'user.rank_changed', aggregate: 'rank', aggregateId: history.id, payload: {
+            rankHistoryId: history.id, userId: userRank.userId, discordUserId: discord?.providerUserId ?? null,
+            oldRankId: currentRank.id, newRankId: nextRank.id, changeType: 'promotion', source: 'automatic',
+          } }, tx);
 
           // Create notification message for rankup
           const message = await tx.message.create({

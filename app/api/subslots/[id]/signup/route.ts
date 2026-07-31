@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 import { resolveOrbatScheduleWindow } from '@/lib/orbat-schedule';
 import { publishOrbatEvent } from '@/lib/realtime/orbat-events';
+import { appendBotEvent } from '@/lib/bot-events';
 import { runSerializableTransaction } from '@/lib/serializable-transaction';
 import {
   formatOrbatTrainingAccessError,
@@ -299,6 +300,9 @@ export async function POST(_req: NextRequest, context: RouteParams) {
     }
 
     await tx.signup.create({ data: { slotId, userId: currentUserId } });
+    await appendBotEvent({ type: 'orbat.signup_changed', aggregate: 'orbat', aggregateId: slot.orbat.id, payload: {
+      orbatId: slot.orbat.id, userId: currentUserId, oldSlotId: null, slotId,
+    } }, tx);
     return { created: true } as const;
   });
 
@@ -368,7 +372,12 @@ export async function DELETE(req: NextRequest, context: RouteParams) {
     return NextResponse.json({ error: 'Signup not found.' }, { status: 400 });
   }
 
-  await prisma.signup.delete({ where: { id: signup.id } });
+  await prisma.$transaction(async (tx) => {
+    await tx.signup.delete({ where: { id: signup.id } });
+    await appendBotEvent({ type: 'orbat.signup_changed', aggregate: 'orbat', aggregateId: slot.orbat.id, payload: {
+      orbatId: slot.orbat.id, signupId: signup.id, userId: signup.userId, oldSlotId: slotId, slotId: null,
+    } }, tx);
+  });
 
   publishOrbatEvent({
     type: 'signup.deleted',

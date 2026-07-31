@@ -156,6 +156,29 @@ paths:
       responses:
         "200":
           description: Admin ORBAT list
+  /admin/ranks/{rankId}/discord-role:
+    put:
+      tags:
+        - TODO
+      summary: TODO document PUT /admin/ranks/{rankId}/discord-role
+      responses:
+        "200":
+          description: Success
+    delete:
+      tags:
+        - TODO
+      summary: TODO document DELETE /admin/ranks/{rankId}/discord-role
+      responses:
+        "200":
+          description: Success
+  /admin/ranks/discord-roles:
+    get:
+      tags:
+        - TODO
+      summary: TODO document GET /admin/ranks/discord-roles
+      responses:
+        "200":
+          description: Success
   /admin/users/bulk-interview-toggle:
     post:
       tags:
@@ -602,6 +625,51 @@ paths:
           description: User not found
         "500":
           description: Internal server error
+  /bot/events/orbats:
+    get:
+      tags:
+        - Bot
+        - Realtime
+      summary: Replay or stream durable ORBAT lifecycle events
+      description: Returns JSON unless Accept is text/event-stream. Resume with Last-Event-ID or cursor.
+      security:
+        - apiKey: []
+      responses:
+        "200":
+          description: Success
+  /bot/events/ranks:
+    get:
+      tags:
+        - Bot
+        - Realtime
+      summary: Replay or stream durable applied-rank events
+      description: Returns JSON unless Accept is text/event-stream. Resume with Last-Event-ID or cursor.
+      security:
+        - apiKey: []
+      parameters:
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: Last-Event-ID
+          in: header
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+  /bot/events/training:
+    get:
+      tags:
+        - Bot
+        - Realtime
+      summary: Replay or stream durable training lifecycle events
+      description: Returns JSON unless Accept is text/event-stream. Resume with Last-Event-ID or cursor.
+      security:
+        - apiKey: []
+      responses:
+        "200":
+          description: Success
   /bot/orbats:
     get:
       tags:
@@ -615,6 +683,66 @@ paths:
       tags:
         - TODO
       summary: TODO document GET /bot/orbats/{id}
+      responses:
+        "200":
+          description: Success
+  /bot/orbats/{id}/availability/{discordId}:
+    get:
+      tags:
+        - Bot
+        - ORBATs
+      summary: Get the shared website/Discord availability note
+      security:
+        - apiKey: []
+      responses:
+        "200":
+          description: Success
+    put:
+      tags:
+        - Bot
+        - ORBATs
+      summary: Upsert the shared website/Discord availability note
+      security:
+        - apiKey: []
+      responses:
+        "200":
+          description: Success
+    delete:
+      tags:
+        - Bot
+        - ORBATs
+      summary: Clear the shared website/Discord availability note
+      security:
+        - apiKey: []
+      responses:
+        "200":
+          description: Success
+  /bot/orbats/{id}/available-slots:
+    get:
+      tags:
+        - Bot
+        - Signups
+      summary: List authoritative slot availability and user eligibility
+      security:
+        - apiKey: []
+      parameters:
+        - name: discordUserId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+  /bot/orbats/{id}/signups:
+    get:
+      tags:
+        - Bot
+        - Signups
+      summary: List signups for an ORBAT
+      description: Returns a stable signup-id cursor and linked Discord/Steam identities.
+      security:
+        - apiKey: []
       responses:
         "200":
           description: Success
@@ -950,6 +1078,24 @@ paths:
           description: Unauthorized - invalid or missing bot API token
         "500":
           description: Internal server error
+  /bot/ranks/discord-roles:
+    get:
+      tags:
+        - Bot
+        - Ranks
+      summary: List active guild-specific rank-role mappings
+      security:
+        - apiKey: []
+      parameters:
+        - name: guildId
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: ^[0-9]{17,20}$
+      responses:
+        "200":
+          description: Success
   /bot/signups:
     post:
       tags:
@@ -1134,6 +1280,27 @@ paths:
           description: ORBAT not found
         "500":
           description: Internal server error
+  /bot/signups/{signupId}:
+    put:
+      tags:
+        - Bot
+        - Signups
+      summary: Atomically move a Discord user's signup
+      security:
+        - apiKey: []
+      responses:
+        "200":
+          description: Success
+    delete:
+      tags:
+        - Bot
+        - Signups
+      summary: Cancel a Discord user's signup
+      security:
+        - apiKey: []
+      responses:
+        "200":
+          description: Success
   /bot/training-reminders:
     post:
       tags:
@@ -1150,11 +1317,52 @@ paths:
       responses:
         "200":
           description: Success
+  /bot/users/{userId}/rank-history:
+    get:
+      tags:
+        - TODO
+      summary: TODO document GET /bot/users/{userId}/rank-history
+      responses:
+        "200":
+          description: Success
   /bot/users/discord/{discordId}:
     get:
       tags:
         - TODO
       summary: TODO document GET /bot/users/discord/{discordId}
+      responses:
+        "200":
+          description: Success
+  /bot/users/discord/{discordId}/notification-preferences:
+    get:
+      tags:
+        - Bot
+        - Messaging
+      summary: Get platform-owned notification preferences
+      security:
+        - apiKey: []
+      responses:
+        "200":
+          description: Success
+    patch:
+      tags:
+        - Bot
+        - Messaging
+      summary: Partially update platform-owned notification preferences
+      security:
+        - apiKey: []
+      responses:
+        "200":
+          description: Success
+  /bot/users/discord/{discordId}/signups:
+    get:
+      tags:
+        - Bot
+        - Signups
+      summary: List signups owned by a linked Discord user
+      description: Returns upcoming signups by default. Pass includePast=true for history.
+      security:
+        - apiKey: []
       responses:
         "200":
           description: Success
@@ -2834,6 +3042,21 @@ paths:
       responses:
         "200":
           description: User training records
+  /users/me/notification-preferences:
+    get:
+      tags:
+        - TODO
+      summary: TODO document GET /users/me/notification-preferences
+      responses:
+        "200":
+          description: Success
+    patch:
+      tags:
+        - TODO
+      summary: TODO document PATCH /users/me/notification-preferences
+      responses:
+        "200":
+          description: Success
 components:
   securitySchemes:
     bearerAuth:
@@ -2842,10 +3065,10 @@ components:
       bearerFormat: JWT
       description: NextAuth.js session token (cookie-based)
     apiKey:
-      type: apiKey
-      in: header
-      name: X-BOT-API-TOKEN
-      description: Bot API token for integration endpoints
+      type: http
+      scheme: bearer
+      bearerFormat: BotToken
+      description: Active bot token stored in the BotToken database table. Use Authorization Bearer; environment tokens and X-BOT-API-TOKEN are not accepted.
   schemas:
     User:
       type: object

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
+import { appendBotEvent } from '@/lib/bot-events';
 import { checkPermission } from '@/lib/auth-middleware';
 
 // POST - Apply mapped legacy data to create/update UserRank entries
@@ -115,7 +116,7 @@ export async function POST() {
           }
 
           // Create RankHistory entry
-          await tx.rankHistory.create({
+          const history = await tx.rankHistory.create({
             data: {
               userId: legacyRecord.mappedUserId!,
               previousRankName: null, // No previous rank for legacy import
@@ -130,6 +131,11 @@ export async function POST() {
               note: `Legacy import: Date Joined ${legacyRecord.dateJoined || 'Unknown'}`,
             },
           });
+          const discord = await tx.authAccount.findFirst({ where: { userId: legacyRecord.mappedUserId!, provider: 'discord' }, select: { providerUserId: true } });
+          await appendBotEvent({ type: 'user.rank_changed', aggregate: 'rank', aggregateId: history.id, payload: {
+            rankHistoryId: history.id, userId: legacyRecord.mappedUserId!, discordUserId: discord?.providerUserId ?? null,
+            oldRankId: existingUserRank?.currentRankId ?? null, newRankId: rank.id, changeType: 'correction', source: 'legacy_import',
+          } }, tx);
 
           // Mark as applied
           await tx.legacyUserData.update({

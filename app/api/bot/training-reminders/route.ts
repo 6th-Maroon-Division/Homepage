@@ -5,6 +5,7 @@ import {
   createTrainingNotification,
   sendDiscordTrainingDm,
 } from '@/lib/training-notifications';
+import { appendBotEvent } from '@/lib/bot-events';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,6 +52,7 @@ export async function POST(request: NextRequest) {
 
   let delivered = 0;
   let discordDelivered = 0;
+  const emittedSessions = new Set<number>();
   for (const attendee of attendees) {
     const claimedAt = new Date();
     const claim = await prisma.trainingSessionAttendee.updateMany({
@@ -58,6 +60,15 @@ export async function POST(request: NextRequest) {
       data: { reminder24hSentAt: claimedAt },
     });
     if (claim.count !== 1 || !attendee.session.startsAt) continue;
+    if (!emittedSessions.has(attendee.session.id)) {
+      emittedSessions.add(attendee.session.id);
+      await appendBotEvent({ type: 'training.reminder_due', aggregate: 'training', aggregateId: attendee.session.id, payload: {
+        trainingId: attendee.session.trainingId, sessionId: attendee.session.id,
+        title: attendee.session.training.name, startsAt: attendee.session.startsAt.toISOString(),
+        websiteUrl: attendee.trainingRequest ? `/trainings/requests/${attendee.trainingRequest.id}` : '/profile?tab=trainings',
+        version: attendee.session.updatedAt.toISOString(),
+      } });
+    }
 
     const startsAt = attendee.session.startsAt.toLocaleString('en-GB', {
       timeZone: 'UTC',

@@ -6,6 +6,7 @@ import { assertEligibleTrainingStaff, isTrainingStaff } from '@/lib/training-sta
 import { createTrainingNotification } from '@/lib/training-notifications';
 import { publishTrainingChatEvent } from '@/lib/realtime/training-chat-events';
 import { publishUserProfileEvent } from '@/lib/realtime/user-events';
+import { appendBotEvent } from '@/lib/bot-events';
 import { Prisma } from '@/generated/prisma/client';
 
 const userSelect = { id: true, username: true, avatarUrl: true } as const;
@@ -466,6 +467,17 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   }
   for (const requestId of outcome.linkedRequestIds) {
     publishTrainingChatEvent(requestId, { source: 'schedule', sessionId, status });
+  }
+  if (status === 'cancelled' || (startsAt && ['scheduled', 'in_progress'].includes(status))) {
+    await appendBotEvent({
+      type: status === 'cancelled' ? 'training.cancelled' : 'training.updated',
+      aggregate: 'training', aggregateId: sessionId, payload: {
+        trainingId: existing.trainingId, sessionId, title: existing.training.name,
+        startsAt: startsAt?.toISOString() ?? null,
+        endsAt: startsAt && durationMinutes !== null ? new Date(startsAt.getTime() + durationMinutes * 60_000).toISOString() : null,
+        websiteUrl: `/trainings/sessions/${sessionId}`, version: updated.updatedAt.toISOString(),
+      },
+    });
   }
   return NextResponse.json({ ...updated, server: 'Arma3 Training Server' });
 }

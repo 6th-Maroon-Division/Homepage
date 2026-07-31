@@ -22,6 +22,8 @@ export default function RankConfigClient() {
   const [ranks, setRanks] = useState<Rank[]>([]);
   const [loading, setLoading] = useState(false);
   const [dragState, setDragState] = useState<DragState>({ draggedIndex: null, dragOverIndex: null });
+  const [discordGuildId, setDiscordGuildId] = useState('');
+  const [discordRoles, setDiscordRoles] = useState<Record<number, string>>({});
 
   const [form, setForm] = useState<Partial<Rank>>({
     name: '',
@@ -109,6 +111,33 @@ export default function RankConfigClient() {
     } catch (e) {
       showToast('Failed to save order', 'error');
     }
+  };
+
+  const loadDiscordRoles = async () => {
+    if (!/^\d{17,20}$/.test(discordGuildId)) return showToast('Enter a valid Discord guild ID', 'error');
+    const response = await fetch(`/api/admin/ranks/discord-roles?guildId=${encodeURIComponent(discordGuildId)}`);
+    if (!response.ok) return showToast('Failed to load Discord role mappings', 'error');
+    const data = await response.json();
+    setDiscordRoles(Object.fromEntries((data.mappings ?? []).map((item: { rankId: number; discordRoleId: string }) => [item.rankId, item.discordRoleId])));
+  };
+
+  const saveDiscordRole = async (rankId: number) => {
+    const discordRoleId = discordRoles[rankId]?.trim();
+    if (!/^\d{17,20}$/.test(discordGuildId) || !/^\d{17,20}$/.test(discordRoleId ?? '')) {
+      return showToast('Guild and role IDs must be Discord snowflakes', 'error');
+    }
+    const response = await fetch(`/api/admin/ranks/${rankId}/discord-role`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ guildId: discordGuildId, discordRoleId }),
+    });
+    showToast(response.ok ? 'Discord role mapping saved' : 'Failed to save Discord role mapping', response.ok ? 'success' : 'error');
+  };
+
+  const deleteDiscordRole = async (rankId: number) => {
+    if (!/^\d{17,20}$/.test(discordGuildId)) return showToast('Enter a valid Discord guild ID', 'error');
+    const response = await fetch(`/api/admin/ranks/${rankId}/discord-role?guildId=${encodeURIComponent(discordGuildId)}`, { method: 'DELETE' });
+    if (response.ok) setDiscordRoles((current) => { const next = { ...current }; delete next[rankId]; return next; });
+    showToast(response.ok ? 'Discord role mapping removed' : 'Failed to remove Discord role mapping', response.ok ? 'success' : 'error');
   };
 
   const handleDragStart = (index: number) => {
@@ -285,6 +314,23 @@ export default function RankConfigClient() {
           </div>
         </div>
       )}
+      <div className="mt-8 border-t pt-6" style={{ borderColor: 'var(--border)' }}>
+        <h3 className="text-lg font-semibold" style={{ color: 'var(--foreground)' }}>Discord rank roles</h3>
+        <p className="mb-3 text-sm" style={{ color: 'var(--muted-foreground)' }}>Mappings are isolated by Discord guild. IDs must be 17–20 digit snowflakes.</p>
+        <div className="mb-4 flex gap-2">
+          <input className="min-w-0 flex-1 rounded border px-3 py-2" style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }} placeholder="Discord guild ID" value={discordGuildId} onChange={(event) => setDiscordGuildId(event.target.value.trim())} />
+          <button className="rounded px-4 py-2" style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }} onClick={loadDiscordRoles}>Load</button>
+        </div>
+        <div className="space-y-2">
+          {ranks.map((rank) => (
+            <div key={rank.id} className="grid gap-2 rounded border p-3 sm:grid-cols-[minmax(10rem,1fr)_minmax(12rem,2fr)_auto]" style={{ borderColor: 'var(--border)' }}>
+              <span style={{ color: 'var(--foreground)' }}>[{rank.abbreviation}] {rank.name}</span>
+              <input className="rounded border px-2 py-1" style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }} placeholder="Discord role ID" value={discordRoles[rank.id] ?? ''} onChange={(event) => setDiscordRoles((current) => ({ ...current, [rank.id]: event.target.value.trim() }))} />
+              <div className="flex gap-2"><button className="rounded border px-3 py-1" style={{ borderColor: 'var(--border)' }} onClick={() => saveDiscordRole(rank.id)}>Save</button><button className="rounded border px-3 py-1" style={{ borderColor: 'var(--border)' }} onClick={() => deleteDiscordRole(rank.id)}>Clear</button></div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

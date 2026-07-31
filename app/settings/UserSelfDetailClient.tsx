@@ -8,6 +8,7 @@ import { useToast } from '@/app/components/ui/ToastContainer';
 import TrainingScheduleSummary from '@/app/components/trainings/TrainingScheduleSummary';
 import TrainingStatusBadge from '@/app/components/trainings/TrainingStatusBadge';
 import type { TrainingRequestSession } from '@/app/components/trainings/training-request-types';
+import NotificationPreferencesPanel from '@/app/settings/NotificationPreferencesPanel';
 
 type UserTraining = {
   id: number;
@@ -133,7 +134,7 @@ type RankHistoryPagination = {
   totalPages: number;
 };
 
-type TabKey = 'overview' | 'attendance' | 'trainings' | 'loa' | 'rank-history' | 'actions';
+type TabKey = 'overview' | 'attendance' | 'trainings' | 'loa' | 'rank-history' | 'notifications' | 'actions';
 
 const ACTIVE_TRAINING_REQUEST_STATUSES = new Set([
   'pending',
@@ -187,7 +188,7 @@ export default function UserSelfDetailClient({
   const { showError, showSuccess } = useToast();
 
   useEffect(() => {
-    const profileTabs: TabKey[] = ['overview', 'attendance', 'trainings', 'loa', 'rank-history', 'actions'];
+    const profileTabs: TabKey[] = ['overview', 'attendance', 'trainings', 'loa', 'rank-history', 'notifications', 'actions'];
     const storedProfileTab = window.localStorage.getItem('profile:last-tab') as TabKey | null;
     const storedTrainingTab = window.localStorage.getItem('profile:trainings:last-tab');
     if (!preferInitialTab && storedProfileTab && profileTabs.includes(storedProfileTab)) {
@@ -300,6 +301,7 @@ export default function UserSelfDetailClient({
             { key: 'trainings' as const, label: 'Trainings' },
             { key: 'loa' as const, label: 'LOA' },
             { key: 'rank-history' as const, label: 'Rank History' },
+            { key: 'notifications' as const, label: 'Notifications' },
             { key: 'actions' as const, label: 'Actions' },
           ].map((tab) => (
             <button
@@ -1468,6 +1470,8 @@ export default function UserSelfDetailClient({
           </div>
         </div>
       )}
+
+      {activeTab === 'notifications' && <NotificationPreferencesPanel />}
 
       {activeTab === 'rank-history' && (
         <div className="rounded-lg border p-4 sm:p-6" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--secondary)' }}>

@@ -4,6 +4,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 import { resolveOrbatScheduleWindow } from '@/lib/orbat-schedule';
+import { appendBotEvent } from '@/lib/bot-events';
 
 type RouteParams = {
   params: Promise<{ id: string }>;
@@ -155,8 +156,8 @@ export async function POST(req: NextRequest, context: RouteParams) {
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
-    const note = await prisma.orbatAttendanceNote.upsert({
-      where: {
+    const note = await prisma.$transaction(async (tx) => {
+      const saved = await tx.orbatAttendanceNote.upsert({ where: {
         orbatId_userId: {
           orbatId,
           userId: targetUserId,
@@ -191,6 +192,11 @@ export async function POST(req: NextRequest, context: RouteParams) {
           },
         },
       },
+      });
+      await appendBotEvent({ type: 'orbat.availability_changed', aggregate: 'orbat', aggregateId: orbatId, payload: {
+        orbatId, userId: targetUserId, status: saved.status,
+      } }, tx);
+      return saved;
     });
 
     return NextResponse.json(note);

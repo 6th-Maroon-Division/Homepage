@@ -4,6 +4,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 import { publishUserProfileEvent } from '@/lib/realtime/user-events';
+import { appendBotEvent } from '@/lib/bot-events';
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -34,24 +35,27 @@ export async function POST(request: NextRequest) {
 
   const attendanceMap = new Map(attendanceData.map((a) => [a.userId, a._count.id]));
 
-  await prisma.$transaction(
-    userIds.map((userId) =>
-      prisma.userRank.upsert({
+  await prisma.$transaction(async (tx) => {
+    const existingRanks = await tx.userRank.findMany({ where: { userId: { in: userIds } } });
+    const oldRankByUser = new Map(existingRanks.map((item) => [item.userId, item.currentRankId]));
+    for (const userId of userIds) {
+      await tx.userRank.upsert({
         where: { userId },
-        update: {
-          currentRankId: rank.id,
-          lastRankedUpAt: new Date(),
-          attendanceSinceLastRank: attendanceMap.get(userId) || 0,
-        },
-        create: {
-          userId,
-          currentRankId: rank.id,
-          lastRankedUpAt: new Date(),
-          attendanceSinceLastRank: attendanceMap.get(userId) || 0,
-        },
-      })
-    )
-  );
+        update: { currentRankId: rank.id, lastRankedUpAt: new Date(), attendanceSinceLastRank: attendanceMap.get(userId) || 0 },
+        create: { userId, currentRankId: rank.id, lastRankedUpAt: new Date(), attendanceSinceLastRank: attendanceMap.get(userId) || 0 },
+      });
+      const history = await tx.rankHistory.create({ data: {
+        userId, previousRankName: null, newRankName: rank.name,
+        attendanceTotalAtChange: attendanceMap.get(userId) || 0, attendanceDeltaSinceLastRank: 0,
+        triggeredBy: 'admin', triggeredByUserId: session.user.id, outcome: 'approved', note: 'Bulk rank assignment',
+      } });
+      const discord = await tx.authAccount.findFirst({ where: { userId, provider: 'discord' }, select: { providerUserId: true } });
+      await appendBotEvent({ type: 'user.rank_changed', aggregate: 'rank', aggregateId: history.id, payload: {
+        rankHistoryId: history.id, userId, discordUserId: discord?.providerUserId ?? null,
+        oldRankId: oldRankByUser.get(userId) ?? null, newRankId: rank.id, changeType: 'assignment', source: 'bulk_assignment',
+      } }, tx);
+    }
+  });
 
   for (const userId of userIds) {
     publishUserProfileEvent(userId, {

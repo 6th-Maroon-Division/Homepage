@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
+import { appendBotEvent } from '@/lib/bot-events';
 import { checkPermission } from '@/lib/auth-middleware';
 
 type MigrationStrategy = 'recalculate' | 'grandfather' | 'map';
@@ -145,7 +146,7 @@ export async function POST(req: NextRequest) {
             });
 
             // Create RankHistory entry
-            await tx.rankHistory.create({
+            const history = await tx.rankHistory.create({
               data: {
                 userId: userRank.userId,
                 previousRankName: currentRank.name,
@@ -160,6 +161,12 @@ export async function POST(req: NextRequest) {
                 note: `Migration: ${strategy} strategy applied`,
               },
             });
+            const discord = await tx.authAccount.findFirst({ where: { userId: userRank.userId, provider: 'discord' }, select: { providerUserId: true } });
+            await appendBotEvent({ type: 'user.rank_changed', aggregate: 'rank', aggregateId: history.id, payload: {
+              rankHistoryId: history.id, userId: userRank.userId, discordUserId: discord?.providerUserId ?? null,
+              oldRankId: currentRank.id, newRankId: newRank.id,
+              changeType: newRank.orderIndex < currentRank.orderIndex ? 'demotion' : 'promotion', source: 'migration',
+            } }, tx);
           });
 
           // Count change type

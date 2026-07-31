@@ -7,6 +7,7 @@ import { getCurrentAttendance } from '@/lib/rank-eligibility';
 import { publishInboxEvent } from '@/lib/realtime/inbox-events';
 import { publishPromotionEvent } from '@/lib/realtime/promotion-events';
 import { publishUserProfileEvent } from '@/lib/realtime/user-events';
+import { appendBotEvent } from '@/lib/bot-events';
 
 export async function POST(
   _req: NextRequest,
@@ -71,7 +72,7 @@ export async function POST(
       },
     });
 
-    await tx.rankHistory.create({
+    const history = await tx.rankHistory.create({
       data: {
         userId: proposal.userId,
         previousRankName: currentRank?.name || null,
@@ -83,6 +84,11 @@ export async function POST(
         outcome: 'approved',
       },
     });
+    const discord = await tx.authAccount.findFirst({ where: { userId: proposal.userId, provider: 'discord' }, select: { providerUserId: true } });
+    await appendBotEvent({ type: 'user.rank_changed', aggregate: 'rank', aggregateId: history.id, payload: {
+      rankHistoryId: history.id, userId: proposal.userId, discordUserId: discord?.providerUserId ?? null,
+      oldRankId: proposal.currentRankId, newRankId: proposal.nextRankId, changeType: 'promotion', source: 'manual_approval',
+    } }, tx);
   });
 
   await prisma.message.create({

@@ -44,20 +44,9 @@ export async function validateBotTokenFromRequest(request: Request): Promise<boo
 }
 
 /**
- * Legacy validation: checks against BOT_API_TOKEN environment variable first,
- * then falls back to database validation. This ensures backward compatibility.
+ * Compatibility alias used by older route modules. Authentication is intentionally
+ * database-only so revoked and inactive BotToken records always take effect.
  */
 export async function validateBotTokenLegacy(request: Request): Promise<boolean> {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader?.startsWith('Bearer ')) return false;
-  
-  const token = authHeader.substring(7);
-  
-  // First check environment variable for backward compatibility
-  if (process.env.BOT_API_TOKEN && token === process.env.BOT_API_TOKEN) {
-    return true;
-  }
-  
-  // Fall back to database validation
-  return validateBotToken(token);
+  return validateBotTokenFromRequest(request);
 }

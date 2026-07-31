@@ -5,6 +5,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
 import { publishOrbatEvent } from '@/lib/realtime/orbat-events';
+import { appendBotEvent } from '@/lib/bot-events';
 import {
   formatOrbatTrainingAccessWarnings,
   getOrbatTrainingAccess,
@@ -150,20 +151,16 @@ export async function PATCH(
     }
 
     // Move the signup
-    const updatedSignup = await prisma.signup.update({
-      where: { id: signupId },
-      data: {
-        slotId: targetId,
-      },
-      include: {
-        user: true,
-        slot: {
-          include: {
-            squad: true,
-            squadRole: true,
-          },
-        },
-      },
+    const updatedSignup = await prisma.$transaction(async (tx) => {
+      const result = await tx.signup.update({
+        where: { id: signupId },
+        data: { slotId: targetId },
+        include: { user: true, slot: { include: { squad: true, squadRole: true } } },
+      });
+      await appendBotEvent({ type: 'orbat.signup_changed', aggregate: 'orbat', aggregateId: signup.slot.orbatId, payload: {
+        orbatId: signup.slot.orbatId, signupId: signup.id, userId: signup.userId, oldSlotId: signup.slotId, slotId: targetId,
+      } }, tx);
+      return result;
     });
 
     publishOrbatEvent({
