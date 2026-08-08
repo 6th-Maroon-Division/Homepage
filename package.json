@@ -46,7 +46,7 @@
     "babel-plugin-react-compiler": "1.0.0",
     "dotenv": "^17.4.2",
     "eslint": "^10",
-    "eslint-config-next": "^16.2.9",
+    "eslint-config-next": "^16.2.10",
     "express": "^5.2.1",
     "prisma": "^7.8.0",
     "swagger-ui-dist": "^5.32.8",
