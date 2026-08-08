@@ -421,6 +421,51 @@ async function main() {
     skipDuplicates: true,
   });
 
+  const sideOp = await prisma.orbat.create({
+    data: {
+      name: 'Side Op: Night Recon',
+      description: 'Side operation with unrestricted roles and raw events, but no compiled attendance',
+      createdById: admin.id,
+      eventDate: daysFromNow(3),
+      startTime: '20:00',
+      endTime: '22:00',
+      isSideOp: true,
+      bluforCountry: 'NATO',
+      bluforRelationship: 'Friendly',
+      opforCountry: 'CSAT',
+      opforRelationship: 'Hostile',
+      iedThreat: 'Low',
+      rulesOfEngagement: 'PID',
+      operationDay: 'Night 1',
+    },
+  });
+
+  const sideOpSquad = await prisma.squad.create({
+    data: { orbatId: sideOp.id, name: 'Recon Team', orderIndex: 1 },
+  });
+  const [sideOpLeader, sideOpMarksman] = await Promise.all([
+    prisma.slot.create({
+      data: { orbatId: sideOp.id, squadId: sideOpSquad.id, squadRoleId: squadRoleByName['Squad Leader'].id, orderIndex: 1, maxSignups: 1 },
+    }),
+    prisma.slot.create({
+      data: { orbatId: sideOp.id, squadId: sideOpSquad.id, squadRoleId: squadRoleByName['Marksman'].id, orderIndex: 2, maxSignups: 2 },
+    }),
+  ]);
+  await prisma.signup.createMany({
+    data: [
+      { slotId: sideOpLeader.id, userId: admin.id },
+      { slotId: sideOpMarksman.id, userId: farah.id },
+    ],
+  });
+
+  const sideOpDate = formatDateToYyyyMmDd(sideOp.eventDate ?? daysFromNow(3));
+  await prisma.attendanceEvent.createMany({
+    data: [
+      { userId: farah.id, discordId: '100000000000000007', isJoin: true, eventTime: new Date(`${sideOpDate}T20:02:00.000Z`), processed: true },
+      { userId: farah.id, discordId: '100000000000000007', isJoin: false, eventTime: new Date(`${sideOpDate}T21:58:00.000Z`), processed: true },
+    ],
+  });
+
   const completedOrbat = await prisma.orbat.create({
     data: {
       name: 'Operation Silent Dagger',
@@ -862,6 +907,31 @@ async function main() {
         },
       ],
       frequencyIds: [srFreq1.id, lrFreq1.id],
+      createdById: admin.id,
+      isActive: true,
+    },
+  });
+
+  await prisma.orbatTemplate.create({
+    data: {
+      name: 'Side Op Recon Team',
+      description: 'Compact side-op roster; role requirements and attendance compilation are disabled on the ORBAT',
+      category: 'Side Op',
+      tagsJson: 'side-op,recon,casual',
+      slotsJson: [
+        {
+          name: 'Recon Team',
+          orderIndex: 1,
+          slots: [
+            { squadRoleId: squadRoleByName['Squad Leader'].id, orderIndex: 1, maxSignups: 1 },
+            { squadRoleId: squadRoleByName['Marksman'].id, orderIndex: 2, maxSignups: 2 },
+            { squadRoleId: squadRoleByName['Medic'].id, orderIndex: 3, maxSignups: 1 },
+          ],
+        },
+      ],
+      frequencyIds: [srFreq1.id],
+      startTime: '20:00',
+      endTime: '22:00',
       createdById: admin.id,
       isActive: true,
     },

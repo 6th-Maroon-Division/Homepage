@@ -64,6 +64,7 @@ export async function PATCH(
     const targetSlot = await prisma.slot.findUnique({
       where: { id: targetId },
       include: {
+        orbat: { select: { isSideOp: true } },
         squadRole: {
           select: {
             id: true,
@@ -99,7 +100,7 @@ export async function PATCH(
     // Collect warnings instead of blocking on requirements
     const warnings: string[] = [];
 
-    if (targetSlot.squadRole) {
+    if (targetSlot.squadRole && !targetSlot.orbat.isSideOp) {
       const requiredTrainingIds = targetSlot.squadRole.requiredTrainingIds?.length
         ? targetSlot.squadRole.requiredTrainingIds
         : [];

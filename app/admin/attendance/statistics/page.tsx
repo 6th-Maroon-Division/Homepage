@@ -87,6 +87,7 @@ export default async function AdminAttendanceStatisticsPage() {
 
   const orbats = await prisma.orbat.findMany({
     where: {
+      isSideOp: false,
       OR: [
         { startsAtUtc: { not: null } },
         { eventDate: { not: null } },

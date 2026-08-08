@@ -184,7 +184,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const requiredTrainingIds = targetSlot.squadRole?.requiredTrainingIds || [];
+    const requiredTrainingIds = orbat.isSideOp ? [] : (targetSlot.squadRole?.requiredTrainingIds || []);
     let temporaryAccess = false;
     if (requiredTrainingIds.length > 0) {
       const trainingAccess = await getOrbatTrainingAccess(user.id, requiredTrainingIds);
@@ -201,7 +201,7 @@ export async function POST(request: NextRequest) {
       temporaryAccess = trainingAccess.hasTemporaryAccess;
     }
 
-    const requiredRankIds = targetSlot.squadRole?.requiredRankIds || [];
+    const requiredRankIds = orbat.isSideOp ? [] : (targetSlot.squadRole?.requiredRankIds || []);
     if (requiredRankIds.length > 0) {
       const [userRank, requiredRanks] = await Promise.all([
         prisma.userRank.findUnique({

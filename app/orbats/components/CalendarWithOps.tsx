@@ -14,7 +14,10 @@ type UiOp = {
   href?: string;
   status?: string;
   trainerName?: string | null;
+  isSideOp?: boolean;
 };
+
+const SIDE_OP_COLOR = '#0f766e';
 
 type CalendarWithOpsProps = {
   initialYear: number;
@@ -86,7 +89,7 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
   }, [ops]);
 
   useEffect(() => {
-    const appendOrbat = (payload: { id?: number; name?: string; description?: string | null; startsAtUtc?: string | null; eventDate?: string }) => {
+    const appendOrbat = (payload: { id?: number; name?: string; description?: string | null; startsAtUtc?: string | null; eventDate?: string; isSideOp?: boolean }) => {
       if (!payload.id || !payload.name || (!payload.startsAtUtc && !payload.eventDate)) {
         return;
       }
@@ -117,6 +120,7 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
             startsAtUtc: payload.startsAtUtc ?? null,
             eventDate: rawDate,
             dateKey,
+            isSideOp: payload.isSideOp === true,
           },
         ];
 
@@ -142,7 +146,7 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
       try {
         const data = JSON.parse(event.data) as {
           type?: string;
-          payload?: { id?: number; name?: string; description?: string | null; startsAtUtc?: string | null; eventDate?: string };
+          payload?: { id?: number; name?: string; description?: string | null; startsAtUtc?: string | null; eventDate?: string; isSideOp?: boolean };
         };
 
         if (data.type === 'orbat.created' && data.payload) {
@@ -323,7 +327,8 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
               const dayOps = opsByDate.get(dateKey) ?? [];
               const hasOps = dayOps.length > 0;
               const hasTrainingSession = dayOps.some((item) => item.kind === 'training_session');
-              const hasOrbat = dayOps.some((item) => (item.kind ?? 'orbat') === 'orbat');
+              const hasSideOp = dayOps.some((item) => (item.kind ?? 'orbat') === 'orbat' && item.isSideOp);
+              const hasRegularOrbat = dayOps.some((item) => (item.kind ?? 'orbat') === 'orbat' && !item.isSideOp);
               const isSelected = selectedDateKey === dateKey;
               
               // Check if date is in the past
@@ -348,7 +353,11 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
                       ? 'var(--secondary)' 
                       : 'var(--background)',
                     borderColor: hasOps
-                      ? hasTrainingSession && !hasOrbat ? 'var(--accent)' : 'var(--primary)'
+                      ? hasRegularOrbat
+                        ? 'var(--primary)'
+                        : hasSideOp
+                          ? SIDE_OP_COLOR
+                          : 'var(--accent)'
                       : 'var(--border)',
                     borderWidth: hasOps ? '2px' : '1px',
                     color: 'var(--foreground)',
@@ -361,7 +370,8 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
                   <span className="text-sm font-semibold">{day}</span>
                   {hasOps && (
                     <span className="mt-0.5 flex gap-0.5">
-                      {hasOrbat && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--primary)' }} />}
+                      {hasRegularOrbat && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--primary)' }} />}
+                      {hasSideOp && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: SIDE_OP_COLOR }} />}
                       {hasTrainingSession && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--accent)' }} />}
                     </span>
                   )}
@@ -406,6 +416,11 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
                       {op.kind === 'training_session' && (
                         <span className="text-[10px] uppercase px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--accent)', color: 'var(--accent-foreground)' }}>
                           Training
+                        </span>
+                      )}
+                      {op.kind !== 'training_session' && op.isSideOp && (
+                        <span className="text-[10px] uppercase px-1.5 py-0.5 rounded" style={{ backgroundColor: SIDE_OP_COLOR, color: '#ffffff' }}>
+                          Side Op
                         </span>
                       )}
                     </div>
@@ -503,7 +518,7 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
               <li
                 key={calendarItemKey(op)}
                 className="rounded-md border px-3 py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
-                style={{ backgroundColor: 'var(--muted)', borderColor: 'var(--border)' }}
+                style={{ backgroundColor: 'var(--muted)', borderColor: op.isSideOp ? SIDE_OP_COLOR : 'var(--border)' }}
               >
                 <div>
                   <button
@@ -512,7 +527,7 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
                     className="text-sm sm:text-base font-medium hover:underline"
                     style={{ color: 'var(--foreground)' }}
                   >
-                    {op.name}{op.kind === 'training_session' ? ' · Training' : ''}
+                    {op.name}{op.kind === 'training_session' ? ' · Training' : op.isSideOp ? ' · Side Op' : ''}
                   </button>
                   {op.description && (
                     <p className="text-xs line-clamp-2" style={{ color: 'var(--muted-foreground)' }}>

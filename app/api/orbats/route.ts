@@ -54,6 +54,7 @@ type OrbatInput = {
   airspace?: string | null;
   inGameTimezone?: string | null;
   operationDay?: string | null;
+  isSideOp?: boolean;
 };
 
 const parseUtcDate = (value?: string | null): Date | null => {
@@ -221,6 +222,7 @@ export async function POST(request: NextRequest) {
           airspace: body.airspace || null,
           inGameTimezone: body.inGameTimezone || null,
           operationDay: body.operationDay || null,
+          isSideOp: body.isSideOp === true,
           createdById: userId,
           tempFrequencies: body.tempFrequencies || [],
         },
@@ -300,6 +302,7 @@ export async function POST(request: NextRequest) {
           description: orbat.description,
           startsAtUtc: orbat.startsAtUtc?.toISOString() ?? null,
           eventDate: eventDate.toISOString(),
+          isSideOp: orbat.isSideOp,
         },
       });
 

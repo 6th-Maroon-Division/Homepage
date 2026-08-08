@@ -74,6 +74,7 @@ type ClientOrbat = {
   airspace?: string | null;
   inGameTimezone?: string | null;
   operationDay?: string | null;
+  isSideOp?: boolean;
 };
 
 type OrbatAttendanceNote = {
@@ -541,6 +542,11 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
             <div className="flex items-start gap-3">
               <div className="flex-1">
                 <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: 'var(--foreground)' }}>{orbat.name}</h1>
+                {orbat.isSideOp && (
+                  <span className="inline-block mt-2 px-2.5 py-1 text-xs font-semibold rounded-full" style={{ backgroundColor: '#0f766e', color: '#ffffff' }}>
+                    Side Op · no role requirements or attendance tracking
+                  </span>
+                )}
                 {orbat.description && (
                   <p className="text-sm sm:text-base mt-2" style={{ color: 'var(--muted-foreground)' }}>
                     {orbat.description}

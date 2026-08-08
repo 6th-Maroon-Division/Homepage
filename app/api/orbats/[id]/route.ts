@@ -55,6 +55,7 @@ type OrbatUpdateInput = {
   airspace?: string | null;
   inGameTimezone?: string | null;
   operationDay?: string | null;
+  isSideOp?: boolean;
 };
 
 const parseUtcDate = (value?: string | null): Date | null => {
@@ -273,6 +274,7 @@ export async function PATCH(
           airspace: body.airspace || null,
           inGameTimezone: body.inGameTimezone || null,
           operationDay: body.operationDay || null,
+          isSideOp: body.isSideOp === true,
           tempFrequencies: body.tempFrequencies || [],
         },
       });

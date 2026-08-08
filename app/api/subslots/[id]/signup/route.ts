@@ -40,6 +40,7 @@ async function buildSlotResponse(slotId: number): Promise<SlotResponse | null> {
   const slot = await prisma.slot.findUnique({
     where: { id: slotId },
     include: {
+      orbat: { select: { isSideOp: true } },
       squadRole: {
         select: {
           name: true,
@@ -72,8 +73,8 @@ async function buildSlotResponse(slotId: number): Promise<SlotResponse | null> {
     return null;
   }
 
-  const requiredTrainingIds = slot.squadRole?.requiredTrainingIds || [];
-  const requiredRankIds = slot.squadRole?.requiredRankIds || [];
+  const requiredTrainingIds = slot.orbat.isSideOp ? [] : (slot.squadRole?.requiredTrainingIds || []);
+  const requiredRankIds = slot.orbat.isSideOp ? [] : (slot.squadRole?.requiredRankIds || []);
 
   const [requiredTrainings, requiredRanks] = await Promise.all([
     requiredTrainingIds.length
@@ -221,7 +222,7 @@ export async function POST(_req: NextRequest, context: RouteParams) {
     );
   }
 
-  const requiredTrainingIds = slot.squadRole?.requiredTrainingIds || [];
+  const requiredTrainingIds = slot.orbat.isSideOp ? [] : (slot.squadRole?.requiredTrainingIds || []);
   if (requiredTrainingIds.length > 0) {
     const trainingAccess = await getOrbatTrainingAccess(currentUserId, requiredTrainingIds);
     if (!trainingAccess.allowed) {
@@ -236,7 +237,7 @@ export async function POST(_req: NextRequest, context: RouteParams) {
     }
   }
 
-  const requiredRankIds = slot.squadRole?.requiredRankIds || [];
+  const requiredRankIds = slot.orbat.isSideOp ? [] : (slot.squadRole?.requiredRankIds || []);
   if (requiredRankIds.length > 0) {
     const [userRank, requiredRanks] = await Promise.all([
       prisma.userRank.findUnique({

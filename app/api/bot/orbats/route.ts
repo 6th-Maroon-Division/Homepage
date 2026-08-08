@@ -85,6 +85,7 @@ export async function GET(request: NextRequest) {
 
     const formattedOrbats = orbats.map((orbat) => ({
       id: orbat.id,
+      isSideOp: orbat.isSideOp,
       name: orbat.name,
       description: orbat.description,
       startsAtUtc: orbat.startsAtUtc?.toISOString() || null,
@@ -99,8 +100,8 @@ export async function GET(request: NextRequest) {
         slots: squad.slots.map((slot) => ({
           id: slot.id,
           name: slot.squadRole?.name || 'Unknown',
-          requiredTrainingIds: slot.squadRole?.requiredTrainingIds ?? [],
-          requiredRankIds: slot.squadRole?.requiredRankIds ?? [],
+          requiredTrainingIds: orbat.isSideOp ? [] : (slot.squadRole?.requiredTrainingIds ?? []),
+          requiredRankIds: orbat.isSideOp ? [] : (slot.squadRole?.requiredRankIds ?? []),
           maxSignups: slot.maxSignups || 1,
           available: (slot.maxSignups || 1) - slot.signups.length,
           signups: slot.signups.map((s) => ({

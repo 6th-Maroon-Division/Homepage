@@ -57,6 +57,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const orbat = await prisma.orbat.findUnique({
+      where: { id: orbatId },
+      select: { isSideOp: true },
+    });
+    if (!orbat) {
+      return NextResponse.json({ error: 'Orbat not found' }, { status: 404 });
+    }
+    if (orbat.isSideOp) {
+      return NextResponse.json(
+        { error: 'Attendance is disabled for side operations.' },
+        { status: 409 }
+      );
+    }
+
     let imported = 0;
     let skipped = 0;
     const errors: string[] = [];

@@ -90,6 +90,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       where: { id },
       select: {
         orbatId: true,
+        orbat: { select: { isSideOp: true } },
         userId: true,
       },
     });
@@ -98,6 +99,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json(
         { error: 'Attendance record not found' },
         { status: 404 }
+      );
+    }
+
+    if (existing.orbat.isSideOp) {
+      return NextResponse.json(
+        { error: 'Attendance is disabled for side operations.' },
+        { status: 409 }
       );
     }
 

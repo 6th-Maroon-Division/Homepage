@@ -19,6 +19,7 @@ export async function GET() {
           startsAtUtc: true,
           eventDate: true,
           createdAt: true,
+          isSideOp: true,
         },
       }),
       userId
@@ -54,6 +55,7 @@ export async function GET() {
         eventDate: date.toISOString(),
         dateKey: date.toISOString().slice(0, 10),
         href: `/orbats/${orbat.id}`,
+        isSideOp: orbat.isSideOp,
       };
     });
 

@@ -71,11 +71,11 @@ export async function PUT(request: NextRequest, route: Context) {
   });
   if (absent?.status === 'absent') return botError(409, 'marked_absent', 'User is marked absent.');
 
-  const requiredTrainingIds = target.squadRole?.requiredTrainingIds ?? [];
+  const requiredTrainingIds = resolved.signup.slot.orbat.isSideOp ? [] : (target.squadRole?.requiredTrainingIds ?? []);
   if (requiredTrainingIds.length && !(await getOrbatTrainingAccess(resolved.user.id, requiredTrainingIds)).allowed) {
     return botError(422, 'training_required', 'The required training has not been met.');
   }
-  const requiredRankIds = target.squadRole?.requiredRankIds ?? [];
+  const requiredRankIds = resolved.signup.slot.orbat.isSideOp ? [] : (target.squadRole?.requiredRankIds ?? []);
   if (requiredRankIds.length) {
     const [userRank, requiredRanks] = await Promise.all([
       prisma.userRank.findUnique({ where: { userId: resolved.user.id }, select: { currentRank: { select: { orderIndex: true } } } }),

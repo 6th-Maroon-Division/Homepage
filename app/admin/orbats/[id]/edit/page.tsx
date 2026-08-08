@@ -95,6 +95,7 @@ export default async function EditOrbatPage({ params }: EditOrbatPageProps) {
     airspace: orbat.airspace || '',
     inGameTimezone: orbat.inGameTimezone || '',
     operationDay: orbat.operationDay || '',
+    isSideOp: orbat.isSideOp,
     slots: orbat.squads.map((squad) => ({
       id: squad.id,
       name: squad.name,

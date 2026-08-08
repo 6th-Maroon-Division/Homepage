@@ -126,6 +126,7 @@ export async function GET(
       : orbat.endTime;
 
     const clientOrbat = {
+      isSideOp: orbat.isSideOp,
       id: orbat.id,
       name: orbat.name,
       description: orbat.description,
@@ -152,8 +153,8 @@ export async function GET(
         name: squad.name,
         orderIndex: squad.orderIndex,
         slots: squad.slots.map((slot) => {
-          const requiredTrainingIds = slot.squadRole?.requiredTrainingIds || [];
-          const requiredRankIds = slot.squadRole?.requiredRankIds || [];
+          const requiredTrainingIds = orbat.isSideOp ? [] : (slot.squadRole?.requiredTrainingIds || []);
+          const requiredRankIds = orbat.isSideOp ? [] : (slot.squadRole?.requiredRankIds || []);
 
           const subslotRequiredTrainings = requiredTrainingIds
             .map((trainingId) => trainingMap.get(trainingId))

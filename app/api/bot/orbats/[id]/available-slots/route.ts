@@ -50,14 +50,14 @@ export async function GET(request: NextRequest, route: Context) {
       if (!isCurrent && slot.maxSignups !== null && slot._count.signups >= slot.maxSignups) {
         reasons.push({ code: 'slot_full', message: 'The slot is full.' });
       }
-      const requiredRanks = (slot.squadRole?.requiredRankIds ?? []).map((id) => rankById.get(id)).filter(Boolean);
-      const rankInvalid = requiredRanks.length !== (slot.squadRole?.requiredRankIds.length ?? 0);
+      const requiredRanks = (orbat.isSideOp ? [] : (slot.squadRole?.requiredRankIds ?? [])).map((id) => rankById.get(id)).filter(Boolean);
+      const rankInvalid = !orbat.isSideOp && requiredRanks.length !== (slot.squadRole?.requiredRankIds.length ?? 0);
       const unmetRanks = requiredRanks.filter((rank) =>
         typeof userRank?.currentRank?.orderIndex !== 'number' || userRank.currentRank.orderIndex < rank!.orderIndex,
       );
       if (rankInvalid || unmetRanks.length) reasons.push({ code: 'rank_required', message: 'The required rank has not been met.' });
 
-      const requiredTrainingIds = slot.squadRole?.requiredTrainingIds ?? [];
+      const requiredTrainingIds = orbat.isSideOp ? [] : (slot.squadRole?.requiredTrainingIds ?? []);
       if (requiredTrainingIds.length) {
         const access = await getOrbatTrainingAccess(user.id, requiredTrainingIds);
         if (!access.allowed) reasons.push({ code: 'training_required', message: 'The required training has not been met.' });

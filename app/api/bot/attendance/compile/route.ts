@@ -49,6 +49,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (orbat.isSideOp) {
+      return NextResponse.json(
+        {
+          error: 'Attendance cannot be compiled for side operations. Raw attendance events remain available.',
+          code: 'side_op_attendance_disabled',
+          orbatId: orbat.id,
+        },
+        { status: 409 }
+      );
+    }
+
     // Prefer canonical UTC schedule fields; fallback to legacy fields for older ORBAT records.
     const orbatDate = orbat.eventDate ? new Date(orbat.eventDate) : null;
     const startsAtUtc = orbat.startsAtUtc ? new Date(orbat.startsAtUtc) : null;
