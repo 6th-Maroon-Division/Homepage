@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
+import { parsePositiveId } from '@/lib/bot-api';
 
 interface ImportRecord {
   username: string;
@@ -48,11 +49,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { records, orbatId } = body as { records: ImportRecord[]; orbatId: number };
+    const { records } = body as { records?: ImportRecord[] };
+    const orbatId = parsePositiveId((body as { orbatId?: unknown }).orbatId);
 
     if (!Array.isArray(records) || !orbatId) {
       return NextResponse.json(
-        { error: 'Invalid request format' },
+        { error: 'records must be an array and orbatId must be a positive integer.' },
         { status: 400 }
       );
     }
