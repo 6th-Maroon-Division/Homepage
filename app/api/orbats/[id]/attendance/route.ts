@@ -39,7 +39,10 @@ export async function GET(
     const orbat = await prisma.orbat.findUnique({ where: { id: orbatId }, select: { isSideOp: true } });
     if (!orbat) return NextResponse.json({ error: 'Orbat not found' }, { status: 404 });
     if (orbat.isSideOp) {
-      return NextResponse.json({ error: 'Attendance is disabled for side operations.' }, { status: 409 });
+      return NextResponse.json(
+        { error: 'Attendance is disabled for side operations.', code: 'side_op_attendance_disabled' },
+        { status: 409 },
+      );
     }
 
     // Get query parameters
@@ -157,7 +160,7 @@ export async function POST(
 
     if (orbat.isSideOp) {
       return NextResponse.json(
-        { error: 'Attendance is disabled for side operations.' },
+        { error: 'Attendance is disabled for side operations.', code: 'side_op_attendance_disabled' },
         { status: 409 }
       );
     }

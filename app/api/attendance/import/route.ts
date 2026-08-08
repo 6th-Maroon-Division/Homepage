@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     }
     if (orbat.isSideOp) {
       return NextResponse.json(
-        { error: 'Attendance is disabled for side operations.' },
+        { error: 'Attendance is disabled for side operations.', code: 'side_op_attendance_disabled' },
         { status: 409 }
       );
     }

@@ -104,7 +104,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     if (existing.orbat.isSideOp) {
       return NextResponse.json(
-        { error: 'Attendance is disabled for side operations.' },
+        { error: 'Attendance is disabled for side operations.', code: 'side_op_attendance_disabled' },
         { status: 409 }
       );
     }
