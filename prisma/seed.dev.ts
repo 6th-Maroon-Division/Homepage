@@ -12,8 +12,26 @@ function formatDateToYyyyMmDd(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
+function operationWindow(days: number, startHour = 19, endHour = 21) {
+  const startsAtUtc = daysFromNow(days);
+  startsAtUtc.setUTCHours(startHour, 0, 0, 0);
+  const endsAtUtc = new Date(startsAtUtc);
+  endsAtUtc.setUTCHours(endHour, 0, 0, 0);
+  if (endsAtUtc <= startsAtUtc) endsAtUtc.setUTCDate(endsAtUtc.getUTCDate() + 1);
+  return { startsAtUtc, endsAtUtc };
+}
+
 async function main() {
+  const devBotApiToken = process.env.DEV_BOT_API_TOKEN?.trim();
+  if (!devBotApiToken) {
+    throw new Error('DEV_BOT_API_TOKEN is required for the development bot seed.');
+  }
+
+  await prisma.botEvent.deleteMany();
+  await prisma.botIdempotencyReceipt.deleteMany();
   await prisma.botToken.deleteMany();
+  await prisma.userNotificationPreference.deleteMany();
+  await prisma.rankDiscordRole.deleteMany();
   await prisma.leaveOfAbsence.deleteMany();
   await prisma.legacyAttendanceData.deleteMany();
   await prisma.legacyUserData.deleteMany();
@@ -293,8 +311,57 @@ async function main() {
     skipDuplicates: true,
   });
 
+  await prisma.userNotificationPreference.createMany({
+    data: [
+      {
+        userId: admin.id,
+        orbatAnnouncements: true,
+        trainingScheduled: true,
+        trainingUpdated: true,
+        trainingCancelled: true,
+        trainingReminders: true,
+        promotionAnnouncements: true,
+        dmEnabled: true,
+        channelMentionsEnabled: true,
+      },
+      {
+        userId: alice.id,
+        orbatAnnouncements: true,
+        trainingScheduled: true,
+        trainingUpdated: true,
+        trainingCancelled: true,
+        trainingReminders: true,
+        promotionAnnouncements: true,
+        dmEnabled: true,
+        channelMentionsEnabled: false,
+      },
+      {
+        userId: bob.id,
+        orbatAnnouncements: true,
+        trainingReminders: true,
+        dmEnabled: false,
+        channelMentionsEnabled: true,
+      },
+      { userId: charlie.id },
+      { userId: diana.id, trainingScheduled: true, trainingUpdated: true, trainingCancelled: true },
+      { userId: ethan.id, promotionAnnouncements: true },
+      { userId: farah.id, orbatAnnouncements: true, dmEnabled: true },
+    ],
+  });
+
   await prisma.rankHistory.createMany({
     data: [
+      {
+        userId: admin.id,
+        previousRankName: 'Sergeant',
+        newRankName: 'Major',
+        attendanceTotalAtChange: 40,
+        attendanceDeltaSinceLastRank: 15,
+        triggeredBy: 'manual',
+        triggeredByUserId: admin.id,
+        outcome: 'approved',
+        note: 'Bot fixture for an applied rank event with a linked Discord account',
+      },
       {
         userId: alice.id,
         previousRankName: 'Recruit',
@@ -373,6 +440,7 @@ async function main() {
 
   const squadRoleByName = Object.fromEntries(squadRoles.map((role) => [role.name, role]));
 
+  const futureWindow = operationWindow(2);
   const futureOrbat = await prisma.orbat.create({
     data: {
       name: 'Operation Iron Talon',
@@ -381,6 +449,9 @@ async function main() {
       eventDate: daysFromNow(2),
       startTime: '19:00',
       endTime: '21:00',
+      startsAtUtc: futureWindow.startsAtUtc,
+      endsAtUtc: futureWindow.endsAtUtc,
+      timezone: 'UTC',
       bluforCountry: 'NATO',
       bluforRelationship: 'Friendly',
       opforCountry: 'CSAT',
@@ -401,12 +472,13 @@ async function main() {
     prisma.squad.create({ data: { orbatId: futureOrbat.id, name: 'Bravo Squad', orderIndex: 2 } }),
   ]);
 
-  const [alphaLeader, alphaRifleman, alphaMedic, bravoLeader, bravoMarksman] = await Promise.all([
+  const [alphaLeader, alphaRifleman, alphaMedic, bravoLeader, bravoMarksman, bravoReserve] = await Promise.all([
     prisma.slot.create({ data: { orbatId: futureOrbat.id, squadId: alphaSquad.id, squadRoleId: squadRoleByName['Squad Leader'].id, orderIndex: 1, maxSignups: 1 } }),
     prisma.slot.create({ data: { orbatId: futureOrbat.id, squadId: alphaSquad.id, squadRoleId: squadRoleByName['Rifleman'].id, orderIndex: 2, maxSignups: 2 } }),
     prisma.slot.create({ data: { orbatId: futureOrbat.id, squadId: alphaSquad.id, squadRoleId: squadRoleByName['Medic'].id, orderIndex: 3, maxSignups: 1 } }),
     prisma.slot.create({ data: { orbatId: futureOrbat.id, squadId: bravoSquad.id, squadRoleId: squadRoleByName['Squad Leader'].id, orderIndex: 1, maxSignups: 1 } }),
     prisma.slot.create({ data: { orbatId: futureOrbat.id, squadId: bravoSquad.id, squadRoleId: squadRoleByName['Marksman'].id, orderIndex: 2, maxSignups: 1 } }),
+    prisma.slot.create({ data: { orbatId: futureOrbat.id, squadId: bravoSquad.id, squadRoleId: squadRoleByName['Rifleman'].id, orderIndex: 3, maxSignups: 2 } }),
   ]);
 
   await prisma.signup.createMany({
@@ -421,6 +493,7 @@ async function main() {
     skipDuplicates: true,
   });
 
+  const completedWindow = operationWindow(-1);
   const completedOrbat = await prisma.orbat.create({
     data: {
       name: 'Operation Silent Dagger',
@@ -429,6 +502,9 @@ async function main() {
       eventDate: daysFromNow(-1),
       startTime: '19:00',
       endTime: '21:00',
+      startsAtUtc: completedWindow.startsAtUtc,
+      endsAtUtc: completedWindow.endsAtUtc,
+      timezone: 'UTC',
       bluforCountry: 'NATO',
       bluforRelationship: 'Friendly',
       opforCountry: 'CSAT',
@@ -598,16 +674,12 @@ async function main() {
         data: [
           {
             userId: plan.user.id,
-            steamId: `7656119800000${plan.user.id.toString().padStart(4, '0')}`,
-            discordId: `dev-discord-${plan.user.id}`,
             isJoin: true,
             eventTime: checkIn,
             processed: true,
           },
           {
             userId: plan.user.id,
-            steamId: `7656119800000${plan.user.id.toString().padStart(4, '0')}`,
-            discordId: `dev-discord-${plan.user.id}`,
             isJoin: false,
             eventTime: checkOut,
             processed: true,
@@ -619,16 +691,12 @@ async function main() {
         data: [
           {
             userId: plan.user.id,
-            steamId: `7656119800000${plan.user.id.toString().padStart(4, '0')}`,
-            discordId: `dev-discord-${plan.user.id}`,
             isJoin: true,
             eventTime: new Date(attendanceStartBase.getTime() - 20 * 60 * 1000),
             processed: false,
           },
           {
             userId: plan.user.id,
-            steamId: `7656119800000${plan.user.id.toString().padStart(4, '0')}`,
-            discordId: `dev-discord-${plan.user.id}`,
             isJoin: false,
             eventTime: new Date(attendanceEndBase.getTime() + 15 * 60 * 1000),
             processed: false,
@@ -656,17 +724,9 @@ async function main() {
   await prisma.attendanceEvent.createMany({
     data: [
       {
-        steamId: '76561198000009999',
-        discordId: 'pending-user-1',
+        discordId: '894924053276663810',
         isJoin: true,
         eventTime: new Date(attendanceStartBase.getTime() + 4 * 60 * 1000),
-        processed: false,
-      },
-      {
-        steamId: '76561198000008888',
-        discordId: 'pending-user-2',
-        isJoin: false,
-        eventTime: new Date(attendanceEndBase.getTime() - 10 * 60 * 1000),
         processed: false,
       },
     ],
@@ -729,6 +789,67 @@ async function main() {
     skipDuplicates: true,
   });
 
+  const [aliceSniperRequest, farahMedicalRequest] = await Promise.all([
+    prisma.trainingRequest.findFirstOrThrow({ where: { userId: alice.id, trainingId: sniperTraining.id } }),
+    prisma.trainingRequest.findFirstOrThrow({ where: { userId: farah.id, trainingId: medicalTraining.id } }),
+  ]);
+  await prisma.trainingRequest.update({
+    where: { id: farahMedicalRequest.id },
+    data: { assignedTrainerId: diana.id },
+  });
+  const reminderStartsAt = new Date(Date.now() + 12 * 60 * 60 * 1000);
+  const scheduledTrainingSession = await prisma.trainingSession.create({
+    data: {
+      trainingId: medicalTraining.id,
+      trainerId: diana.id,
+      createdById: admin.id,
+      startsAt: reminderStartsAt,
+      durationMinutes: 150,
+      status: 'scheduled',
+      specialInstructions: 'Bot test fixture: reminder is due within 24 hours.',
+      attendees: {
+        create: {
+          userId: farah.id,
+          trainingRequestId: farahMedicalRequest.id,
+          status: 'scheduled',
+        },
+      },
+    },
+  });
+  const cancelledTrainingSession = await prisma.trainingSession.create({
+    data: {
+      trainingId: sniperTraining.id,
+      trainerId: diana.id,
+      createdById: admin.id,
+      startsAt: daysFromNow(3),
+      durationMinutes: 180,
+      status: 'cancelled',
+      cancelledAt: new Date(),
+      specialInstructions: 'Bot test fixture: cancelled lifecycle event.',
+      attendees: {
+        create: {
+          userId: alice.id,
+          trainingRequestId: aliceSniperRequest.id,
+          status: 'cancelled',
+        },
+      },
+    },
+  });
+  await prisma.trainingRequestSubscription.createMany({
+    data: [
+      { requestId: aliceSniperRequest.id, userId: alice.id, websiteEnabled: true, discordEnabled: true },
+      { requestId: aliceSniperRequest.id, userId: diana.id, websiteEnabled: true, discordEnabled: false },
+      { requestId: farahMedicalRequest.id, userId: farah.id, websiteEnabled: true, discordEnabled: true },
+      { requestId: farahMedicalRequest.id, userId: diana.id, websiteEnabled: true, discordEnabled: true },
+    ],
+  });
+  await prisma.trainingRequestMessage.createMany({
+    data: [
+      { requestId: farahMedicalRequest.id, senderRole: 'SYSTEM', body: `Training scheduled for ${reminderStartsAt.toISOString()}.` },
+      { requestId: farahMedicalRequest.id, senderId: diana.id, senderRole: 'STAFF', body: 'Bring the standard medical loadout.' },
+    ],
+  });
+
   await prisma.leaveOfAbsence.createMany({
     data: [
       {
@@ -769,18 +890,96 @@ async function main() {
     data: [
       {
         name: 'Main Dev Bot',
-        token: `dev-bot-token-main-${Date.now()}`,
+        token: devBotApiToken,
         isActive: true,
         createdById: admin.id,
       },
       {
         name: 'Backup Dev Bot',
-        token: `dev-bot-token-backup-${Date.now()}`,
+        token: 'dev-bot-token-revoked',
         isActive: false,
         createdById: admin.id,
       },
     ],
     skipDuplicates: true,
+  });
+
+  const rankHistoryForEvent = await prisma.rankHistory.findFirstOrThrow({
+    where: { userId: admin.id, outcome: 'approved' },
+    orderBy: { id: 'desc' },
+  });
+  await prisma.botEvent.createMany({
+    data: [
+      {
+        type: 'user.rank_changed',
+        aggregate: 'rank',
+        aggregateId: String(rankHistoryForEvent.id),
+        payload: {
+          rankHistoryId: rankHistoryForEvent.id,
+          userId: admin.id,
+          discordUserId: '894924053276663810',
+          oldRankId: rankByAbbr['Sgt'].id,
+          newRankId: rankByAbbr['Maj'].id,
+          changeType: 'promotion',
+          source: 'seed_fixture',
+        },
+        occurredAt: daysFromNow(-1),
+      },
+      {
+        type: 'orbat.created',
+        aggregate: 'orbat',
+        aggregateId: String(futureOrbat.id),
+        payload: { orbatId: futureOrbat.id, name: futureOrbat.name, version: futureOrbat.createdAt.toISOString() },
+      },
+      {
+        type: 'orbat.signup_changed',
+        aggregate: 'orbat',
+        aggregateId: String(futureOrbat.id),
+        payload: { orbatId: futureOrbat.id, userId: alice.id, discordUserId: null, slotId: alphaRifleman.id },
+      },
+      {
+        type: 'orbat.availability_changed',
+        aggregate: 'orbat',
+        aggregateId: String(futureOrbat.id),
+        payload: { orbatId: futureOrbat.id, userId: farah.id, discordUserId: null, status: 'absent' },
+      },
+      {
+        type: 'training.scheduled',
+        aggregate: 'training',
+        aggregateId: String(scheduledTrainingSession.id),
+        payload: {
+          trainingId: medicalTraining.id,
+          sessionId: scheduledTrainingSession.id,
+          title: medicalTraining.name,
+          startsAt: reminderStartsAt.toISOString(),
+          websiteUrl: `/trainings/requests/${farahMedicalRequest.id}`,
+          version: scheduledTrainingSession.updatedAt.toISOString(),
+        },
+      },
+      {
+        type: 'training.cancelled',
+        aggregate: 'training',
+        aggregateId: String(cancelledTrainingSession.id),
+        payload: {
+          trainingId: sniperTraining.id,
+          sessionId: cancelledTrainingSession.id,
+          title: sniperTraining.name,
+          startsAt: cancelledTrainingSession.startsAt?.toISOString() ?? null,
+          websiteUrl: `/trainings/sessions/${cancelledTrainingSession.id}`,
+          version: cancelledTrainingSession.updatedAt.toISOString(),
+        },
+      },
+    ],
+  });
+  await prisma.botIdempotencyReceipt.create({
+    data: {
+      idempotencyKey: 'expired-dev-interaction',
+      operation: 'signup.create',
+      requestHash: 'expired-fixture',
+      responseStatus: 200,
+      responseBody: { success: true, fixture: 'expired' },
+      expiresAt: daysFromNow(-1),
+    },
   });
 
   await prisma.legacyUserData.createMany({
@@ -890,6 +1089,8 @@ async function main() {
   });
 
   console.log('✅ Development seed complete with SquadRole/Squad/Slot schema.');
+  console.log('🤖 Bot API fixture token loaded from DEV_BOT_API_TOKEN and stored in BotToken.');
+  console.log('🔗 Synthetic users have no Discord or Steam account identifiers.');
 }
 
 main()
