@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '../ui/ToastContainer';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import DualRingTimePicker from '../ui/DualRingTimePicker';
+import { isSideOpTemplateCategory } from '@/lib/side-op';
 
 const logClientError = (...args: unknown[]) => {
   if (process.env.NODE_ENV === 'development') {
@@ -57,6 +58,7 @@ type OrbatData = {
   airspace?: string | null;
   inGameTimezone?: string | null;
   operationDay?: string | null;
+  isSideOp?: boolean;
 };
 
 type OrbatFormProps = {
@@ -167,6 +169,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
   const [airspace, setAirspace] = useState(initialData?.airspace || '');
   const [inGameTimezone, setInGameTimezone] = useState(initialData?.inGameTimezone || '');
   const [operationDay, setOperationDay] = useState(initialData?.operationDay || '');
+  const [isSideOp, setIsSideOp] = useState(initialData?.isSideOp ?? false);
   const [slots, setSlots] = useState<Slot[]>(initialData?.slots || []);
   const [radioFrequencies, setRadioFrequencies] = useState<Array<{
     id: number;
@@ -291,6 +294,9 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         // Pre-fill form with template data
         if (data.name) setName(`${data.name} - Copy`);
         if (data.description) setDescription(data.description);
+        setIsSideOp(templateType === 'template'
+          ? isSideOpTemplateCategory(data.category)
+          : Boolean(data.isSideOp));
         
         // Handle slots - templates use slotsJson as squads with nested slots, orbats use squads
         let slots = null;
@@ -389,6 +395,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
               // Pre-fill form with template data
               if (template.name) setName(`${template.name} - Copy`);
               if (template.description) setDescription(template.description);
+              setIsSideOp(isSideOpTemplateCategory(template.category));
               if (template.slotsJson) {
                 const parsedSlotsJson: unknown = typeof template.slotsJson === 'string'
                   ? JSON.parse(template.slotsJson)
@@ -914,6 +921,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         airspace: airspace || null,
         inGameTimezone: inGameTimezone || null,
         operationDay: operationDay || null,
+        isSideOp,
       };
 
       const url = mode === 'create' ? '/api/orbats' : `/api/orbats/${initialData?.id}`;
@@ -1071,6 +1079,27 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
             placeholder="Brief description of the operation"
           />
         </div>
+
+        <label
+          htmlFor="isSideOp"
+          className="flex items-center justify-between gap-4 rounded-lg border p-4 cursor-pointer"
+          style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}
+        >
+          <span>
+            <span className="block text-sm font-medium" style={{ color: 'var(--foreground)' }}>Side operation</span>
+            <span className="block text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
+              Role requirements and attendance tracking are disabled for this event.
+            </span>
+          </span>
+          <input
+            id="isSideOp"
+            type="checkbox"
+            role="switch"
+            checked={isSideOp}
+            onChange={(event) => setIsSideOp(event.target.checked)}
+            className="h-5 w-5 accent-current"
+          />
+        </label>
 
         <div>
           <label htmlFor="eventDate" className="block text-sm font-medium mb-2" style={{ color: 'var(--muted-foreground)' }}>

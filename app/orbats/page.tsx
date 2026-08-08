@@ -15,6 +15,7 @@ type OrbatWithDates = {
   startsAtUtc: Date | null;
   eventDate: Date | null;
   createdAt: Date;
+  isSideOp: boolean;
 };
 
 export default async function OrbatsPage() {
@@ -68,6 +69,7 @@ export default async function OrbatsPage() {
       eventDate: date.toISOString(),
       dateKey,
       href: `/orbats/${orbat.id}`,
+      isSideOp: orbat.isSideOp,
     };
   });
 
@@ -105,7 +107,7 @@ export default async function OrbatsPage() {
           initialYear={initialYear} 
           initialMonth={initialMonth} 
           ops={[...uiOps, ...trainingItems]}
-          helpText="Operations and your scheduled training sessions share this calendar. Training sessions use the secondary colour."
+          helpText="Operations and your scheduled training sessions share this calendar. Side ops use teal; training sessions use the secondary colour."
         />
       </div>
     </main>

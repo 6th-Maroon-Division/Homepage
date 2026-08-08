@@ -24,6 +24,12 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid ORBAT id' }, { status: 400 });
   }
 
+  const orbat = await prisma.orbat.findUnique({
+    where: { id: orbatId },
+    select: { isSideOp: true },
+  });
+  if (!orbat) return NextResponse.json({ error: 'ORBAT not found' }, { status: 404 });
+
   const slots = await prisma.slot.findMany({
     where: { orbatId },
     select: {
@@ -31,10 +37,6 @@ export async function GET(
       squadRole: { select: { requiredTrainingIds: true } },
     },
   });
-  if (slots.length === 0) {
-    const exists = await prisma.orbat.count({ where: { id: orbatId } });
-    if (!exists) return NextResponse.json({ error: 'ORBAT not found' }, { status: 404 });
-  }
 
   const requiredIds = Array.from(new Set(
     slots.flatMap((slot) => slot.squadRole?.requiredTrainingIds ?? []),
@@ -53,7 +55,7 @@ export async function GET(
   const statusRecords = userTrainings as UserTrainingStatusRecord[];
 
   const eligibility = Object.fromEntries(slots.map((slot) => {
-    const requirements: OrbatTrainingRequirement[] = (slot.squadRole?.requiredTrainingIds ?? []).map(
+    const requirements: OrbatTrainingRequirement[] = (orbat.isSideOp ? [] : (slot.squadRole?.requiredTrainingIds ?? [])).map(
       (trainingId) => trainingById.get(trainingId) ?? {
         id: trainingId,
         name: `Training #${trainingId}`,

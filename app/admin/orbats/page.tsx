@@ -69,6 +69,7 @@ export default async function AdminOrbatsPage() {
       eventDate: date.toISOString(),
       dateKey,
       href: `/admin/orbats/${orbat.id}`,
+      isSideOp: orbat.isSideOp,
     };
   });
 
@@ -131,7 +132,7 @@ export default async function AdminOrbatsPage() {
             initialMonth={initialMonth} 
             ops={[...uiOps, ...trainingItems]}
             isAdmin={true}
-            helpText="Operations and all training sessions share this calendar. Click an empty day to create an operation."
+            helpText="Operations and all training sessions share this calendar. Side ops use teal. Click an empty day to create an operation."
           />
         </div>
       </div>

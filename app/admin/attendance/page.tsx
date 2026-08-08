@@ -28,6 +28,7 @@ export default async function AdminAttendancePage() {
   // Get recent orbats with attendance data
   const recentOrbats = await prisma.orbat.findMany({
     where: {
+      isSideOp: false,
       OR: [
         { startsAtUtc: { not: null } },
         { eventDate: { not: null } },

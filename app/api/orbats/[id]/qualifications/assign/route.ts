@@ -46,6 +46,15 @@ export async function POST(
   if (!targetSlot || targetSlot.orbatId !== orbatId) {
     return NextResponse.json({ error: 'Target slot is not part of this ORBAT' }, { status: 404 });
   }
+  if (targetSlot.orbat.isSideOp) {
+    return NextResponse.json(
+      {
+        error: 'Training qualifications are disabled for side operations.',
+        code: 'side_op_qualification_disabled',
+      },
+      { status: 409 },
+    );
+  }
   if (!targetSlot.squadRole?.requiredTrainingIds.includes(credential.trainingId)) {
     return NextResponse.json({ error: 'Target slot does not evaluate this qualification' }, { status: 409 });
   }

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { checkPermission } from '@/lib/auth-middleware';
+import { parsePositiveId } from '@/lib/bot-api';
 
 interface ImportRecord {
   username: string;
@@ -48,12 +49,27 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { records, orbatId } = body as { records: ImportRecord[]; orbatId: number };
+    const { records } = body as { records?: ImportRecord[] };
+    const orbatId = parsePositiveId((body as { orbatId?: unknown }).orbatId);
 
     if (!Array.isArray(records) || !orbatId) {
       return NextResponse.json(
-        { error: 'Invalid request format' },
+        { error: 'records must be an array and orbatId must be a positive integer.' },
         { status: 400 }
+      );
+    }
+
+    const orbat = await prisma.orbat.findUnique({
+      where: { id: orbatId },
+      select: { isSideOp: true },
+    });
+    if (!orbat) {
+      return NextResponse.json({ error: 'Orbat not found' }, { status: 404 });
+    }
+    if (orbat.isSideOp) {
+      return NextResponse.json(
+        { error: 'Attendance is disabled for side operations.', code: 'side_op_attendance_disabled' },
+        { status: 409 }
       );
     }
 

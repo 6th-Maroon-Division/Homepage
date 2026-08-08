@@ -70,6 +70,13 @@ export async function POST(
       );
     }
 
+    if (orbat.isSideOp) {
+      return NextResponse.json(
+        { error: 'Attendance is disabled for side operations.', code: 'side_op_attendance_disabled' },
+        { status: 409 }
+      );
+    }
+
     const scheduleWindow = resolveOrbatScheduleWindow(orbat);
 
     // Check if user has a signup for this orbat

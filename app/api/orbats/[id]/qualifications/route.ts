@@ -32,9 +32,23 @@ async function authorize(context: RouteContext) {
   if (!Number.isInteger(orbatId) || orbatId <= 0) {
     return { error: NextResponse.json({ error: 'Invalid ORBAT id' }, { status: 400 }) } as const;
   }
-  const exists = await prisma.orbat.count({ where: { id: orbatId } });
-  if (!exists) {
+  const orbat = await prisma.orbat.findUnique({
+    where: { id: orbatId },
+    select: { isSideOp: true },
+  });
+  if (!orbat) {
     return { error: NextResponse.json({ error: 'ORBAT not found' }, { status: 404 }) } as const;
+  }
+  if (orbat.isSideOp) {
+    return {
+      error: NextResponse.json(
+        {
+          error: 'Training qualifications are disabled for side operations.',
+          code: 'side_op_qualification_disabled',
+        },
+        { status: 409 },
+      ),
+    } as const;
   }
   return { actorId, orbatId } as const;
 }

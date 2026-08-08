@@ -243,6 +243,7 @@ export default async function OrbatPage({ params }: OrbatPageProps) {
 
   // Serialize for client component
   const clientOrbat = {
+    isSideOp: orbat.isSideOp,
     id: orbat.id,
     name: orbat.name,
     description: orbat.description,
@@ -284,10 +285,10 @@ export default async function OrbatPage({ params }: OrbatPageProps) {
           orderIndex: slot.orderIndex,
           maxSignups: slot.maxSignups ?? 9999,
           squadRoleId: slot.squadRoleId,
-          requiredTrainings: slotRequiredTrainings,
-          requiredRanks: slotRequiredRanks,
-          requiredTraining: slotRequiredTrainings[0] || null,
-          requiredRank: slotRequiredRanks[0] || null,
+          requiredTrainings: orbat.isSideOp ? [] : slotRequiredTrainings,
+          requiredRanks: orbat.isSideOp ? [] : slotRequiredRanks,
+          requiredTraining: orbat.isSideOp ? null : (slotRequiredTrainings[0] || null),
+          requiredRank: orbat.isSideOp ? null : (slotRequiredRanks[0] || null),
           signups: slot.signups.map((s) => ({
             id: s.id,
             user: s.user

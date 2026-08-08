@@ -93,6 +93,7 @@ type ClientOrbat = {
   airspace?: string | null;
   inGameTimezone?: string | null;
   operationDay?: string | null;
+  isSideOp?: boolean;
 };
 
 type OrbatAttendanceNote = {
@@ -648,11 +649,24 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
     <div className="space-y-6">
       {/* Header */}
       <div className="border rounded-lg p-6" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
-        <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: 'var(--foreground)' }}>{orbat.name}</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: 'var(--foreground)' }}>{orbat.name}</h1>
+          {orbat.isSideOp && (
+            <span className="px-2.5 py-1 text-xs font-semibold rounded-full" style={{ backgroundColor: '#0f766e', color: '#ffffff' }}>
+              Side Op
+            </span>
+          )}
+        </div>
 
         {orbat.description && (
           <p className="text-sm sm:text-base mt-2" style={{ color: 'var(--muted-foreground)' }}>
             {orbat.description}
+          </p>
+        )}
+
+        {orbat.isSideOp && (
+          <p className="text-xs mt-2" style={{ color: 'var(--muted-foreground)' }}>
+            Role requirements and attendance tracking are disabled for this operation.
           </p>
         )}
 
@@ -832,7 +846,7 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
         );})}
       </section>
 
-      <OrbatQualificationPanel orbatId={orbat.id} />
+      {!orbat.isSideOp && <OrbatQualificationPanel orbatId={orbat.id} />}
 
       {/* Absent / Late-Unsure Section */}
       <section className="rounded-lg border p-4 space-y-4" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>

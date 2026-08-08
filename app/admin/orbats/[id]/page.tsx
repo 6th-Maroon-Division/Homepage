@@ -91,6 +91,7 @@ export default async function AdminOrbatPage({ params }: AdminOrbatPageProps) {
   }
 
   const clientOrbat = {
+    isSideOp: orbat.isSideOp,
     id: orbat.id,
     name: orbat.name,
     description: orbat.description,

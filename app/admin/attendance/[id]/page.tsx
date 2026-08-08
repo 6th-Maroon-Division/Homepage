@@ -36,7 +36,7 @@ export default async function OrbatAttendancePage({
     },
   });
 
-  if (!orbat) {
+  if (!orbat || orbat.isSideOp) {
     redirect('/admin/attendance');
   }
 

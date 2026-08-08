@@ -9,6 +9,7 @@ import {
 } from '@/lib/attendance';
 import { resolveOrbatScheduleWindow } from '@/lib/orbat-schedule';
 import { buildAttendanceNoteFlags } from '@/lib/attendance-note-flags';
+import { parsePositiveId } from '@/lib/bot-api';
 
 // GET /api/orbats/[id]/attendance - Get all attendance for an orbat
 export async function GET(
@@ -35,7 +36,18 @@ export async function GET(
     }
 
     const { id } = await params;
-    const orbatId = parseInt(id);
+    const orbatId = parsePositiveId(id);
+    if (!orbatId) {
+      return NextResponse.json({ error: 'ORBAT id must be a positive integer.' }, { status: 400 });
+    }
+    const orbat = await prisma.orbat.findUnique({ where: { id: orbatId }, select: { isSideOp: true } });
+    if (!orbat) return NextResponse.json({ error: 'Orbat not found' }, { status: 404 });
+    if (orbat.isSideOp) {
+      return NextResponse.json(
+        { error: 'Attendance is disabled for side operations.', code: 'side_op_attendance_disabled' },
+        { status: 409 },
+      );
+    }
 
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;
@@ -118,7 +130,10 @@ export async function POST(
     }
 
     const { id } = await params;
-    const orbatId = parseInt(id);
+    const orbatId = parsePositiveId(id);
+    if (!orbatId) {
+      return NextResponse.json({ error: 'ORBAT id must be a positive integer.' }, { status: 400 });
+    }
     const body = await request.json();
 
     const {
@@ -147,6 +162,13 @@ export async function POST(
       return NextResponse.json(
         { error: 'Orbat not found' },
         { status: 404 }
+      );
+    }
+
+    if (orbat.isSideOp) {
+      return NextResponse.json(
+        { error: 'Attendance is disabled for side operations.', code: 'side_op_attendance_disabled' },
+        { status: 409 }
       );
     }
 

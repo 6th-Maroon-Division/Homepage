@@ -224,6 +224,7 @@ model Orbat {
   createdById           Int
   createdAt             DateTime                    @default(now())
   isMainOp              Boolean                     @default(false)
+  isSideOp              Boolean                     @default(false)
   squads                Squad[] // Renamed from slots
   frequencies           OrbatRadioFrequency[]
   attendances           Attendance[]
