@@ -16,6 +16,16 @@ const asRecord = (value: unknown): UnknownRecord | null =>
     ? value as UnknownRecord
     : null;
 
+const toNonNegativeInteger = (value: unknown, fallback: number) =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? Math.floor(value)
+    : fallback;
+
+const toPositiveInteger = (value: unknown, fallback: number) =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 1
+    ? Math.floor(value)
+    : fallback;
+
 export function normalizeTemplateSlots(value: unknown): UnknownRecord[] {
   let parsed = value;
   if (typeof parsed === 'string') {
@@ -33,14 +43,14 @@ export function normalizeTemplateSlots(value: unknown): UnknownRecord[] {
     return {
       ...canonicalSquad,
       name: typeof squad.name === 'string' ? squad.name : `Squad ${squadIndex + 1}`,
-      orderIndex: typeof squad.orderIndex === 'number' ? squad.orderIndex : squadIndex,
+      orderIndex: toNonNegativeInteger(squad.orderIndex, squadIndex),
       slots: rawSlots.map((rawSlot, slotIndex) => {
         const slot = asRecord(rawSlot) ?? {};
         return {
           ...slot,
           name: typeof slot.name === 'string' ? slot.name : 'Unknown Role',
-          orderIndex: typeof slot.orderIndex === 'number' ? slot.orderIndex : slotIndex,
-          maxSignups: typeof slot.maxSignups === 'number' ? slot.maxSignups : 1,
+          orderIndex: toNonNegativeInteger(slot.orderIndex, slotIndex),
+          maxSignups: toPositiveInteger(slot.maxSignups, 1),
         };
       }),
     };

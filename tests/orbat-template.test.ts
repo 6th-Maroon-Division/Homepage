@@ -53,3 +53,21 @@ test('multiple instances of the same role are preserved within a squad', () => {
   assert.equal(squadSlots[1].squadRoleId, 7);
   assert.equal(squadSlots[1].maxSignups, 2);
 });
+
+test('invalid numeric slot values are replaced with safe canonical defaults', () => {
+  const slots = normalizeTemplateSlots([{
+    name: 'Alpha',
+    orderIndex: Number.NaN,
+    slots: [
+      { name: 'Medic', orderIndex: Number.POSITIVE_INFINITY, maxSignups: Number.NaN },
+      { name: 'Rifleman', orderIndex: -2, maxSignups: 2.9 },
+    ],
+  }]);
+
+  assert.equal(slots[0].orderIndex, 0);
+  const squadSlots = slots[0].slots as Array<Record<string, unknown>>;
+  assert.equal(squadSlots[0].orderIndex, 0);
+  assert.equal(squadSlots[0].maxSignups, 1);
+  assert.equal(squadSlots[1].orderIndex, 1);
+  assert.equal(squadSlots[1].maxSignups, 2);
+});

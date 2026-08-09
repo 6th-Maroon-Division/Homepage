@@ -200,6 +200,12 @@ export async function PUT(
     let normalizedSlotsJson = slotsJson;
     if (slotsJson) {
       const inputSlots = normalizeTemplateSlots(slotsJson) as TemplateSquadInput[];
+      if (inputSlots.length === 0) {
+        return NextResponse.json(
+          { error: 'Slot structure must contain at least one squad.' },
+          { status: 400 }
+        );
+      }
       const requestedDefinitionIds = Array.from(
         new Set(
           inputSlots
