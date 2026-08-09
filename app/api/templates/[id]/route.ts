@@ -52,7 +52,7 @@ export async function GET(
     ]);
 
     if (!canAccessTemplateReadApi({
-      hasSuperAdmin: (session.user.permissions?.['system:super_admin'] ?? 0) > 0,
+      hasSuperAdmin: false,
       canCreateTemplate,
       canEditTemplate,
       canDeleteTemplate,
@@ -286,7 +286,7 @@ export async function PUT(
         ...(category !== undefined && { category }),
         ...(tagsJson !== undefined && { tagsJson }),
         ...(normalizedSlotsJson && { slotsJson: normalizedSlotsJson }),
-        ...(frequencyIds && { frequencyIds }),
+        ...(frequencyIds !== undefined && { frequencyIds: Array.isArray(frequencyIds) ? frequencyIds : [] }),
         ...(tempFrequencies !== undefined && { tempFrequencies: Array.isArray(tempFrequencies) ? tempFrequencies : [] }),
         ...(isSideOp !== undefined && { isSideOp: typeof isSideOp === 'boolean' ? isSideOp : null }),
         ...(timezone !== undefined && { timezone: timezone || null }),

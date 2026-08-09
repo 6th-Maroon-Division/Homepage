@@ -166,7 +166,7 @@ export default function TemplateEditor() {
             frequencyIds: Array.isArray(data.frequencyIds) ? data.frequencyIds : [],
             tempFrequencies: Array.isArray(data.tempFrequencies)
               ? data.tempFrequencies.map((frequency: OrbatTemplate['tempFrequencies'][number]) => ({
-                  _id: frequency._id,
+                  _id: frequency._id || createClientId(),
                   frequency: frequency.frequency ?? '',
                   type: frequency.type === 'LR' ? 'LR' : 'SR',
                   isAdditional: frequency.isAdditional === true,

@@ -123,6 +123,7 @@ const buildUtcDateFromLocalDate = (dateValue: string): Date | null => {
 export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
   const router = useRouter();
   const { showSuccess, showError } = useToast();
+  const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -172,7 +173,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
   const [inGameTimezone, setInGameTimezone] = useState(initialData?.inGameTimezone || '');
   const [operationDay, setOperationDay] = useState(initialData?.operationDay || '');
   const [timezone, setTimezone] = useState(
-    initialData?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || ''
+    initialData?.timezone || localTimezone
   );
   const [isSideOp, setIsSideOp] = useState(initialData?.isSideOp ?? false);
   const [slots, setSlots] = useState<Slot[]>(initialData?.slots || []);
@@ -370,16 +371,16 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         if (data.operationDay) setOperationDay(data.operationDay);
         if (data.startTime) setStartTime(data.startTime);
         if (data.endTime) setEndTime(data.endTime);
-        if (data.timezone) setTimezone(data.timezone);
-        if (Array.isArray(data.frequencyIds)) setSelectedFrequencyIds(data.frequencyIds);
-        if (Array.isArray(data.tempFrequencies)) {
-          setTempFrequencies(data.tempFrequencies.map((frequency: TempFrequency) => ({
+        setTimezone(typeof data.timezone === 'string' && data.timezone ? data.timezone : localTimezone);
+        setSelectedFrequencyIds(Array.isArray(data.frequencyIds) ? data.frequencyIds : []);
+        setTempFrequencies(Array.isArray(data.tempFrequencies)
+          ? data.tempFrequencies.map((frequency: TempFrequency) => ({
             ...frequency,
             _id: frequency._id || createClientId(),
             channel: frequency.channel || '',
             callsign: frequency.callsign || '',
-          })));
-        }
+          }))
+          : []);
         
         showSuccess(`${templateType === 'template' ? 'Template' : 'OrbAT'} loaded successfully`);
         setSelectedTemplate('');
@@ -455,16 +456,16 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
               if (template.operationDay) setOperationDay(template.operationDay);
               if (template.startTime) setStartTime(template.startTime);
               if (template.endTime) setEndTime(template.endTime);
-              if (template.timezone) setTimezone(template.timezone);
-              if (Array.isArray(template.frequencyIds)) setSelectedFrequencyIds(template.frequencyIds);
-              if (Array.isArray(template.tempFrequencies)) {
-                setTempFrequencies(template.tempFrequencies.map((frequency: TempFrequency) => ({
+              setTimezone(typeof template.timezone === 'string' && template.timezone ? template.timezone : localTimezone);
+              setSelectedFrequencyIds(Array.isArray(template.frequencyIds) ? template.frequencyIds : []);
+              setTempFrequencies(Array.isArray(template.tempFrequencies)
+                ? template.tempFrequencies.map((frequency: TempFrequency) => ({
                   ...frequency,
                   _id: frequency._id || createClientId(),
                   channel: frequency.channel || '',
                   callsign: frequency.callsign || '',
-                })));
-              }
+                }))
+                : []);
               
               showSuccess('Template loaded successfully');
             }
