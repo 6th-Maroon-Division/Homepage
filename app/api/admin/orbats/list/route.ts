@@ -11,9 +11,13 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const [canCreate, canEdit, canDelete] = await Promise.all([
+    checkPermission(session.user.id, 'orbat:create'),
+    checkPermission(session.user.id, 'orbat:edit'),
+    checkPermission(session.user.id, 'orbat:delete'),
+  ]);
   const hasPermission =
-    (session.user.permissions?.['system:super_admin'] ?? 0) > 0 ||
-    await checkPermission(session.user.id, 'orbat:edit');
+    (session.user.permissions?.['system:super_admin'] ?? 0) > 0 || canCreate || canEdit || canDelete;
 
   if (!hasPermission) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

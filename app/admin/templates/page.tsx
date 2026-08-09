@@ -21,7 +21,7 @@ export default async function AdminTemplatesPage() {
     checkPermission(session.user.id, 'orbat:create'),
     checkPermission(session.user.id, 'orbat:edit'),
   ]);
-  const hasSuperAdmin = (session.user.permissions?.['system:super_admin'] ?? 0) > 0;
+  const hasSuperAdmin = await checkPermission(session.user.id, 'system:super_admin');
   const canManageTemplates = hasSuperAdmin || canEditTemplates || canCreateTemplates || canDeleteTemplates;
   const hasPermission = canManageTemplates || canCreateOrbat || canEditOrbat;
   const isReadOnly = !canManageTemplates && (canCreateOrbat || canEditOrbat);
@@ -64,7 +64,13 @@ export default async function AdminTemplatesPage() {
   return (
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        <TemplateManagementClient templates={serializedTemplates} isReadOnly={isReadOnly} />
+        <TemplateManagementClient
+          templates={serializedTemplates}
+          isReadOnly={isReadOnly}
+          canCreate={hasSuperAdmin || canCreateTemplates}
+          canEdit={hasSuperAdmin || canEditTemplates}
+          canDelete={hasSuperAdmin || canDeleteTemplates}
+        />
       </div>
     </main>
   );

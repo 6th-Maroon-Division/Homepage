@@ -6,6 +6,7 @@ import { checkPermission } from '@/lib/auth-middleware';
 import { canAccessTemplateReadApi } from '@/lib/permission-api-logic';
 import { publishAdminCatalogEvent } from '@/lib/realtime/admin-catalog-events';
 import type { NextRequest } from 'next/server';
+import { normalizeTemplateForRead, normalizeTemplateSlots } from '@/lib/orbat-template';
 
 type TemplateRoleSlotInput = {
   name: string;
@@ -70,7 +71,7 @@ export async function GET() {
       orderBy: [{ category: 'asc' }, { name: 'asc' }],
     });
 
-    return NextResponse.json(templates);
+    return NextResponse.json(templates.map(normalizeTemplateForRead));
   } catch (error) {
     console.error('Error fetching templates:', error);
     return NextResponse.json(
@@ -108,6 +109,9 @@ export async function POST(request: NextRequest) {
       tagsJson,
       slotsJson,
       frequencyIds,
+      tempFrequencies,
+      isSideOp,
+      timezone,
       bluforCountry,
       bluforRelationship,
       opforCountry,
@@ -139,7 +143,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const inputSlots = slotsJson as TemplateSquadInput[];
+    const inputSlots = normalizeTemplateSlots(slotsJson) as TemplateSquadInput[];
     const requestedDefinitionIds = Array.from(
       new Set(
         inputSlots
@@ -215,6 +219,9 @@ export async function POST(request: NextRequest) {
         tagsJson: tagsJson || null,
         slotsJson: normalizedSlotsJson,
         frequencyIds: frequencyIds || [],
+        tempFrequencies: Array.isArray(tempFrequencies) ? tempFrequencies : [],
+        isSideOp: isSideOp === true,
+        timezone: timezone || null,
         bluforCountry: bluforCountry || null,
         bluforRelationship: bluforRelationship || null,
         opforCountry: opforCountry || null,
@@ -247,7 +254,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(template, { status: 201 });
+    return NextResponse.json(normalizeTemplateForRead(template), { status: 201 });
   } catch (error) {
     console.error('Error creating template:', error);
     return NextResponse.json(

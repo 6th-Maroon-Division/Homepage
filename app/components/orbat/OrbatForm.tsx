@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '../ui/ToastContainer';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import DualRingTimePicker from '../ui/DualRingTimePicker';
-import { isSideOpTemplateCategory } from '@/lib/side-op';
 
 const logClientError = (...args: unknown[]) => {
   if (process.env.NODE_ENV === 'development') {
@@ -169,6 +168,9 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
   const [airspace, setAirspace] = useState(initialData?.airspace || '');
   const [inGameTimezone, setInGameTimezone] = useState(initialData?.inGameTimezone || '');
   const [operationDay, setOperationDay] = useState(initialData?.operationDay || '');
+  const [timezone, setTimezone] = useState(
+    initialData?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || ''
+  );
   const [isSideOp, setIsSideOp] = useState(initialData?.isSideOp ?? false);
   const [slots, setSlots] = useState<Slot[]>(initialData?.slots || []);
   const [radioFrequencies, setRadioFrequencies] = useState<Array<{
@@ -294,9 +296,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         // Pre-fill form with template data
         if (data.name) setName(`${data.name} - Copy`);
         if (data.description) setDescription(data.description);
-        setIsSideOp(templateType === 'template'
-          ? isSideOpTemplateCategory(data.category)
-          : Boolean(data.isSideOp));
+        setIsSideOp(Boolean(data.isSideOp));
         
         // Handle slots - templates use slotsJson as squads with nested slots, orbats use squads
         let slots = null;
@@ -367,6 +367,16 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         if (data.operationDay) setOperationDay(data.operationDay);
         if (data.startTime) setStartTime(data.startTime);
         if (data.endTime) setEndTime(data.endTime);
+        if (data.timezone) setTimezone(data.timezone);
+        if (Array.isArray(data.frequencyIds)) setSelectedFrequencyIds(data.frequencyIds);
+        if (Array.isArray(data.tempFrequencies)) {
+          setTempFrequencies(data.tempFrequencies.map((frequency: TempFrequency) => ({
+            ...frequency,
+            _id: frequency._id || Math.random().toString(36).slice(2, 11),
+            channel: frequency.channel || '',
+            callsign: frequency.callsign || '',
+          })));
+        }
         
         showSuccess(`${templateType === 'template' ? 'Template' : 'OrbAT'} loaded successfully`);
         setSelectedTemplate('');
@@ -395,7 +405,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
               // Pre-fill form with template data
               if (template.name) setName(`${template.name} - Copy`);
               if (template.description) setDescription(template.description);
-              setIsSideOp(isSideOpTemplateCategory(template.category));
+              setIsSideOp(Boolean(template.isSideOp));
               if (template.slotsJson) {
                 const parsedSlotsJson: unknown = typeof template.slotsJson === 'string'
                   ? JSON.parse(template.slotsJson)
@@ -442,6 +452,16 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
               if (template.operationDay) setOperationDay(template.operationDay);
               if (template.startTime) setStartTime(template.startTime);
               if (template.endTime) setEndTime(template.endTime);
+              if (template.timezone) setTimezone(template.timezone);
+              if (Array.isArray(template.frequencyIds)) setSelectedFrequencyIds(template.frequencyIds);
+              if (Array.isArray(template.tempFrequencies)) {
+                setTempFrequencies(template.tempFrequencies.map((frequency: TempFrequency) => ({
+                  ...frequency,
+                  _id: frequency._id || Math.random().toString(36).slice(2, 11),
+                  channel: frequency.channel || '',
+                  callsign: frequency.callsign || '',
+                })));
+              }
               
               showSuccess('Template loaded successfully');
             }
@@ -905,7 +925,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         endTime: endTime || null,
         startsAtUtc: startDateTime ? startDateTime.toISOString() : null,
         endsAtUtc: endDateTime ? endDateTime.toISOString() : null,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || null,
+        timezone: timezone || null,
         squads: cleanSquads,
         frequencyIds: selectedFrequencyIds,
         tempFrequencies,

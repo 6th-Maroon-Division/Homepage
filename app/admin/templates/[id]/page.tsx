@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
-import { usePermission, usePermissionLoading } from '@/app/hooks/usePermissions';
+import DualRingTimePicker from '@/app/components/ui/DualRingTimePicker';
 
 type TemplateSlot = {
   name: string;
@@ -31,6 +31,16 @@ interface OrbatTemplate {
   tagsJson: string | null;
   slotsJson: TemplateSquad[];
   frequencyIds: number[];
+  tempFrequencies: Array<{
+    _id?: string;
+    frequency: string;
+    type: 'SR' | 'LR';
+    isAdditional: boolean;
+    channel?: string;
+    callsign?: string;
+  }>;
+  isSideOp: boolean;
+  timezone: string | null;
   bluforCountry: string | null;
   bluforRelationship: string | null;
   opforCountry: string | null;
@@ -53,11 +63,12 @@ export default function TemplateEditor() {
   const isNewTemplate = params.id === 'new';
 
   const [isLoading, setIsLoading] = useState(!isNewTemplate);
+  const [isAccessLoading, setIsAccessLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const { showError, showSuccess } = useToast();
-  const canCreateTemplate = usePermission('template:create');
-  const canEditTemplate = usePermission('template:edit');
-  const isPermissionLoading = usePermissionLoading();
+  const [access, setAccess] = useState({ canCreate: false, canEdit: false, canDelete: false, canRead: false });
+  const canCreateTemplate = access.canCreate;
+  const canEditTemplate = access.canEdit;
   const isReadOnly = !isNewTemplate && !canEditTemplate;
   const [subslotDefinitions, setSubslotDefinitions] = useState<Array<{
     id: number;
@@ -77,6 +88,9 @@ export default function TemplateEditor() {
   const [dragOverTarget, setDragOverTarget] = useState<{ squadIndex: number; slotIndex: number | null } | null>(null);
   const [draggedSquadIndex, setDraggedSquadIndex] = useState<number | null>(null);
   const [dragOverSquadIndex, setDragOverSquadIndex] = useState<number | null>(null);
+  const [radioFrequencies, setRadioFrequencies] = useState<Array<{
+    id: number; frequency: string; type: string; channel?: string | null; callsign?: string | null;
+  }>>([]);
 
   const [template, setTemplate] = useState<OrbatTemplate>({
     name: '',
@@ -85,6 +99,9 @@ export default function TemplateEditor() {
     tagsJson: null,
     slotsJson: [],
     frequencyIds: [],
+    tempFrequencies: [],
+    isSideOp: false,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || null,
     bluforCountry: null,
     bluforRelationship: null,
     opforCountry: null,
@@ -103,6 +120,31 @@ export default function TemplateEditor() {
 
   // Fetch template if editing
   useEffect(() => {
+    const fetchAccess = async () => {
+      try {
+        const response = await fetch('/api/templates/access');
+        if (!response.ok) {
+          router.push('/admin');
+          return;
+        }
+        const capabilities = await response.json();
+        setAccess(capabilities);
+        if (!capabilities.canRead || (isNewTemplate && !capabilities.canCreate)) {
+          showError(isNewTemplate ? 'You do not have permission to create templates' : 'You do not have permission to view templates');
+          router.push('/admin/templates');
+        }
+      } catch {
+        showError('Failed to verify template permissions');
+        router.push('/admin');
+      } finally {
+        setIsAccessLoading(false);
+      }
+    };
+
+    void fetchAccess();
+  }, [isNewTemplate, router, showError]);
+
+  useEffect(() => {
     if (!isNewTemplate) {
       const fetchTemplate = async () => {
         try {
@@ -113,7 +155,24 @@ export default function TemplateEditor() {
           if (typeof data.slotsJson === 'string') {
             data.slotsJson = JSON.parse(data.slotsJson);
           }
-          setTemplate(data);
+          setTemplate((current) => ({
+            ...current,
+            ...data,
+            name: data.name ?? '',
+            slotsJson: Array.isArray(data.slotsJson) ? data.slotsJson : [],
+            frequencyIds: Array.isArray(data.frequencyIds) ? data.frequencyIds : [],
+            tempFrequencies: Array.isArray(data.tempFrequencies)
+              ? data.tempFrequencies.map((frequency: OrbatTemplate['tempFrequencies'][number]) => ({
+                  _id: frequency._id,
+                  frequency: frequency.frequency ?? '',
+                  type: frequency.type === 'LR' ? 'LR' : 'SR',
+                  isAdditional: frequency.isAdditional === true,
+                  channel: frequency.channel ?? '',
+                  callsign: frequency.callsign ?? '',
+                }))
+              : [],
+            isSideOp: data.isSideOp === true,
+          }));
         } catch (error) {
           console.error('Error fetching template:', error);
           showError('Failed to load template');
@@ -143,15 +202,11 @@ export default function TemplateEditor() {
   }, []);
 
   useEffect(() => {
-    if (isPermissionLoading) {
-      return;
-    }
-
-    if (isNewTemplate && !canCreateTemplate) {
-      showError('You do not have permission to create templates');
-      router.push('/admin/templates');
-    }
-  }, [isPermissionLoading, isNewTemplate, canCreateTemplate, router, showError]);
+    fetch('/api/radio-frequencies')
+      .then((response) => response.ok ? response.json() : [])
+      .then(setRadioFrequencies)
+      .catch(() => setRadioFrequencies([]));
+  }, []);
 
   const handleSave = async () => {
     if (isReadOnly) {
@@ -237,15 +292,6 @@ export default function TemplateEditor() {
     const definition = subslotDefinitions.find((item) => item.id === definitionId);
     if (!definition) {
       showError('Selected role definition was not found');
-      return;
-    }
-
-    const alreadyAdded = template.slotsJson[squadIndex].slots.some(
-      (slot) => slot.squadRoleId === definition.id
-    );
-
-    if (alreadyAdded) {
-      showError('This slot is already added to the squad');
       return;
     }
 
@@ -396,7 +442,7 @@ export default function TemplateEditor() {
     handleSquadDragEnd();
   };
 
-  if (isLoading) {
+  if (isLoading || isAccessLoading) {
     return (
       <main className="min-h-screen flex items-center justify-center">
         <LoadingSpinner />
@@ -509,6 +555,63 @@ export default function TemplateEditor() {
                   />
                 </div>
               </div>
+
+              <label className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={template.isSideOp}
+                  onChange={(event) => setTemplate({ ...template, isSideOp: event.target.checked })}
+                />
+                <span className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
+                  Side operation defaults (training and rank requirements are ignored)
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div className="border rounded-lg p-6" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+            <h2 className="text-xl font-bold mb-4" style={{ color: 'var(--foreground)' }}>Radio Defaults</h2>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-5">
+              {radioFrequencies.map((frequency) => (
+                <label key={frequency.id} className="flex items-center gap-2 border rounded px-3 py-2" style={{ borderColor: 'var(--border)' }}>
+                  <input
+                    type="checkbox"
+                    checked={template.frequencyIds.includes(frequency.id)}
+                    onChange={(event) => setTemplate({
+                      ...template,
+                      frequencyIds: event.target.checked
+                        ? [...template.frequencyIds, frequency.id]
+                        : template.frequencyIds.filter((id) => id !== frequency.id),
+                    })}
+                  />
+                  <span className="text-sm" style={{ color: 'var(--foreground)' }}>
+                    {frequency.frequency} ({frequency.type}) {frequency.channel || frequency.callsign || ''}
+                  </span>
+                </label>
+              ))}
+            </div>
+            <div className="space-y-2">
+              {template.tempFrequencies.map((frequency, index) => (
+                <div key={frequency._id || index} className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr_1fr_auto] gap-2">
+                  <input className="border rounded px-2 py-1" value={frequency.frequency ?? ''} placeholder="Frequency" onChange={(event) => {
+                    const next = [...template.tempFrequencies]; next[index] = { ...frequency, frequency: event.target.value }; setTemplate({ ...template, tempFrequencies: next });
+                  }} />
+                  <select className="border rounded px-2 py-1" value={frequency.type} onChange={(event) => {
+                    const next = [...template.tempFrequencies]; next[index] = { ...frequency, type: event.target.value as 'SR' | 'LR' }; setTemplate({ ...template, tempFrequencies: next });
+                  }}><option value="SR">SR</option><option value="LR">LR</option></select>
+                  <input className="border rounded px-2 py-1" value={frequency.channel || ''} placeholder="Channel" onChange={(event) => {
+                    const next = [...template.tempFrequencies]; next[index] = { ...frequency, channel: event.target.value }; setTemplate({ ...template, tempFrequencies: next });
+                  }} />
+                  <input className="border rounded px-2 py-1" value={frequency.callsign || ''} placeholder="Callsign" onChange={(event) => {
+                    const next = [...template.tempFrequencies]; next[index] = { ...frequency, callsign: event.target.value }; setTemplate({ ...template, tempFrequencies: next });
+                  }} />
+                  <button type="button" className="px-3 py-1 rounded border" onClick={() => setTemplate({ ...template, tempFrequencies: template.tempFrequencies.filter((_, itemIndex) => itemIndex !== index) })}>Remove</button>
+                </div>
+              ))}
+              <button type="button" className="px-3 py-2 rounded font-medium" style={{ backgroundColor: 'var(--primary)', color: 'white' }} onClick={() => setTemplate({
+                ...template,
+                tempFrequencies: [...template.tempFrequencies, { _id: crypto.randomUUID(), frequency: '', type: 'SR', isAdditional: false, channel: '', callsign: '' }],
+              })}>+ Add temporary frequency</button>
             </div>
           </div>
 
@@ -576,7 +679,7 @@ export default function TemplateEditor() {
                         </label>
                         <input
                           type="text"
-                          value={squad.name}
+                          value={squad.name ?? ''}
                           onChange={(e) => updateSquad(squadIndex, 'name', e.target.value)}
                           placeholder="e.g., Platoon 1"
                           className="w-full border rounded px-2 py-1"
@@ -738,7 +841,7 @@ export default function TemplateEditor() {
                                   <input
                                     type="number"
                                     min="1"
-                                    value={slot.maxSignups}
+                                    value={slot.maxSignups ?? 1}
                                     onChange={(e) => updateSlotMaxSignups(squadIndex, slotIndex, parseInt(e.target.value) || 1)}
                                     className="w-20 border rounded px-2 py-1 text-xs"
                                     style={{
@@ -982,6 +1085,19 @@ export default function TemplateEditor() {
             <div className="grid grid-cols-2 gap-4 mt-4">
               <div>
                 <label className="block text-xs font-semibold mb-2 uppercase" style={{ color: 'var(--foreground)' }}>
+                  Scheduling Timezone
+                </label>
+                <input
+                  type="text"
+                  value={template.timezone || ''}
+                  onChange={(e) => setTemplate({ ...template, timezone: e.target.value || null })}
+                  placeholder="e.g., Europe/Berlin"
+                  className="border rounded px-2 py-1 text-sm w-full"
+                  style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-2 uppercase" style={{ color: 'var(--foreground)' }}>
                   Rules of Engagement
                 </label>
                 <select
@@ -1055,38 +1171,20 @@ export default function TemplateEditor() {
                   }}
                 />
               </div>
-              <div>
-                <label className="block text-xs font-semibold mb-2 uppercase" style={{ color: 'var(--foreground)' }}>
-                  Start Time
-                </label>
-                <input
-                  type="time"
-                  value={template.startTime || ''}
-                  onChange={(e) => setTemplate({ ...template, startTime: e.target.value || null })}
-                  className="border rounded px-2 py-1 text-sm w-full"
-                  style={{
-                    backgroundColor: 'var(--background)',
-                    borderColor: 'var(--border)',
-                    color: 'var(--foreground)',
-                  }}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-2 uppercase" style={{ color: 'var(--foreground)' }}>
-                  End Time
-                </label>
-                <input
-                  type="time"
-                  value={template.endTime || ''}
-                  onChange={(e) => setTemplate({ ...template, endTime: e.target.value || null })}
-                  className="border rounded px-2 py-1 text-sm w-full"
-                  style={{
-                    backgroundColor: 'var(--background)',
-                    borderColor: 'var(--border)',
-                    color: 'var(--foreground)',
-                  }}
-                />
-              </div>
+              <DualRingTimePicker
+                id="templateStartTime"
+                label="Start Time"
+                value={template.startTime || ''}
+                onChange={(value) => setTemplate((current) => ({ ...current, startTime: value || null }))}
+                disabled={isReadOnly}
+              />
+              <DualRingTimePicker
+                id="templateEndTime"
+                label="End Time"
+                value={template.endTime || ''}
+                onChange={(value) => setTemplate((current) => ({ ...current, endTime: value || null }))}
+                disabled={isReadOnly}
+              />
             </div>
           </div>
         </fieldset>

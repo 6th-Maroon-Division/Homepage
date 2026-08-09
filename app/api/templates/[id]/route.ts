@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { checkPermission } from '@/lib/auth-middleware';
 import { canAccessTemplateReadApi } from '@/lib/permission-api-logic';
 import { publishAdminCatalogEvent } from '@/lib/realtime/admin-catalog-events';
+import { normalizeTemplateForRead, normalizeTemplateSlots } from '@/lib/orbat-template';
 
 type TemplateRoleSlotInput = {
   name: string;
@@ -84,9 +85,7 @@ export async function GET(
     // Enrich slotsJson with current role names from squadRole table
     let enrichedTemplate = template;
     if (template.slotsJson) {
-      const slotsJson = typeof template.slotsJson === 'string' 
-        ? JSON.parse(template.slotsJson) 
-        : template.slotsJson;
+      const slotsJson = normalizeTemplateSlots(template.slotsJson);
       
       const inputSlots = slotsJson as TemplateSquadInput[];
       const requestedDefinitionIds = Array.from(
@@ -134,7 +133,7 @@ export async function GET(
       }
     }
 
-    return NextResponse.json(enrichedTemplate);
+    return NextResponse.json(normalizeTemplateForRead(enrichedTemplate));
   } catch (error) {
     console.error('Error fetching template:', error);
     return NextResponse.json(
@@ -178,6 +177,9 @@ export async function PUT(
       tagsJson,
       slotsJson,
       frequencyIds,
+      tempFrequencies,
+      isSideOp,
+      timezone,
       bluforCountry,
       bluforRelationship,
       opforCountry,
@@ -197,7 +199,7 @@ export async function PUT(
 
     let normalizedSlotsJson = slotsJson;
     if (slotsJson) {
-      const inputSlots = slotsJson as TemplateSquadInput[];
+      const inputSlots = normalizeTemplateSlots(slotsJson) as TemplateSquadInput[];
       const requestedDefinitionIds = Array.from(
         new Set(
           inputSlots
@@ -279,6 +281,9 @@ export async function PUT(
         ...(tagsJson !== undefined && { tagsJson }),
         ...(normalizedSlotsJson && { slotsJson: normalizedSlotsJson }),
         ...(frequencyIds && { frequencyIds }),
+        ...(tempFrequencies !== undefined && { tempFrequencies: Array.isArray(tempFrequencies) ? tempFrequencies : [] }),
+        ...(isSideOp !== undefined && { isSideOp: isSideOp === true }),
+        ...(timezone !== undefined && { timezone: timezone || null }),
         ...(bluforCountry !== undefined && { bluforCountry }),
         ...(bluforRelationship !== undefined && { bluforRelationship }),
         ...(opforCountry !== undefined && { opforCountry }),
@@ -312,7 +317,7 @@ export async function PUT(
       },
     });
 
-    return NextResponse.json(template);
+    return NextResponse.json(normalizeTemplateForRead(template));
   } catch (error) {
     console.error('Error updating template:', error);
     return NextResponse.json(

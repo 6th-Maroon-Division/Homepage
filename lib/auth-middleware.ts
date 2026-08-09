@@ -14,25 +14,21 @@ declare module 'next' {
 }
 
 /**
- * Check if user has a permission (simple check, no hierarchy)
- * Prefers session-based check to avoid database queries when possible
+ * Check if user has a permission (simple check, no hierarchy).
+ *
+ * Permission assignments can change while a JWT session is active, so access
+ * decisions must use the database as the source of truth. The session copy is
+ * only suitable for optimistic UI rendering.
  */
 export async function checkPermission(userId: number, permission: PermissionKey): Promise<boolean> {
-  // Try to get permissions from session first (cached in JWT)
-  const session = await getServerSession(authOptions);
-  if (session?.user?.id === userId && session.user.permissions) {
-    const value = session.user.permissions[permission] ?? 0;
-    return value > 0;
-  }
-  
-  // Fall back to database query if session not available or user doesn't match
-  const userPerm = await prisma.userPermission.findFirst({
+  const userPermissions = await prisma.userPermission.findMany({
     where: {
       userId,
-      permission: { key: permission },
+      permission: { key: { in: permission === 'system:super_admin' ? [permission] : [permission, 'system:super_admin'] } },
     },
+    include: { permission: { select: { key: true } } },
   });
-  return (userPerm?.value ?? 0) > 0;
+  return userPermissions.some((entry) => entry.value > 0);
 }
 
 /**
