@@ -151,6 +151,15 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    const hasInvalidDefinitionId = inputSlots.some((squad) =>
+      squad.slots.some((slot) => slot.squadRoleId !== undefined && slot.squadRoleId !== null && !Number.isInteger(slot.squadRoleId))
+    );
+    if (hasInvalidDefinitionId) {
+      return NextResponse.json(
+        { error: 'Slot role definition IDs must be integers or null.' },
+        { status: 400 }
+      );
+    }
     const requestedDefinitionIds = Array.from(
       new Set(
         inputSlots
