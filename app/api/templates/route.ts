@@ -6,7 +6,7 @@ import { checkPermission } from '@/lib/auth-middleware';
 import { canAccessTemplateReadApi } from '@/lib/permission-api-logic';
 import { publishAdminCatalogEvent } from '@/lib/realtime/admin-catalog-events';
 import type { NextRequest } from 'next/server';
-import { normalizeTemplateForRead, normalizeTemplateSlots } from '@/lib/orbat-template';
+import { normalizeTemplateForRead, normalizeTemplateFrequencyIds, normalizeTemplateSlots } from '@/lib/orbat-template';
 
 type TemplateRoleSlotInput = {
   name: string;
@@ -160,6 +160,13 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    const normalizedFrequencyIds = normalizeTemplateFrequencyIds(frequencyIds ?? []);
+    if (normalizedFrequencyIds === null) {
+      return NextResponse.json(
+        { error: 'Frequency IDs must be an array of positive integers.' },
+        { status: 400 }
+      );
+    }
     const requestedDefinitionIds = Array.from(
       new Set(
         inputSlots
@@ -234,7 +241,7 @@ export async function POST(request: NextRequest) {
         category: category || null,
         tagsJson: tagsJson || null,
         slotsJson: normalizedSlotsJson,
-        frequencyIds: Array.isArray(frequencyIds) ? frequencyIds : [],
+        frequencyIds: normalizedFrequencyIds,
         tempFrequencies: Array.isArray(tempFrequencies) ? tempFrequencies : [],
         isSideOp: typeof isSideOp === 'boolean' ? isSideOp : null,
         timezone: timezone || null,

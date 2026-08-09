@@ -57,6 +57,12 @@ export function normalizeTemplateSlots(value: unknown): UnknownRecord[] {
   });
 }
 
+export function normalizeTemplateFrequencyIds(value: unknown): number[] | null {
+  if (!Array.isArray(value)) return null;
+  if (!value.every((id) => Number.isInteger(id) && id > 0)) return null;
+  return Array.from(new Set(value as number[]));
+}
+
 export function normalizeTemplateForRead<T extends UnknownRecord>(template: T) {
   return {
     ...template,

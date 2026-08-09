@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 import { checkPermission } from '@/lib/auth-middleware';
 import { canAccessTemplateReadApi } from '@/lib/permission-api-logic';
 import { publishAdminCatalogEvent } from '@/lib/realtime/admin-catalog-events';
-import { normalizeTemplateForRead, normalizeTemplateSlots } from '@/lib/orbat-template';
+import { normalizeTemplateForRead, normalizeTemplateFrequencyIds, normalizeTemplateSlots } from '@/lib/orbat-template';
 
 type TemplateRoleSlotInput = {
   name: string;
@@ -199,6 +199,15 @@ export async function PUT(
     } = data;
 
     let normalizedSlotsJson = slotsJson;
+    const normalizedFrequencyIds = frequencyIds === undefined
+      ? undefined
+      : normalizeTemplateFrequencyIds(frequencyIds);
+    if (normalizedFrequencyIds === null) {
+      return NextResponse.json(
+        { error: 'Frequency IDs must be an array of positive integers.' },
+        { status: 400 }
+      );
+    }
     if (slotsJson) {
       const inputSlots = normalizeTemplateSlots(slotsJson) as TemplateSquadInput[];
       if (inputSlots.length === 0) {
@@ -296,7 +305,7 @@ export async function PUT(
         ...(category !== undefined && { category }),
         ...(tagsJson !== undefined && { tagsJson }),
         ...(normalizedSlotsJson && { slotsJson: normalizedSlotsJson }),
-        ...(frequencyIds !== undefined && { frequencyIds: Array.isArray(frequencyIds) ? frequencyIds : [] }),
+        ...(normalizedFrequencyIds !== undefined && { frequencyIds: normalizedFrequencyIds }),
         ...(tempFrequencies !== undefined && { tempFrequencies: Array.isArray(tempFrequencies) ? tempFrequencies : [] }),
         ...(isSideOp !== undefined && { isSideOp: typeof isSideOp === 'boolean' ? isSideOp : null }),
         ...(timezone !== undefined && { timezone: timezone || null }),

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeTemplateForRead, normalizeTemplateSlots } from '../lib/orbat-template';
+import { normalizeTemplateForRead, normalizeTemplateFrequencyIds, normalizeTemplateSlots } from '../lib/orbat-template';
 
 test('legacy templates are normalized without losing their structure', () => {
   const result = normalizeTemplateForRead({
@@ -70,4 +70,13 @@ test('invalid numeric slot values are replaced with safe canonical defaults', ()
   assert.equal(squadSlots[0].maxSignups, 1);
   assert.equal(squadSlots[1].orderIndex, 1);
   assert.equal(squadSlots[1].maxSignups, 2);
+});
+
+test('frequency IDs require positive integers and are deduplicated', () => {
+  assert.deepEqual(normalizeTemplateFrequencyIds([3, 1, 3]), [3, 1]);
+  assert.deepEqual(normalizeTemplateFrequencyIds([]), []);
+  assert.equal(normalizeTemplateFrequencyIds(['3']), null);
+  assert.equal(normalizeTemplateFrequencyIds([0]), null);
+  assert.equal(normalizeTemplateFrequencyIds([1.5]), null);
+  assert.equal(normalizeTemplateFrequencyIds('3'), null);
 });
