@@ -224,7 +224,7 @@ export async function POST(request: NextRequest) {
         category: category || null,
         tagsJson: tagsJson || null,
         slotsJson: normalizedSlotsJson,
-        frequencyIds: frequencyIds || [],
+        frequencyIds: Array.isArray(frequencyIds) ? frequencyIds : [],
         tempFrequencies: Array.isArray(tempFrequencies) ? tempFrequencies : [],
         isSideOp: typeof isSideOp === 'boolean' ? isSideOp : null,
         timezone: timezone || null,

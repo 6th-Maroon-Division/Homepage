@@ -121,7 +121,7 @@ export default function TemplateEditor() {
     endTime: null,
   });
 
-  // Fetch template if editing
+  // Resolve access before fetching template data.
   useEffect(() => {
     const fetchAccess = async () => {
       try {
@@ -148,7 +148,7 @@ export default function TemplateEditor() {
   }, [isNewTemplate, router, showError]);
 
   useEffect(() => {
-    if (!isNewTemplate) {
+    if (!isNewTemplate && !isAccessLoading && access.canRead) {
       const fetchTemplate = async () => {
         try {
           const response = await fetch(`/api/templates/${params.id}`);
@@ -187,7 +187,7 @@ export default function TemplateEditor() {
 
       fetchTemplate();
     }
-  }, [isNewTemplate, params.id, router, showError]);
+  }, [access.canRead, isAccessLoading, isNewTemplate, params.id, router, showError]);
 
   useEffect(() => {
     const fetchSubslotDefinitions = async () => {
