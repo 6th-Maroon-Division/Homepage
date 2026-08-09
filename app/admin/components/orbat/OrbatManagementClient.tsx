@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import DeleteOrbatButton from '../../../components/orbat/DeleteOrbatButton';
-import { usePermission } from '@/app/hooks/usePermissions';
 
 type Orbat = {
   id: number;
@@ -26,16 +25,16 @@ type Orbat = {
 
 type OrbatManagementClientProps = {
   orbats: Orbat[];
+  canCreate: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
 };
 
-export default function OrbatManagementClient({ orbats: initialOrbats }: OrbatManagementClientProps) {
+export default function OrbatManagementClient({ orbats: initialOrbats, canCreate, canEdit, canDelete }: OrbatManagementClientProps) {
   const [orbats, setOrbats] = useState<Orbat[]>(initialOrbats);
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const canCreateOrbat = usePermission('orbat:create');
-  const canEditOrbat = usePermission('orbat:edit');
 
   const getOperationCutoff = (orbat: Orbat) => {
     if (orbat.endsAtUtc) {
@@ -173,7 +172,7 @@ export default function OrbatManagementClient({ orbats: initialOrbats }: OrbatMa
             >
               Manage Roles
             </Link>
-            {canCreateOrbat && (
+            {canCreate && (
               <Link
                 href="/admin/orbats/new"
                 className="px-4 py-2 rounded-md transition-colors font-medium"
@@ -325,7 +324,7 @@ export default function OrbatManagementClient({ orbats: initialOrbats }: OrbatMa
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
-                        {canEditOrbat && (
+                        {canEdit && (
                           <>
                             <Link
                               href={`/admin/orbats/${orbat.id}/edit`}
@@ -337,7 +336,7 @@ export default function OrbatManagementClient({ orbats: initialOrbats }: OrbatMa
                             <span style={{ color: 'var(--border)' }}>|</span>
                           </>
                         )}
-                        <DeleteOrbatButton orbatId={orbat.id} />
+                        <DeleteOrbatButton orbatId={orbat.id} hasDeletePermission={canDelete} />
                       </td>
                     </tr>
                   );

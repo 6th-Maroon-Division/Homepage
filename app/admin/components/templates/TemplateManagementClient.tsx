@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
-import { usePermission } from '@/app/hooks/usePermissions';
 
 interface OrbatTemplate {
   id: number;
@@ -25,9 +24,12 @@ interface OrbatTemplate {
 interface TemplateManagementClientProps {
   templates: OrbatTemplate[];
   isReadOnly?: boolean;
+  canCreate: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
 }
 
-export default function TemplateManagementClient({ templates: initialTemplates, isReadOnly = false }: TemplateManagementClientProps) {
+export default function TemplateManagementClient({ templates: initialTemplates, isReadOnly = false, canCreate, canEdit, canDelete }: TemplateManagementClientProps) {
   const [templates, setTemplates] = useState<OrbatTemplate[]>(initialTemplates);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<OrbatTemplate | null>(null);
@@ -36,10 +38,6 @@ export default function TemplateManagementClient({ templates: initialTemplates, 
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { showError, showSuccess } = useToast();
-
-  const canCreateTemplate = usePermission('template:create');
-  const canEditTemplate = usePermission('template:edit');
-  const canDeleteTemplate = usePermission('template:delete');
 
   useEffect(() => {
     const fetchTemplates = async () => {
@@ -146,7 +144,7 @@ export default function TemplateManagementClient({ templates: initialTemplates, 
               {isReadOnly ? 'View ORBAT templates' : 'Manage ORBAT templates'}
             </p>
           </div>
-          {!isReadOnly && canCreateTemplate && (
+          {!isReadOnly && canCreate && (
             <Link
               href="/admin/templates/new"
               className="px-4 py-2 rounded-md transition-colors font-medium"
@@ -283,7 +281,7 @@ export default function TemplateManagementClient({ templates: initialTemplates, 
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
-                        {!isReadOnly && canEditTemplate && (
+                        {!isReadOnly && canEdit && (
                           <Link
                             href={`/admin/templates/${template.id}`}
                             className="px-3 py-1 rounded text-sm font-medium transition-colors"
@@ -295,7 +293,7 @@ export default function TemplateManagementClient({ templates: initialTemplates, 
                             Edit
                           </Link>
                         )}
-                        {!isReadOnly && canDeleteTemplate && (
+                        {!isReadOnly && canDelete && (
                           <button
                             onClick={() => {
                               setTemplateToDelete(template);

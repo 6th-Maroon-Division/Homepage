@@ -494,8 +494,14 @@ model OrbatTemplate {
   tagsJson    String? // Comma-separated tags for filtering
 
   // Full ORBAT structure as JSON
-  slotsJson    Json // [{name, orderIndex, subslots: [{name, orderIndex, maxSignups}]}]
+  slotsJson    Json // [{name, orderIndex, slots: [{name, orderIndex, maxSignups, squadRoleId}]}]
   frequencyIds Int[] // Array of RadioFrequency IDs
+  tempFrequencies Json @default("[]")
+
+  // ORBAT-compatible defaults. Nullable keeps legacy templates distinguishable so
+  // their old category-based side-op value can be normalized on read.
+  isSideOp Boolean?
+  timezone String?
 
   // Optional faction/intel defaults
   bluforCountry        String?

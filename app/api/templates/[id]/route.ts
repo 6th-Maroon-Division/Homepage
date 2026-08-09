@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { checkPermission } from '@/lib/auth-middleware';
 import { canAccessTemplateReadApi } from '@/lib/permission-api-logic';
 import { publishAdminCatalogEvent } from '@/lib/realtime/admin-catalog-events';
+import { normalizeTemplateForRead, normalizeTemplateFrequencyIds, normalizeTemplateSlots } from '@/lib/orbat-template';
 
 type TemplateRoleSlotInput = {
   name: string;
@@ -42,16 +43,17 @@ export async function GET(
     }
     
     // Allow access if user has any template or ORBAT permission
-    const [canCreateTemplate, canEditTemplate, canDeleteTemplate, canCreateOrbat, canEditOrbat] = await Promise.all([
+    const [canCreateTemplate, canEditTemplate, canDeleteTemplate, canCreateOrbat, canEditOrbat, hasSuperAdmin] = await Promise.all([
       checkPermission(session.user.id, 'template:create'),
       checkPermission(session.user.id, 'template:edit'),
       checkPermission(session.user.id, 'template:delete'),
       checkPermission(session.user.id, 'orbat:create'),
       checkPermission(session.user.id, 'orbat:edit'),
+      checkPermission(session.user.id, 'system:super_admin'),
     ]);
 
     if (!canAccessTemplateReadApi({
-      hasSuperAdmin: (session.user.permissions?.['system:super_admin'] ?? 0) > 0,
+      hasSuperAdmin,
       canCreateTemplate,
       canEditTemplate,
       canDeleteTemplate,
@@ -84,9 +86,7 @@ export async function GET(
     // Enrich slotsJson with current role names from squadRole table
     let enrichedTemplate = template;
     if (template.slotsJson) {
-      const slotsJson = typeof template.slotsJson === 'string' 
-        ? JSON.parse(template.slotsJson) 
-        : template.slotsJson;
+      const slotsJson = normalizeTemplateSlots(template.slotsJson);
       
       const inputSlots = slotsJson as TemplateSquadInput[];
       const requestedDefinitionIds = Array.from(
@@ -134,7 +134,7 @@ export async function GET(
       }
     }
 
-    return NextResponse.json(enrichedTemplate);
+    return NextResponse.json(normalizeTemplateForRead(enrichedTemplate));
   } catch (error) {
     console.error('Error fetching template:', error);
     return NextResponse.json(
@@ -178,6 +178,9 @@ export async function PUT(
       tagsJson,
       slotsJson,
       frequencyIds,
+      tempFrequencies,
+      isSideOp,
+      timezone,
       bluforCountry,
       bluforRelationship,
       opforCountry,
@@ -196,8 +199,32 @@ export async function PUT(
     } = data;
 
     let normalizedSlotsJson = slotsJson;
+    const normalizedFrequencyIds = frequencyIds === undefined
+      ? undefined
+      : normalizeTemplateFrequencyIds(frequencyIds);
+    if (normalizedFrequencyIds === null) {
+      return NextResponse.json(
+        { error: 'Frequency IDs must be an array of positive integers.' },
+        { status: 400 }
+      );
+    }
     if (slotsJson) {
-      const inputSlots = slotsJson as TemplateSquadInput[];
+      const inputSlots = normalizeTemplateSlots(slotsJson) as TemplateSquadInput[];
+      if (inputSlots.length === 0) {
+        return NextResponse.json(
+          { error: 'Slot structure must contain at least one squad.' },
+          { status: 400 }
+        );
+      }
+      const hasInvalidDefinitionId = inputSlots.some((squad) =>
+        squad.slots.some((slot) => slot.squadRoleId !== undefined && slot.squadRoleId !== null && !Number.isInteger(slot.squadRoleId))
+      );
+      if (hasInvalidDefinitionId) {
+        return NextResponse.json(
+          { error: 'Slot role definition IDs must be integers or null.' },
+          { status: 400 }
+        );
+      }
       const requestedDefinitionIds = Array.from(
         new Set(
           inputSlots
@@ -278,7 +305,10 @@ export async function PUT(
         ...(category !== undefined && { category }),
         ...(tagsJson !== undefined && { tagsJson }),
         ...(normalizedSlotsJson && { slotsJson: normalizedSlotsJson }),
-        ...(frequencyIds && { frequencyIds }),
+        ...(normalizedFrequencyIds !== undefined && { frequencyIds: normalizedFrequencyIds }),
+        ...(tempFrequencies !== undefined && { tempFrequencies: Array.isArray(tempFrequencies) ? tempFrequencies : [] }),
+        ...(isSideOp !== undefined && { isSideOp: typeof isSideOp === 'boolean' ? isSideOp : null }),
+        ...(timezone !== undefined && { timezone: timezone || null }),
         ...(bluforCountry !== undefined && { bluforCountry }),
         ...(bluforRelationship !== undefined && { bluforRelationship }),
         ...(opforCountry !== undefined && { opforCountry }),
@@ -312,7 +342,7 @@ export async function PUT(
       },
     });
 
-    return NextResponse.json(template);
+    return NextResponse.json(normalizeTemplateForRead(template));
   } catch (error) {
     console.error('Error updating template:', error);
     return NextResponse.json(

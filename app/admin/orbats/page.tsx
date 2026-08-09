@@ -13,9 +13,12 @@ export default async function AdminOrbatsPage() {
     redirect('/');
   }
 
-  const hasPermission =
-    (session.user.permissions?.['system:super_admin'] ?? 0) > 0 ||
-    await checkPermission(session.user.id, 'orbat:edit');
+  const [canCreateOrbat, canEditOrbat, canDeleteOrbat] = await Promise.all([
+    checkPermission(session.user.id, 'orbat:create'),
+    checkPermission(session.user.id, 'orbat:edit'),
+    checkPermission(session.user.id, 'orbat:delete'),
+  ]);
+  const hasPermission = canCreateOrbat || canEditOrbat || canDeleteOrbat;
 
   if (!hasPermission) {
     redirect('/');
@@ -123,7 +126,12 @@ export default async function AdminOrbatsPage() {
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* Table View with Filters */}
-        <OrbatManagementClient orbats={orbatsWithCounts} />
+        <OrbatManagementClient
+          orbats={orbatsWithCounts}
+          canCreate={canCreateOrbat}
+          canEdit={canEditOrbat}
+          canDelete={canDeleteOrbat}
+        />
 
         {/* Calendar View */}
         <div className="pt-6" style={{ borderTop: '1px solid var(--border)' }}>

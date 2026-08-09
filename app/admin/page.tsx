@@ -4,16 +4,33 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { canAccessSubslotReadApi } from '@/lib/permission-api-logic';
+import { prisma } from '@/lib/prisma';
 
 export default async function AdminPage() {
   const session = await getServerSession(authOptions);
-  const userPermissions = session?.user?.permissions || {};
+  if (!session?.user?.id) {
+    redirect('/');
+  }
+
+  const permissionRows = await prisma.userPermission.findMany({
+    where: { userId: session.user.id, value: { gt: 0 } },
+    include: { permission: { select: { key: true } } },
+  });
+  const userPermissions = Object.fromEntries(
+    permissionRows.map((entry) => [entry.permission.key, entry.value])
+  );
   const hasSuperAdmin = (userPermissions['system:super_admin'] ?? 0) > 0;
+  const canCreateOrbatPermission = hasSuperAdmin || (userPermissions['orbat:create'] ?? 0) > 0;
+  const canEditOrbatPermission = hasSuperAdmin || (userPermissions['orbat:edit'] ?? 0) > 0;
+  const canDeleteOrbatPermission = hasSuperAdmin || (userPermissions['orbat:delete'] ?? 0) > 0;
+  const canCreateTemplatePermission = hasSuperAdmin || (userPermissions['template:create'] ?? 0) > 0;
+  const canEditTemplatePermission = hasSuperAdmin || (userPermissions['template:edit'] ?? 0) > 0;
+  const canDeleteTemplatePermission = hasSuperAdmin || (userPermissions['template:delete'] ?? 0) > 0;
 
   // Allow access if user has super-admin OR has any permissions (at least one with a positive value)
   const hasAnyPermissions =
     Object.values(userPermissions).some((value) => value > 0);
-  if (!session || (!hasSuperAdmin && !hasAnyPermissions)) {
+  if (!hasAnyPermissions) {
     redirect('/');
   }
 
@@ -30,14 +47,14 @@ export default async function AdminPage() {
     canEditOrbat: (userPermissions['orbat:edit'] ?? 0) > 0,
   });
 
-  const canAccessOrbats = hasSuperAdmin;
+  const canAccessOrbats = hasSuperAdmin || canCreateOrbatPermission || canEditOrbatPermission || canDeleteOrbatPermission;
   const canAccessTemplates =
     hasSuperAdmin ||
-    (userPermissions['template:create'] ?? 0) > 0 ||
-    (userPermissions['template:edit'] ?? 0) > 0 ||
-    (userPermissions['template:delete'] ?? 0) > 0 ||
-    (userPermissions['orbat:create'] ?? 0) > 0 ||
-    (userPermissions['orbat:edit'] ?? 0) > 0;
+    canCreateTemplatePermission ||
+    canEditTemplatePermission ||
+    canDeleteTemplatePermission ||
+    canCreateOrbatPermission ||
+    canEditOrbatPermission;
   const canAccessUsers =
     hasSuperAdmin ||
     (userPermissions['user:manage'] ?? 0) > 0 ||

@@ -6,6 +6,7 @@ import { checkPermission } from '@/lib/auth-middleware';
 import { canAccessTemplateReadApi } from '@/lib/permission-api-logic';
 import { publishAdminCatalogEvent } from '@/lib/realtime/admin-catalog-events';
 import type { NextRequest } from 'next/server';
+import { normalizeTemplateForRead, normalizeTemplateFrequencyIds, normalizeTemplateSlots } from '@/lib/orbat-template';
 
 type TemplateRoleSlotInput = {
   name: string;
@@ -37,16 +38,17 @@ export async function GET() {
     }
     
     // Allow access if user has any template or ORBAT permission
-    const [canCreateTemplate, canEditTemplate, canDeleteTemplate, canCreateOrbat, canEditOrbat] = await Promise.all([
+    const [canCreateTemplate, canEditTemplate, canDeleteTemplate, canCreateOrbat, canEditOrbat, hasSuperAdmin] = await Promise.all([
       checkPermission(session.user.id, 'template:create'),
       checkPermission(session.user.id, 'template:edit'),
       checkPermission(session.user.id, 'template:delete'),
       checkPermission(session.user.id, 'orbat:create'),
       checkPermission(session.user.id, 'orbat:edit'),
+      checkPermission(session.user.id, 'system:super_admin'),
     ]);
 
     if (!canAccessTemplateReadApi({
-      hasSuperAdmin: (session.user.permissions?.['system:super_admin'] ?? 0) > 0,
+      hasSuperAdmin,
       canCreateTemplate,
       canEditTemplate,
       canDeleteTemplate,
@@ -70,7 +72,7 @@ export async function GET() {
       orderBy: [{ category: 'asc' }, { name: 'asc' }],
     });
 
-    return NextResponse.json(templates);
+    return NextResponse.json(templates.map(normalizeTemplateForRead));
   } catch (error) {
     console.error('Error fetching templates:', error);
     return NextResponse.json(
@@ -108,6 +110,9 @@ export async function POST(request: NextRequest) {
       tagsJson,
       slotsJson,
       frequencyIds,
+      tempFrequencies,
+      isSideOp,
+      timezone,
       bluforCountry,
       bluforRelationship,
       opforCountry,
@@ -139,7 +144,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const inputSlots = slotsJson as TemplateSquadInput[];
+    const inputSlots = normalizeTemplateSlots(slotsJson) as TemplateSquadInput[];
+    if (inputSlots.length === 0) {
+      return NextResponse.json(
+        { error: 'Slot structure must contain at least one squad.' },
+        { status: 400 }
+      );
+    }
+    const hasInvalidDefinitionId = inputSlots.some((squad) =>
+      squad.slots.some((slot) => slot.squadRoleId !== undefined && slot.squadRoleId !== null && !Number.isInteger(slot.squadRoleId))
+    );
+    if (hasInvalidDefinitionId) {
+      return NextResponse.json(
+        { error: 'Slot role definition IDs must be integers or null.' },
+        { status: 400 }
+      );
+    }
+    const normalizedFrequencyIds = normalizeTemplateFrequencyIds(frequencyIds ?? []);
+    if (normalizedFrequencyIds === null) {
+      return NextResponse.json(
+        { error: 'Frequency IDs must be an array of positive integers.' },
+        { status: 400 }
+      );
+    }
     const requestedDefinitionIds = Array.from(
       new Set(
         inputSlots
@@ -214,7 +241,10 @@ export async function POST(request: NextRequest) {
         category: category || null,
         tagsJson: tagsJson || null,
         slotsJson: normalizedSlotsJson,
-        frequencyIds: frequencyIds || [],
+        frequencyIds: normalizedFrequencyIds,
+        tempFrequencies: Array.isArray(tempFrequencies) ? tempFrequencies : [],
+        isSideOp: typeof isSideOp === 'boolean' ? isSideOp : null,
+        timezone: timezone || null,
         bluforCountry: bluforCountry || null,
         bluforRelationship: bluforRelationship || null,
         opforCountry: opforCountry || null,
@@ -247,7 +277,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(template, { status: 201 });
+    return NextResponse.json(normalizeTemplateForRead(template), { status: 201 });
   } catch (error) {
     console.error('Error creating template:', error);
     return NextResponse.json(
