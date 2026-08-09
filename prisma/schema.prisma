@@ -494,7 +494,7 @@ model OrbatTemplate {
   tagsJson    String? // Comma-separated tags for filtering
 
   // Full ORBAT structure as JSON
-  slotsJson    Json // [{name, orderIndex, subslots: [{name, orderIndex, maxSignups}]}]
+  slotsJson    Json // [{name, orderIndex, slots: [{name, orderIndex, maxSignups, squadRoleId}]}]
   frequencyIds Int[] // Array of RadioFrequency IDs
   tempFrequencies Json @default("[]")
 

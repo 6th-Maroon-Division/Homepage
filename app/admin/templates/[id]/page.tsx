@@ -23,6 +23,9 @@ type TemplateSquad = {
   slots: TemplateSlot[];
 };
 
+const createClientId = () =>
+  globalThis.crypto?.randomUUID?.() ?? `temp-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+
 interface OrbatTemplate {
   id?: number;
   name: string;
@@ -610,7 +613,7 @@ export default function TemplateEditor() {
               ))}
               <button type="button" className="px-3 py-2 rounded font-medium" style={{ backgroundColor: 'var(--primary)', color: 'white' }} onClick={() => setTemplate({
                 ...template,
-                tempFrequencies: [...template.tempFrequencies, { _id: crypto.randomUUID(), frequency: '', type: 'SR', isAdditional: false, channel: '', callsign: '' }],
+                tempFrequencies: [...template.tempFrequencies, { _id: createClientId(), frequency: '', type: 'SR', isAdditional: false, channel: '', callsign: '' }],
               })}>+ Add temporary frequency</button>
             </div>
           </div>

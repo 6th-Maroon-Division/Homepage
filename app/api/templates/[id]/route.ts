@@ -282,7 +282,7 @@ export async function PUT(
         ...(normalizedSlotsJson && { slotsJson: normalizedSlotsJson }),
         ...(frequencyIds && { frequencyIds }),
         ...(tempFrequencies !== undefined && { tempFrequencies: Array.isArray(tempFrequencies) ? tempFrequencies : [] }),
-        ...(isSideOp !== undefined && { isSideOp: isSideOp === true }),
+        ...(isSideOp !== undefined && { isSideOp: typeof isSideOp === 'boolean' ? isSideOp : null }),
         ...(timezone !== undefined && { timezone: timezone || null }),
         ...(bluforCountry !== undefined && { bluforCountry }),
         ...(bluforRelationship !== undefined && { bluforRelationship }),

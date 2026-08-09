@@ -220,7 +220,7 @@ export async function POST(request: NextRequest) {
         slotsJson: normalizedSlotsJson,
         frequencyIds: frequencyIds || [],
         tempFrequencies: Array.isArray(tempFrequencies) ? tempFrequencies : [],
-        isSideOp: isSideOp === true,
+        isSideOp: typeof isSideOp === 'boolean' ? isSideOp : null,
         timezone: timezone || null,
         bluforCountry: bluforCountry || null,
         bluforRelationship: bluforRelationship || null,

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { checkPermission } from '@/lib/auth-middleware';
+import { prisma } from '@/lib/prisma';
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -9,14 +9,24 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const [canCreate, canEdit, canDelete, canCreateOrbat, canEditOrbat, isSuperAdmin] = await Promise.all([
-    checkPermission(session.user.id, 'template:create'),
-    checkPermission(session.user.id, 'template:edit'),
-    checkPermission(session.user.id, 'template:delete'),
-    checkPermission(session.user.id, 'orbat:create'),
-    checkPermission(session.user.id, 'orbat:edit'),
-    checkPermission(session.user.id, 'system:super_admin'),
-  ]);
+  const permissionRows = await prisma.userPermission.findMany({
+    where: {
+      userId: session.user.id,
+      value: { gt: 0 },
+      permission: { key: { in: [
+        'template:create', 'template:edit', 'template:delete',
+        'orbat:create', 'orbat:edit', 'system:super_admin',
+      ] } },
+    },
+    select: { permission: { select: { key: true } } },
+  });
+  const permissions = new Set(permissionRows.map((entry) => entry.permission.key));
+  const isSuperAdmin = permissions.has('system:super_admin');
+  const canCreate = permissions.has('template:create');
+  const canEdit = permissions.has('template:edit');
+  const canDelete = permissions.has('template:delete');
+  const canCreateOrbat = permissions.has('orbat:create');
+  const canEditOrbat = permissions.has('orbat:edit');
 
   return NextResponse.json({
     canCreate: isSuperAdmin || canCreate,
