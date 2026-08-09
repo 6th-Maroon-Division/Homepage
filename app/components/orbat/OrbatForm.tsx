@@ -12,6 +12,9 @@ const logClientError = (...args: unknown[]) => {
   }
 };
 
+const createClientId = () =>
+  globalThis.crypto?.randomUUID?.() ?? `temp-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+
 type Subslot = {
   id?: number;
   squadRoleId?: number | null;
@@ -372,7 +375,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         if (Array.isArray(data.tempFrequencies)) {
           setTempFrequencies(data.tempFrequencies.map((frequency: TempFrequency) => ({
             ...frequency,
-            _id: frequency._id || Math.random().toString(36).slice(2, 11),
+            _id: frequency._id || createClientId(),
             channel: frequency.channel || '',
             callsign: frequency.callsign || '',
           })));
@@ -457,7 +460,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
               if (Array.isArray(template.tempFrequencies)) {
                 setTempFrequencies(template.tempFrequencies.map((frequency: TempFrequency) => ({
                   ...frequency,
-                  _id: frequency._id || Math.random().toString(36).slice(2, 11),
+                  _id: frequency._id || createClientId(),
                   channel: frequency.channel || '',
                   callsign: frequency.callsign || '',
                 })));
@@ -503,7 +506,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
             if (orbat.tempFrequencies && Array.isArray(orbat.tempFrequencies) && orbat.tempFrequencies.length > 0) {
               // Load temporary frequencies from the orbat
               const loadedTempFreqs = orbat.tempFrequencies.map((f: { _id?: string; frequency: string; type: 'SR' | 'LR'; isAdditional: boolean; channel?: string; callsign?: string }) => ({
-                _id: f._id || Math.random().toString(36).substr(2, 9),
+                _id: f._id || createClientId(),
                 frequency: f.frequency,
                 type: f.type,
                 isAdditional: f.isAdditional,
@@ -530,7 +533,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     }
 
     const newFreq: TempFrequency = {
-      _id: Math.random().toString(36).substr(2, 9),
+      _id: createClientId(),
       frequency: tempFreqForm.frequency.trim(),
       type: tempFreqForm.type,
       isAdditional: tempFreqForm.isAdditional,

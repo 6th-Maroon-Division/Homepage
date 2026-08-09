@@ -16,8 +16,7 @@ export async function GET() {
     checkPermission(session.user.id, 'orbat:edit'),
     checkPermission(session.user.id, 'orbat:delete'),
   ]);
-  const hasPermission =
-    (session.user.permissions?.['system:super_admin'] ?? 0) > 0 || canCreate || canEdit || canDelete;
+  const hasPermission = canCreate || canEdit || canDelete;
 
   if (!hasPermission) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

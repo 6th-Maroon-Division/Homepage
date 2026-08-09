@@ -21,63 +21,38 @@ declare module 'next' {
  * only suitable for optimistic UI rendering.
  */
 export async function checkPermission(userId: number, permission: PermissionKey): Promise<boolean> {
-  const userPermissions = await prisma.userPermission.findMany({
+  const userPermission = await prisma.userPermission.findFirst({
     where: {
       userId,
       permission: { key: { in: permission === 'system:super_admin' ? [permission] : [permission, 'system:super_admin'] } },
+      value: { gt: 0 },
     },
-    include: { permission: { select: { key: true } } },
+    select: { id: true },
   });
-  return userPermissions.some((entry) => entry.value > 0);
+  return userPermission !== null;
 }
 
 /**
  * Check if user can perform action on target (hierarchy aware)
  * Returns true if actor's permission value > target's permission value
- * Prefers session-based check for actor to avoid database queries when possible
+ * Uses current database values so permission grants and revocations take effect immediately.
  */
 export async function checkHierarchyPermission(
   actorId: number,
   targetId: number,
   permission: PermissionKey
 ): Promise<boolean> {
-  // Try to get actor permissions from session first (cached in JWT)
-  const session = await getServerSession(authOptions);
-  const targetPermPromise = prisma.userPermission.findFirst({
-    where: {
-      userId: targetId,
-      permission: { key: permission },
-    },
-  });
-
-  let actorValue = 0;
-
-  if (session?.user?.id === actorId && session.user.permissions) {
-    actorValue = session.user.permissions[permission] ?? 0;
-  } else {
-    const [actorPerm, targetPerm] = await Promise.all([
-      prisma.userPermission.findFirst({
-        where: {
-          userId: actorId,
-          permission: { key: permission },
-        },
-      }),
-      targetPermPromise,
-    ]);
-
-    actorValue = actorPerm?.value ?? 0;
-    const targetValue = targetPerm?.value ?? 0;
-
-    // Same-user actions still require non-zero permission
-    if (actorId === targetId) {
-      return actorValue > 0;
-    }
-
-    // Actor must have higher value than target
-    return actorValue > targetValue;
-  }
-
-  const targetPerm = await targetPermPromise;
+  const [actorPerm, targetPerm] = await Promise.all([
+    prisma.userPermission.findFirst({
+      where: { userId: actorId, permission: { key: permission } },
+      select: { value: true },
+    }),
+    prisma.userPermission.findFirst({
+      where: { userId: targetId, permission: { key: permission } },
+      select: { value: true },
+    }),
+  ]);
+  const actorValue = actorPerm?.value ?? 0;
   const targetValue = targetPerm?.value ?? 0;
 
   // Same-user actions still require non-zero permission
