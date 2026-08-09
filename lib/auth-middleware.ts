@@ -42,7 +42,7 @@ export async function checkHierarchyPermission(
   targetId: number,
   permission: PermissionKey
 ): Promise<boolean> {
-  const [actorPermissions, targetPerm] = await Promise.all([
+  const [actorPermissions, targetPermissions] = await Promise.all([
     prisma.userPermission.findMany({
       where: {
         userId: actorId,
@@ -50,17 +50,30 @@ export async function checkHierarchyPermission(
       },
       select: { value: true, permission: { select: { key: true } } },
     }),
-    prisma.userPermission.findFirst({
-      where: { userId: targetId, permission: { key: permission } },
-      select: { value: true },
+    prisma.userPermission.findMany({
+      where: {
+        userId: targetId,
+        permission: { key: { in: permission === 'system:super_admin' ? [permission] : [permission, 'system:super_admin'] } },
+      },
+      select: { value: true, permission: { select: { key: true } } },
     }),
   ]);
-  if (actorPermissions.some((entry) => entry.permission.key === 'system:super_admin' && entry.value > 0)) {
+  const actorIsSuperAdmin = actorPermissions.some(
+    (entry) => entry.permission.key === 'system:super_admin' && entry.value > 0
+  );
+  const targetIsSuperAdmin = targetPermissions.some(
+    (entry) => entry.permission.key === 'system:super_admin' && entry.value > 0
+  );
+
+  if (targetIsSuperAdmin && !actorIsSuperAdmin) {
+    return false;
+  }
+  if (actorIsSuperAdmin) {
     return true;
   }
 
   const actorValue = actorPermissions.find((entry) => entry.permission.key === permission)?.value ?? 0;
-  const targetValue = targetPerm?.value ?? 0;
+  const targetValue = targetPermissions.find((entry) => entry.permission.key === permission)?.value ?? 0;
 
   // Same-user actions still require non-zero permission
   if (actorId === targetId) {
