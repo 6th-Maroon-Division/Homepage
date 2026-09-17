@@ -97,6 +97,21 @@ Both methods return `{ minimumRankId, requiredTrainingIds, minimumRank, required
 
 Missing referenced resources return 404, self-references return 422, and dependency cycles return 409. Cycle validation follows the proposed prerequisite edges to reject a path back to the updated training. Changes and an ID-only `training_requirements.updated` audit snapshot commit within a serializable transaction; concurrency conflicts return 409 so callers can refresh and retry. General configuration reads are not audited.
 
+## Eighth migration batch: training catalog
+
+| Canonical endpoint | Methods | User permissions |
+|---|---|---|
+| `/api/trainings` | GET, POST | GET: authenticated; POST: `training:create` |
+| `/api/trainings/{id}` | GET, PATCH, DELETE | GET: authenticated; PATCH: `training:edit`; DELETE: `training:delete` |
+
+Active bot tokens retain superadmin access. PATCH replaces PUT. `GET /api/trainings?activeOnly=true` replaces `/api/trainings/available`; `activeOnly` is a strict boolean string defaulting to false. An optional positive Int32 `categoryId` filters the collection. Results use ascending-ID cursor pages, default 50/cap 100.
+
+List, detail, create, and update share the training’s scalar catalog fields and `counts: { userTrainings, trainingRequests }`, replacing `_count`. Timestamps are UTC. Detail no longer embeds personal user-training or request records; their dedicated existing APIs remain separate and are not migrated by this batch. Catalog reads require authentication and do not produce read audits.
+
+Creation requires a trimmed nonempty name. Strict editable fields are `name`, nullable trimmed `description`/`orbatQualificationNotes`, nullable integer `duration` (1–1440 minutes), nullable positive Int32 `categoryId`, and boolean `isActive`/`requiresTrainingSession`/`requiresOrbatQualification`. `requiredForNewPeople` is read-only. Empty strings for nullable text become null; PATCH preserves omitted values and rejects empty payloads. Missing category references return 404. Training names need not be unique.
+
+Mutations and audit records commit together, with description and qualification-note contents redacted in audit snapshots. Existing sessions or requests prevent deletion with 409. Existing cascades of assigned user-training records remain, with affected IDs and target user IDs captured in the same audit transaction and no personal notes copied. Successful deletion returns `data: null`; missing trainings return 404.
+
 ## Verification and remaining rollout
 
 Every endpoint and supported method must have tests, even once overall coverage reaches its target. Cover both authentication modes, invalid/inactive/revoked tokens, allowed/forbidden actions, ownership/hierarchy, payloads, response contracts, pagination, database mutations/rollback, audit actors/redaction, and UTC offset/daylight-saving/date boundaries. Use unit tests with Prisma test doubles plus isolated Prisma-managed local PGlite integration tests through Prisma Client. Do not use raw SQL queries or access the development database. Integration tests check actual relational behavior and transaction rollback in the local emulator; they do not establish production PostgreSQL deployment, concurrency, or performance guarantees.

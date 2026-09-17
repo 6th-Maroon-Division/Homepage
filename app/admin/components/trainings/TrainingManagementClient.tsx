@@ -52,6 +52,8 @@ type Training = {
   requiredTrainings: { id: number; name: string }[];
 };
 
+type TrainingCatalog = Omit<Training, '_count' | 'minimumRank' | 'requiredTrainings'> & { counts: Training['_count'] };
+
 type TrainingRequirements = {
   minimumRankId: number | null;
   requiredTrainingIds: number[];
@@ -205,20 +207,18 @@ export default function TrainingManagementClient({
   // Fetch updated data
   const refreshTrainings = async () => {
     try {
-      const response = await fetch('/api/trainings');
-      if (response.ok) {
-        const data = await response.json();
-        if (Array.isArray(data)) {
-          setTrainings((current) => data.map((row) => {
-            const previous = current.find((training) => training.id === row.id);
-            return {
-              ...row,
-              minimumRank: previous?.minimumRank ?? null,
-              requiredTrainings: previous?.requiredTrainings ?? [],
-            };
-          }));
-        }
-      }
+      const data = await apiList<TrainingCatalog>('/api/trainings');
+      setTrainings((current) => data
+        .sort((a, b) => a.name.localeCompare(b.name) || a.id - b.id)
+        .map(({ counts, ...row }) => {
+          const previous = current.find((training) => training.id === row.id);
+          return {
+            ...row,
+            _count: counts,
+            minimumRank: previous?.minimumRank ?? null,
+            requiredTrainings: previous?.requiredTrainings ?? [],
+          };
+        }));
     } catch (error) {
       logClientError('Error refreshing trainings:', error);
     }
@@ -280,46 +280,21 @@ export default function TrainingManagementClient({
 
     setIsSaving(true);
     try {
-      if (editingId) {
-        // Update existing training
-        const response = await fetch(`/api/trainings/${editingId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...formData,
-            categoryId: formData.categoryId ? parseInt(formData.categoryId) : null,
-          }),
-        });
-
-        if (response.ok) {
-          showSuccess('Training updated successfully');
-          await refreshTrainings();
-          resetForm();
-        } else {
-          showError('Failed to update training');
-        }
-      } else {
-        // Create new training
-        const response = await fetch('/api/trainings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...formData,
-            categoryId: formData.categoryId ? parseInt(formData.categoryId) : null,
-          }),
-        });
-
-        if (response.ok) {
-          showSuccess('Training created successfully');
-          await refreshTrainings();
-          resetForm();
-        } else {
-          showError('Failed to create training');
-        }
-      }
+      await apiRequest<TrainingCatalog>(editingId ? `/api/trainings/${editingId}` : '/api/trainings', {
+        method: editingId ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          categoryId: formData.categoryId ? Number(formData.categoryId) : null,
+          duration: formData.duration ? Number(formData.duration) : null,
+        }),
+      });
+      showSuccess(editingId ? 'Training updated successfully' : 'Training created successfully');
+      await refreshTrainings();
+      resetForm();
     } catch (error) {
       logClientError('Error saving training:', error);
-      showError('Error saving training');
+      showError(error instanceof Error ? error.message : 'Error saving training');
     } finally {
       setIsSaving(false);
     }
@@ -346,21 +321,13 @@ export default function TrainingManagementClient({
 
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/trainings/${deleteId}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        showSuccess('Training deleted successfully');
-        await refreshTrainings();
-        setDeleteId(null);
-      } else {
-        const payload = await response.json().catch(() => ({}));
-        showError(payload.error || 'Failed to delete training');
-      }
+      await apiRequest(`/api/trainings/${deleteId}`, { method: 'DELETE' });
+      showSuccess('Training deleted successfully');
+      await refreshTrainings();
+      setDeleteId(null);
     } catch (error) {
       logClientError('Error deleting training:', error);
-      showError('Error deleting training');
+      showError(error instanceof Error ? error.message : 'Error deleting training');
     } finally {
       setIsSaving(false);
     }

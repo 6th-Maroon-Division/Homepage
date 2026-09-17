@@ -415,11 +415,8 @@ export default function UserManagementClient({
     if (availableTrainings.length > 0) return; // Already fetched
     setLoadingTrainings(true);
     try {
-      const res = await fetch('/api/trainings/available');
-      if (res.ok) {
-        const data = await res.json();
-        setAvailableTrainings(data);
-      }
+      const data = await apiList<{ id: number; name: string; duration: number | null }>('/api/trainings?activeOnly=true');
+      setAvailableTrainings(data.sort((a, b) => a.name.localeCompare(b.name) || a.id - b.id).map(training => ({ ...training, category: null })));
     } catch (error) {
       logClientError('Error fetching trainings:', error);
     } finally {

@@ -3648,17 +3648,124 @@ paths:
     get:
       tags:
         - Training
-      summary: List all trainings
+      summary: List the training catalog
+      description: Requires an authenticated session user. Active database bot tokens act as superadmin. Ascending ID pages.
+        activeOnly=true replaces /trainings/available. General catalog reads do not create audit records.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: activeOnly
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+            default: "false"
+        - name: categoryId
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+          description: Optional category filter.
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+          description: Values above 100 are clamped to 100.
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            pattern: ^[0-9]+$
+          description: Positive 32-bit training ID from meta.nextCursor; returns greater IDs in ascending order.
       responses:
         "200":
-          description: List of trainings
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Training"
+                  meta:
+                    type: object
+                    required:
+                      - limit
+                      - nextCursor
+                    properties:
+                      limit:
+                        type: integer
+                        minimum: 1
+                        maximum: 100
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
     post:
       tags:
         - Training
-      summary: Create training
+      summary: Create a training catalog entry
+      description: Requires training:create for session users. Active database bot tokens act as superadmin. Unknown payload
+        fields, including requiredForNewPeople, are rejected. Missing category references return 404. Successful
+        mutations and their audit records commit together.
       security:
-        - bearerAuth:
-            - training:create
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
       requestBody:
         required: true
         content:
@@ -3667,22 +3774,151 @@ paths:
               $ref: "#/components/schemas/TrainingCreateInput"
       responses:
         "201":
-          description: Training created
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Training"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
   /trainings/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
     get:
       tags:
         - Training
-      summary: Get training by ID
+      summary: Get a training catalog entry
+      description: Requires an authenticated session user. Active database bot tokens act as superadmin. Returns catalog
+        fields and counts only. Personal records are accessed through dedicated user-training and training-request APIs.
+        Catalog reads are not audited.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
       responses:
         "200":
-          description: Training details
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Training"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
     patch:
       tags:
         - Training
-      summary: Update training
+      summary: Partially update a training catalog entry
+      description: Requires training:edit for session users. Active database bot tokens act as superadmin. Unknown payload
+        fields, including requiredForNewPeople, are rejected. Missing category references return 404. Successful
+        mutations and their audit records commit together. Replaces PUT; omitted fields are preserved.
       security:
-        - bearerAuth:
-            - training:edit
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
       requestBody:
         required: true
         content:
@@ -3691,24 +3927,132 @@ paths:
               $ref: "#/components/schemas/TrainingUpdateInput"
       responses:
         "200":
-          description: Training updated
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Training"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
     delete:
       tags:
         - Training
-      summary: Delete training
+      summary: Delete a training catalog entry
+      description: Requires training:delete for session users. Active database bot tokens act as superadmin. Existing training
+        sessions or requests prevent deletion with 409. Assigned user-training records retain the existing cascade
+        behavior; affected record IDs and target user IDs are recorded in the transaction’s audit, without personal
+        notes. Missing training returns 404.
       security:
-        - bearerAuth:
-            - training:delete
-      responses:
-        "200":
-          description: Training deleted
-    put:
-      tags:
-        - TODO
-      summary: TODO document PUT /trainings/{id}
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
       responses:
         "200":
           description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: "null"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
   /trainings/{id}/requirements:
     parameters:
       - name: id
@@ -3865,16 +4209,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiFailure"
-  /trainings/available:
-    get:
-      tags:
-        - Training
-      summary: Get available trainings for current user
-      responses:
-        "200":
-          description: Available trainings
-        "401":
-          description: Unauthorized
   /user-trainings:
     get:
       tags:
@@ -5429,34 +5763,79 @@ components:
                 type: object
     Training:
       type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - description
+        - orbatQualificationNotes
+        - duration
+        - categoryId
+        - isActive
+        - requiresTrainingSession
+        - requiresOrbatQualification
+        - requiredForNewPeople
+        - createdAt
+        - updatedAt
+        - counts
       properties:
-        id:
+        id: &a15
           type: integer
+          minimum: 1
+          maximum: 2147483647
         name:
           type: string
-        categoryId:
-          type: integer
-          nullable: true
+          minLength: 1
+          description: Trimmed nonempty name; names need not be unique.
         description:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
+          description: Trimmed; an empty string becomes null.
+        orbatQualificationNotes:
+          type:
+            - string
+            - "null"
+          description: Trimmed; an empty string becomes null.
         duration:
-          type: integer
-          nullable: true
+          anyOf:
+            - type: integer
+              minimum: 1
+              maximum: 1440
+            - type: "null"
+          description: Duration in minutes.
+        categoryId:
+          anyOf:
+            - *a15
+            - type: "null"
         isActive:
           type: boolean
-        orderIndex:
-          type: integer
-        minimumRankId:
-          type: integer
-          nullable: true
-        prerequisiteTrainingIds:
-          type: array
-          items:
-            type: integer
+        requiresTrainingSession:
+          type: boolean
+        requiresOrbatQualification:
+          type: boolean
+        requiredForNewPeople:
+          type: boolean
+          readOnly: true
         createdAt:
-          type: string
-          format: date-time
+          $ref: "#/components/schemas/UtcTimestamp"
+        updatedAt:
+          $ref: "#/components/schemas/UtcTimestamp"
+        counts:
+          type: object
+          additionalProperties: false
+          required:
+            - userTrainings
+            - trainingRequests
+          properties:
+            userTrainings:
+              type: integer
+              minimum: 0
+            trainingRequests:
+              type: integer
+              minimum: 0
+      description: Catalog DTO shared by list/detail/create/update. counts replaces _count. Embedded personal user-training
+        and request records are not included; use their dedicated APIs.
     Rank:
       type: object
       required:
@@ -5784,50 +6163,81 @@ components:
                 default: false
     TrainingCreateInput:
       type: object
+      additionalProperties: false
       required:
         - name
-        - categoryId
       properties:
         name:
           type: string
-        categoryId:
-          type: integer
+          minLength: 1
+          description: Trimmed nonempty name; names need not be unique.
         description:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
+          description: Trimmed; an empty string becomes null.
+        orbatQualificationNotes:
+          type:
+            - string
+            - "null"
+          description: Trimmed; an empty string becomes null.
         duration:
-          type: integer
-          nullable: true
+          anyOf:
+            - type: integer
+              minimum: 1
+              maximum: 1440
+            - type: "null"
+          description: Duration in minutes.
+        categoryId:
+          anyOf:
+            - type: integer
+              minimum: 1
+              maximum: 2147483647
+            - type: "null"
         isActive:
           type: boolean
-          default: true
-        orderIndex:
-          type: integer
-          default: 0
-        minimumRankId:
-          type: integer
-          nullable: true
+        requiresTrainingSession:
+          type: boolean
+        requiresOrbatQualification:
+          type: boolean
     TrainingUpdateInput:
       type: object
+      additionalProperties: false
+      minProperties: 1
       properties:
         name:
           type: string
-        categoryId:
-          type: integer
-          nullable: true
+          minLength: 1
+          description: Trimmed nonempty name; names need not be unique.
         description:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
+          description: Trimmed; an empty string becomes null.
+        orbatQualificationNotes:
+          type:
+            - string
+            - "null"
+          description: Trimmed; an empty string becomes null.
         duration:
-          type: integer
-          nullable: true
+          anyOf:
+            - type: integer
+              minimum: 1
+              maximum: 1440
+            - type: "null"
+          description: Duration in minutes.
+        categoryId:
+          anyOf:
+            - type: integer
+              minimum: 1
+              maximum: 2147483647
+            - type: "null"
         isActive:
           type: boolean
-        orderIndex:
-          type: integer
-        minimumRankId:
-          type: integer
-          nullable: true
+        requiresTrainingSession:
+          type: boolean
+        requiresOrbatQualification:
+          type: boolean
     RankCreateInput:
       type: object
       additionalProperties: false
