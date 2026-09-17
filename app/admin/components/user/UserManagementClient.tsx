@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Fragment } from 'react';
 import Link from 'next/link';
-import { apiList } from '@/lib/api/client';
+import { apiList, apiRequest } from '@/lib/api/client';
 import { useRouter } from 'next/navigation';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
 import { useToast } from '@/app/components/ui/ToastContainer';
@@ -95,6 +95,7 @@ export default function UserManagementClient({
   const [unrankedLoading, setUnrankedLoading] = useState(false);
   const [unrankedFilter, setUnrankedFilter] = useState<'all' | 'needsInterview' | 'needsBCT' | 'retired'>('all');
   const [selectedUnranked, setSelectedUnranked] = useState<Set<number>>(new Set());
+  const [updatingUserStatus, setUpdatingUserStatus] = useState(false);
   const [ranks, setRanks] = useState<Array<{ id: number; name: string; abbreviation: string }>>([]);
   
   const { showSuccess, showError } = useToast();
@@ -289,35 +290,27 @@ export default function UserManagementClient({
     }
   };
 
-  const bulkToggleInterview = async () => {
-    try {
-      const res = await fetch('/api/admin/users/bulk-interview-toggle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userIds: Array.from(selectedUnranked) }),
-      });
-      if (!res.ok) throw new Error('Failed');
-      showSuccess(`Toggled interview for ${selectedUnranked.size} users`);
-      setSelectedUnranked(new Set());
-      fetchUnrankedUsers();
-    } catch (e) {
-      showError('Failed to toggle interview');
+  const bulkSetStatus = async (field: 'interviewDone' | 'retired', value: boolean) => {
+    const userIds = Array.from(selectedUnranked);
+    if (updatingUserStatus || userIds.length === 0) return;
+    if (userIds.length > 100) {
+      showError('Select up to 100 users for a status update.');
+      return;
     }
-  };
-
-  const bulkToggleRetired = async () => {
+    setUpdatingUserStatus(true);
     try {
-      const res = await fetch('/api/admin/users/bulk-retire-toggle', {
-        method: 'POST',
+      await apiRequest('/api/users/status', {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userIds: Array.from(selectedUnranked) }),
+        body: JSON.stringify({ updates: userIds.map(userId => ({ userId, [field]: value })) }),
       });
-      if (!res.ok) throw new Error('Failed');
-      showSuccess(`Toggled retired for ${selectedUnranked.size} users`);
+      showSuccess(`Updated status for ${userIds.length} users`);
       setSelectedUnranked(new Set());
-      fetchUnrankedUsers();
-    } catch (e) {
-      showError('Failed to toggle retired');
+      await fetchUnrankedUsers();
+    } catch (error) {
+      showError(error instanceof Error ? error.message : 'Failed to update user status');
+    } finally {
+      setUpdatingUserStatus(false);
     }
   };
 
@@ -1430,25 +1423,32 @@ export default function UserManagementClient({
                   key={rank.id}
                   className="px-3 py-1 rounded-md text-sm font-medium"
                   style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                  disabled={updatingUserStatus}
                   onClick={() => bulkAssignRank(rank.id)}
                 >
                   → {rank.abbreviation}
                 </button>
               ))}
-              <button
-                className="px-3 py-1 rounded-md text-sm font-medium"
-                style={{ backgroundColor: 'var(--accent)', color: 'white' }}
-                onClick={bulkToggleInterview}
-              >
-                Toggle Interview
-              </button>
-              <button
-                className="px-3 py-1 rounded-md text-sm font-medium"
-                style={{ backgroundColor: 'var(--accent)', color: 'white' }}
-                onClick={bulkToggleRetired}
-              >
-                Toggle Retired
-              </button>
+              {([
+                { field: 'interviewDone', value: true, label: 'Mark Interview Complete' },
+                { field: 'interviewDone', value: false, label: 'Mark Interview Pending' },
+                { field: 'retired', value: true, label: 'Mark Retired' },
+                { field: 'retired', value: false, label: 'Mark Active' },
+              ] as const).map(({ field, value, label }) => (
+                <button
+                  key={`${field}-${value}`}
+                  className="px-3 py-1 rounded-md text-sm font-medium disabled:opacity-50"
+                  style={{ backgroundColor: 'var(--accent)', color: 'white' }}
+                  disabled={updatingUserStatus || selectedUnranked.size > 100}
+                  onClick={() => bulkSetStatus(field, value)}
+                >
+                  {label}
+                </button>
+              ))}
+              {updatingUserStatus && <span role="status">Updating status…</span>}
+              {selectedUnranked.size > 100 && (
+                <span className="text-sm py-2">Select up to 100 users for a status update.</span>
+              )}
             </div>
           )}
 
@@ -1469,6 +1469,7 @@ export default function UserManagementClient({
                     <th className="px-6 py-3 text-left">
                       <input
                         type="checkbox"
+                        disabled={updatingUserStatus}
                         checked={selectedUnranked.size === unrankedUsers.length && unrankedUsers.length > 0}
                         onChange={() => {
                           if (selectedUnranked.size === unrankedUsers.length) {
@@ -1505,6 +1506,7 @@ export default function UserManagementClient({
                       <td className="px-6 py-4">
                         <input
                           type="checkbox"
+                          disabled={updatingUserStatus}
                           checked={selectedUnranked.has(user.id)}
                           onChange={() => {
                             const newSelected = new Set(selectedUnranked);

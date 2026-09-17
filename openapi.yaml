@@ -119,18 +119,6 @@ paths:
       responses:
         "200":
           description: Admin ORBAT list
-  /admin/users/bulk-interview-toggle:
-    post:
-      tags:
-        - Admin
-        - Users
-      summary: Bulk toggle interview status
-      security:
-        - bearerAuth:
-            - user:manage
-      responses:
-        "200":
-          description: Interview status toggled
   /admin/users/bulk-rank-assign:
     post:
       tags:
@@ -156,18 +144,6 @@ paths:
       responses:
         "200":
           description: Ranks assigned to users
-  /admin/users/bulk-retire-toggle:
-    post:
-      tags:
-        - Admin
-        - Users
-      summary: Bulk toggle retired status
-      security:
-        - bearerAuth:
-            - user:manage
-      responses:
-        "200":
-          description: Retired status toggled
   /admin/users/events:
     get:
       tags:
@@ -4401,17 +4377,6 @@ paths:
             text/event-stream:
               schema:
                 type: object
-  /users/{id}/interview/toggle:
-    post:
-      tags:
-        - Users
-      summary: Toggle user interview status
-      security:
-        - bearerAuth:
-            - user:manage
-      responses:
-        "200":
-          description: Interview status toggled
   /users/{id}/permissions:
     get:
       tags:
@@ -4735,17 +4700,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiFailure"
-  /users/{id}/retired/toggle:
-    post:
-      tags:
-        - Users
-      summary: Toggle user retired status
-      security:
-        - bearerAuth:
-            - user:manage
-      responses:
-        "200":
-          description: Retired status toggled
   /users/{id}/trainings:
     get:
       tags:
@@ -5941,6 +5895,181 @@ paths:
                 properties:
                   data:
                     $ref: "#/components/schemas/RankRequirements"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+  /users/{id}/status:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          oneOf:
+            - type: integer
+              minimum: 1
+              maximum: 2147483647
+            - type: string
+              enum:
+                - me
+        description: Positive user ID or me for session users only. Bot tokens must supply a numeric ID.
+    patch:
+      tags:
+        - Users
+      summary: Set a user’s interview and retirement status
+      description: Requires user:manage globally, including self changes, plus live target hierarchy authorization under
+        user:manage for session users. Active database bot tokens act as superadmin. Explicit flag updates preserve
+        existing rank, attendance baseline, and rank date. Missing user-rank state is initialized with database
+        defaults. Each user’s flags-only user_status.updated audit commits with the update in a serializable
+        transaction. No rank history or bot rank event is created; profile notifications follow commit. Missing targets
+        return 404, invalid payloads 422, malformed IDs/JSON 400, and conflicts 409 for retry.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserStatusPatchInput"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/UserStatus"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+  /users/status:
+    patch:
+      tags:
+        - Users
+      summary: Set interview and retirement status for multiple users
+      description: Requires user:manage globally, including self changes, plus live target hierarchy authorization under
+        user:manage for session users. Active database bot tokens act as superadmin. All targets must be authorized and
+        exist before any write. Returns status records in input order with empty meta. An invalid target rolls back the
+        entire batch. Explicit flag updates preserve existing rank, attendance baseline, and rank date. Missing
+        user-rank state is initialized with database defaults. Each user’s flags-only user_status.updated audit commits
+        with the update in a serializable transaction. No rank history or bot rank event is created; profile
+        notifications follow commit. Missing targets return 404, invalid payloads 422, malformed IDs/JSON 400, and
+        conflicts 409 for retry.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserStatusBulkPatchInput"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserStatus"
                   meta:
                     type: object
                     additionalProperties: true
@@ -7460,3 +7589,56 @@ components:
             - "null"
           description: Trimmed; an empty string becomes null. Stored in rank history, redacted from audits, and omitted from the
             rank-change event.
+    UserStatus:
+      type: object
+      additionalProperties: false
+      required:
+        - userId
+        - interviewDone
+        - retired
+      properties:
+        userId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        interviewDone:
+          type: boolean
+        retired:
+          type: boolean
+    UserStatusPatchInput:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        interviewDone:
+          type: boolean
+        retired:
+          type: boolean
+      description: Sets explicit flag values; omitted flags remain unchanged. This is not a toggle operation.
+    UserStatusBulkPatchInput:
+      type: object
+      additionalProperties: false
+      required:
+        - updates
+      properties:
+        updates:
+          type: array
+          minItems: 1
+          maxItems: 100
+          description: Unique user IDs; each update requires at least one flag. All targets are authorized and checked before
+            writes.
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - userId
+            minProperties: 2
+            properties:
+              userId:
+                type: integer
+                minimum: 1
+                maximum: 2147483647
+              interviewDone:
+                type: boolean
+              retired:
+                type: boolean
