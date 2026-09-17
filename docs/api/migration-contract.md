@@ -52,10 +52,23 @@ Consolidate website administration and bot rank-role lookup into shared business
 
 Every request requires a string Discord `guildId` query parameter. GET supports `activeOnly=true` or `false` (default false), ascending-ID cursor pagination, and the shared `{ data, meta }` envelope. Mapping records include numeric mapping/rank IDs, string guild/Discord-role IDs, activity state, UTC timestamps, and rank metadata. PATCH accepts partial `discordRoleId`/`isActive` fields; creating a mapping requires `discordRoleId`. The guild ID is supplied only in the query, not duplicated in the body. Mutations and audit records commit together. These rank-configuration reads contain no user data and do not require read auditing.
 
+## Fourth migration batch: leave of absence
+
+| Canonical endpoint | Methods | Replaces |
+|---|---|---|
+| `/api/users/{id}/leave-of-absences` | GET, POST | `/api/loa` |
+| `/api/leave-of-absences/{id}` | PATCH | `/api/loa/{id}` |
+
+Users can manage their own leave records; accessing another user requires hierarchy-aware `user:edit` or superadmin. Active bot tokens retain superadmin access. The collection accepts `me` only for a user session. GET returns descending-ID cursor pages, default 50/cap 100. Reads of another user’s leave, including bot reads, are audited without copying returned personal data. Self-reads are not audited.
+
+POST requires `startDate` and accepts nullable `returnDate` and `reason`. Dates must include a timezone and are normalized to UTC; a return date cannot precede the start. PATCH accepts a nonempty partial payload of `returnDate`, `reason`, and/or `cancel`; the start date is immutable. `cancel: true` records the current UTC cancellation time, while false clears it. Reasons are trimmed, with empty strings becoming null, and their contents are redacted in audit snapshots. Mutations and their audit records commit together. There is no delete operation; cancellation preserves the leave record.
+
+The website labels leave date inputs as UTC dates, displays leave dates in UTC, and converts selected dates to explicit midnight-UTC timestamps before API requests. “Mark back” records the current UTC instant, bounded to the leave start if necessary, rather than truncating the return time to midnight. Date-only strings are not accepted as timestamp payloads. Responses preserve the leave DTO’s existing fields with UTC `Z` timestamps; the old unwrapped response format and routes are removed together with website caller migration.
+
 ## Verification and remaining rollout
 
 Every endpoint and supported method must have tests, even once overall coverage reaches its target. Cover both authentication modes, invalid/inactive/revoked tokens, allowed/forbidden actions, ownership/hierarchy, payloads, response contracts, pagination, database mutations/rollback, audit actors/redaction, and UTC offset/daylight-saving/date boundaries. Use unit tests with Prisma test doubles plus isolated Prisma-managed local PGlite integration tests through Prisma Client. Do not use raw SQL queries or access the development database. Integration tests check actual relational behavior and transaction rollback in the local emulator; they do not establish production PostgreSQL deployment, concurrency, or performance guarantees.
 
 The target is an enforced minimum of 80% lines, branches, functions, and statements across API handlers and supporting services, progressing toward 100%. Publish CI reports and gate merges on tests and coverage. A threshold applied only to migrated modules is an interim batch guard, not repository-wide completion. Endpoint tests and actual coverage reports must establish readiness; inventory test references alone do not.
 
-For each remaining resource family, review caller evidence and duplicates, choose canonical operations, migrate handler/service and website consumers together, and update OpenAPI and tests. Preserve distinct operations; avoid deleting routes solely because static search found no caller. Follow-up batches include user administration, ORBATs/signups/availability, attendance, ranks/promotions, training, messaging, templates, leave, and realtime/auth transport review. Build the Discord bot after the shared contracts are ready.
+For each remaining resource family, review caller evidence and duplicates, choose canonical operations, migrate handler/service and website consumers together, and update OpenAPI and tests. Preserve distinct operations; avoid deleting routes solely because static search found no caller. Follow-up batches include user administration, ORBATs/signups/availability, attendance, ranks/promotions, training, messaging, templates, and realtime/auth transport review. Build the Discord bot after the shared contracts are ready.

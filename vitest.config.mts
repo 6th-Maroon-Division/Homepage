@@ -13,6 +13,7 @@ export default defineConfig({
       reportsDirectory: 'coverage/api',
       include: [
         'app/api/ranks/discord-roles/route.ts', 'app/api/ranks/[[]id]/discord-role/route.ts',
+        'app/api/users/[[]id]/leave-of-absences/route.ts', 'app/api/leave-of-absences/[[]id]/route.ts',
         'lib/api/**/*.ts', 'lib/notification-preferences.ts',
         'app/api/bot-tokens/route.ts', 'app/api/bot-tokens/[[]id]/route.ts',
         'app/api/users/[[]id]/notification-preferences/route.ts', 'app/api/audit-logs/route.ts',

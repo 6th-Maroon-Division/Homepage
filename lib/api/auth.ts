@@ -33,9 +33,9 @@ export async function requireApiAccess(request: Request, permission?: Permission
   return { principal } as const;
 }
 
-export async function canAccessApiUser(principal: NonNullable<Awaited<ReturnType<typeof authenticateApi>>>, userId: number, permission: PermissionKey) {
+export async function canAccessApiUser(principal: NonNullable<Awaited<ReturnType<typeof authenticateApi>>>, userId: number, permission: PermissionKey, database: Pick<typeof prisma, 'userPermission'> = prisma) {
   if (principal.kind === 'user' && principal.userId === userId) return true;
-  const target = await prisma.userPermission.findMany({ where: { userId }, select: { value: true, permission: { select: { key: true } } } });
+  const target = await database.userPermission.findMany({ where: { userId }, select: { value: true, permission: { select: { key: true } } } });
   const grants = parsePermissionGrants(Object.fromEntries(target.map(entry => [entry.permission.key, entry.value]))) ?? {};
   return hasApiHierarchyPermission(principal.permissions, grants, permission);
 }

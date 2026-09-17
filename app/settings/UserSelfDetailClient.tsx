@@ -9,6 +9,7 @@ import TrainingScheduleSummary from '@/app/components/trainings/TrainingSchedule
 import TrainingStatusBadge from '@/app/components/trainings/TrainingStatusBadge';
 import type { TrainingRequestSession } from '@/app/components/trainings/training-request-types';
 import NotificationPreferencesPanel from '@/app/settings/NotificationPreferencesPanel';
+import { apiRequest } from '@/lib/api/client';
 
 type UserTraining = {
   id: number;
@@ -884,6 +885,9 @@ export default function UserSelfDetailClient({
             <h3 className="font-semibold mb-3" style={{ color: 'var(--foreground)' }}>
               Submit Leave Of Absence
             </h3>
+            <p className="mb-3 text-sm" style={{ color: 'var(--muted-foreground)' }}>
+              Dates are shown in UTC. Selected dates begin at 00:00 UTC.
+            </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
@@ -948,22 +952,16 @@ export default function UserSelfDetailClient({
 
                   setIsSubmittingLoa(true);
                   try {
-                    const response = await fetch('/api/loa', {
+                    const { data: created } = await apiRequest<LoaEntry>('/api/users/me/leave-of-absences', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({
-                        startDate: loaStartDate,
-                        returnDate: loaReturnDate || null,
+                        startDate: `${loaStartDate}T00:00:00.000Z`,
+                        returnDate: loaReturnDate ? `${loaReturnDate}T00:00:00.000Z` : null,
                         reason: loaReason.trim() || null,
                       }),
                     });
 
-                    if (!response.ok) {
-                      const data = await response.json().catch(() => ({}));
-                      throw new Error(data.error || 'Failed to submit LOA');
-                    }
-
-                    const created = await response.json();
                     setLoaRows((prev) => [created, ...prev]);
                     setLoaStartDate('');
                     setLoaReturnDate('');
@@ -1016,11 +1014,11 @@ export default function UserSelfDetailClient({
                       <div className="flex flex-col gap-2">
                         <p className="text-sm" style={{ color: 'var(--foreground)' }}>
                           <span className="font-semibold">Start:</span>{' '}
-                          {new Date(entry.startDate).toLocaleDateString('en-GB')}
+                          {new Date(entry.startDate).toLocaleDateString('en-GB', { timeZone: 'UTC' })}
                         </p>
                         <p className="text-sm" style={{ color: 'var(--foreground)' }}>
                           <span className="font-semibold">Return:</span>{' '}
-                          {entry.returnDate ? new Date(entry.returnDate).toLocaleDateString('en-GB') : 'Not set yet'}
+                          {entry.returnDate ? new Date(entry.returnDate).toLocaleDateString('en-GB', { timeZone: 'UTC' }) : 'Not set yet'}
                         </p>
                         {isCancelled && (
                           <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
@@ -1061,18 +1059,12 @@ export default function UserSelfDetailClient({
                             onClick={async () => {
                               setIsSavingLoaId(entry.id);
                               try {
-                                const response = await fetch(`/api/loa/${entry.id}`, {
+                                const { data: updated } = await apiRequest<LoaEntry>(`/api/leave-of-absences/${entry.id}`, {
                                   method: 'PATCH',
                                   headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ returnDate: draftReturnDate || null }),
+                                  body: JSON.stringify({ returnDate: draftReturnDate ? `${draftReturnDate}T00:00:00.000Z` : null }),
                                 });
 
-                                if (!response.ok) {
-                                  const data = await response.json().catch(() => ({}));
-                                  throw new Error(data.error || 'Failed to update LOA return date');
-                                }
-
-                                const updated = await response.json();
                                 setLoaRows((prev) => prev.map((row) => (row.id === entry.id ? updated : row)));
                                 showSuccess('LOA return date updated');
                                 router.refresh();
@@ -1093,18 +1085,12 @@ export default function UserSelfDetailClient({
                               if (isFuture) {
                                 setIsCancellingLoaId(entry.id);
                                 try {
-                                  const response = await fetch(`/api/loa/${entry.id}`, {
+                                  const { data: updated } = await apiRequest<LoaEntry>(`/api/leave-of-absences/${entry.id}`, {
                                     method: 'PATCH',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ cancel: true }),
                                   });
 
-                                  if (!response.ok) {
-                                    const data = await response.json().catch(() => ({}));
-                                    throw new Error(data.error || 'Failed to cancel LOA');
-                                  }
-
-                                  const updated = await response.json();
                                   setLoaRows((prev) => prev.map((row) => (row.id === entry.id ? updated : row)));
                                   showSuccess('Future LOA cancelled');
                                   router.refresh();
@@ -1118,25 +1104,17 @@ export default function UserSelfDetailClient({
 
                               setIsMarkingBackLoaId(entry.id);
                               try {
-                                const today = new Date().toISOString().slice(0, 10);
-                                const startDate = entry.startDate.slice(0, 10);
-                                const returnDateToSet = today >= startDate ? today : startDate;
-                                const response = await fetch(`/api/loa/${entry.id}`, {
+                                const returnDateToSet = new Date(Math.max(Date.now(), new Date(entry.startDate).getTime())).toISOString();
+                                const { data: updated } = await apiRequest<LoaEntry>(`/api/leave-of-absences/${entry.id}`, {
                                   method: 'PATCH',
                                   headers: { 'Content-Type': 'application/json' },
                                   body: JSON.stringify({ returnDate: returnDateToSet }),
                                 });
 
-                                if (!response.ok) {
-                                  const data = await response.json().catch(() => ({}));
-                                  throw new Error(data.error || 'Failed to mark LOA as returned');
-                                }
-
-                                const updated = await response.json();
                                 setLoaRows((prev) => prev.map((row) => (row.id === entry.id ? updated : row)));
                                 setLoaReturnDateDrafts((prev) => ({
                                   ...prev,
-                                  [entry.id]: returnDateToSet,
+                                  [entry.id]: returnDateToSet.slice(0, 10),
                                 }));
                                 showSuccess('Marked as back now');
                                 router.refresh();

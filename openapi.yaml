@@ -1298,52 +1298,6 @@ paths:
       responses:
         "200":
           description: Success
-  /loa:
-    get:
-      tags:
-        - Leave of Absence
-      summary: List all Leave of Absence requests
-      security:
-        - bearerAuth:
-            - loa:view_all
-      responses:
-        "200":
-          description: List of LOA requests
-    post:
-      tags:
-        - Leave of Absence
-      summary: Create Leave of Absence request
-      responses:
-        "201":
-          description: LOA request created
-        "401":
-          description: Unauthorized
-  /loa/{id}:
-    get:
-      tags:
-        - Leave of Absence
-      summary: Get Leave of Absence by ID
-      responses:
-        "200":
-          description: LOA details
-    patch:
-      tags:
-        - Leave of Absence
-      summary: Update Leave of Absence
-      responses:
-        "200":
-          description: LOA updated
-        "401":
-          description: Unauthorized
-    delete:
-      tags:
-        - Leave of Absence
-      summary: Delete Leave of Absence
-      responses:
-        "200":
-          description: LOA deleted
-        "401":
-          description: Unauthorized
   /messaging/{id}/read:
     post:
       tags:
@@ -4604,6 +4558,277 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiFailure"
+  /users/{id}/leave-of-absences:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          oneOf:
+            - type: integer
+              minimum: 1
+              maximum: 2147483647
+            - type: string
+              enum:
+                - me
+        description: Numeric user ID, or me for a user session. Bot tokens must supply a numeric ID.
+    get:
+      tags:
+        - Leave of Absence
+      summary: List a user’s leave-of-absence records
+      description: Requires self ownership, hierarchy-aware user:edit for another user, or superadmin for session users.
+        Active database bot tokens act as superadmin. Newest ID first. Reading another user’s data is audited, including
+        bot reads; self-reads are not audited. The audit records actor/target context without returned personal data.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+          description: Values above 100 are clamped to 100.
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            pattern: ^[0-9]+$
+          description: Positive 32-bit record ID from meta.nextCursor; returns records with smaller IDs in descending order.
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/LeaveOfAbsence"
+                  meta:
+                    type: object
+                    required:
+                      - limit
+                      - nextCursor
+                    properties:
+                      limit:
+                        type: integer
+                        minimum: 1
+                        maximum: 100
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+    post:
+      tags:
+        - Leave of Absence
+      summary: Create a user’s leave-of-absence record
+      description: Requires self ownership, hierarchy-aware user:edit for another user, or superadmin for session users.
+        Active database bot tokens act as superadmin. Mutation and redacted audit record commit in one transaction. The
+        reason is not copied into the audit log.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeaveOfAbsenceCreateInput"
+      responses:
+        "201":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/LeaveOfAbsence"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+  /leave-of-absences/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        description: Leave-of-absence record ID.
+    patch:
+      tags:
+        - Leave of Absence
+      summary: Update or cancel a leave-of-absence record
+      description: Requires self ownership, hierarchy-aware user:edit for another user, or superadmin for session users.
+        Active database bot tokens act as superadmin. Authorization is evaluated against the leave record’s user.
+        Mutation and redacted audit record commit together. Cancellation preserves the record; no DELETE operation is
+        exposed.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeaveOfAbsencePatchInput"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/LeaveOfAbsence"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
 components:
   securitySchemes:
     bearerAuth:
@@ -5645,3 +5870,80 @@ components:
           type: boolean
       description: At least one field is required. Creating a mapping requires discordRoleId; isActive defaults to true on
         creation. Omitted fields on existing mappings are preserved.
+    LeaveOfAbsence:
+      type: object
+      required:
+        - id
+        - userId
+        - startDate
+        - returnDate
+        - cancelledAt
+        - reason
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        startDate:
+          $ref: "#/components/schemas/UtcTimestamp"
+        returnDate:
+          anyOf:
+            - $ref: "#/components/schemas/UtcTimestamp"
+            - type: "null"
+        cancelledAt:
+          anyOf:
+            - $ref: "#/components/schemas/UtcTimestamp"
+            - type: "null"
+        reason:
+          type:
+            - string
+            - "null"
+          description: Trimmed; an empty string becomes null. Reason contents are redacted in audit snapshots.
+        createdAt:
+          $ref: "#/components/schemas/UtcTimestamp"
+        updatedAt:
+          $ref: "#/components/schemas/UtcTimestamp"
+    LeaveOfAbsenceCreateInput:
+      type: object
+      additionalProperties: false
+      required:
+        - startDate
+      properties:
+        startDate: &a12
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp with Z or an explicit UTC offset. Date-only and timezone-free values are rejected;
+            accepted values are normalized to UTC.
+        returnDate:
+          anyOf:
+            - *a12
+            - type: "null"
+        reason:
+          type:
+            - string
+            - "null"
+          description: Trimmed; an empty string becomes null. Reason contents are redacted in audit snapshots.
+      description: returnDate must be on or after startDate, or null.
+    LeaveOfAbsencePatchInput:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        returnDate:
+          anyOf:
+            - type: string
+              format: date-time
+              description: ISO 8601 timestamp with Z or an explicit UTC offset. Date-only and timezone-free values are rejected;
+                accepted values are normalized to UTC.
+            - type: "null"
+        reason:
+          type:
+            - string
+            - "null"
+          description: Trimmed; an empty string becomes null. Reason contents are redacted in audit snapshots.
+        cancel:
+          type: boolean
+          description: true sets cancelledAt to the current UTC time; false clears it.
+      description: startDate is immutable. returnDate cannot precede the saved startDate.
