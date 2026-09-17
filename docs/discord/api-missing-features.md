@@ -466,6 +466,8 @@ Bots and authorized website users assign or demote through `PATCH /users/{id}/ra
 
 A lower rank order is recorded as demotion; other changes are assignment. Same-rank assignment still resets the attendance baseline and creates history. The rank update, UTC rank date, history, `user.rank_changed` outbox event, and redacted audit are atomic. The optional reason remains in history notes and is excluded from the outbox event. PATCH returns the shared updated rank summary.
 
+For bulk assignment, use `PATCH /users/ranks` with `{ updates: [{ userId, rankId, reason? }] }`, limited to 100 unique users. It shares the single-user permission and attendance rules, checks all targets before writes, and returns rank summaries in input order. All changes, history, audits, and rank-change outbox records (`source: bulk_assignment`) commit atomically. The former admin bulk-rank-assign URL is removed.
+
 ### Training announcement metadata
 
 Do not add web-platform message metadata solely to support Discord reply forwarding until the product decisions in the bot design are settled. The bot can store its own Discord announcement message reference because that is operational Discord state.

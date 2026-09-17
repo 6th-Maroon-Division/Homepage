@@ -82,8 +82,11 @@ Both require current `rank:edit` permission or an active superadmin bot token. G
 - `GET /api/users/[id]/rank`
 - `GET /api/users/[id]/rank-history?limit=20&cursor=...`
 - `PATCH /api/users/[id]/rank`
+- `PATCH /api/users/ranks`
 
 The two user-rank read endpoints use the shared API envelope and support session-only `me` or numeric user IDs. They require self access, live hierarchy-aware `user:manage`, or superadmin (including active bot tokens). History uses descending-ID cursors; the former `page` parameter is rejected. Other-user reads are audited without storing returned records or decline reasons; rank-summary reads now require authentication. Assignment and demotion share PATCH with `{ rankId, reason? }`. Mutations require global `rank:manage_promotions` even for self changes plus target hierarchy authorization under that permission; GET’s `user:manage` permission is not required for PATCH. The transaction preserves retired/interview flags, resets the baseline/time, and writes history, a rank-change outbox event, and a redacted audit. Lower rank order is recorded as demotion; other changes are assignment, including the existing same-rank baseline-reset behavior. The PATCH response is the updated rank summary.
+
+Bulk assignment uses `{ updates: [{ userId, rankId, reason? }] }`, with 1–100 unique users. It shares individual assignment authorization and attendance calculation, checks every target before writes, and commits all updates/history/outbox/audits atomically. Summaries return in input order. The former admin bulk-rank-assign endpoint is removed.
 
 ### Bot Integration Endpoints
 - `GET /api/ranks/bot/promotions`

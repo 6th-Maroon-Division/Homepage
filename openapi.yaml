@@ -119,31 +119,6 @@ paths:
       responses:
         "200":
           description: Admin ORBAT list
-  /admin/users/bulk-rank-assign:
-    post:
-      tags:
-        - Admin
-        - Users
-      summary: Bulk assign ranks
-      security:
-        - bearerAuth:
-            - user:manage
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                userIds:
-                  type: array
-                  items:
-                    type: integer
-                rankId:
-                  type: integer
-      responses:
-        "200":
-          description: Ranks assigned to users
   /admin/users/events:
     get:
       tags:
@@ -6115,6 +6090,90 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiFailure"
+  /users/ranks:
+    patch:
+      tags:
+        - Ranks
+      summary: Assign or demote ranks for multiple users
+      description: Requires rank:manage_promotions globally, including self changes, plus live target hierarchy authorization
+        under the same permission for session users. Active database bot tokens act as superadmin. All user and rank
+        references are authorized and checked before writes. One serializable transaction preserves flags, resets each
+        attendance baseline and UTC rank date, and writes history, rank-change outbox events (source bulk_assignment),
+        and redacted audits. Attendance uses the same current-present plus legacy calculation as individual assignment.
+        A lower rank order is demotion; other changes are assignment. Same-rank assignment still resets the baseline and
+        writes history. Missing references return 404, denied targets 403, invalid payloads 422, malformed JSON 400, and
+        concurrency/reference conflicts 409. Returns rank summaries in input order with empty meta; any failure prevents
+        partial changes. Profile notifications run safely after commit.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkUserRankPatchInput"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserRankSummary"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
 components:
   securitySchemes:
     bearerAuth:
@@ -7642,3 +7701,32 @@ components:
                 type: boolean
               retired:
                 type: boolean
+    BulkUserRankPatchInput:
+      type: object
+      additionalProperties: false
+      required:
+        - updates
+      properties:
+        updates:
+          type: array
+          minItems: 1
+          maxItems: 100
+          description: Unique user IDs; response summaries follow this input order.
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - userId
+              - rankId
+            properties:
+              userId: &a17
+                type: integer
+                minimum: 1
+                maximum: 2147483647
+              rankId: *a17
+              reason:
+                type:
+                  - string
+                  - "null"
+                description: Trimmed; empty strings become null. Reasons remain in history notes, are redacted in audits, and are not
+                  included in rank-change events.

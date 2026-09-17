@@ -1,4 +1,5 @@
-import { startPrismaDevServer } from '@prisma/dev';
+import { startDBServer } from '@prisma/dev/internal/db';
+import { ServerState } from '@prisma/dev/internal/state';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -6,14 +7,20 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('..', import.meta.url));
 let child;
 let server;
+let state;
 let stopping = false;
 let failed = false;
+
+async function closeDatabase() {
+  try { await server?.close(); }
+  finally { await state?.close(); }
+}
 
 async function stop(signal) {
   if (stopping) return;
   stopping = true;
   child?.kill(signal);
-  await server?.close();
+  await closeDatabase();
   process.exit(signal === 'SIGINT' ? 130 : 143);
 }
 process.once('SIGINT', () => void stop('SIGINT'));
@@ -33,11 +40,16 @@ function run(script, args, env) {
 
 try {
   console.log('Starting isolated Prisma-managed PGlite database…');
-  server = await startPrismaDevServer({
+  // Prisma dev 0.24.3's public launcher also starts a Streams/WAL sidecar.
+  // Its background schema reads share PGlite's session and can interfere with
+  // the deliberately failing transactions in this suite. Start only Prisma's
+  // database service; the pinned dependency keeps these internal exports stable.
+  state = await ServerState.createExclusively({
     name: `orbat-api-test-${randomUUID()}`, persistenceMode: 'stateless',
     port: 0, databasePort: 0, shadowDatabasePort: 0,
   });
-  const databaseUrl = server.database.prismaORMConnectionString;
+  server = await startDBServer('database', state);
+  const databaseUrl = server.prismaORMConnectionString;
   const env = {
     ...process.env, NODE_ENV: 'test', DATABASE_URL: databaseUrl,
     API_INTEGRATION_DATABASE_URL: databaseUrl,
@@ -51,7 +63,7 @@ try {
   console.error(error instanceof Error ? error.message : error);
   failed = true;
 } finally {
-  await server?.close();
+  await closeDatabase();
 }
 // Prisma dev cleanup can change process.exitCode; preserve test failures after it.
 if (failed) process.exitCode = 1;

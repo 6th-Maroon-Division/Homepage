@@ -96,6 +96,8 @@ export default function UserManagementClient({
   const [unrankedFilter, setUnrankedFilter] = useState<'all' | 'needsInterview' | 'needsBCT' | 'retired'>('all');
   const [selectedUnranked, setSelectedUnranked] = useState<Set<number>>(new Set());
   const [updatingUserStatus, setUpdatingUserStatus] = useState(false);
+  const [assigningRanks, setAssigningRanks] = useState(false);
+  const updatingUnrankedUsers = updatingUserStatus || assigningRanks;
   const [ranks, setRanks] = useState<Array<{ id: number; name: string; abbreviation: string }>>([]);
   
   const { showSuccess, showError } = useToast();
@@ -275,24 +277,32 @@ export default function UserManagementClient({
 
   // Bulk actions for unranked users
   const bulkAssignRank = async (rankId: number) => {
+    const userIds = Array.from(selectedUnranked);
+    if (updatingUnrankedUsers || userIds.length === 0) return;
+    if (userIds.length > 100) {
+      showError('Select up to 100 users for a rank assignment.');
+      return;
+    }
+    setAssigningRanks(true);
     try {
-      const res = await fetch('/api/admin/users/bulk-rank-assign', {
-        method: 'POST',
+      await apiRequest('/api/users/ranks', {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userIds: Array.from(selectedUnranked), rankId }),
+        body: JSON.stringify({ updates: userIds.map(userId => ({ userId, rankId })) }),
       });
-      if (!res.ok) throw new Error('Failed');
-      showSuccess(`Assigned rank to ${selectedUnranked.size} users`);
+      showSuccess(`Assigned rank to ${userIds.length} users`);
       setSelectedUnranked(new Set());
-      fetchUnrankedUsers();
-    } catch (e) {
-      showError('Failed to assign ranks');
+      await fetchUnrankedUsers();
+    } catch (error) {
+      showError(error instanceof Error ? error.message : 'Failed to assign ranks');
+    } finally {
+      setAssigningRanks(false);
     }
   };
 
   const bulkSetStatus = async (field: 'interviewDone' | 'retired', value: boolean) => {
     const userIds = Array.from(selectedUnranked);
-    if (updatingUserStatus || userIds.length === 0) return;
+    if (updatingUnrankedUsers || userIds.length === 0) return;
     if (userIds.length > 100) {
       showError('Select up to 100 users for a status update.');
       return;
@@ -1421,9 +1431,9 @@ export default function UserManagementClient({
               {ranks.map((rank) => (
                 <button
                   key={rank.id}
-                  className="px-3 py-1 rounded-md text-sm font-medium"
+                  className="px-3 py-1 rounded-md text-sm font-medium disabled:opacity-50"
                   style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
-                  disabled={updatingUserStatus}
+                  disabled={updatingUnrankedUsers || selectedUnranked.size > 100}
                   onClick={() => bulkAssignRank(rank.id)}
                 >
                   → {rank.abbreviation}
@@ -1439,15 +1449,16 @@ export default function UserManagementClient({
                   key={`${field}-${value}`}
                   className="px-3 py-1 rounded-md text-sm font-medium disabled:opacity-50"
                   style={{ backgroundColor: 'var(--accent)', color: 'white' }}
-                  disabled={updatingUserStatus || selectedUnranked.size > 100}
+                  disabled={updatingUnrankedUsers || selectedUnranked.size > 100}
                   onClick={() => bulkSetStatus(field, value)}
                 >
                   {label}
                 </button>
               ))}
               {updatingUserStatus && <span role="status">Updating status…</span>}
+              {assigningRanks && <span role="status">Assigning ranks…</span>}
               {selectedUnranked.size > 100 && (
-                <span className="text-sm py-2">Select up to 100 users for a status update.</span>
+                <span className="text-sm py-2">Select up to 100 users for a bulk update.</span>
               )}
             </div>
           )}
@@ -1469,7 +1480,7 @@ export default function UserManagementClient({
                     <th className="px-6 py-3 text-left">
                       <input
                         type="checkbox"
-                        disabled={updatingUserStatus}
+                        disabled={updatingUnrankedUsers}
                         checked={selectedUnranked.size === unrankedUsers.length && unrankedUsers.length > 0}
                         onChange={() => {
                           if (selectedUnranked.size === unrankedUsers.length) {
@@ -1506,7 +1517,7 @@ export default function UserManagementClient({
                       <td className="px-6 py-4">
                         <input
                           type="checkbox"
-                          disabled={updatingUserStatus}
+                          disabled={updatingUnrankedUsers}
                           checked={selectedUnranked.has(user.id)}
                           onChange={() => {
                             const newSelected = new Set(selectedUnranked);

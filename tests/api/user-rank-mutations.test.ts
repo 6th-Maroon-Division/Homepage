@@ -142,3 +142,79 @@ it('returns committed success if a post-commit realtime listener throws', async 
   expect(JSON.stringify(log.mock.calls)).not.toContain('Sensitive listener details');
   log.mockRestore();
 });
+
+import { PATCH as bulk } from '@/app/api/users/ranks/route';
+import { parseBulkUserRankMutation } from '@/lib/api/user-rank-mutations';
+describe('bulk rank mutation contracts', () => {
+  it.each([null, [], {}, { updates: [] }, { updates: [null] }, { updates: [{ userId: '5', rankId: 3 }] }, { updates: [{ userId: 2147483648, rankId: 3 }] }, { updates: [{ userId: 5, rankId: '3' }] }, { updates: [{ userId: 5, rankId: 3 }, { userId: 5, rankId: 2 }] }, { updates: [{ userId: 5, rankId: 3, other: true }] }, { updates: [{ userId: 5, rankId: 3 }], other: true }])('rejects malformed batch %j', async body => expect((await bulk(req(body))).status).toBe(422));
+  it('enforces max100 and normalizes per-user reasons through the singleton parser', () => {
+    const updates = Array.from({ length: 101 }, (_, index) => ({ userId: index + 1, rankId: 3 }));
+    expect(parseBulkUserRankMutation({ updates })).toHaveProperty('error');
+    expect(parseBulkUserRankMutation({ updates: updates.slice(0, 100) })).toHaveProperty('data');
+    expect(parseBulkUserRankMutation({ updates: [{ userId: 5, rankId: 3, reason: ' why ' }] })).toEqual({ data: [{ userId: 5, rankId: 3, reason: 'why' }] });
+  });
+  it('requires global rank management even self and validates bot credentials', async () => {
+    const body = { updates: [{ userId: 4, rankId: 3 }] };
+    mocks.db.user.findUnique.mockResolvedValue({ userPermissions: [] });
+    expect((await bulk(req(body))).status).toBe(403);
+    expect((await bulk(req(body, true))).status).toBe(200);
+    mocks.session.mockResolvedValue(null);
+    expect((await bulk(req(body))).status).toBe(401);
+    mocks.session.mockResolvedValue({ user: { id: 4 } });
+    mocks.db.botToken.findFirst.mockResolvedValue(null);
+    expect((await bulk(req(body, true))).status).toBe(401);
+  });
+  it('rejects malformed JSON', async () => expect((await bulk(new Request('http://localhost/api/users/ranks', { method: 'PATCH', body: '{' }))).status).toBe(400));
+});
+describe('bulk rank atomic preflight and effects', () => {
+  const body = { updates: [{ userId: 5, rankId: 3 }, { userId: 6, rankId: 2, reason: 'Requested change' }] };
+  it('preflights all hierarchy checks before writes', async () => {
+    mocks.db.userPermission.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([{ permission: { key: 'rank:manage_promotions' }, value: 2 }]);
+    expect((await bulk(req(body))).status).toBe(403);
+    expect(mocks.db.userRank.upsert).not.toHaveBeenCalled();
+    expect(mocks.db.rankHistory.create).not.toHaveBeenCalled();
+    expect(mocks.db.botEvent.create).not.toHaveBeenCalled();
+  });
+  it('preflights all rank and user references before first mutation', async () => {
+    mocks.db.rank.findUnique.mockResolvedValueOnce(next).mockResolvedValueOnce(null);
+    expect((await bulk(req(body))).status).toBe(404);
+    expect(mocks.db.userRank.upsert).not.toHaveBeenCalled();
+    mocks.db.user.findUnique.mockResolvedValueOnce({ userPermissions: [{ permission: { key: 'rank:manage_promotions' }, value: 2 }] }).mockResolvedValueOnce({ id: 5 }).mockResolvedValueOnce(null);
+    expect((await bulk(req(body))).status).toBe(404);
+    expect(mocks.db.userRank.upsert).not.toHaveBeenCalled();
+  });
+  it('preserves input order, emits bulk sources, and records explicit reasons', async () => {
+    mocks.db.rank.findUnique.mockImplementation(async ({ where }) => ({ id: where.id, name: `Rank ${where.id}`, orderIndex: where.id === 2 ? 0 : 2 }));
+    const response = await bulk(req(body));
+    expect(response.status).toBe(200);
+    const { data } = await response.json();
+    expect(data.map((row: { userId: number }) => row.userId)).toEqual([5, 6]);
+    expect(data.map((row: { attendanceDelta: number }) => row.attendanceDelta)).toEqual([0, 0]);
+    expect(mocks.db.rankHistory.create.mock.calls.map(([arg]) => arg.data.note)).toEqual([null, 'Requested change']);
+    expect(mocks.db.botEvent.create.mock.calls.map(([arg]) => [arg.data.payload.source, arg.data.payload.changeType])).toEqual([['bulk_assignment', 'assignment'], ['bulk_assignment', 'demotion']]);
+    expect(mocks.db.apiAuditLog.create.mock.calls.map(([arg]) => arg.data.targetUserIds)).toEqual([[5], [6]]);
+    expect(mocks.publish.mock.calls).toEqual([[5, { source: 'rank.bulk-assigned', rankId: 3 }], [6, { source: 'rank.bulk-assigned', rankId: 2 }]]);
+    expect(mocks.db.$transaction).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: 'Serializable' });
+  });
+  it('attributes every bot history/audit consistently', async () => {
+    expect((await bulk(req(body, true))).status).toBe(200);
+    for (const [arg] of mocks.db.rankHistory.create.mock.calls) expect(arg.data).toMatchObject({ triggeredBy: 'bot', triggeredByUserId: null });
+    for (const [arg] of mocks.db.apiAuditLog.create.mock.calls) expect(arg.data).toMatchObject({ actorType: 'bot', actorTokenId: 9 });
+  });
+  it.each(['rankHistory', 'botEvent', 'apiAuditLog'] as const)('fails whole operation on later %s errors without publishing', async model => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mocks.db[model].create.mockResolvedValueOnce({ id: 7 }).mockRejectedValueOnce(new Error('Second write failure'));
+    expect((await bulk(req(body))).status).toBe(500);
+    expect(mocks.publish).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+  it('continues postcommit notifications after one listener fails and returns committed success', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mocks.publish.mockImplementationOnce(() => { throw new Error('Sensitive failure'); }).mockImplementation(() => {});
+    expect((await bulk(req(body))).status).toBe(200);
+    expect(mocks.publish).toHaveBeenCalledTimes(2);
+    expect(mocks.publish.mock.calls[1][0]).toBe(6);
+    expect(JSON.stringify(log.mock.calls)).not.toContain('Sensitive failure');
+    log.mockRestore();
+  });
+});
