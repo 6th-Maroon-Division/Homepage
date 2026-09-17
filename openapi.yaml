@@ -3709,77 +3709,162 @@ paths:
       responses:
         "200":
           description: Success
-  /trainings/{id}/prerequisites:
-    get:
-      tags:
-        - Training
-      summary: Get training prerequisites
-      responses:
-        "200":
-          description: Training prerequisites
-    post:
-      tags:
-        - Training
-      summary: Add prerequisite
-      security:
-        - bearerAuth:
-            - training:edit
-      responses:
-        "201":
-          description: Prerequisite added
-    delete:
-      tags:
-        - Training
-      summary: Remove prerequisite
-      security:
-        - bearerAuth:
-            - training:edit
-      responses:
-        "200":
-          description: Prerequisite removed
-  /trainings/{id}/prerequisites/{prerequisiteId}:
-    delete:
-      tags:
-        - Training
-      summary: Remove specific prerequisite
-      security:
-        - bearerAuth:
-            - training:edit
-      responses:
-        "200":
-          description: Prerequisite removed
   /trainings/{id}/requirements:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        description: Training ID.
     get:
       tags:
         - Training
-      summary: Get training requirements
+      summary: Get a training’s requirements
+      description: Requires an authenticated session user. Active database bot tokens act as superadmin. Returns one
+        configured resource, without pagination. General catalog reads do not create audit records.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
       responses:
         "200":
-          description: Training requirements
-    put:
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/TrainingRequirements"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+    patch:
       tags:
         - Training
-      summary: Update training requirements
+      summary: Update a training’s requirements
+      description: Requires training:edit for session users. Active database bot tokens act as superadmin. Clearing
+        minimumRankId requires superadmin, including an active bot token. Omitted fields are preserved; supplied
+        prerequisite IDs replace the set. Missing training/rank/prerequisite references return 404; self-reference
+        returns 422; dependency cycles or serializable transaction conflicts return 409. Retry after refreshing on a
+        transaction conflict. The requirements change and ID-only audit snapshot commit in one serializable transaction.
+        Replaces the previous requirements POST/DELETE and separate prerequisite mutation routes.
       security:
-        - bearerAuth:
-            - training:edit
-      responses:
-        "200":
-          description: Requirements updated
-    post:
-      tags:
-        - TODO
-      summary: TODO document POST /trainings/{id}/requirements
-      responses:
-        "200":
-          description: Success
-    delete:
-      tags:
-        - TODO
-      summary: TODO document DELETE /trainings/{id}/requirements
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrainingRequirementsPatchInput"
       responses:
         "200":
           description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/TrainingRequirements"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
   /trainings/available:
     get:
       tags:
@@ -6425,3 +6510,68 @@ components:
         isTrainer:
           type: boolean
           description: True when the user has a positive training:approve_request, training:mark, or system:super_admin grant.
+    TrainingRequirementsPatchInput:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        minimumRankId:
+          anyOf:
+            - &a14
+              type: integer
+              minimum: 1
+              maximum: 2147483647
+            - type: "null"
+        requiredTrainingIds:
+          type: array
+          uniqueItems: true
+          items: *a14
+      description: Omitted fields remain unchanged. A provided requiredTrainingIds array replaces the complete prerequisite
+        set; [] clears it. minimumRankId:null clears the rank requirement and requires superadmin.
+    TrainingRequirements:
+      type: object
+      additionalProperties: false
+      required:
+        - minimumRankId
+        - requiredTrainingIds
+        - minimumRank
+        - requiredTrainings
+      properties:
+        minimumRankId:
+          anyOf:
+            - &a14
+              type: integer
+              minimum: 1
+              maximum: 2147483647
+            - type: "null"
+        requiredTrainingIds:
+          type: array
+          uniqueItems: true
+          items: *a14
+        minimumRank:
+          anyOf:
+            - $ref: "#/components/schemas/Rank"
+            - type: "null"
+        requiredTrainings:
+          type: array
+          items:
+            type: object
+            required:
+              - id
+              - name
+              - category
+            properties:
+              id: *a14
+              name:
+                type: string
+              category:
+                anyOf:
+                  - type: object
+                    required:
+                      - name
+                    properties:
+                      name:
+                        type: string
+                  - type: "null"
+      description: A single training’s complete configuration. Prerequisite IDs and summaries are sorted by ID; this resource
+        is not paginated.

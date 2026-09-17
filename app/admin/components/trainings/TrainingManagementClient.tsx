@@ -1,6 +1,6 @@
 'use client';
 
-import { apiList } from '@/lib/api/client';
+import { apiList, apiRequest } from '@/lib/api/client';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -48,6 +48,13 @@ type Training = {
     userTrainings: number;
     trainingRequests: number;
   };
+  minimumRank: Rank | null;
+  requiredTrainings: { id: number; name: string }[];
+};
+
+type TrainingRequirements = {
+  minimumRankId: number | null;
+  requiredTrainingIds: number[];
   minimumRank: Rank | null;
   requiredTrainings: { id: number; name: string }[];
 };
@@ -374,30 +381,28 @@ export default function TrainingManagementClient({
     setTrainingModalOpen(false);
   };
 
-  // Requirements management functions
+  // Apply the returned requirements so the controls immediately show saved changes.
+  const saveRequirements = async (trainingId: number, patch: { minimumRankId?: number | null; requiredTrainingIds?: number[] }) => {
+    const { data } = await apiRequest<TrainingRequirements>(`/api/trainings/${trainingId}/requirements`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    setTrainings((current) => current.map((training) => training.id === trainingId
+      ? { ...training, minimumRank: data.minimumRank, requiredTrainings: data.requiredTrainings }
+      : training));
+  };
+
   const handleSetRankRequirement = async (trainingId: number) => {
     const rankId = selectedRankForTraining[trainingId];
     if (!rankId) return;
-
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/trainings/${trainingId}/requirements`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ minimumRankId: rankId }),
-      });
-
-      if (response.ok) {
-        showSuccess('Rank requirement set successfully');
-        await refreshTrainings();
-        setSelectedRankForTraining((prev) => ({ ...prev, [trainingId]: null }));
-      } else {
-        const data = await response.json();
-        showError(data.error || 'Failed to set rank requirement');
-      }
+      await saveRequirements(trainingId, { minimumRankId: rankId });
+      setSelectedRankForTraining((prev) => ({ ...prev, [trainingId]: null }));
+      showSuccess('Rank requirement set successfully');
     } catch (error) {
-      logClientError('Error setting rank requirement:', error);
-      showError('Error setting rank requirement');
+      showError(error instanceof Error ? error.message : 'Failed to set rank requirement');
     } finally {
       setIsSaving(false);
     }
@@ -406,19 +411,10 @@ export default function TrainingManagementClient({
   const handleRemoveRankRequirement = async (trainingId: number) => {
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/trainings/${trainingId}/requirements`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        showSuccess('Rank requirement removed successfully');
-        await refreshTrainings();
-      } else {
-        showError('Failed to remove rank requirement');
-      }
+      await saveRequirements(trainingId, { minimumRankId: null });
+      showSuccess('Rank requirement removed successfully');
     } catch (error) {
-      logClientError('Error removing rank requirement:', error);
-      showError('Error removing rank requirement');
+      showError(error instanceof Error ? error.message : 'Failed to remove rank requirement');
     } finally {
       setIsSaving(false);
     }
@@ -430,26 +426,14 @@ export default function TrainingManagementClient({
       showError('Invalid prerequisite selection');
       return;
     }
-
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/trainings/${trainingId}/prerequisites`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requiredTrainingId: prerequisiteId }),
-      });
-
-      if (response.ok) {
-        showSuccess('Prerequisite added successfully');
-        await refreshTrainings();
-        setSelectedPrerequisite((prev) => ({ ...prev, [trainingId]: null }));
-      } else {
-        const data = await response.json();
-        showError(data.error || 'Failed to add prerequisite');
-      }
+      const { data } = await apiRequest<TrainingRequirements>(`/api/trainings/${trainingId}/requirements`, { cache: 'no-store' });
+      await saveRequirements(trainingId, { requiredTrainingIds: [...new Set([...data.requiredTrainingIds, prerequisiteId])] });
+      setSelectedPrerequisite((prev) => ({ ...prev, [trainingId]: null }));
+      showSuccess('Prerequisite added successfully');
     } catch (error) {
-      logClientError('Error adding prerequisite:', error);
-      showError('Error adding prerequisite');
+      showError(error instanceof Error ? error.message : 'Failed to add prerequisite');
     } finally {
       setIsSaving(false);
     }
@@ -458,19 +442,11 @@ export default function TrainingManagementClient({
   const handleRemovePrerequisite = async (trainingId: number, prerequisiteId: number) => {
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/trainings/${trainingId}/prerequisites/${prerequisiteId}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        showSuccess('Prerequisite removed successfully');
-        await refreshTrainings();
-      } else {
-        showError('Failed to remove prerequisite');
-      }
+      const { data } = await apiRequest<TrainingRequirements>(`/api/trainings/${trainingId}/requirements`, { cache: 'no-store' });
+      await saveRequirements(trainingId, { requiredTrainingIds: data.requiredTrainingIds.filter(id => id !== prerequisiteId) });
+      showSuccess('Prerequisite removed successfully');
     } catch (error) {
-      logClientError('Error removing prerequisite:', error);
-      showError('Error removing prerequisite');
+      showError(error instanceof Error ? error.message : 'Failed to remove prerequisite');
     } finally {
       setIsSaving(false);
     }

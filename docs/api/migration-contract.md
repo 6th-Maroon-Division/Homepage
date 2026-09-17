@@ -87,6 +87,16 @@ The endpoint returns ascending-ID cursor pages, default 50/cap 100, containing o
 
 Audit only other users included in the returned page: exclude the session user and pagination lookahead rows; for bots, include every returned user. Empty and self-only results produce no read audit. Audit records contain target IDs and request context, without returned personal-data snapshots. This batch introduces no mutation operations.
 
+## Seventh migration batch: training requirements
+
+`GET` and `PATCH /api/trainings/{id}/requirements` become the shared configuration resource. They replace the former requirements POST/DELETE and separate prerequisite-add/remove routes. GET accepts any authenticated session or active bot token; PATCH requires `training:edit`. Clearing a minimum rank with `minimumRankId: null` retains the existing superadmin-only rule; active bot tokens qualify.
+
+The strict nonempty PATCH body accepts nullable positive Int32 `minimumRankId` and/or `requiredTrainingIds`, an array of unique positive Int32 IDs. Omitted fields remain unchanged. A provided prerequisite array replaces the complete set, with `[]` clearing it. The website fetches the current requirements before replacing a prerequisite set and applies the PATCH response directly to its requirements state. This also fixes stale minimum-rank/prerequisite displays after changes; refreshing the broader training list did not update that state.
+
+Both methods return `{ minimumRankId, requiredTrainingIds, minimumRank, requiredTrainings }` inside the standard envelope. The rank is a full rank DTO or null; prerequisite summaries contain `id`, `name`, and nullable `category: { name }`. Prerequisite arrays are sorted by ID. This is one configured resource, so it has no pagination.
+
+Missing referenced resources return 404, self-references return 422, and dependency cycles return 409. Cycle validation follows the proposed prerequisite edges to reject a path back to the updated training. Changes and an ID-only `training_requirements.updated` audit snapshot commit within a serializable transaction; concurrency conflicts return 409 so callers can refresh and retry. General configuration reads are not audited.
+
 ## Verification and remaining rollout
 
 Every endpoint and supported method must have tests, even once overall coverage reaches its target. Cover both authentication modes, invalid/inactive/revoked tokens, allowed/forbidden actions, ownership/hierarchy, payloads, response contracts, pagination, database mutations/rollback, audit actors/redaction, and UTC offset/daylight-saving/date boundaries. Use unit tests with Prisma test doubles plus isolated Prisma-managed local PGlite integration tests through Prisma Client. Do not use raw SQL queries or access the development database. Integration tests check actual relational behavior and transaction rollback in the local emulator; they do not establish production PostgreSQL deployment, concurrency, or performance guarantees.

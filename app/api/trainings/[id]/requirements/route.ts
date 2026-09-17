@@ -1,136 +1,52 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
-import { checkPermission } from '@/lib/auth-middleware';
-
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const { id } = await params;
-  const trainingId = Number(id);
-  if (isNaN(trainingId)) {
-    return NextResponse.json({ error: 'Invalid training ID' }, { status: 400 });
-  }
-
-  const training = await prisma.training.findUnique({
-    where: { id: trainingId },
-    include: {
-      rankRequirement: {
-        include: {
-          minimumRank: true,
-        },
-      },
-      requiresTrainings: {
-        include: {
-          requiredTraining: {
-            select: {
-              id: true,
-              name: true,
-              category: { select: { name: true } },
-            },
-          },
-        },
-      },
-    },
+import { handleApiRequest } from '@/lib/api/handler';
+import { apiError, apiSuccess } from '@/lib/api/response';
+import { readJsonBody } from '@/lib/api/request';
+import { parsePositiveId } from '@/lib/api/validation';
+import { hasApiPermission } from '@/lib/api/permissions';
+import { writeApiAudit } from '@/lib/api/audit';
+import { parseTrainingRequirements, introducesTrainingCycle, readTrainingRequirements, requirementsSnapshot, requirementsDatabaseError } from '@/lib/api/training-requirements';
+type Context = { params: Promise<{ id: string }> };
+export async function GET(request: Request, context: Context) {
+  return handleApiRequest(request, undefined, async () => {
+    const id = parsePositiveId((await context.params).id);
+    if (!id || id > 2147483647) return apiError(400, 'invalid_request', 'Invalid training id.');
+    const requirements = await readTrainingRequirements(prisma, id);
+    if (!requirements) return apiError(404, 'not_found', 'Training not found.');
+    return apiSuccess(requirements);
   });
-
-  if (!training) {
-    return NextResponse.json({ error: 'Training not found' }, { status: 404 });
-  }
-
-  const requirements = {
-    minimumRank: training.rankRequirement?.minimumRank || null,
-    requiredTrainings: training.requiresTrainings.map((r) => r.requiredTraining),
-  };
-
-  return NextResponse.json({ requirements });
 }
-
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  
-  const hasPermission = await checkPermission(session.user.id, 'training:edit');
-  if (!hasPermission) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  const { id } = await params;
-  const trainingId = Number(id);
-  if (isNaN(trainingId)) {
-    return NextResponse.json({ error: 'Invalid training ID' }, { status: 400 });
-  }
-
-  const { minimumRankId } = await request.json();
-  if (!minimumRankId || isNaN(Number(minimumRankId))) {
-    return NextResponse.json({ error: 'minimumRankId required' }, { status: 400 });
-  }
-
-  const training = await prisma.training.findUnique({ where: { id: trainingId } });
-  if (!training) {
-    return NextResponse.json({ error: 'Training not found' }, { status: 404 });
-  }
-
-  const rank = await prisma.rank.findUnique({ where: { id: Number(minimumRankId) } });
-  if (!rank) {
-    return NextResponse.json({ error: 'Rank not found' }, { status: 404 });
-  }
-
-  const requirement = await prisma.trainingRankRequirement.upsert({
-    where: { trainingId },
-    create: {
-      trainingId,
-      minimumRankId: Number(minimumRankId),
-    },
-    update: {
-      minimumRankId: Number(minimumRankId),
-    },
-    include: {
-      minimumRank: true,
-    },
+export async function PATCH(request: Request, context: Context) {
+  return handleApiRequest(request, 'training:edit', async (principal, audit) => {
+    const id = parsePositiveId((await context.params).id);
+    if (!id || id > 2147483647) return apiError(400, 'invalid_request', 'Invalid training id.');
+    const parsed = parseTrainingRequirements(await readJsonBody(request));
+    if (parsed.error) return parsed.error;
+    if (parsed.data.minimumRankId === null && !hasApiPermission(principal.permissions, 'system:super_admin')) return apiError(403, 'forbidden', 'Only superadmins can clear minimum rank requirements.');
+    try {
+      return await prisma.$transaction(async tx => {
+        const before = await readTrainingRequirements(tx, id);
+        if (!before) return apiError(404, 'not_found', 'Training not found.');
+        if (parsed.data.minimumRankId !== undefined && parsed.data.minimumRankId !== null && !await tx.rank.findUnique({ where: { id: parsed.data.minimumRankId }, select: { id: true } })) return apiError(404, 'not_found', 'Rank not found.');
+        const requiredIds = parsed.data.requiredTrainingIds;
+        if (requiredIds !== undefined) {
+          if (requiredIds.includes(id)) return apiError(422, 'validation_failed', 'Training cannot require itself.');
+          if (requiredIds.length && await tx.training.count({ where: { id: { in: requiredIds } } }) !== requiredIds.length) return apiError(404, 'not_found', 'One or more required trainings do not exist.');
+          if (requiredIds.length) {
+            const edges = await tx.trainingTrainingRequirement.findMany({ select: { trainingId: true, requiredTrainingId: true } });
+            if (introducesTrainingCycle(id, requiredIds, edges)) return apiError(409, 'conflict', 'These prerequisites would create a circular dependency.');
+          }
+        }
+        if (parsed.data.minimumRankId === null) await tx.trainingRankRequirement.deleteMany({ where: { trainingId: id } });
+        else if (parsed.data.minimumRankId !== undefined) await tx.trainingRankRequirement.upsert({ where: { trainingId: id }, create: { trainingId: id, minimumRankId: parsed.data.minimumRankId }, update: { minimumRankId: parsed.data.minimumRankId } });
+        if (requiredIds !== undefined) {
+          await tx.trainingTrainingRequirement.deleteMany({ where: { trainingId: id } });
+          if (requiredIds.length) await tx.trainingTrainingRequirement.createMany({ data: requiredIds.map(requiredTrainingId => ({ trainingId: id, requiredTrainingId })) });
+        }
+        const after = (await readTrainingRequirements(tx, id))!;
+        await writeApiAudit(tx, audit, { action: 'training_requirements.updated', resource: 'training_requirements', resourceId: String(id), outcome: 'success', before: requirementsSnapshot(before), after: requirementsSnapshot(after) });
+        return apiSuccess(after);
+      }, { isolationLevel: 'Serializable' });
+    } catch (error) { return requirementsDatabaseError(error); }
   });
-
-  return NextResponse.json({ requirement });
-}
-
-export async function DELETE(
-  _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const hasPermission = await checkPermission(session.user.id, 'system:super_admin');
-  if (!hasPermission) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  const { id } = await params;
-  const trainingId = Number(id);
-  if (isNaN(trainingId)) {
-    return NextResponse.json({ error: 'Invalid training ID' }, { status: 400 });
-  }
-
-  const existing = await prisma.trainingRankRequirement.findUnique({ where: { trainingId } });
-  if (!existing) {
-    return NextResponse.json({ error: 'No rank requirement found' }, { status: 404 });
-  }
-
-  await prisma.trainingRankRequirement.delete({ where: { trainingId } });
-
-  return NextResponse.json({ success: true });
 }

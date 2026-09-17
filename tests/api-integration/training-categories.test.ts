@@ -27,8 +27,11 @@ test('category CRUD, swaps, pagination, detachment and audits use real Prisma tr
   const second = (await (await POST(request('POST', { name: 'Integration category B' }))).json()).data;
   expect(second.orderIndex).toBe(first.orderIndex + 1);
   expect(first.createdAt).toMatch(/Z$/);
-  const page = await (await GET(request('GET', undefined, undefined, '?limit=1'))).json();
+  // Other integration files may already have created category fixtures.
+  const startCursor = first.id > 1 ? `&cursor=${first.id - 1}` : '';
+  const page = await (await GET(request('GET', undefined, undefined, `?limit=1${startCursor}`))).json();
   expect(page.data).toHaveLength(1);
+  expect(page.data[0].id).toBe(first.id);
   expect(page.meta.nextCursor).toBe(String(first.id));
   const next = await (await GET(request('GET', undefined, undefined, `?limit=1&cursor=${first.id}`))).json();
   expect(next.data[0].id).toBe(second.id);
