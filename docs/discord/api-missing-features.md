@@ -57,7 +57,7 @@ The routes referenced in older bot documentation are now available:
 
 - `GET /bot/orbats/{id}/signups`
 - `GET /bot/users/discord/{discordId}/signups`
-- `GET /bot/ranks/discord-roles`
+- `GET /ranks/discord-roles`
 - shared user/bot notification-preference routes (`/users/{id}/notification-preferences`)
 - bot availability-note routes
 - a bot-authenticated applied-rank event stream
@@ -272,38 +272,43 @@ model RankDiscordRole {
 
 Snowflakes remain strings.
 
-### Proposed administration endpoints
+### Canonical shared endpoints
 
 ```http
-GET    /admin/ranks/discord-roles?guildId={guildId}
-PUT    /admin/ranks/{rankId}/discord-role
-DELETE /admin/ranks/{rankId}/discord-role?guildId={guildId}
+GET    /ranks/discord-roles?guildId={guildId}
+PATCH  /ranks/{id}/discord-role?guildId={guildId}
+DELETE /ranks/{id}/discord-role?guildId={guildId}
 ```
 
-Administration requires an appropriate rank-configuration permission. The UI should validate snowflake format but cannot prove Discord role existence without Discord access.
+All methods require `rank:edit` for session users; active database bot tokens are superadmin. PATCH accepts `discordRoleId` and/or `isActive`, with `discordRoleId` required when creating a mapping. The UI validates snowflake format but cannot prove Discord role existence without Discord access. Mutations are audited in their database transaction.
 
-### Proposed bot endpoint
+Bot synchronization uses the same paginated collection, filtering active mappings:
 
 ```http
-GET /bot/ranks/discord-roles?guildId={guildId}
+GET /ranks/discord-roles?guildId={guildId}&activeOnly=true&limit=100
 ```
 
-Example response:
+Follow `meta.nextCursor` until null before reconciling the complete guild mapping set. `activeOnly` defaults to false for administration. Responses use the shared envelope, with string Discord IDs and numeric platform IDs:
 
 ```json
 {
-  "guildId": "111111111111111111",
-  "version": "2026-07-29T10:00:00.000Z",
-  "mappings": [
+  "data": [
     {
+      "id": 10,
       "rankId": 2,
-      "rankName": "Private",
-      "rankAbbreviation": "Pvt",
-      "discordRoleId": "222222222222222222"
+      "guildId": "111111111111111111",
+      "discordRoleId": "222222222222222222",
+      "isActive": true,
+      "createdAt": "2026-07-29T10:00:00.000Z",
+      "updatedAt": "2026-07-29T10:00:00.000Z",
+      "rank": { "id": 2, "name": "Private", "abbreviation": "Pvt", "orderIndex": 2 }
     }
-  ]
+  ],
+  "meta": { "limit": 100, "nextCursor": null }
 }
 ```
+
+The former admin/bot URLs and the proposed version/mappings envelope are superseded by this contract.
 
 The bot caches successful results. An empty result and an API failure must be distinguishable so an outage cannot cause destructive role removal.
 

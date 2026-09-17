@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
+import { apiList, apiRequest } from '@/lib/api/client';
 import { useToast } from '@/app/components/ui/ToastContainer';
 
 type Rank = {
@@ -115,10 +116,12 @@ export default function RankConfigClient() {
 
   const loadDiscordRoles = async () => {
     if (!/^\d{17,20}$/.test(discordGuildId)) return showToast('Enter a valid Discord guild ID', 'error');
-    const response = await fetch(`/api/admin/ranks/discord-roles?guildId=${encodeURIComponent(discordGuildId)}`);
-    if (!response.ok) return showToast('Failed to load Discord role mappings', 'error');
-    const data = await response.json();
-    setDiscordRoles(Object.fromEntries((data.mappings ?? []).map((item: { rankId: number; discordRoleId: string }) => [item.rankId, item.discordRoleId])));
+    try {
+      const mappings = await apiList<{ rankId: number; discordRoleId: string }>(`/api/ranks/discord-roles?guildId=${encodeURIComponent(discordGuildId)}`);
+      setDiscordRoles(Object.fromEntries(mappings.map((item) => [item.rankId, item.discordRoleId])));
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to load Discord role mappings', 'error');
+    }
   };
 
   const saveDiscordRole = async (rankId: number) => {
@@ -126,18 +129,26 @@ export default function RankConfigClient() {
     if (!/^\d{17,20}$/.test(discordGuildId) || !/^\d{17,20}$/.test(discordRoleId ?? '')) {
       return showToast('Guild and role IDs must be Discord snowflakes', 'error');
     }
-    const response = await fetch(`/api/admin/ranks/${rankId}/discord-role`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ guildId: discordGuildId, discordRoleId }),
-    });
-    showToast(response.ok ? 'Discord role mapping saved' : 'Failed to save Discord role mapping', response.ok ? 'success' : 'error');
+    try {
+      await apiRequest(`/api/ranks/${rankId}/discord-role?guildId=${encodeURIComponent(discordGuildId)}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ discordRoleId }),
+      });
+      showToast('Discord role mapping saved', 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to save Discord role mapping', 'error');
+    }
   };
 
   const deleteDiscordRole = async (rankId: number) => {
     if (!/^\d{17,20}$/.test(discordGuildId)) return showToast('Enter a valid Discord guild ID', 'error');
-    const response = await fetch(`/api/admin/ranks/${rankId}/discord-role?guildId=${encodeURIComponent(discordGuildId)}`, { method: 'DELETE' });
-    if (response.ok) setDiscordRoles((current) => { const next = { ...current }; delete next[rankId]; return next; });
-    showToast(response.ok ? 'Discord role mapping removed' : 'Failed to remove Discord role mapping', response.ok ? 'success' : 'error');
+    try {
+      await apiRequest(`/api/ranks/${rankId}/discord-role?guildId=${encodeURIComponent(discordGuildId)}`, { method: 'DELETE' });
+      setDiscordRoles((current) => { const next = { ...current }; delete next[rankId]; return next; });
+      showToast('Discord role mapping removed', 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to remove Discord role mapping', 'error');
+    }
   };
 
   const handleDragStart = (index: number) => {

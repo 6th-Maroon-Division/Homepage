@@ -23,7 +23,7 @@ Run that suite with the enforced coverage threshold:
 npm run test:api:coverage
 ```
 
-Reports are written to `coverage/api/`: HTML (`index.html`), LCOV (`lcov.info`), and JSON summary (`coverage-summary.json`), plus console output. The threshold currently covers `lib/api/`, notification-preference helpers, and the canonical migrated handlers. The first batch covered bot tokens, notification preferences, and audit logs; the second adds radio frequencies, subslot definitions, and training categories. Consult [vitest.config.mts](../../vitest.config.mts) for the exact scope. Expand this scope with each migration batch; meeting the current threshold does not establish 80% coverage of all endpoints.
+Reports are written to `coverage/api/`: HTML (`index.html`), LCOV (`lcov.info`), and JSON summary (`coverage-summary.json`), plus console output. The threshold currently covers `lib/api/`, notification-preference helpers, and the canonical migrated handlers. The first batch covered bot tokens, notification preferences, and audit logs; the second adds radio frequencies, subslot definitions, and training categories; the third consolidates Discord rank mappings. Consult [vitest.config.mts](../../vitest.config.mts) for the exact scope. Expand this scope with each migration batch; meeting the current threshold does not establish 80% coverage of all endpoints.
 
 Run isolated database integration tests:
 
@@ -32,6 +32,8 @@ npm run test:api:integration
 ```
 
 The runner starts a fresh, stateless Prisma-managed PGlite database on automatically assigned local ports, pushes the Prisma schema to that database, generates the client, runs `tests/api-integration/`, and closes the server. It overrides the child processes’ database URL with the temporary database URL. Tests use Prisma Client, with no raw SQL queries and no development database access. No PostgreSQL service or test database URL needs to be supplied. Local loopback ports must be available.
+
+The integration setup supplies a real Prisma Client with the PostgreSQL adapter configured with `max: 1` and `maxUses: 1`. Retiring a connection after use avoids reusing a PGlite wire-transport socket after an intentionally triggered constraint error. This adjustment is test-only: it does not mock database results, bypass constraints, or change the production connection pool. The runner uses the public `startPrismaDevServer` API.
 
 The integration-only Prisma PostgreSQL adapter uses one connection and retires it after each checkout (`max: 1`, `maxUses: 1`). This avoids PGlite socket reuse problems after constraint failures; each interactive transaction still holds one real connection through commit or rollback. Application connection pooling is unchanged, and no model or query is mocked. The runner preserves a failing exit status after database cleanup.
 

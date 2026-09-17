@@ -119,29 +119,6 @@ paths:
       responses:
         "200":
           description: Admin ORBAT list
-  /admin/ranks/{rankId}/discord-role:
-    put:
-      tags:
-        - TODO
-      summary: TODO document PUT /admin/ranks/{rankId}/discord-role
-      responses:
-        "200":
-          description: Success
-    delete:
-      tags:
-        - TODO
-      summary: TODO document DELETE /admin/ranks/{rankId}/discord-role
-      responses:
-        "200":
-          description: Success
-  /admin/ranks/discord-roles:
-    get:
-      tags:
-        - TODO
-      summary: TODO document GET /admin/ranks/discord-roles
-      responses:
-        "200":
-          description: Success
   /admin/users/bulk-interview-toggle:
     post:
       tags:
@@ -1064,24 +1041,6 @@ paths:
           description: Unauthorized - invalid or missing bot API token
         "500":
           description: Internal server error
-  /bot/ranks/discord-roles:
-    get:
-      tags:
-        - Bot
-        - Ranks
-      summary: List active guild-specific rank-role mappings
-      security:
-        - apiKey: []
-      parameters:
-        - name: guildId
-          in: query
-          required: true
-          schema:
-            type: string
-            pattern: ^[0-9]{17,20}$
-      responses:
-        "200":
-          description: Success
   /bot/signups:
     post:
       tags:
@@ -4372,6 +4331,279 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiFailure"
+  /ranks/discord-roles:
+    get:
+      tags:
+        - Ranks
+      summary: List Discord rank-role mappings
+      description: Requires rank:edit for session users. Active database bot tokens act as superadmin. Returns mappings for
+        one guild, ascending by mapping ID. Bot synchronization should set activeOnly=true and follow every page. This
+        is general rank configuration, so reads are not audited.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: guildId
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: ^\d{17,20}$
+            description: Discord snowflake represented as a 17–20 digit string.
+        - name: activeOnly
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+            default: "false"
+          description: true limits the response to active mappings; false includes all.
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+          description: Values above 100 are clamped to 100.
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            pattern: ^[0-9]+$
+          description: Positive ID from meta.nextCursor; returns greater IDs in ascending order. IDs above 2147483647 are rejected.
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RankDiscordRoleMapping"
+                  meta:
+                    type: object
+                    required:
+                      - limit
+                      - nextCursor
+                    properties:
+                      limit:
+                        type: integer
+                        minimum: 1
+                        maximum: 100
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+  /ranks/{id}/discord-role:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+      - name: guildId
+        in: query
+        required: true
+        schema:
+          type: string
+          pattern: ^\d{17,20}$
+          description: Discord snowflake represented as a 17–20 digit string.
+    patch:
+      tags:
+        - Ranks
+      summary: Create or partially update a Discord rank-role mapping
+      description: Requires rank:edit for session users. Active database bot tokens act as superadmin. Guild identity belongs
+        in the required query parameter, not the body. Missing rank returns 404; creation without discordRoleId returns
+        422; conflicting rank/guild creation returns 409. Successful mutation and audit record commit together. Returns
+        200 for both creation and update.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RankDiscordRolePatchInput"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/RankDiscordRoleMapping"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+    delete:
+      tags:
+        - Ranks
+      summary: Delete a Discord rank-role mapping
+      description: Requires rank:edit for session users. Active database bot tokens act as superadmin. Missing mapping returns
+        404. Deletion and audit record commit together.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: "null"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
 components:
   securitySchemes:
     bearerAuth:
@@ -5357,3 +5589,59 @@ components:
               minimum: 1
               maximum: 2147483647
               description: Another existing category; cannot be this category.
+    RankDiscordRoleMapping:
+      type: object
+      required:
+        - id
+        - rankId
+        - guildId
+        - discordRoleId
+        - isActive
+        - createdAt
+        - updatedAt
+        - rank
+      properties:
+        id:
+          type: integer
+        rankId:
+          type: integer
+        guildId: &a11
+          type: string
+          pattern: ^\d{17,20}$
+          description: Discord snowflake represented as a 17–20 digit string.
+        discordRoleId: *a11
+        isActive:
+          type: boolean
+        createdAt:
+          $ref: "#/components/schemas/UtcTimestamp"
+        updatedAt:
+          $ref: "#/components/schemas/UtcTimestamp"
+        rank:
+          type: object
+          required:
+            - id
+            - name
+            - abbreviation
+            - orderIndex
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            abbreviation:
+              type: string
+            orderIndex:
+              type: integer
+    RankDiscordRolePatchInput:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        discordRoleId:
+          type: string
+          pattern: ^\d{17,20}$
+          description: Discord snowflake represented as a 17–20 digit string.
+        isActive:
+          type: boolean
+      description: At least one field is required. Creating a mapping requires discordRoleId; isActive defaults to true on
+        creation. Omitted fields on existing mappings are preserved.

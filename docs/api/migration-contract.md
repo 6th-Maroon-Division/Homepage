@@ -41,6 +41,17 @@ This batch migrates radio frequencies, subslot definitions, and training categor
 
 Active bot tokens retain superadmin access. Collection GETs use ascending ID cursor pagination, default 50 and maximum 100, with `meta.limit` and a lookahead-backed `meta.nextCursor`. Website consumers fetch all pages and apply domain-specific display ordering. General catalog reads do not create audit records; mutations and denied requests do. Successful mutation audits share the database transaction. Unknown payload fields are rejected. Subslot definitions use plural prerequisite arrays only; singular legacy input/output aliases are removed. Linked ORBAT slots prevent role deletion with 409. Category PATCH supports either a regular partial update or an exclusive `swapWithCategoryId` operation; swaps audit both affected categories. Category deletion detaches linked trainings in the same transaction. Radio deletion removes related ORBAT frequency assignments. Refer to OpenAPI for each resource’s exact payload and permission contract.
 
+## Third migration batch: Discord rank mappings
+
+Consolidate website administration and bot rank-role lookup into shared business routes. All methods require `rank:edit` for users or an active superadmin bot token.
+
+| Canonical endpoint | Methods | Replaces |
+|---|---|---|
+| `/api/ranks/discord-roles` | GET | `/api/admin/ranks/discord-roles` and `/api/bot/ranks/discord-roles` |
+| `/api/ranks/{id}/discord-role` | PATCH, DELETE | `/api/admin/ranks/{rankId}/discord-role`, including its PUT method |
+
+Every request requires a string Discord `guildId` query parameter. GET supports `activeOnly=true` or `false` (default false), ascending-ID cursor pagination, and the shared `{ data, meta }` envelope. Mapping records include numeric mapping/rank IDs, string guild/Discord-role IDs, activity state, UTC timestamps, and rank metadata. PATCH accepts partial `discordRoleId`/`isActive` fields; creating a mapping requires `discordRoleId`. The guild ID is supplied only in the query, not duplicated in the body. Mutations and audit records commit together. These rank-configuration reads contain no user data and do not require read auditing.
+
 ## Verification and remaining rollout
 
 Every endpoint and supported method must have tests, even once overall coverage reaches its target. Cover both authentication modes, invalid/inactive/revoked tokens, allowed/forbidden actions, ownership/hierarchy, payloads, response contracts, pagination, database mutations/rollback, audit actors/redaction, and UTC offset/daylight-saving/date boundaries. Use unit tests with Prisma test doubles plus isolated Prisma-managed local PGlite integration tests through Prisma Client. Do not use raw SQL queries or access the development database. Integration tests check actual relational behavior and transaction rollback in the local emulator; they do not establish production PostgreSQL deployment, concurrency, or performance guarantees.
