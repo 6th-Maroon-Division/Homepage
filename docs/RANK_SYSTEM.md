@@ -73,9 +73,10 @@ These catalog routes use the [canonical API contract](./api/migration-contract.m
 - `POST /api/ranks/migrate/apply`
 
 ### Rank Transition Training Requirements
-- `GET /api/ranks/[id]/transitions`
-- `POST /api/ranks/[id]/transitions`
-- `DELETE /api/ranks/[id]/transitions/[trainingId]`
+- `GET /api/ranks/[id]/requirements`
+- `PATCH /api/ranks/[id]/requirements`
+
+Both require current `rank:edit` permission or an active superadmin bot token. GET returns the ID-sorted `{ requiredTrainingIds, requiredTrainings }` configuration in the shared envelope, without pagination. PATCH replaces the complete set using `{ requiredTrainingIds: [...] }`; an empty array clears it. Updates and ID-only audit records commit atomically with serializable isolation. Missing references return 404; conflicts return 409 for refresh/retry. Existing empty configurations are read without writes. Internal promotion eligibility continues to use the same requirement table even though no website API callers were found for the old transition routes.
 
 ### User-Facing Rank Data
 - `GET /api/users/[id]/rank`

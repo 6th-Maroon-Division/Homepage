@@ -112,6 +112,14 @@ Creation requires a trimmed nonempty name. Strict editable fields are `name`, nu
 
 Mutations and audit records commit together, with description and qualification-note contents redacted in audit snapshots. Existing sessions or requests prevent deletion with 409. Existing cascades of assigned user-training records remain, with affected IDs and target user IDs captured in the same audit transaction and no personal notes copied. Successful deletion returns `data: null`; missing trainings return 404.
 
+## Ninth migration batch: rank training requirements
+
+`GET` and `PATCH /api/ranks/{id}/requirements` replace rank-transition GET/POST and per-training DELETE routes. Both methods require current `rank:edit` permission or an active superadmin bot token. The configuration DTO is `{ requiredTrainingIds, requiredTrainings }`, with ID-sorted prerequisite summaries containing `id`, `name`, and nullable `category: { name }`. This single resource is not paginated.
+
+GET returns 404 for a missing rank; an existing rank with no requirements returns empty arrays without inserting a row. PATCH requires exactly `{ requiredTrainingIds: [...] }`, with unique positive Int32 IDs. The supplied array replaces the complete set, and `[]` clears it. Missing references return 404, invalid payloads 422, and malformed path IDs 400.
+
+Replacement and an ID-only `rank_requirements.updated` audit record commit in one serializable transaction. Conflicts return 409 for refresh/retry. General configuration reads are not audited. No website API callers were found for the replaced routes, but internal promotion eligibility still reads the existing requirement table; this migration does not remove that feature or its data.
+
 ## Verification and remaining rollout
 
 Every endpoint and supported method must have tests, even once overall coverage reaches its target. Cover both authentication modes, invalid/inactive/revoked tokens, allowed/forbidden actions, ownership/hierarchy, payloads, response contracts, pagination, database mutations/rollback, audit actors/redaction, and UTC offset/daylight-saving/date boundaries. Use unit tests with Prisma test doubles plus isolated Prisma-managed local PGlite integration tests through Prisma Client. Do not use raw SQL queries or access the development database. Integration tests check actual relational behavior and transaction rollback in the local emulator; they do not establish production PostgreSQL deployment, concurrency, or performance guarantees.

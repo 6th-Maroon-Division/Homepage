@@ -2391,35 +2391,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiFailure"
-  /ranks/{id}/transitions:
-    get:
-      tags:
-        - Ranks
-      summary: Get rank transition requirements
-      responses:
-        "200":
-          description: Rank transition requirements
-    post:
-      tags:
-        - Ranks
-      summary: Set rank transition requirements
-      security:
-        - bearerAuth:
-            - ranks:manage
-      responses:
-        "200":
-          description: Transition requirements set
-  /ranks/{id}/transitions/{trainingId}:
-    delete:
-      tags:
-        - Ranks
-      summary: Remove training requirement from rank transition
-      security:
-        - bearerAuth:
-            - ranks:manage
-      responses:
-        "200":
-          description: Training requirement removed
   /ranks/auto-rankup:
     post:
       tags:
@@ -5648,6 +5619,159 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiFailure"
+  /ranks/{id}/requirements:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+    get:
+      tags:
+        - Ranks
+      summary: Get a rank’s training requirements
+      description: Requires rank:edit for session users. Active database bot tokens act as superadmin. Missing rank returns
+        404. No write is performed when requirements are absent. General configuration reads are not audited.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/RankRequirements"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+    patch:
+      tags:
+        - Ranks
+      summary: Replace a rank’s training requirements
+      description: Requires rank:edit for session users. Active database bot tokens act as superadmin. Missing rank or
+        training references return 404; malformed payloads return 422. Requirement replacement and ID-only
+        rank_requirements.updated audit records commit in a serializable transaction. Transaction or reference conflicts
+        return 409; reload and retry. Replaces the old transitions add/remove operations.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RankRequirementsPatchInput"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/RankRequirements"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
 components:
   securitySchemes:
     bearerAuth:
@@ -6985,3 +7109,54 @@ components:
                   - type: "null"
       description: A single training’s complete configuration. Prerequisite IDs and summaries are sorted by ID; this resource
         is not paginated.
+    RankRequirementsPatchInput:
+      type: object
+      additionalProperties: false
+      required:
+        - requiredTrainingIds
+      properties:
+        requiredTrainingIds:
+          type: array
+          uniqueItems: true
+          items:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+      description: Replaces the complete required-training set. An empty array clears the requirements; duplicate IDs are rejected.
+    RankRequirements:
+      type: object
+      additionalProperties: false
+      required:
+        - requiredTrainingIds
+        - requiredTrainings
+      properties:
+        requiredTrainingIds:
+          type: array
+          uniqueItems: true
+          items: &a16
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+        requiredTrainings:
+          type: array
+          items:
+            type: object
+            required:
+              - id
+              - name
+              - category
+            properties:
+              id: *a16
+              name:
+                type: string
+              category:
+                anyOf:
+                  - type: object
+                    required:
+                      - name
+                    properties:
+                      name:
+                        type: string
+                  - type: "null"
+      description: Single rank requirement configuration, sorted by training ID without pagination. An existing rank with no
+        requirements returns empty arrays.
