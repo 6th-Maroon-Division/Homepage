@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
+import { apiList } from '@/lib/api/client';
 import TrainingSessionAttendeeManager from './TrainingSessionAttendeeManager';
 import DualRingTimePicker from '@/app/components/ui/DualRingTimePicker';
 
@@ -521,15 +522,8 @@ export default function TrainingSessionManagement({
     setIsLoadingStaff(true);
     setStaffError('');
     try {
-      const response = await fetch('/api/training-staff', { cache: 'no-store', signal });
-      const payload = await readJson(response);
-      if (!response.ok) {
-        throw new Error(errorMessage(payload, 'Unable to load eligible trainers.'));
-      }
-      if (!payload || typeof payload !== 'object' || !('staff' in payload) || !Array.isArray(payload.staff)) {
-        throw new Error('The training staff response was invalid.');
-      }
-      setStaff((payload.staff as StaffUser[]).sort((left, right) => staffLabel(left).localeCompare(staffLabel(right))));
+      const rows = await apiList<StaffUser>('/api/training-users?staffOnly=true', { cache: 'no-store', signal });
+      if (!signal?.aborted) setStaff(rows.sort((left, right) => staffLabel(left).localeCompare(staffLabel(right)) || left.id - right.id));
     } catch (loadError) {
       if (loadError instanceof DOMException && loadError.name === 'AbortError') return;
       setStaffError(loadError instanceof Error ? loadError.message : 'Unable to load eligible trainers.');

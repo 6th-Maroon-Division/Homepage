@@ -3535,22 +3535,115 @@ paths:
       responses:
         "200":
           description: Success
-  /training-staff:
-    get:
-      tags:
-        - TODO
-      summary: TODO document GET /training-staff
-      responses:
-        "200":
-          description: Success
   /training-users:
     get:
       tags:
-        - TODO
-      summary: TODO document GET /training-users
+        - Training
+      summary: List users eligible for training workflows
+      description: Requires a positive training:approve_request or training:mark grant, or superadmin for session users.
+        Active database bot tokens act as superadmin. Returns users in ascending ID order. staffOnly=true restricts
+        results to users eligible as training staff; false includes all users and marks each with isTrainer. Audits only
+        other-user IDs included in the returned page; bot reads audit all returned user IDs. Self-only and empty pages
+        are not audited, and lookahead rows are excluded. No returned names or avatar data are copied into audit
+        snapshots.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: staffOnly
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+            default: "false"
+          description: Optional strict boolean string; other values return 400.
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+          description: Values above 100 are clamped to 100.
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            pattern: ^[0-9]+$
+          description: Positive 32-bit user ID from meta.nextCursor; returns users with greater IDs in ascending order.
       responses:
         "200":
           description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TrainingUserLookup"
+                  meta:
+                    type: object
+                    required:
+                      - limit
+                      - nextCursor
+                    properties:
+                      limit:
+                        type: integer
+                        minimum: 1
+                        maximum: 100
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
   /trainings:
     get:
       tags:
@@ -6308,3 +6401,27 @@ components:
                 type: integer
                 minimum: 0
                 maximum: 2147483647
+    TrainingUserLookup:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - username
+        - avatarUrl
+        - isTrainer
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        username:
+          type:
+            - string
+            - "null"
+        avatarUrl:
+          type:
+            - string
+            - "null"
+        isTrainer:
+          type: boolean
+          description: True when the user has a positive training:approve_request, training:mark, or system:super_admin grant.

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
+import { apiList } from '@/lib/api/client';
 
 type AttendanceStatus = 'scheduled' | 'attended' | 'completed' | 'absent' | 'cancelled';
 
@@ -98,10 +99,13 @@ export default function TrainingSessionAttendeeManager({
   }, [loadSession]);
 
   useEffect(() => {
-    void fetch('/api/training-users', { cache: 'no-store' })
-      .then(async (response) => response.ok ? response.json() : { users: [] })
-      .then((payload) => setTrainingUsers(Array.isArray(payload.users) ? payload.users : []))
-      .catch(() => setTrainingUsers([]));
+    const controller = new AbortController();
+    void apiList<TrainingUser>('/api/training-users', { cache: 'no-store', signal: controller.signal })
+      .then((rows) => {
+        if (!controller.signal.aborted) setTrainingUsers(rows.sort((left, right) => (left.username || '').localeCompare(right.username || '') || left.id - right.id));
+      })
+      .catch(() => { if (!controller.signal.aborted) setTrainingUsers([]); });
+    return () => controller.abort();
   }, []);
 
   const availableRequests = useMemo(() => {

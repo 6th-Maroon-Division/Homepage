@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
+import { apiList } from '@/lib/api/client';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import TrainingScheduleSummary from './TrainingScheduleSummary';
 import DualRingTimePicker from '@/app/components/ui/DualRingTimePicker';
@@ -61,32 +62,15 @@ export default function TrainingSchedulePanel({
   }, [defaultDurationMinutes, session]);
 
   useEffect(() => {
-    let active = true;
-    void fetch('/api/training-staff', { cache: 'no-store' })
-      .then(async (response) => {
-        if (!response.ok) return [];
-        const payload = await response.json();
-        return Array.isArray(payload) ? payload : Array.isArray(payload.staff) ? payload.staff : [];
-      })
-      .then((rows: unknown[]) => {
-        if (!active) return;
-        setStaff(
-          rows
-            .map((row) => row as Partial<TrainingRequestUser>)
-            .filter((row) => typeof row.id === 'number')
-            .map((row) => ({
-              id: row.id as number,
-              username: typeof row.username === 'string' ? row.username : null,
-              avatarUrl: typeof row.avatarUrl === 'string' ? row.avatarUrl : null,
-            }))
-            .sort((left, right) => (left.username || '').localeCompare(right.username || '')),
-        );
+    const controller = new AbortController();
+    void apiList<TrainingRequestUser>('/api/training-users?staffOnly=true', { cache: 'no-store', signal: controller.signal })
+      .then((rows) => {
+        if (controller.signal.aborted) return;
+        setStaff(rows.sort((left, right) => (left.username || '').localeCompare(right.username || '') || left.id - right.id));
       })
       .catch(() => undefined);
 
-    return () => {
-      active = false;
-    };
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {

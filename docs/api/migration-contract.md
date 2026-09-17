@@ -79,6 +79,14 @@ Creation requires trimmed nonempty `name`/`abbreviation` and nonnegative Int32 `
 
 Reordering accepts `{ ranks: [{ id, orderIndex }] }` with a nonempty array, unique positive Int32 IDs, and nonnegative Int32 order values. All referenced ranks must exist before changes commit. The mutation and per-rank audit records are atomic; missing IDs return 404 without partial changes. The response is `data: null`.
 
+## Sixth migration batch: training user lookup
+
+`GET /api/training-users` replaces the separate `/api/training-staff` lookup with a strict `staffOnly=true|false` filter (default false). Both user sessions and active bot tokens use the shared endpoint. Users require a positive `training:approve_request` or `training:mark` grant, or superadmin; bot tokens retain superadmin access. The same positive permission rules determine training staff eligibility.
+
+The endpoint returns ascending-ID cursor pages, default 50/cap 100, containing only `id`, nullable `username`, nullable `avatarUrl`, and boolean `isTrainer`. The website loads all pages and sorts names for display. `staffOnly=true` returns staff candidates; false returns all user candidates with their staff flag. Invalid filter values return 400.
+
+Audit only other users included in the returned page: exclude the session user and pagination lookahead rows; for bots, include every returned user. Empty and self-only results produce no read audit. Audit records contain target IDs and request context, without returned personal-data snapshots. This batch introduces no mutation operations.
+
 ## Verification and remaining rollout
 
 Every endpoint and supported method must have tests, even once overall coverage reaches its target. Cover both authentication modes, invalid/inactive/revoked tokens, allowed/forbidden actions, ownership/hierarchy, payloads, response contracts, pagination, database mutations/rollback, audit actors/redaction, and UTC offset/daylight-saving/date boundaries. Use unit tests with Prisma test doubles plus isolated Prisma-managed local PGlite integration tests through Prisma Client. Do not use raw SQL queries or access the development database. Integration tests check actual relational behavior and transaction rollback in the local emulator; they do not establish production PostgreSQL deployment, concurrency, or performance guarantees.
