@@ -25,7 +25,7 @@ beforeAll(async () => {
   if (!process.env.API_INTEGRATION_DATABASE_URL || process.env.DATABASE_URL !== process.env.API_INTEGRATION_DATABASE_URL) {
     throw new Error('Run integration tests through scripts/test-api-integration.mjs with its isolated Prisma database.');
   }
-  const permission = await prisma.permission.create({ data: { key: 'system:super_admin' } });
+  const permission = await prisma.permission.upsert({ where: { key: 'system:super_admin' }, update: {}, create: { key: 'system:super_admin' } });
   const admin = await prisma.user.create({ data: { username: 'Integration administrator', userPermissions: { create: { permissionId: permission.id, value: 255 } } } });
   const user = await prisma.user.create({ data: { username: 'Integration member' } });
   adminId = admin.id;

@@ -1837,16 +1837,107 @@ paths:
       tags:
         - Radio Frequencies
       summary: List radio frequencies
+      description: Requires an authenticated session user. Active database bot tokens act as superadmin. General catalog reads
+        do not create audit records.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+          description: Values above 100 are clamped to 100.
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            pattern: ^[0-9]+$
+          description: Positive 32-bit ID from meta.nextCursor (maximum 2147483647); returns greater IDs in ascending order.
       responses:
         "200":
-          description: List of radio frequencies
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RadioFrequency"
+                  meta:
+                    type: object
+                    required:
+                      - limit
+                      - nextCursor
+                    properties:
+                      limit:
+                        type: integer
+                        minimum: 1
+                        maximum: 100
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
     post:
       tags:
         - Radio Frequencies
-      summary: Create radio frequency
+      summary: Create a radio frequency
+      description: Requires orbat:edit for session users. Active database bot tokens act as superadmin. Successful mutations
+        and their audit records commit in one database transaction. Duplicate frequencies return 409.
       security:
-        - bearerAuth:
-            - radio_frequencies:manage
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
       requestBody:
         required: true
         content:
@@ -1855,35 +1946,213 @@ paths:
               $ref: "#/components/schemas/RadioFrequencyCreateInput"
       responses:
         "201":
-          description: Radio frequency created
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/RadioFrequency"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
   /radio-frequencies/{id}:
-    get:
-      tags:
-        - Radio Frequencies
-      summary: Get radio frequency by ID
-      responses:
-        "200":
-          description: Radio frequency details
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
     patch:
       tags:
         - Radio Frequencies
-      summary: Update radio frequency
+      summary: Update a radio frequency
+      description: Requires orbat:edit for session users. Active database bot tokens act as superadmin. Successful mutations
+        and their audit records commit in one database transaction. Duplicate frequencies return 409.
       security:
-        - bearerAuth:
-            - radio_frequencies:manage
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RadioFrequencyPatchInput"
       responses:
         "200":
-          description: Radio frequency updated
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/RadioFrequency"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
     delete:
       tags:
         - Radio Frequencies
-      summary: Delete radio frequency
+      summary: Delete a radio frequency
+      description: Requires orbat:delete for session users. Active database bot tokens act as superadmin. The deletion and
+        audit record commit together. Related ORBAT frequency assignments are removed by the database relation.
       security:
-        - bearerAuth:
-            - radio_frequencies:delete
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
       responses:
         "200":
-          description: Radio frequency deleted
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: "null"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
   /ranks:
     get:
       tags:
@@ -2166,16 +2435,110 @@ paths:
       tags:
         - Templates
       summary: List subslot definitions
+      description: Requires any of subslot:view, subslot:create, subslot:edit, subslot:delete, template:create, template:edit,
+        template:delete, orbat:create, orbat:edit for session users. Active database bot tokens act as superadmin.
+        Catalog reads are not audited. Responses expose plural prerequisite arrays only; singular legacy aliases are
+        removed.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+          description: Values above 100 are clamped to 100.
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            pattern: ^[0-9]+$
+          description: Positive 32-bit ID from meta.nextCursor (maximum 2147483647); returns greater IDs in ascending order.
       responses:
         "200":
-          description: List of subslot definitions
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SubslotDefinition"
+                  meta:
+                    type: object
+                    required:
+                      - limit
+                      - nextCursor
+                    properties:
+                      limit:
+                        type: integer
+                        minimum: 1
+                        maximum: 100
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
     post:
       tags:
         - Templates
-      summary: Create subslot definition
+      summary: Create a subslot definition
+      description: Requires subslot:create for session users. Active database bot tokens act as superadmin. Mutation and audit
+        record commit in the same transaction; catalog events publish after commit. Missing prerequisite IDs return 422;
+        duplicate names return 409.
       security:
-        - bearerAuth:
-            - templates:manage
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
       requestBody:
         required: true
         content:
@@ -2184,35 +2547,214 @@ paths:
               $ref: "#/components/schemas/SubslotDefinitionCreateInput"
       responses:
         "201":
-          description: Subslot definition created
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/SubslotDefinition"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
   /subslot-definitions/{id}:
-    get:
-      tags:
-        - Templates
-      summary: Get subslot definition by ID
-      responses:
-        "200":
-          description: Subslot definition details
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
     patch:
       tags:
         - Templates
-      summary: Update subslot definition
+      summary: Update a subslot definition
+      description: Requires subslot:edit for session users. Active database bot tokens act as superadmin. Mutation and audit
+        record commit in the same transaction; catalog events publish after commit. Missing prerequisite IDs return 422;
+        duplicate names return 409.
       security:
-        - bearerAuth:
-            - templates:manage
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubslotDefinitionPatchInput"
       responses:
         "200":
-          description: Subslot definition updated
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/SubslotDefinition"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
     delete:
       tags:
         - Templates
-      summary: Delete subslot definition
+      summary: Delete a subslot definition
+      description: Requires subslot:delete for session users. Active database bot tokens act as superadmin. Mutation and audit
+        record commit in the same transaction; catalog events publish after commit. Definitions referenced by ORBAT
+        slots cannot be deleted and return 409.
       security:
-        - bearerAuth:
-            - templates:delete
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
       responses:
         "200":
-          description: Subslot definition deleted
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: "null"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
   /subslots/{id}/signup:
     post:
       tags:
@@ -2292,47 +2834,336 @@ paths:
       tags:
         - Training
       summary: List training categories
-      responses:
-        "200":
-          description: List of training categories
-    post:
-      tags:
-        - Training
-      summary: Create training category
+      description: Requires an authenticated session user. Active database bot tokens act as superadmin. Catalog reads do not
+        create audit records. Pagination is by ascending ID; sort orderIndex for display.
       security:
-        - bearerAuth:
-            - training:create
-      responses:
-        "201":
-          description: Category created
-  /training-categories/{id}:
-    patch:
-      tags:
-        - Training
-      summary: Update training category
-      security:
-        - bearerAuth:
-            - training:edit
-      responses:
-        "200":
-          description: Category updated
-    delete:
-      tags:
-        - Training
-      summary: Delete training category
-      security:
-        - bearerAuth:
-            - training:delete
-      responses:
-        "200":
-          description: Category deleted
-    put:
-      tags:
-        - TODO
-      summary: TODO document PUT /training-categories/{id}
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+          description: Values above 100 are clamped to 100.
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            pattern: ^[0-9]+$
+          description: Positive 32-bit ID from meta.nextCursor (maximum 2147483647); returns greater IDs in ascending order.
       responses:
         "200":
           description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TrainingCategory"
+                  meta:
+                    type: object
+                    required:
+                      - limit
+                      - nextCursor
+                    properties:
+                      limit:
+                        type: integer
+                        minimum: 1
+                        maximum: 100
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+    post:
+      tags:
+        - Training
+      summary: Create a training category
+      description: Requires training:create for session users. Active database bot tokens act as superadmin. Mutation and
+        audit records commit in the same transaction. Duplicate category names return 409. The new category is appended
+        to the current order.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrainingCategoryCreateInput"
+      responses:
+        "201":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/TrainingCategory"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+  /training-categories/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+    patch:
+      tags:
+        - Training
+      summary: Update or swap a training category
+      description: Requires training:edit for session users. Active database bot tokens act as superadmin. Mutation and audit
+        records commit in the same transaction. Duplicate category names return 409. Replaces PUT. Send either
+        name/orderIndex fields, or swapWithCategoryId alone. A swap changes and audits both categories and returns
+        data.updated; regular updates return the category. Empty payloads and self-swaps return 422.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrainingCategoryPatchInput"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    oneOf:
+                      - $ref: "#/components/schemas/TrainingCategory"
+                      - type: object
+                        required:
+                          - updated
+                        properties:
+                          updated:
+                            type: array
+                            minItems: 2
+                            maxItems: 2
+                            items:
+                              $ref: "#/components/schemas/TrainingCategory"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+    delete:
+      tags:
+        - Training
+      summary: Delete a training category
+      description: Requires training:delete for session users. Active database bot tokens act as superadmin. Linked trainings
+        are detached (categoryId becomes null), then the category is deleted and audited in the same transaction.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: "null"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
   /training-requests:
     get:
       tags:
@@ -3098,7 +3929,7 @@ paths:
           schema:
             type: string
             pattern: ^[0-9]+$
-          description: Positive token ID from meta.nextCursor; returns tokens with a larger ID.
+          description: Positive 32-bit token ID from meta.nextCursor (maximum 2147483647); returns tokens with a larger ID.
     post:
       summary: Create a bot token
       security: *a1
@@ -3475,7 +4306,7 @@ paths:
           schema:
             type: string
             pattern: ^[0-9]+$
-          description: Positive record ID from meta.nextCursor; returns records with a smaller ID.
+          description: Positive 32-bit record ID from meta.nextCursor (maximum 2147483647); returns records with a smaller ID.
         - name: from
           in: query
           schema:
@@ -3705,11 +4536,21 @@ components:
           nullable: true
     RadioFrequency:
       type: object
+      required:
+        - id
+        - frequency
+        - type
+        - isAdditional
+        - channel
+        - callsign
+        - createdAt
       properties:
         id:
           type: integer
         frequency:
           type: string
+          minLength: 1
+          description: Trimmed nonempty frequency label.
         type:
           type: string
           enum:
@@ -3717,12 +4558,19 @@ components:
             - LR
         isAdditional:
           type: boolean
+          default: false
         channel:
-          type: string
+          type:
+            - string
+            - "null"
+          description: Trimmed; an empty string becomes null.
         callsign:
-          type: string
-        orderIndex:
-          type: integer
+          type:
+            - string
+            - "null"
+          description: Trimmed; an empty string becomes null.
+        createdAt:
+          $ref: "#/components/schemas/UtcTimestamp"
     Template:
       type: object
       properties:
@@ -4060,12 +4908,15 @@ components:
           nullable: true
     RadioFrequencyCreateInput:
       type: object
+      additionalProperties: false
       required:
         - frequency
         - type
       properties:
         frequency:
           type: string
+          minLength: 1
+          description: Trimmed nonempty frequency label.
         type:
           type: string
           enum:
@@ -4075,14 +4926,15 @@ components:
           type: boolean
           default: false
         channel:
-          type: string
-          default: ""
+          type:
+            - string
+            - "null"
+          description: Trimmed; an empty string becomes null.
         callsign:
-          type: string
-          default: ""
-        orderIndex:
-          type: integer
-          default: 0
+          type:
+            - string
+            - "null"
+          description: Trimmed; an empty string becomes null.
     RadioFrequencyUpdateInput:
       type: object
       properties:
@@ -4155,23 +5007,21 @@ components:
             type: object
     SubslotDefinitionCreateInput:
       type: object
+      additionalProperties: false
       required:
         - name
-        - maxSignups
       properties:
         name:
           type: string
-        description:
-          type: string
-          nullable: true
-        abbreviation:
-          type: string
-          nullable: true
-        maxSignups:
-          type: integer
-        orderIndex:
-          type: integer
-          default: 0
+          minLength: 1
+          description: Trimmed nonempty name.
+        requiredTrainingIds: &a8
+          type: array
+          items:
+            type: integer
+            minimum: 1
+          description: Existing positive numeric IDs; duplicates are deduplicated.
+        requiredRankIds: *a8
     SubslotDefinitionUpdateInput:
       type: object
       properties:
@@ -4344,3 +5194,166 @@ components:
           description: Redacted mutation state; never a read response snapshot.
         after:
           description: Redacted mutation state; never a read response snapshot.
+    SubslotDefinitionPatchInput:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Trimmed nonempty name.
+        requiredTrainingIds: &a8
+          type: array
+          items:
+            type: integer
+            minimum: 1
+          description: Existing positive numeric IDs; duplicates are deduplicated.
+        requiredRankIds: *a8
+        isRetired:
+          type: boolean
+    SubslotDefinition:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          minLength: 1
+          description: Trimmed nonempty name.
+        requiredTrainingIds: &a8
+          type: array
+          items:
+            type: integer
+            minimum: 1
+          description: Existing positive numeric IDs; duplicates are deduplicated.
+        requiredRankIds: *a8
+        category:
+          type:
+            - string
+            - "null"
+        description:
+          type:
+            - string
+            - "null"
+        tags:
+          type:
+            - string
+            - "null"
+        isRetired:
+          type: boolean
+        createdAt:
+          $ref: "#/components/schemas/UtcTimestamp"
+        updatedAt:
+          $ref: "#/components/schemas/UtcTimestamp"
+        requiredTrainings:
+          type: array
+          items:
+            type: object
+            required:
+              - id
+              - name
+            properties:
+              id: &a9
+                type: integer
+              name: &a10
+                type: string
+        requiredRanks:
+          type: array
+          items:
+            type: object
+            required:
+              - id
+              - name
+              - abbreviation
+              - orderIndex
+            properties:
+              id: *a9
+              name: *a10
+              abbreviation:
+                type: string
+              orderIndex:
+                type: integer
+    RadioFrequencyPatchInput:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        frequency:
+          type: string
+          minLength: 1
+          description: Trimmed nonempty frequency label.
+        type:
+          type: string
+          enum:
+            - SR
+            - LR
+        isAdditional:
+          type: boolean
+          default: false
+        channel:
+          type:
+            - string
+            - "null"
+          description: Trimmed; an empty string becomes null.
+        callsign:
+          type:
+            - string
+            - "null"
+          description: Trimmed; an empty string becomes null.
+    TrainingCategory:
+      type: object
+      required:
+        - id
+        - name
+        - orderIndex
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          minLength: 1
+          description: Trimmed nonempty unique category name.
+        orderIndex:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+        createdAt:
+          $ref: "#/components/schemas/UtcTimestamp"
+        updatedAt:
+          $ref: "#/components/schemas/UtcTimestamp"
+    TrainingCategoryCreateInput:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Trimmed nonempty unique category name.
+    TrainingCategoryPatchInput:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          minProperties: 1
+          properties:
+            name:
+              type: string
+              minLength: 1
+              description: Trimmed nonempty unique category name.
+            orderIndex:
+              type: integer
+              minimum: 0
+              maximum: 2147483647
+        - type: object
+          additionalProperties: false
+          required:
+            - swapWithCategoryId
+          properties:
+            swapWithCategoryId:
+              type: integer
+              minimum: 1
+              maximum: 2147483647
+              description: Another existing category; cannot be this category.

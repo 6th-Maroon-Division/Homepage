@@ -15,6 +15,7 @@ export default defineConfig({
         'lib/api/**/*.ts', 'lib/notification-preferences.ts',
         'app/api/bot-tokens/route.ts', 'app/api/bot-tokens/[[]id]/route.ts',
         'app/api/users/[[]id]/notification-preferences/route.ts', 'app/api/audit-logs/route.ts',
+        'app/api/radio-frequencies/**/route.ts', 'app/api/subslot-definitions/**/route.ts', 'app/api/training-categories/**/route.ts',
       ],
       thresholds: { lines: 80, branches: 80, functions: 80, statements: 80 },
     },

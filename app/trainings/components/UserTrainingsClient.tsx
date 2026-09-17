@@ -1,5 +1,7 @@
 'use client';
 
+import { apiList } from '@/lib/api/client';
+
 import { useState, useEffect } from 'react';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
@@ -81,11 +83,8 @@ export default function UserTrainingsClient({
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch('/api/training-categories');
-      if (response.ok) {
-        const data = await response.json();
-        setCategories(data.sort((a: Category, b: Category) => a.orderIndex - b.orderIndex));
-      }
+      const data = await apiList<Category>('/api/training-categories');
+      setCategories(data.sort((a, b) => a.orderIndex - b.orderIndex || a.name.localeCompare(b.name)));
     } catch (error) {
       console.error('Error fetching categories:', error);
     }

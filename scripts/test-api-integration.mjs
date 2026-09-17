@@ -7,6 +7,7 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 let child;
 let server;
 let stopping = false;
+let failed = false;
 
 async function stop(signal) {
   if (stopping) return;
@@ -48,7 +49,9 @@ try {
   await run('node_modules/vitest/vitest.mjs', ['run', '--config', 'vitest.integration.config.mts'], env);
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
-  process.exitCode = 1;
+  failed = true;
 } finally {
   await server?.close();
 }
+// Prisma dev cleanup can change process.exitCode; preserve test failures after it.
+if (failed) process.exitCode = 1;

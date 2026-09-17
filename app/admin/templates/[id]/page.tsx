@@ -1,5 +1,7 @@
 'use client';
 
+import { apiList } from '@/lib/api/client';
+
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useToast } from '@/app/components/ui/ToastContainer';
@@ -81,8 +83,6 @@ export default function TemplateEditor() {
     requiredRankIds?: number[];
     requiredTrainings?: Array<{ id: number; name: string }>;
     requiredRanks?: Array<{ id: number; name: string; abbreviation: string }>;
-    requiredTraining: { id: number; name: string } | null;
-    requiredRank: { id: number; name: string; abbreviation: string } | null;
     isRetired?: boolean;
   }>>([]);
   const [slotSearchBySquad, setSlotSearchBySquad] = useState<Record<number, string>>({});
@@ -192,10 +192,8 @@ export default function TemplateEditor() {
   useEffect(() => {
     const fetchSubslotDefinitions = async () => {
       try {
-        const response = await fetch('/api/subslot-definitions');
-        if (!response.ok) return;
-        const data = await response.json();
-        setSubslotDefinitions(data);
+        const data = await apiList<(typeof subslotDefinitions)[number]>('/api/subslot-definitions');
+        setSubslotDefinitions(data.sort((a, b) => a.name.localeCompare(b.name)));
       } catch (error) {
         console.error('Error fetching subslot definitions:', error);
       }
@@ -205,8 +203,8 @@ export default function TemplateEditor() {
   }, []);
 
   useEffect(() => {
-    fetch('/api/radio-frequencies')
-      .then((response) => response.ok ? response.json() : [])
+    apiList<(typeof radioFrequencies)[number]>('/api/radio-frequencies')
+      .then(rows => rows.sort((a, b) => a.type.localeCompare(b.type) || a.frequency.localeCompare(b.frequency, undefined, { numeric: true })))
       .then(setRadioFrequencies)
       .catch(() => setRadioFrequencies([]));
   }, []);
@@ -306,17 +304,13 @@ export default function TemplateEditor() {
       requiredTrainingIds:
         definition.requiredTrainingIds && definition.requiredTrainingIds.length > 0
           ? definition.requiredTrainingIds
-          : definition.requiredTraining
-            ? [definition.requiredTraining.id]
-            : [],
+          : [],
       requiredRankIds:
         definition.requiredRankIds && definition.requiredRankIds.length > 0
           ? definition.requiredRankIds
-          : definition.requiredRank
-            ? [definition.requiredRank.id]
-            : [],
-      requiredTrainingId: definition.requiredTraining?.id ?? null,
-      requiredRankId: definition.requiredRank?.id ?? null,
+          : [],
+      requiredTrainingId: definition.requiredTrainingIds?.[0] ?? null,
+      requiredRankId: definition.requiredRankIds?.[0] ?? null,
     };
     const updatedSlots = [...template.slotsJson];
     updatedSlots[squadIndex].slots.push(newSlot);

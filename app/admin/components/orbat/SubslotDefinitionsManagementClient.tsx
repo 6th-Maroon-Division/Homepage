@@ -1,5 +1,7 @@
 'use client';
 
+import { apiList } from '@/lib/api/client';
+
 import { type ChangeEvent, useEffect, useRef, useState } from 'react';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
@@ -26,8 +28,6 @@ type SubslotDefinition = {
   requiredRankId: number | null;
   requiredTrainings: { id: number; name: string }[];
   requiredRanks: { id: number; name: string; abbreviation: string; orderIndex?: number }[];
-  requiredTraining: { id: number; name: string } | null;
-  requiredRank: { id: number; name: string; abbreviation: string } | null;
   isRetired?: boolean;
 };
 
@@ -74,13 +74,8 @@ export default function SubslotDefinitionsManagementClient({
   useEffect(() => {
     const fetchDefinitions = async () => {
       try {
-        const response = await fetch('/api/subslot-definitions');
-        if (!response.ok) {
-          return;
-        }
-
-        const data = (await response.json()) as SubslotDefinition[];
-        setDefinitions(data);
+        const data = await apiList<SubslotDefinition>('/api/subslot-definitions');
+        setDefinitions(data.sort((a, b) => a.name.localeCompare(b.name)));
       } catch {
         // keep local state if sync fails
       }
@@ -176,11 +171,11 @@ export default function SubslotDefinitionsManagementClient({
 
       if (!response.ok) {
         const body = await response.json().catch(() => ({ error: 'Failed to save role definition' }));
-        showError(body.error || 'Failed to save role definition');
+        showError(body.error?.message || 'Failed to save role definition');
         return;
       }
 
-      const saved: SubslotDefinition = await response.json();
+      const saved: SubslotDefinition = (await response.json()).data;
       setDefinitions((prev) => {
         const hasExisting = prev.some((definition) => definition.id === saved.id);
         const next = hasExisting
@@ -208,7 +203,7 @@ export default function SubslotDefinitionsManagementClient({
 
       if (!response.ok) {
         const body = await response.json().catch(() => ({ error: 'Failed to delete role definition' }));
-        showError(body.error || 'Failed to delete role definition');
+        showError(body.error?.message || 'Failed to delete role definition');
         return;
       }
 
@@ -243,11 +238,11 @@ export default function SubslotDefinitionsManagementClient({
 
       if (!response.ok) {
         const body = await response.json().catch(() => ({ error: 'Failed to update role definition' }));
-        showError(body.error || 'Failed to update role definition');
+        showError(body.error?.message || 'Failed to update role definition');
         return;
       }
 
-      const updated: SubslotDefinition = await response.json();
+      const updated: SubslotDefinition = (await response.json()).data;
       setDefinitions((prev) =>
         prev.map((definition) => (definition.id === updated.id ? updated : definition))
       );

@@ -18,6 +18,6 @@ export function parseCursorPagination(
   const limit = params.has('limit') ? parsePositiveId(params.get('limit')) : options.defaultLimit;
   if (limit === null) return { error: 'limit must be a positive integer.' };
   const cursor = params.has('cursor') ? parsePositiveId(params.get('cursor')) : null;
-  if (params.has('cursor') && cursor === null) return { error: 'cursor must be a positive integer id.' };
+  if (params.has('cursor') && (cursor === null || cursor > 2147483647)) return { error: 'cursor must be a positive 32-bit integer id.' };
   return { data: { limit: Math.min(limit, options.maxLimit), cursor } };
 }

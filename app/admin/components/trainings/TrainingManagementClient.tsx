@@ -1,5 +1,7 @@
 'use client';
 
+import { apiList } from '@/lib/api/client';
+
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useToast } from '@/app/components/ui/ToastContainer';
@@ -185,11 +187,8 @@ export default function TrainingManagementClient({
   // Fetch categories
   const fetchCategories = async () => {
     try {
-      const response = await fetch('/api/training-categories');
-      if (response.ok) {
-        const data = await response.json();
-        setCategories(data.sort((a: Category, b: Category) => a.orderIndex - b.orderIndex));
-      }
+      const data = await apiList<Category>('/api/training-categories');
+      setCategories(data.sort((a, b) => a.orderIndex - b.orderIndex || a.name.localeCompare(b.name)));
     } catch (error) {
       logClientError('Error fetching categories:', error);
     }
@@ -525,7 +524,7 @@ export default function TrainingManagementClient({
         await fetchCategories();
       } else {
         const error = await response.json();
-        showError(error.error || 'Failed to add category');
+        showError(error.error?.message || 'Failed to add category');
       }
     } catch (error) {
       logClientError('Error adding category:', error);
@@ -569,7 +568,7 @@ export default function TrainingManagementClient({
     setIsSaving(true);
     try {
       const response = await fetch(`/api/training-categories/${categoryId}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
       });
@@ -580,7 +579,7 @@ export default function TrainingManagementClient({
         await fetchCategories();
       } else {
         const error = await response.json();
-        showError(error.error || 'Failed to update category');
+        showError(error.error?.message || 'Failed to update category');
       }
     } catch (error) {
       logClientError('Error updating category:', error);
@@ -610,7 +609,7 @@ export default function TrainingManagementClient({
       
       // Use a single API call with swap operation for atomicity
       const response = await fetch(`/api/training-categories/${categoryId}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ swapWithCategoryId: otherCategory.id }),
       });

@@ -1,5 +1,7 @@
 'use client';
 
+import { apiList } from '@/lib/api/client';
+
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '../ui/ToastContainer';
@@ -218,8 +220,6 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     requiredRankIds?: number[];
     requiredTrainings?: Array<{ id: number; name: string }>;
     requiredRanks?: Array<{ id: number; name: string; abbreviation: string }>;
-    requiredTraining: { id: number; name: string } | null;
-    requiredRank: { id: number; name: string; abbreviation: string } | null;
     isRetired?: boolean;
   }>>([]);
   const [subslotSearchBySlot, setSubslotSearchBySlot] = useState<Record<number, string>>({});
@@ -262,11 +262,8 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
 
     const fetchSubslotDefinitions = async () => {
       try {
-        const response = await fetch('/api/subslot-definitions');
-        if (response.ok) {
-          const data = await response.json();
-          setSubslotDefinitions(data);
-        }
+        const data = await apiList<(typeof subslotDefinitions)[number]>('/api/subslot-definitions');
+        setSubslotDefinitions(data.sort((a, b) => a.name.localeCompare(b.name)));
       } catch (error) {
         logClientError('Error fetching role definitions:', error);
       }
@@ -402,11 +399,8 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
   useEffect(() => {
     const fetchFrequencies = async () => {
       try {
-        const response = await fetch('/api/radio-frequencies');
-        if (response.ok) {
-          const data = await response.json();
-          setRadioFrequencies(data);
-        }
+        const data = await apiList<(typeof radioFrequencies)[number]>('/api/radio-frequencies');
+        setRadioFrequencies(data.sort((a, b) => a.type.localeCompare(b.type) || a.frequency.localeCompare(b.frequency, undefined, { numeric: true })));
       } catch (error) {
         logClientError('Error fetching radio frequencies:', error);
       }
@@ -714,17 +708,13 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
       requiredTrainingIds:
         definition.requiredTrainingIds && definition.requiredTrainingIds.length > 0
           ? definition.requiredTrainingIds
-          : definition.requiredTraining
-            ? [definition.requiredTraining.id]
-            : [],
+          : [],
       requiredRankIds:
         definition.requiredRankIds && definition.requiredRankIds.length > 0
           ? definition.requiredRankIds
-          : definition.requiredRank
-            ? [definition.requiredRank.id]
-            : [],
-      requiredTrainingId: definition.requiredTraining?.id ?? null,
-      requiredRankId: definition.requiredRank?.id ?? null,
+          : [],
+      requiredTrainingId: definition.requiredTrainingIds?.[0] ?? null,
+      requiredRankId: definition.requiredRankIds?.[0] ?? null,
     });
     setSlots(normalizeOrderIndexes(newSlots));
 
