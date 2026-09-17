@@ -1262,14 +1262,6 @@ paths:
       responses:
         "200":
           description: Success
-  /bot/users/{userId}/rank-history:
-    get:
-      tags:
-        - TODO
-      summary: TODO document GET /bot/users/{userId}/rank-history
-      responses:
-        "200":
-          description: Success
   /bot/users/discord/{discordId}:
     get:
       tags:
@@ -4465,38 +4457,203 @@ paths:
         "403":
           description: Forbidden
   /users/{id}/rank:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          oneOf:
+            - type: integer
+              minimum: 1
+              maximum: 2147483647
+            - type: string
+              enum:
+                - me
+        description: Positive user ID, or me for session users only. Bot tokens must provide a numeric user ID.
     get:
       tags:
-        - Users
         - Ranks
-      summary: Get user rank
-      responses:
-        "200":
-          description: User rank information
-    put:
-      tags:
-        - Users
-        - Ranks
-      summary: Assign rank to user
+      summary: Get a user’s current rank summary
+      description: Requires self ownership, live hierarchy-aware user:manage for another user, or superadmin for session
+        users. Active database bot tokens act as superadmin. Requires authentication. Missing user-rank state returns
+        404. Other-user reads, including bot reads and empty target histories, are audited using target/request metadata
+        only. No rank records or decline reasons are copied into audit snapshots. Self-reads are not audited;
+        audit-write failure returns 500.
       security:
-        - bearerAuth:
-            - user:manage_ranks
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
       responses:
         "200":
-          description: Rank assigned
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/UserRankSummary"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
         "401":
-          description: Unauthorized
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
         "403":
-          description: Forbidden
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
   /users/{id}/rank-history:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          oneOf:
+            - type: integer
+              minimum: 1
+              maximum: 2147483647
+            - type: string
+              enum:
+                - me
+        description: Positive user ID, or me for session users only. Bot tokens must provide a numeric user ID.
     get:
       tags:
-        - Users
         - Ranks
-      summary: Get user rank history
+      summary: List a user’s rank history
+      description: Requires self ownership, live hierarchy-aware user:manage for another user, or superadmin for session
+        users. Active database bot tokens act as superadmin. Descending ID cursor pagination replaces page-number
+        pagination; supplying page returns 400. The website uses limit=20 and keeps its cursor navigation state.
+        Other-user reads, including bot reads and empty target histories, are audited using target/request metadata
+        only. No rank records or decline reasons are copied into audit snapshots. Self-reads are not audited;
+        audit-write failure returns 500.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+          description: Values above 100 are clamped to 100.
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            pattern: ^[0-9]+$
+          description: Positive 32-bit history record ID from meta.nextCursor; returns smaller IDs in descending order.
       responses:
         "200":
-          description: User rank history
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserRankHistoryEntry"
+                  meta:
+                    type: object
+                    required:
+                      - limit
+                      - nextCursor
+                    properties:
+                      limit:
+                        type: integer
+                        minimum: 1
+                        maximum: 100
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
   /users/{id}/rank/assign:
     post:
       tags:
@@ -7160,3 +7317,73 @@ components:
                   - type: "null"
       description: Single rank requirement configuration, sorted by training ID without pagination. An existing rank with no
         requirements returns empty arrays.
+    UserRankSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - userId
+        - currentRank
+        - retired
+        - interviewDone
+        - attendanceSinceLastRank
+        - attendanceTotal
+        - attendanceDelta
+        - lastRankedUpAt
+      properties:
+        userId:
+          type: integer
+        currentRank:
+          anyOf:
+            - $ref: "#/components/schemas/Rank"
+            - type: "null"
+        retired:
+          type: boolean
+        interviewDone:
+          type: boolean
+        attendanceSinceLastRank:
+          type: integer
+        attendanceTotal:
+          type: integer
+        attendanceDelta:
+          type: integer
+        lastRankedUpAt:
+          $ref: "#/components/schemas/UtcTimestamp"
+    UserRankHistoryEntry:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - previousRankName
+        - newRankName
+        - attendanceTotalAtChange
+        - attendanceDeltaSinceLastRank
+        - triggeredBy
+        - outcome
+        - declineReason
+        - createdAt
+      properties:
+        id:
+          type: integer
+        previousRankName:
+          type:
+            - string
+            - "null"
+        newRankName:
+          type: string
+        attendanceTotalAtChange:
+          type: integer
+        attendanceDeltaSinceLastRank:
+          type: integer
+        triggeredBy:
+          type: string
+        outcome:
+          type:
+            - string
+            - "null"
+        declineReason:
+          type:
+            - string
+            - "null"
+        createdAt:
+          $ref: "#/components/schemas/UtcTimestamp"
+      description: Common website/bot history DTO. Legacy bot note, userId, and actor-ID extras are not included.

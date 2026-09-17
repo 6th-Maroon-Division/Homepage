@@ -129,10 +129,7 @@ type RankHistoryEntry = {
 };
 
 type RankHistoryPagination = {
-  page: number;
-  pageSize: number;
-  total: number;
-  totalPages: number;
+  nextCursor: string | null;
 };
 
 type TabKey = 'overview' | 'attendance' | 'trainings' | 'loa' | 'rank-history' | 'notifications' | 'actions';
@@ -179,6 +176,8 @@ export default function UserSelfDetailClient({
   const [tabsRestored, setTabsRestored] = useState(false);
   const [rankHistoryRows, setRankHistoryRows] = useState<RankHistoryEntry[]>([]);
   const [rankHistoryPage, setRankHistoryPage] = useState(1);
+  const [rankHistoryCursors, setRankHistoryCursors] = useState<Array<string | null>>([null]);
+  const rankHistoryCursor = rankHistoryCursors[rankHistoryPage - 1] ?? null;
   const [rankHistoryPagination, setRankHistoryPagination] = useState<RankHistoryPagination | null>(null);
   const [isLoadingRankHistory, setIsLoadingRankHistory] = useState(false);
   const [rankHistoryError, setRankHistoryError] = useState('');
@@ -208,31 +207,37 @@ export default function UserSelfDetailClient({
   }, [activeTab, tabsRestored, trainingsViewTab]);
 
 
-  const fetchRankHistory = useCallback(async (pageNum: number) => {
+  const fetchRankHistory = useCallback(async (cursor: string | null, signal: AbortSignal) => {
     setIsLoadingRankHistory(true);
+    setRankHistoryRows([]);
+    setRankHistoryPagination(null);
+    setRankHistoryError('');
     try {
-      const response = await fetch(`/api/users/${user.id}/rank-history?page=${pageNum}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch rank history');
-      }
-
-      const data = await response.json();
-      setRankHistoryRows(data.data ?? []);
-      setRankHistoryPagination(data.pagination ?? null);
-      setRankHistoryError('');
+      const params = new URLSearchParams({ limit: '20' });
+      if (cursor) params.set('cursor', cursor);
+      const { data, meta } = await apiRequest<RankHistoryEntry[]>(`/api/users/${user.id}/rank-history?${params}`, { signal });
+      if (signal.aborted) return;
+      setRankHistoryRows(data);
+      setRankHistoryPagination({ nextCursor: meta.nextCursor ?? null });
     } catch (error) {
-      console.error('Error fetching rank history:', error);
-      setRankHistoryError('Failed to load rank history');
+      if (signal.aborted) return;
+      setRankHistoryError(error instanceof Error ? error.message : 'Failed to load rank history');
     } finally {
-      setIsLoadingRankHistory(false);
+      if (!signal.aborted) setIsLoadingRankHistory(false);
     }
   }, [user.id]);
 
   useEffect(() => {
-    if (activeTab === 'rank-history') {
-      fetchRankHistory(rankHistoryPage);
-    }
-  }, [activeTab, rankHistoryPage, fetchRankHistory]);
+    setRankHistoryPage(1);
+    setRankHistoryCursors([null]);
+  }, [user.id]);
+
+  useEffect(() => {
+    if (activeTab !== 'rank-history') return;
+    const controller = new AbortController();
+    void fetchRankHistory(rankHistoryCursor, controller.signal);
+    return () => controller.abort();
+  }, [activeTab, rankHistoryPage, rankHistoryCursor, fetchRankHistory]);
 
   useEffect(() => {
     setEditableUsername(user.username ?? '');
@@ -1534,7 +1539,7 @@ export default function UserSelfDetailClient({
             </div>
           )}
 
-          {rankHistoryPagination && rankHistoryPagination.totalPages > 1 && (
+          {(rankHistoryPage > 1 || rankHistoryPagination?.nextCursor) && (
             <div className="mt-4 flex justify-center gap-2">
               <button
                 onClick={() => setRankHistoryPage(Math.max(1, rankHistoryPage - 1))}
@@ -1545,11 +1550,16 @@ export default function UserSelfDetailClient({
                 Previous
               </button>
               <div style={{ color: 'var(--muted-foreground)' }} className="px-3 py-2 text-sm">
-                Page {rankHistoryPage} of {rankHistoryPagination.totalPages}
+                Page {rankHistoryPage}
               </div>
               <button
-                onClick={() => setRankHistoryPage(Math.min(rankHistoryPagination.totalPages, rankHistoryPage + 1))}
-                disabled={rankHistoryPage === rankHistoryPagination.totalPages || isLoadingRankHistory}
+                onClick={() => {
+                  const nextCursor = rankHistoryPagination?.nextCursor;
+                  if (!nextCursor) return;
+                  setRankHistoryCursors((current) => [...current.slice(0, rankHistoryPage), nextCursor]);
+                  setRankHistoryPage((page) => page + 1);
+                }}
+                disabled={!rankHistoryPagination?.nextCursor || isLoadingRankHistory}
                 className="px-3 py-2 rounded-md border disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ borderColor: 'var(--border)', color: 'var(--foreground)' }}
               >

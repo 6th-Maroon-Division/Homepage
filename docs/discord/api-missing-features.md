@@ -445,15 +445,20 @@ The bot should use ORBAT date filtering to identify candidates. The platform may
 
 ## 15. P2 and deferred contracts
 
-### Bot rank-history access
+### Shared user rank reads
 
-Add only if operator diagnostics or user-visible history requires it:
+Bots and the website use the same canonical endpoints:
 
 ```http
-GET /bot/users/{userId}/rank-history?limit=50&cursor={cursor}
+GET /users/{id}/rank
+GET /users/{id}/rank-history?limit=50&cursor={cursor}
 ```
 
-The applied-rank event and current-user endpoints are sufficient for routine synchronization.
+Bots supply numeric platform user IDs and an active database bearer token. Session users can use `me`; access to others requires live hierarchy-aware `user:manage` or superadmin. Rank-summary reads now require authentication. The legacy `/bot/users/{userId}/rank-history` route is removed.
+
+History uses descending-ID cursor pagination with default 50/cap 100 and `{ data, meta: { limit, nextCursor } }`. The old `page` query returns 400. Each entry contains only `id`, nullable `previousRankName`, `newRankName`, `attendanceTotalAtChange`, `attendanceDeltaSinceLastRank`, `triggeredBy`, nullable `outcome`, nullable `declineReason`, and UTC `createdAt`. The legacy bot note/userId/actor-ID extras are omitted. Empty history does not require a user-rank record; missing rank-summary state returns 404.
+
+Other-user reads, including all bot reads and empty target histories, are audited using target/request metadata without response records or decline reasons. The applied-rank event and current-user endpoints remain sufficient for routine synchronization; history is available for diagnostics and user-visible history.
 
 ### Training announcement metadata
 

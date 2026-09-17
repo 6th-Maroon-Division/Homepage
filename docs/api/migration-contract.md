@@ -120,6 +120,14 @@ GET returns 404 for a missing rank; an existing rank with no requirements return
 
 Replacement and an ID-only `rank_requirements.updated` audit record commit in one serializable transaction. Conflicts return 409 for refresh/retry. General configuration reads are not audited. No website API callers were found for the replaced routes, but internal promotion eligibility still reads the existing requirement table; this migration does not remove that feature or its data.
 
+## Tenth migration batch: user rank reads
+
+`GET /api/users/{id}/rank` and `GET /api/users/{id}/rank-history` accept user sessions or active bot tokens. Access requires self ownership, live hierarchy-aware `user:manage` for another user, or superadmin. The `me` alias is session-only; other IDs must be positive Int32 values. The previously unauthenticated rank-summary read now requires authentication. Rank assignment and demotion mutations are outside this batch.
+
+The summary retains `userId`, nullable `currentRank`, `retired`, `interviewDone`, `attendanceSinceLastRank`, `attendanceTotal`, `attendanceDelta`, and UTC `lastRankedUpAt`; missing user-rank state returns 404. History replaces `/api/bot/users/{userId}/rank-history` and page-number pagination with descending-ID cursor pages, default 50/cap 100. The `page` query is rejected with 400; the website requests 20 rows and manages cursors locally.
+
+Both clients receive history entries containing only `id`, `previousRankName`, `newRankName`, `attendanceTotalAtChange`, `attendanceDeltaSinceLastRank`, `triggeredBy`, `outcome`, `declineReason`, and UTC `createdAt`. Legacy bot `note`, `userId`, and actor-ID extras are removed. Other-user reads are audited, including bot reads and empty target histories, using target/request metadata only. Rank records and decline reasons are not copied into audit logs. Self-reads are not audited; failure to persist a required audit returns 500.
+
 ## Verification and remaining rollout
 
 Every endpoint and supported method must have tests, even once overall coverage reaches its target. Cover both authentication modes, invalid/inactive/revoked tokens, allowed/forbidden actions, ownership/hierarchy, payloads, response contracts, pagination, database mutations/rollback, audit actors/redaction, and UTC offset/daylight-saving/date boundaries. Use unit tests with Prisma test doubles plus isolated Prisma-managed local PGlite integration tests through Prisma Client. Do not use raw SQL queries or access the development database. Integration tests check actual relational behavior and transaction rollback in the local emulator; they do not establish production PostgreSQL deployment, concurrency, or performance guarantees.
