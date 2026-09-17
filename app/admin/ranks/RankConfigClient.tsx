@@ -37,9 +37,8 @@ export default function RankConfigClient() {
   const fetchRanks = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/ranks');
-      const data = await res.json();
-      setRanks(data.ranks || []);
+      const data = await apiList<Rank>('/api/ranks');
+      setRanks(data.sort((a, b) => a.orderIndex - b.orderIndex || a.id - b.id));
     } catch (e) {
       console.error(e);
       showToast('Failed to load ranks', 'error');
@@ -54,63 +53,61 @@ export default function RankConfigClient() {
 
   const createRank = async () => {
     try {
-      const res = await fetch('/api/ranks', {
+      await apiRequest<Rank>('/api/ranks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       });
-      if (!res.ok) throw new Error('Failed to create');
       showToast('Rank created', 'success');
       setForm({ name: '', abbreviation: '', orderIndex: 0, attendanceRequiredSinceLastRank: null, autoRankupEnabled: false });
       fetchRanks();
     } catch (e) {
-      showToast('Failed to create rank', 'error');
+      showToast(e instanceof Error ? e.message : 'Failed to create rank', 'error');
     }
   };
 
   const updateRank = async (rank: Rank) => {
     try {
-      const res = await fetch(`/api/ranks/${rank.id}`, {
-        method: 'PUT',
+      await apiRequest<Rank>(`/api/ranks/${rank.id}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(rank),
+        body: JSON.stringify({
+          name: rank.name,
+          abbreviation: rank.abbreviation,
+          orderIndex: rank.orderIndex,
+          attendanceRequiredSinceLastRank: rank.attendanceRequiredSinceLastRank,
+          autoRankupEnabled: rank.autoRankupEnabled,
+        }),
       });
-      if (!res.ok) throw new Error('Failed to update');
       showToast('Rank updated', 'success');
       fetchRanks();
     } catch (e) {
-      showToast('Failed to update rank', 'error');
+      showToast(e instanceof Error ? e.message : 'Failed to update rank', 'error');
     }
   };
 
   const deleteRank = async (id: number) => {
     try {
-      const res = await fetch(`/api/ranks/${id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const err = await res.json();
-        showToast(err.error || 'Failed to delete', 'error');
-        return;
-      }
+      await apiRequest(`/api/ranks/${id}`, { method: 'DELETE' });
       showToast('Rank deleted', 'success');
       fetchRanks();
     } catch (e) {
-      showToast('Failed to delete rank', 'error');
+      showToast(e instanceof Error ? e.message : 'Failed to delete rank', 'error');
     }
   };
 
   const saveOrder = async () => {
     try {
       const payload = { ranks: ranks.map((r) => ({ id: r.id, orderIndex: r.orderIndex })) };
-      const res = await fetch('/api/ranks/reorder', {
-        method: 'PUT',
+      await apiRequest('/api/ranks/reorder', {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error('Failed to reorder');
       showToast('Order saved', 'success');
       fetchRanks();
     } catch (e) {
-      showToast('Failed to save order', 'error');
+      showToast(e instanceof Error ? e.message : 'Failed to save order', 'error');
     }
   };
 

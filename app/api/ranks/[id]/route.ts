@@ -1,87 +1,45 @@
-// app/api/ranks/[id]/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
-import { checkPermission } from '@/lib/auth-middleware';
-
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  
-  const hasPermission = await checkPermission(session.user.id, 'rank:edit');
-  if (!hasPermission) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-  try {
-    const { id } = await params;
-    const rankId = parseInt(id);
-    if (isNaN(rankId)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
-
-    const body = await request.json();
-    const {
-      name,
-      abbreviation,
-      orderIndex,
-      attendanceRequiredSinceLastRank,
-      autoRankupEnabled,
-    } = body;
-
-    const rank = await prisma.rank.update({
-      where: { id: rankId },
-      data: {
-        ...(name && { name }),
-        ...(abbreviation && { abbreviation }),
-        ...(typeof orderIndex === 'number' && { orderIndex }),
-        attendanceRequiredSinceLastRank:
-          attendanceRequiredSinceLastRank === null || attendanceRequiredSinceLastRank === undefined
-            ? null
-            : attendanceRequiredSinceLastRank,
-        ...(typeof autoRankupEnabled === 'boolean' && { autoRankupEnabled }),
-      },
-    });
-    return NextResponse.json({ rank });
-  } catch (error) {
-    console.error('Error updating rank:', error);
-    return NextResponse.json({ error: 'Failed to update rank' }, { status: 500 });
-  }
+import { handleApiRequest } from '@/lib/api/handler';
+import { apiError, apiSuccess } from '@/lib/api/response';
+import { readJsonBody } from '@/lib/api/request';
+import { parsePositiveId } from '@/lib/api/validation';
+import { writeApiAudit } from '@/lib/api/audit';
+import { parseRankBody, rankSnapshot, rankDatabaseError } from '@/lib/api/ranks';
+type Context = { params: Promise<{ id: string }> };
+export async function PATCH(request: Request, context: Context) {
+  return handleApiRequest(request, 'rank:edit', async (_principal, audit) => {
+    const id = parsePositiveId((await context.params).id);
+    if (!id || id > 2147483647) return apiError(400, 'invalid_request', 'Invalid rank id.');
+    const parsed = parseRankBody(await readJsonBody(request), false);
+    if (parsed.error) return parsed.error;
+    try {
+      return await prisma.$transaction(async tx => {
+        const before = await tx.rank.findUnique({ where: { id } });
+        if (!before) return apiError(404, 'not_found', 'Rank not found.');
+        const after = await tx.rank.update({ where: { id }, data: parsed.data });
+        await writeApiAudit(tx, audit, { action: 'rank.updated', resource: 'rank', resourceId: String(id), outcome: 'success', before: rankSnapshot(before), after: rankSnapshot(after) });
+        return apiSuccess(after);
+      });
+    } catch (error) { return rankDatabaseError(error); }
+  });
 }
-
-export async function DELETE(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  
-  const hasPermission = await checkPermission(session.user.id, 'rank:delete');
-  if (!hasPermission) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-  try {
-    const { id } = await params;
-    const rankId = parseInt(id);
-    if (isNaN(rankId)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
-
-    const assignedCount = await prisma.userRank.count({ where: { currentRankId: rankId } });
-    if (assignedCount > 0) {
-      return NextResponse.json(
-        { error: 'Cannot delete rank: users are currently assigned' },
-        { status: 400 }
-      );
-    }
-
-    await prisma.rank.delete({ where: { id: rankId } });
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error deleting rank:', error);
-    return NextResponse.json({ error: 'Failed to delete rank' }, { status: 500 });
-  }
+export async function DELETE(request: Request, context: Context) {
+  return handleApiRequest(request, 'rank:delete', async (_principal, audit) => {
+    const id = parsePositiveId((await context.params).id);
+    if (!id || id > 2147483647) return apiError(400, 'invalid_request', 'Invalid rank id.');
+    try {
+      return await prisma.$transaction(async tx => {
+        const before = await tx.rank.findUnique({ where: { id } });
+        if (!before) return apiError(404, 'not_found', 'Rank not found.');
+        if (await tx.userRank.count({ where: { currentRankId: id } })) return apiError(409, 'conflict', 'Cannot delete a rank currently assigned to users.');
+        const affectedDiscordMappings = await tx.rankDiscordRole.findMany({ where: { rankId: id }, select: { id: true, guildId: true, discordRoleId: true, isActive: true } });
+        const detachedTrainingRequirements = await tx.trainingRankRequirement.findMany({ where: { minimumRankId: id }, select: { id: true, trainingId: true, minimumRankId: true } });
+        const transitions = await tx.rankTransitionRequirement.findMany({ where: { targetRankId: id }, select: { id: true, targetRankId: true, requiredTrainings: { select: { id: true } } } });
+        const deletedTransitionRequirements = transitions.map(row => ({ id: row.id, targetRankId: row.targetRankId, requiredTrainingIds: row.requiredTrainings.map(training => training.id) }));
+        await tx.rank.delete({ where: { id } });
+        await writeApiAudit(tx, audit, { action: 'rank.deleted', resource: 'rank', resourceId: String(id), outcome: 'success', before: { ...rankSnapshot(before), affectedDiscordMappings, detachedTrainingRequirements, deletedTransitionRequirements } });
+        return apiSuccess(null);
+      });
+    } catch (error) { return rankDatabaseError(error); }
+  });
 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Fragment } from 'react';
 import Link from 'next/link';
+import { apiList } from '@/lib/api/client';
 import { useRouter } from 'next/navigation';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
 import { useToast } from '@/app/components/ui/ToastContainer';
@@ -245,9 +246,8 @@ export default function UserManagementClient({
   // Fetch ranks for bulk assignment
   const fetchRanks = async () => {
     try {
-      const res = await fetch('/api/ranks');
-      const data = await res.json();
-      setRanks(data.ranks || []);
+      const data = await apiList<{ id: number; name: string; abbreviation: string; orderIndex: number }>('/api/ranks');
+      setRanks(data.sort((a, b) => a.orderIndex - b.orderIndex || a.id - b.id));
     } catch (e) {
       logClientError(e);
     }

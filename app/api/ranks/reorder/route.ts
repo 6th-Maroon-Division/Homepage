@@ -1,39 +1,24 @@
-// app/api/ranks/reorder/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
-import { checkPermission } from '@/lib/auth-middleware';
-
-export async function PUT(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  
-  const hasPermission = await checkPermission(session.user.id, 'rank:edit');
-  if (!hasPermission) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-  try {
-    const body = await request.json();
-    const ranks: Array<{ id: number; orderIndex: number }> = body?.ranks;
-    if (!Array.isArray(ranks) || ranks.length === 0) {
-      return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
-    }
-
-    await prisma.$transaction(
-      ranks.map((r) =>
-        prisma.rank.update({
-          where: { id: r.id },
-          data: { orderIndex: r.orderIndex },
-        })
-      )
-    );
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error reordering ranks:', error);
-    return NextResponse.json({ error: 'Failed to reorder ranks' }, { status: 500 });
-  }
+import { handleApiRequest } from '@/lib/api/handler';
+import { apiError, apiSuccess } from '@/lib/api/response';
+import { readJsonBody } from '@/lib/api/request';
+import { writeApiAudit } from '@/lib/api/audit';
+import { parseRankReorder, rankDatabaseError } from '@/lib/api/ranks';
+export async function PATCH(request: Request) {
+  return handleApiRequest(request, 'rank:edit', async (_principal, audit) => {
+    const parsed = parseRankReorder(await readJsonBody(request));
+    if (parsed.error) return parsed.error;
+    try {
+      return await prisma.$transaction(async tx => {
+        const before = await tx.rank.findMany({ where: { id: { in: parsed.data.map(row => row.id) } } });
+        if (before.length !== parsed.data.length) return apiError(404, 'not_found', 'One or more ranks do not exist.');
+        const previous = new Map(before.map(row => [row.id, row]));
+        for (const item of parsed.data) {
+          const after = await tx.rank.update({ where: { id: item.id }, data: { orderIndex: item.orderIndex } });
+          await writeApiAudit(tx, audit, { action: 'rank.reordered', resource: 'rank', resourceId: String(item.id), outcome: 'success', before: { orderIndex: previous.get(item.id)!.orderIndex }, after: { orderIndex: after.orderIndex } });
+        }
+        return apiSuccess(null);
+      });
+    } catch (error) { return rankDatabaseError(error); }
+  });
 }

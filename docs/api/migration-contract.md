@@ -65,6 +65,20 @@ POST requires `startDate` and accepts nullable `returnDate` and `reason`. Dates 
 
 The website labels leave date inputs as UTC dates, displays leave dates in UTC, and converts selected dates to explicit midnight-UTC timestamps before API requests. “Mark back” records the current UTC instant, bounded to the leave start if necessary, rather than truncating the return time to midnight. Date-only strings are not accepted as timestamp payloads. Responses preserve the leave DTO’s existing fields with UTC `Z` timestamps; the old unwrapped response format and routes are removed together with website caller migration.
 
+## Fifth migration batch: rank catalog
+
+| Canonical endpoint | Methods | User permissions |
+|---|---|---|
+| `/api/ranks` | GET, POST | GET: authenticated; POST: `rank:create` |
+| `/api/ranks/{id}` | PATCH, DELETE | PATCH: `rank:edit`; DELETE: `rank:delete` |
+| `/api/ranks/reorder` | PATCH | `rank:edit` |
+
+Active bot tokens retain superadmin access. PATCH replaces PUT for updates and reordering. Rank listing uses ascending-ID cursor pages (default 50, capped at 100); clients collect the pages and apply rank order for display. General catalog reads are not audited. Responses include the stored rank fields, numeric IDs, and UTC timestamps.
+
+Creation requires trimmed nonempty `name`/`abbreviation` and nonnegative Int32 `orderIndex`. Optional fields are nullable nonnegative Int32 `attendanceRequiredSinceLastRank` and boolean `autoRankupEnabled`. Partial updates preserve omitted values and reject empty or unknown payload fields. Assigned users prevent rank deletion with 409; missing ranks return 404. Deletion returns `data: null`. Its audit snapshot also records affected Discord mappings, detached training requirements, and deleted transition requirements.
+
+Reordering accepts `{ ranks: [{ id, orderIndex }] }` with a nonempty array, unique positive Int32 IDs, and nonnegative Int32 order values. All referenced ranks must exist before changes commit. The mutation and per-rank audit records are atomic; missing IDs return 404 without partial changes. The response is `data: null`.
+
 ## Verification and remaining rollout
 
 Every endpoint and supported method must have tests, even once overall coverage reaches its target. Cover both authentication modes, invalid/inactive/revoked tokens, allowed/forbidden actions, ownership/hierarchy, payloads, response contracts, pagination, database mutations/rollback, audit actors/redaction, and UTC offset/daylight-saving/date boundaries. Use unit tests with Prisma test doubles plus isolated Prisma-managed local PGlite integration tests through Prisma Client. Do not use raw SQL queries or access the development database. Integration tests check actual relational behavior and transaction rollback in the local emulator; they do not establish production PostgreSQL deployment, concurrency, or performance guarantees.

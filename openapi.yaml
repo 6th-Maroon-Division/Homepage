@@ -2070,17 +2070,109 @@ paths:
     get:
       tags:
         - Ranks
-      summary: List all ranks
+      summary: List ranks
+      description: Requires an authenticated session user. Active database bot tokens act as superadmin. Returns ascending-ID
+        cursor pages. General catalog reads are not audited. Clients should fetch all pages and sort by orderIndex for
+        rank display.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+          description: Values above 100 are clamped to 100.
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            pattern: ^[0-9]+$
+          description: Positive 32-bit rank ID from meta.nextCursor; returns ranks with greater IDs in ascending order.
       responses:
         "200":
-          description: List of ranks
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Rank"
+                  meta:
+                    type: object
+                    required:
+                      - limit
+                      - nextCursor
+                    properties:
+                      limit:
+                        type: integer
+                        minimum: 1
+                        maximum: 100
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
     post:
       tags:
         - Ranks
-      summary: Create rank
+      summary: Create a rank
+      description: Requires rank:create for session users. Active database bot tokens act as superadmin. Mutation and its
+        audit record commit in the same transaction. Duplicate name or abbreviation returns 409.
       security:
-        - bearerAuth:
-            - ranks:manage
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
       requestBody:
         required: true
         content:
@@ -2089,22 +2181,82 @@ paths:
               $ref: "#/components/schemas/RankCreateInput"
       responses:
         "201":
-          description: Rank created
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Rank"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
   /ranks/{id}:
-    get:
-      tags:
-        - Ranks
-      summary: Get rank by ID
-      responses:
-        "200":
-          description: Rank details
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
     patch:
       tags:
         - Ranks
-      summary: Update rank
+      summary: Partially update a rank
+      description: Requires rank:edit for session users. Active database bot tokens act as superadmin. Mutation and its audit
+        record commit in the same transaction. Duplicate name or abbreviation returns 409. Omitted fields retain their
+        existing values. Replaces PUT.
       security:
-        - bearerAuth:
-            - ranks:manage
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
       requestBody:
         required: true
         content:
@@ -2113,24 +2265,132 @@ paths:
               $ref: "#/components/schemas/RankUpdateInput"
       responses:
         "200":
-          description: Rank updated
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Rank"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
     delete:
       tags:
         - Ranks
-      summary: Delete rank
+      summary: Delete a rank
+      description: Requires rank:delete for session users. Active database bot tokens act as superadmin. Missing ranks return
+        404. Ranks assigned to users cannot be deleted and return 409. Successful deletion and audit record commit
+        together. The audit snapshot includes affected Discord mappings, detached training requirements, and deleted
+        transition requirements.
       security:
-        - bearerAuth:
-            - ranks:delete
-      responses:
-        "200":
-          description: Rank deleted
-    put:
-      tags:
-        - TODO
-      summary: TODO document PUT /ranks/{id}
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
       responses:
         "200":
           description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: "null"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
   /ranks/{id}/transitions:
     get:
       tags:
@@ -2289,34 +2549,81 @@ paths:
         "201":
           description: Promotion proposed
   /ranks/reorder:
-    post:
+    patch:
       tags:
         - Ranks
-      summary: Reorder ranks
+      summary: Reorder ranks atomically
+      description: Requires rank:edit for session users. Active database bot tokens act as superadmin. Replaces PUT. Missing
+        rank IDs return 404 with no rank changes. A separate audit entry is written for each changed rank within the
+        same transaction. Empty arrays, duplicate IDs, and invalid numeric values return 422.
       security:
-        - bearerAuth:
-            - ranks:manage
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                rankIds:
-                  type: array
-                  items:
-                    type: integer
-      responses:
-        "200":
-          description: Ranks reordered
-    put:
-      tags:
-        - TODO
-      summary: TODO document PUT /ranks/reorder
+              $ref: "#/components/schemas/RankReorderInput"
       responses:
         "200":
           description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: "null"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
   /signups/{id}/move:
     post:
       tags:
@@ -4974,23 +5281,42 @@ components:
           format: date-time
     Rank:
       type: object
+      required:
+        - id
+        - name
+        - abbreviation
+        - orderIndex
+        - attendanceRequiredSinceLastRank
+        - autoRankupEnabled
+        - createdAt
+        - updatedAt
       properties:
         id:
           type: integer
+          minimum: 1
+          maximum: 2147483647
         name:
           type: string
+          minLength: 1
+          description: Trimmed nonempty unique rank name.
         abbreviation:
           type: string
-        orderIndex:
+          minLength: 1
+          description: Trimmed nonempty unique abbreviation.
+        orderIndex: &a13
           type: integer
-        isActive:
+          minimum: 0
+          maximum: 2147483647
+        attendanceRequiredSinceLastRank:
+          anyOf:
+            - *a13
+            - type: "null"
+        autoRankupEnabled:
           type: boolean
-        color:
-          type: string
-          nullable: true
-        description:
-          type: string
-          nullable: true
+        createdAt:
+          $ref: "#/components/schemas/UtcTimestamp"
+        updatedAt:
+          $ref: "#/components/schemas/UtcTimestamp"
     RadioFrequency:
       type: object
       required:
@@ -5326,43 +5652,53 @@ components:
           nullable: true
     RankCreateInput:
       type: object
+      additionalProperties: false
       required:
         - name
         - abbreviation
+        - orderIndex
       properties:
         name:
           type: string
+          minLength: 1
+          description: Trimmed nonempty unique rank name.
         abbreviation:
           type: string
-        orderIndex:
+          minLength: 1
+          description: Trimmed nonempty unique abbreviation.
+        orderIndex: &a13
           type: integer
-          default: 0
-        isActive:
+          minimum: 0
+          maximum: 2147483647
+        attendanceRequiredSinceLastRank:
+          anyOf:
+            - *a13
+            - type: "null"
+        autoRankupEnabled:
           type: boolean
-          default: true
-        color:
-          type: string
-          nullable: true
-        description:
-          type: string
-          nullable: true
     RankUpdateInput:
       type: object
+      additionalProperties: false
+      minProperties: 1
       properties:
         name:
           type: string
+          minLength: 1
+          description: Trimmed nonempty unique rank name.
         abbreviation:
           type: string
-        orderIndex:
+          minLength: 1
+          description: Trimmed nonempty unique abbreviation.
+        orderIndex: &a13
           type: integer
-        isActive:
+          minimum: 0
+          maximum: 2147483647
+        attendanceRequiredSinceLastRank:
+          anyOf:
+            - *a13
+            - type: "null"
+        autoRankupEnabled:
           type: boolean
-        color:
-          type: string
-          nullable: true
-        description:
-          type: string
-          nullable: true
     RadioFrequencyCreateInput:
       type: object
       additionalProperties: false
@@ -5947,3 +6283,28 @@ components:
           type: boolean
           description: true sets cancelledAt to the current UTC time; false clears it.
       description: startDate is immutable. returnDate cannot precede the saved startDate.
+    RankReorderInput:
+      type: object
+      additionalProperties: false
+      required:
+        - ranks
+      properties:
+        ranks:
+          type: array
+          minItems: 1
+          description: Each rank ID must occur exactly once in the payload. Existing ranks not listed remain unchanged.
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - id
+              - orderIndex
+            properties:
+              id:
+                type: integer
+                minimum: 1
+                maximum: 2147483647
+              orderIndex:
+                type: integer
+                minimum: 0
+                maximum: 2147483647

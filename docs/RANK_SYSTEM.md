@@ -53,9 +53,11 @@ Notes:
 ### Rank CRUD and Ordering
 - `GET /api/ranks`
 - `POST /api/ranks`
-- `PUT /api/ranks/[id]`
+- `PATCH /api/ranks/[id]`
 - `DELETE /api/ranks/[id]`
-- `PUT /api/ranks/reorder`
+- `PATCH /api/ranks/reorder`
+
+These catalog routes use the [canonical API contract](./api/migration-contract.md): user sessions or active superadmin bot tokens, `{ data, meta }` responses, structured errors, strict payloads, and UTC timestamps. GET requires authentication and uses ascending-ID cursor pages; the website retrieves all pages and sorts by `orderIndex` then ID. POST requires `rank:create`, PATCH/reordering require `rank:edit`, and DELETE requires `rank:delete`. PATCH bodies contain editable fields only, excluding IDs and timestamps. Reordering accepts `{ ranks: [{ id, orderIndex }] }`, applies atomically, and audits each rank; DELETE and reorder return `data: null`. Other rank workflows below remain subject to their existing contracts until migrated.
 
 ### Promotions and Eligibility Flow
 - `POST /api/ranks/promotions/propose`
