@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import { usePermission } from '@/app/hooks/usePermissions';
+import { apiList } from '@/lib/api/client';
 
 export default function AdminPromotionsToast() {
   const { data: session } = useSession();
@@ -21,12 +22,12 @@ export default function AdminPromotionsToast() {
       return;
     }
 
+    const controller = new AbortController();
     const checkPending = async () => {
       try {
-        const res = await fetch('/api/ranks/promotions/pending');
-        if (!res.ok) return;
-        const data = await res.json();
-        const count = Array.isArray(data.proposals) ? data.proposals.length : 0;
+        const proposals = await apiList<{ id: number }>('/api/ranks/promotions/pending', { signal: controller.signal });
+        if (controller.signal.aborted) return;
+        const count = proposals.length;
         if (count > 0) {
           showToast(
             `You have ${count} pending promotion${count === 1 ? '' : 's'}.`,
@@ -40,12 +41,13 @@ export default function AdminPromotionsToast() {
         }
         hasShownRef.current = true;
       } catch (error) {
-        console.error('Failed to check pending promotions:', error);
+        if (!controller.signal.aborted) console.error('Failed to check pending promotions:', error);
       }
     };
 
-    checkPending();
-  }, [session, showToast]);
+    void checkPending();
+    return () => controller.abort();
+  }, [session, showToast, hasManagePromotions]);
 
   return null;
 }

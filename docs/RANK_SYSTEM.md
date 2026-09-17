@@ -68,6 +68,8 @@ These catalog routes use the [canonical API contract](./api/migration-contract.m
 - `POST /api/ranks/promotions/[id]/decline`
 - `POST /api/ranks/auto-rankup`
 
+Pending promotion reads use the shared `/api/ranks/promotions/pending` endpoint for sessions and bots. It requires global `rank:manage_promotions`; visibility is filtered before descending-ID cursor pagination. Users see self proposals and lower-hierarchy non-superadmin targets, while superadmins/bots see all. Only single `cursor`/`limit` query keys are accepted. The queue exposes reduced user/rank summaries and audits returned other-user IDs without snapshots. Approval/decline routes below retain their existing contracts.
+
 ### Rank Migration
 - `POST /api/ranks/migrate/preview`
 - `POST /api/ranks/migrate/apply`
@@ -89,7 +91,6 @@ The two user-rank read endpoints use the shared API envelope and support session
 Bulk assignment uses `{ updates: [{ userId, rankId, reason? }] }`, with 1–100 unique users. It shares individual assignment authorization and attendance calculation, checks every target before writes, and commits all updates/history/outbox/audits atomically. Summaries return in input order. The former admin bulk-rank-assign endpoint is removed.
 
 ### Bot Integration Endpoints
-- `GET /api/ranks/bot/promotions`
 - `POST /api/ranks/bot/promotions` (approve by `proposalId` in body)
 - `POST /api/ranks/bot/promotions/[id]/decline`
 
@@ -107,6 +108,8 @@ Bot endpoints use Bearer token auth with `BOT_API_TOKEN`.
 - list pending proposals
 - approve/decline with notes
 - trigger auto-rankup process
+
+Pending promotion reads use the shared `/api/ranks/promotions/pending` endpoint for sessions and bots. It requires global `rank:manage_promotions`; visibility is filtered before descending-ID cursor pagination. Users see self proposals and lower-hierarchy non-superadmin targets, while superadmins/bots see all. Only single `cursor`/`limit` query keys are accepted. The queue exposes reduced user/rank summaries and audits returned other-user IDs without snapshots. Approval/decline routes below retain their existing contracts.
 
 ### Rank Migration (`/admin/ranks/migrate`)
 - strategies: `recalculate`, `grandfather`, `map`

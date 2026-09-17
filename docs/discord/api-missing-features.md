@@ -45,7 +45,7 @@ The inventory below includes legacy routes awaiting consolidation. â€œAvailableâ
 | `POST /bot/attendance/compile` | Available | Compile an ORBAT | Contract must guarantee idempotency |
 | `POST /bot/attendance/backfill` | Available | Administrative recovery | Define whether the Discord bot should call it |
 | `POST /bot/events` | Available | Attendance event ingestion | Not a replacement for availability notes |
-| `GET /bot/promotions/pending` | Available | Manual approval queue | Polling only; define pagination/cursor |
+| `GET /ranks/promotions/pending` | Available | Shared manual approval queue | Descending-ID cursor pagination; only cursor/limit accepted |
 | `POST /bot/promotions/{id}/approve` | Available | Approve proposal | Needs concurrency/error contract and actor audit data |
 | `POST /bot/promotions/{id}/decline` | Available | Decline proposal | Platform already resets attendance baseline |
 | `GET /bot/promotions/auto` | Partial | Recent automatic rank history | Does not cover all manual changes or provide a durable cursor |
@@ -63,6 +63,8 @@ The routes referenced in older bot documentation are now available:
 - a bot-authenticated applied-rank event stream
 
 Embedded signup data remains available from `GET /bot/orbats/{id}`, while the dedicated routes provide pagination and user-specific lookup.
+
+Pending queue reads are consolidated at `GET /ranks/promotions/pending` with active bot bearer authentication or an authorized session. Fetch all cursor pages for the complete visible queue. The reduced proposal DTO includes stored rank IDs, attendance totals/delta, status, UTC creation time, `user: { id, username, discordId }`, and nullable `currentRank`/`nextRank` summaries. It excludes email, avatar, Steam/account fields, and `updatedAt`. Bot reads audit returned target IDs without response snapshots. The old bot queue GET routes are removed; legacy approval/decline POST routes remain unchanged.
 
 ## 4. Priority summary
 

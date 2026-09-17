@@ -4,10 +4,12 @@ This is the agreed target for the website and future Discord bot. Migration is i
 
 ## Shared contract
 
-- Use one canonical business operation for website and bot callers. Accept a valid current user session or active database bot bearer token. Reject missing, invalid, inactive, revoked, and legacy environment credentials. User authorization checks current permissions, ownership, and hierarchy. Bot tokens act as superadmin by explicit product decision; no token scopes are introduced.
+- Use one canonical business operation for website and bot callers. Protected operations accept a valid current user session or active database bot bearer token. Explicitly public operations also support anonymous callers while sharing the same argument, payload, UTC, and response contracts; public access must not be removed merely to standardize authentication. Reject missing credentials on protected operations and reject supplied invalid, inactive, revoked, or legacy environment credentials. User authorization checks current permissions, ownership, and hierarchy. Bot tokens act as superadmin by explicit product decision; no token scopes are introduced.
 - Use consistent resource and field names, JSON bodies, positive numeric database IDs, string Discord IDs, and PATCH for partial updates. Reject unknown payload fields. Distinguish malformed input (400), missing authentication (401), forbidden actions (403), missing resources (404), conflicts (409), and payload validation failures (422).
 - Return `{ data, meta }` on success and `{ error: { code, message, details, correlationId } }` on failure. Do not expose internal errors or credentials. List pagination uses `limit`, `cursor`, and `meta.nextCursor`. Login callbacks, SSE, and file responses keep their required transport formats.
 - Serialize timestamps as ISO 8601 UTC ending in `Z`. Timestamp inputs require `Z` or an explicit offset, which is normalized to UTC; reject ambiguous local timestamps. Use UTC in filters, calculations, audit events, and operational logs. Date-only values remain `YYYY-MM-DD`. Preserve named timezones for recurring calendar schedules and daylight-saving rules. The website converts local input to UTC and converts UTC to the viewer’s timezone for display.
+
+Public access is an endpoint-level decision. The user confirmed that logged-out visitors must be able to browse ORBATs and all data presented by the ORBAT view. Mutations retain authorization. Additional public endpoints and prior migrations that added authentication remain under review; see [public-access review](./public-access-review.md).
 
 ## Audit policy
 
@@ -151,6 +153,16 @@ Updates preserve existing rank, attendance baseline, and rank date, creating mis
 Bulk writes require global `rank:manage_promotions` even for self changes plus live hierarchy authorization for every target. Active bots retain superadmin access. All user/rank references are checked before any write. Missing references return 404, denied targets 403, invalid payloads 422, malformed JSON 400, and transaction/reference conflicts 409. The website limits selection to 100 users and guards against repeated submission while a request is pending.
 
 One serializable transaction preserves each user’s flags, resets the attendance baseline and UTC rank date, and writes history, outbox events, and redacted audits. Bulk attendance now uses the same present-attendance plus legacy calculation as individual assignment; history captures the correct prior rank name and attendance delta. Lower rank order is demotion, with other changes recorded as assignment. Same-rank reset/history behavior is retained. Outbox events use `source: bulk_assignment`; reasons are not included. Profile notifications run safely after commit. A failed target or audit rolls back the whole batch.
+
+## Fourteenth migration batch: pending promotion reads
+
+`GET /api/ranks/promotions/pending` serves both website and bot clients, replacing `/api/bot/promotions/pending` and only the GET method of `/api/ranks/bot/promotions`. The latter’s legacy approval POST remains, and approval/decline mutations are not migrated in this batch.
+
+All callers require global `rank:manage_promotions`, or an active superadmin bot token. Session users see their own proposals plus non-superadmin targets below their hierarchy under that permission; superadmin users and bots see all. Visibility is filtered before pagination. Only `cursor` and `limit` query keys are accepted, with unknown or duplicate keys returning 400. Pages are descending-ID, default 50/cap 100, with actual-lookahead `meta.nextCursor`.
+
+The reduced DTO includes `id`, `userId`, stored `currentRankId`/`nextRankId`, proposal attendance total/delta, `status`, UTC `createdAt`, `user: { id, username, discordId }`, and nullable current/next rank summaries `{ id, name, abbreviation }`. Ranks are resolved from the proposal’s snapshot IDs. Email, avatar, Steam/account fields, and `updatedAt` are excluded.
+
+Audit only returned other-user IDs, excluding the actor and lookahead rows; bots audit all returned users. Empty and self-only pages are not audited. Audit records have request/target metadata and no data snapshots; required audit failure returns 500. Website queue and notification counts use the same shared list, collecting all pages.
 
 ## Verification and remaining rollout
 

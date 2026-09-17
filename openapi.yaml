@@ -902,96 +902,6 @@ paths:
           description: Unauthorized - invalid or missing bot API token
         "500":
           description: Internal server error
-  /bot/promotions/pending:
-    get:
-      tags:
-        - Bot
-        - Ranks
-      summary: Get pending promotions
-      description: |
-        Returns a list of pending promotion proposals that the bot can approve or decline.
-        Includes user details, current rank, proposed rank, and proposal reason.
-      security:
-        - apiKey: []
-      parameters:
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 50
-          description: Maximum number of promotions to return
-      responses:
-        "200":
-          description: List of pending promotions
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  pendingPromotions:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        id:
-                          type: integer
-                          example: 123
-                        userId:
-                          type: integer
-                          example: 42
-                        username:
-                          type: string
-                          example: Soldier_John
-                        discordId:
-                          type: string
-                          nullable: true
-                          example: "123456789012345678"
-                        steamId:
-                          type: string
-                          nullable: true
-                          example: "76561198000000000"
-                        currentRank:
-                          type: object
-                          nullable: true
-                          properties:
-                            id:
-                              type: integer
-                            name:
-                              type: string
-                            abbreviation:
-                              type: string
-                        proposedRank:
-                          type: object
-                          properties:
-                            id:
-                              type: integer
-                            name:
-                              type: string
-                            abbreviation:
-                              type: string
-                        proposedById:
-                          type: integer
-                          nullable: true
-                        proposedByUsername:
-                          type: string
-                          nullable: true
-                        reason:
-                          type: string
-                          nullable: true
-                        createdAt:
-                          type: string
-                          format: date-time
-                          example: 2024-01-15T10:00:00.000Z
-                  total:
-                    type: integer
-                    example: 5
-        "401":
-          description: Unauthorized - invalid or missing bot API token
-        "500":
-          description: Internal server error
   /bot/signups:
     post:
       tags:
@@ -2345,15 +2255,6 @@ paths:
         "401":
           description: Unauthorized
   /ranks/bot/promotions:
-    get:
-      tags:
-        - Ranks
-      summary: Get bot promotions
-      security:
-        - apiKey: []
-      responses:
-        "200":
-          description: Bot promotions data
     post:
       tags:
         - Ranks
@@ -2444,13 +2345,104 @@ paths:
     get:
       tags:
         - Ranks
-      summary: Get pending promotions
+      summary: List visible pending promotion proposals
+      description: "Requires rank:manage_promotions globally for session users. Active database bot tokens act as superadmin.
+        Only cursor and limit query parameters are accepted; unknown or duplicate parameters return 400. Rows are
+        filtered for visibility before descending-ID pagination: session users see self proposals and non-superadmin
+        targets below their rank:manage_promotions hierarchy. Superadmin users and active bot tokens see all. Audit only
+        other users actually included in the returned page, excluding self and lookahead rows; bots audit all returned
+        users. Empty/self-only pages are not audited. Audit records contain target/request metadata without snapshots;
+        audit failure returns 500. This route replaces both legacy bot queue GETs; approval and decline mutations are
+        unchanged."
       security:
-        - bearerAuth:
-            - ranks:manage_promotions
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+          description: Values above 100 are clamped to 100.
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            pattern: ^[0-9]+$
+          description: Positive 32-bit proposal ID from meta.nextCursor; returns smaller IDs in descending order.
       responses:
         "200":
-          description: List of pending promotions
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PendingPromotion"
+                  meta:
+                    type: object
+                    required:
+                      - limit
+                      - nextCursor
+                    properties:
+                      limit:
+                        type: integer
+                        minimum: 1
+                        maximum: 100
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
   /ranks/promotions/propose:
     post:
       tags:
@@ -7730,3 +7722,76 @@ components:
                   - "null"
                 description: Trimmed; empty strings become null. Reasons remain in history notes, are redacted in audits, and are not
                   included in rank-change events.
+    PendingPromotion:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - userId
+        - currentRankId
+        - nextRankId
+        - attendanceTotalAtProposal
+        - attendanceDeltaSinceLastRank
+        - status
+        - createdAt
+        - user
+        - currentRank
+        - nextRank
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        currentRankId:
+          type: integer
+        nextRankId:
+          type: integer
+        attendanceTotalAtProposal:
+          type: integer
+        attendanceDeltaSinceLastRank:
+          type: integer
+        status:
+          type: string
+        createdAt:
+          $ref: "#/components/schemas/UtcTimestamp"
+        user:
+          type: object
+          additionalProperties: false
+          required:
+            - id
+            - username
+            - discordId
+          properties:
+            id:
+              type: integer
+            username:
+              type:
+                - string
+                - "null"
+            discordId:
+              type:
+                - string
+                - "null"
+        currentRank:
+          anyOf:
+            - &a18
+              type: object
+              additionalProperties: false
+              required:
+                - id
+                - name
+                - abbreviation
+              properties:
+                id:
+                  type: integer
+                name:
+                  type: string
+                abbreviation:
+                  type: string
+            - type: "null"
+        nextRank:
+          anyOf:
+            - *a18
+            - type: "null"
+      description: Reduced pending proposal DTO. Rank summaries resolve the proposal’s stored rank IDs; they do not substitute
+        the user’s current rank. No email, avatar, Steam/account data, or updatedAt is returned.

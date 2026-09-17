@@ -11,61 +11,6 @@ function validateBotToken(request: NextRequest): Promise<boolean> {
 }
 
 /**
- * GET /api/ranks/bot/promotions - Get all pending promotion proposals
- */
-export async function GET(request: NextRequest) {
-  try {
-    if (!(await validateBotToken(request))) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const proposals = await prisma.promotionProposal.findMany({
-      where: { status: 'pending' },
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            avatarUrl: true,
-          },
-        },
-      },
-      orderBy: { createdAt: 'asc' },
-    });
-
-    // Fetch rank names for display
-    const ranksToFetch = new Set<number>();
-    proposals.forEach((p) => {
-      ranksToFetch.add(p.currentRankId);
-      ranksToFetch.add(p.nextRankId);
-    });
-
-    const ranks = await prisma.rank.findMany({
-      where: { id: { in: Array.from(ranksToFetch) } },
-      select: { id: true, name: true, abbreviation: true },
-    });
-
-    const rankMap = new Map(ranks.map((r) => [r.id, r]));
-
-    const serialized = proposals.map((p) => ({
-      id: p.id,
-      userId: p.userId,
-      username: p.user.username,
-      currentRank: rankMap.get(p.currentRankId),
-      nextRank: rankMap.get(p.nextRankId),
-      attendanceTotalAtProposal: p.attendanceTotalAtProposal,
-      attendanceDeltaSinceLastRank: p.attendanceDeltaSinceLastRank,
-      createdAt: p.createdAt.toISOString(),
-    }));
-
-    return NextResponse.json(serialized);
-  } catch (error) {
-    console.error('Error fetching pending promotions:', error);
-    return NextResponse.json({ error: 'Failed to fetch promotions' }, { status: 500 });
-  }
-}
-
-/**
  * POST /api/ranks/bot/promotions/approve - Approve a promotion (called by bot)
  */
 export async function POST(request: NextRequest) {

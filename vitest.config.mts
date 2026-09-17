@@ -22,6 +22,7 @@ export default defineConfig({
         'app/api/users/[[]id]/rank/route.ts', 'app/api/users/[[]id]/rank-history/route.ts',
         'app/api/users/[[]id]/status/route.ts', 'app/api/users/status/route.ts',
         'app/api/users/ranks/route.ts',
+        'app/api/ranks/promotions/pending/route.ts',
         'lib/api/**/*.ts', 'lib/notification-preferences.ts',
         'app/api/bot-tokens/route.ts', 'app/api/bot-tokens/[[]id]/route.ts',
         'app/api/users/[[]id]/notification-preferences/route.ts', 'app/api/audit-logs/route.ts',

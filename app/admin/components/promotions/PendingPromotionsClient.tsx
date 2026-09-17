@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
+import { apiList } from '@/lib/api/client';
 
 type Rank = {
   id: number;
@@ -22,7 +23,7 @@ type Proposal = {
   user: {
     id: number;
     username: string | null;
-    email: string | null;
+    discordId: string | null;
   };
   currentRank: Rank | null;
   nextRank: Rank | null;
@@ -36,24 +37,31 @@ export default function PendingPromotionsClient() {
   const [isActing, setIsActing] = useState(false);
   const [isRunningAutoRankup, setIsRunningAutoRankup] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const proposalRequest = useRef<AbortController | null>(null);
 
   const fetchProposals = useCallback(async () => {
+    proposalRequest.current?.abort();
+    const controller = new AbortController();
+    proposalRequest.current = controller;
     setIsLoading(true);
     try {
-      const res = await fetch('/api/ranks/promotions/pending');
-      if (!res.ok) throw new Error('Failed to load proposals');
-      const data = await res.json();
-      setProposals(data.proposals || []);
+      const data = await apiList<Proposal>('/api/ranks/promotions/pending', { signal: controller.signal });
+      if (controller.signal.aborted) return;
+      setProposals(data);
+      setSelected(previous => new Set([...previous].filter(id => data.some(proposal => proposal.id === id))));
     } catch (error) {
-      console.error(error);
-      showError('Failed to load pending promotions');
+      if (controller.signal.aborted) return;
+      setProposals([]);
+      setSelected(new Set());
+      showError(error instanceof Error ? error.message : 'Failed to load pending promotions');
     } finally {
-      setIsLoading(false);
+      if (!controller.signal.aborted) setIsLoading(false);
     }
   }, [showError]);
 
   useEffect(() => {
-    fetchProposals();
+    void fetchProposals();
+    return () => proposalRequest.current?.abort();
   }, [fetchProposals]);
 
   useEffect(() => {
@@ -329,11 +337,6 @@ export default function PendingPromotionsClient() {
                     </td>
                     <td className="px-6 py-4" style={{ color: 'var(--foreground)' }}>
                       <div className="font-medium">{proposal.user.username || `User #${proposal.userId}`}</div>
-                      {proposal.user.email && (
-                        <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-                          {proposal.user.email}
-                        </div>
-                      )}
                     </td>
                     <td className="px-6 py-4" style={{ color: 'var(--foreground)' }}>
                       {proposal.currentRankLabel}
