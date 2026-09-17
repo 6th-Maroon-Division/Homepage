@@ -4541,6 +4541,87 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiFailure"
+    patch:
+      tags:
+        - Ranks
+      summary: Assign or demote a user’s rank
+      description: Requires rank:manage_promotions globally (including self changes) and live hierarchy authorization against
+        the target user under the same permission for session users. Active database bot tokens act as superadmin.
+        Mutation authorization is independent of the GET user:manage rule. Missing users/ranks return 404; invalid
+        payloads return 422; transaction/reference conflicts return 409 for refresh and retry. A lower orderIndex than
+        the previous rank is recorded as demotion; other changes are assignment. A first assignment creates missing
+        user-rank state. Even assigning the same rank resets the attendance baseline and creates history.
+        Retired/interview flags are preserved. The rank update, UTC rank date, history entry, user.rank_changed outbox
+        event, and redacted audit commit together. Returns the same summary as GET with reset baseline and
+        attendanceDelta=0.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserRankPatchInput"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/UserRankSummary"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
   /users/{id}/rank-history:
     parameters:
       - name: id
@@ -4654,30 +4735,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiFailure"
-  /users/{id}/rank/assign:
-    post:
-      tags:
-        - Users
-        - Ranks
-      summary: Assign rank with options
-      security:
-        - bearerAuth:
-            - user:manage_ranks
-      responses:
-        "200":
-          description: Rank assigned with options
-  /users/{id}/rank/demote:
-    post:
-      tags:
-        - Users
-        - Ranks
-      summary: Demote user
-      security:
-        - bearerAuth:
-            - user:manage_ranks
-      responses:
-        "200":
-          description: User demoted
   /users/{id}/retired/toggle:
     post:
       tags:
@@ -7387,3 +7444,19 @@ components:
         createdAt:
           $ref: "#/components/schemas/UtcTimestamp"
       description: Common website/bot history DTO. Legacy bot note, userId, and actor-ID extras are not included.
+    UserRankPatchInput:
+      type: object
+      additionalProperties: false
+      required:
+        - rankId
+      properties:
+        rankId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        reason:
+          type:
+            - string
+            - "null"
+          description: Trimmed; an empty string becomes null. Stored in rank history, redacted from audits, and omitted from the
+            rank-change event.

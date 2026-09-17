@@ -41,24 +41,24 @@ export function getEligibilityReasonForRankupLane(nextRankAutoRankupEnabled: boo
  * Get current attendance count for rank eligibility, including legacy data
  * This counts only present attendance on main operations from all time periods
  */
-export async function getCurrentAttendance(userId: number): Promise<number> {
+export async function getCurrentAttendance(userId: number, database: Pick<typeof prisma, 'attendance' | 'legacyAttendanceData' | 'legacyUserData'> = prisma): Promise<number> {
   // Count attendance from new system
   // Fetch counts and legacy user data in parallel to reduce latency
   const [newAttendanceCount, legacyAttendanceCount, legacyUserData] = await Promise.all([
-    prisma.attendance.count({
+    database.attendance.count({
       where: {
         userId,
         orbat: { isMainOp: true },
         status: { in: PRESENT_STATUSES_ARRAY },
       },
     }),
-    prisma.legacyAttendanceData.count({
+    database.legacyAttendanceData.count({
       where: {
         mappedUserId: userId,
         legacyStatus: { in: ['P'] }, // Only count Present status from legacy data
       },
     }),
-    prisma.legacyUserData.findMany({
+    database.legacyUserData.findMany({
       where: {
         mappedUserId: userId,
         isApplied: true, // Only count if legacy data has been applied

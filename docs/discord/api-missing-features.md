@@ -460,6 +460,12 @@ History uses descending-ID cursor pagination with default 50/cap 100 and `{ data
 
 Other-user reads, including all bot reads and empty target histories, are audited using target/request metadata without response records or decline reasons. The applied-rank event and current-user endpoints remain sufficient for routine synchronization; history is available for diagnostics and user-visible history.
 
+### Shared rank assignment
+
+Bots and authorized website users assign or demote through `PATCH /users/{id}/rank` with `{ rankId, reason? }`; the former separate assign/demote URLs are removed. Users require global `rank:manage_promotions` plus target hierarchy authorization, even for self changes. Active bot tokens qualify as superadmin. GET’s `user:manage` permission is independent of mutation authorization.
+
+A lower rank order is recorded as demotion; other changes are assignment. Same-rank assignment still resets the attendance baseline and creates history. The rank update, UTC rank date, history, `user.rank_changed` outbox event, and redacted audit are atomic. The optional reason remains in history notes and is excluded from the outbox event. PATCH returns the shared updated rank summary.
+
 ### Training announcement metadata
 
 Do not add web-platform message metadata solely to support Discord reply forwarding until the product decisions in the bot design are settled. The bot can store its own Discord announcement message reference because that is operational Discord state.

@@ -122,11 +122,19 @@ Replacement and an ID-only `rank_requirements.updated` audit record commit in on
 
 ## Tenth migration batch: user rank reads
 
-`GET /api/users/{id}/rank` and `GET /api/users/{id}/rank-history` accept user sessions or active bot tokens. Access requires self ownership, live hierarchy-aware `user:manage` for another user, or superadmin. The `me` alias is session-only; other IDs must be positive Int32 values. The previously unauthenticated rank-summary read now requires authentication. Rank assignment and demotion mutations are outside this batch.
+`GET /api/users/{id}/rank` and `GET /api/users/{id}/rank-history` accept user sessions or active bot tokens. Access requires self ownership, live hierarchy-aware `user:manage` for another user, or superadmin. The `me` alias is session-only; other IDs must be positive Int32 values. The previously unauthenticated rank-summary read now requires authentication. Rank assignment and demotion mutations are covered separately in the next batch.
 
 The summary retains `userId`, nullable `currentRank`, `retired`, `interviewDone`, `attendanceSinceLastRank`, `attendanceTotal`, `attendanceDelta`, and UTC `lastRankedUpAt`; missing user-rank state returns 404. History replaces `/api/bot/users/{userId}/rank-history` and page-number pagination with descending-ID cursor pages, default 50/cap 100. The `page` query is rejected with 400; the website requests 20 rows and manages cursors locally.
 
 Both clients receive history entries containing only `id`, `previousRankName`, `newRankName`, `attendanceTotalAtChange`, `attendanceDeltaSinceLastRank`, `triggeredBy`, `outcome`, `declineReason`, and UTC `createdAt`. Legacy bot `note`, `userId`, and actor-ID extras are removed. Other-user reads are audited, including bot reads and empty target histories, using target/request metadata only. Rank records and decline reasons are not copied into audit logs. Self-reads are not audited; failure to persist a required audit returns 500.
+
+## Eleventh migration batch: user rank assignment
+
+`PATCH /api/users/{id}/rank` replaces separate rank-assign and rank-demote routes. The strict payload is `{ rankId, reason? }`: `rankId` is a required positive numeric Int32 value; `reason` is optional nullable text, trimmed with empty strings becoming null. The session-only `me` alias remains available; bots must supply numeric user IDs. Existing GET behavior is preserved.
+
+Mutations require global `rank:manage_promotions` even for self changes, plus live target hierarchy authorization under that permission. They do not require the separate `user:manage` permission used by GET. Active bot tokens retain superadmin rights. Missing target users/ranks return 404, invalid payloads 422, malformed arguments/JSON 400, and transaction/reference conflicts 409 for refresh/retry.
+
+The transaction creates user-rank state on first assignment or updates it while preserving retired/interview flags. It resets the attendance baseline and rank timestamp, writes history, writes a `user.rank_changed` outbox event, and saves a redacted audit. A lower rank order than the previous rank is recorded as demotion; all other changes are assignment. Assigning the same rank retains the existing baseline-reset/history behavior. Reasons remain in history notes, are redacted in audit records, and are excluded from the outbox event. The response is the same rank summary as GET, with the updated baseline, UTC timestamp, and zero attendance delta.
 
 ## Verification and remaining rollout
 

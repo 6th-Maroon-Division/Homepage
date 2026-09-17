@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import TrainingStatusBadge from '@/app/components/trainings/TrainingStatusBadge';
+import { apiRequest } from '@/lib/api/client';
 
 type UserPermission = {
   id: number;
@@ -1164,16 +1165,11 @@ export default function UserDetailClient({
 
                     setIsPromoting(true);
                     try {
-                      const response = await fetch(`/api/users/${user.id}/rank/assign`, {
-                        method: 'POST',
+                      await apiRequest(`/api/users/${user.id}/rank`, {
+                        method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ rankId: promoteRank.id }),
                       });
-
-                      if (!response.ok) {
-                        const data = await response.json().catch(() => ({}));
-                        throw new Error(data.error || 'Failed to promote user');
-                      }
 
                       showSuccess(`Promoted to ${promoteRank.abbreviation} - ${promoteRank.name}`);
                       router.refresh();
@@ -1203,16 +1199,11 @@ export default function UserDetailClient({
 
                     setIsDemoting(true);
                     try {
-                      const response = await fetch(`/api/users/${user.id}/rank/demote`, {
-                        method: 'POST',
+                      await apiRequest(`/api/users/${user.id}/rank`, {
+                        method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ rankId: demoteRank.id, reason }),
                       });
-
-                      if (!response.ok) {
-                        const data = await response.json().catch(() => ({}));
-                        throw new Error(data.error || 'Failed to demote user');
-                      }
 
                       showSuccess(`Demoted to ${demoteRank.abbreviation} - ${demoteRank.name}`);
                       router.refresh();
