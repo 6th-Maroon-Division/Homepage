@@ -1,5 +1,7 @@
 'use client';
 
+import { apiRequest } from '@/lib/api/client';
+
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import MoveSignupModal from '@/app/components/orbat/MoveSignupModal';
@@ -42,7 +44,7 @@ type ClientFrequency = {
     isAdditional: boolean;
     channel?: string | null;
     callsign?: string | null;
-    createdAt: Date;
+    createdAt: string | Date;
   };
 };
 
@@ -259,13 +261,8 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
 
   const refreshOrbat = useCallback(async () => {
     try {
-      const refreshRes = await fetch(`/api/orbats/${initialOrbat.id}/full`);
-      if (!refreshRes.ok) {
-        return;
-      }
-
-      const updatedOrbat = await refreshRes.json();
-      setOrbat(updatedOrbat);
+      const { data } = await apiRequest<ClientOrbat>(`/api/orbats/${initialOrbat.id}/full`);
+      setOrbat(data);
     } catch {
       // fallback interval may recover
     }

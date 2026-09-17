@@ -1,6 +1,6 @@
 # Public-access review
 
-The user confirmed that logged-out visitors must be able to browse operations and all data shown by the ORBAT view. Public endpoints support anonymous access with the common payload/response/UTC conventions. Mutation authorization is unchanged. This is a read-only audit, not authorization to make unrelated endpoints public or to remove existing checks.
+The user confirmed that logged-out visitors must be able to browse operations and all data shown by the ORBAT view. Public endpoints support anonymous access with the common payload/response/UTC conventions. Mutation authorization is unchanged. The review began as a read-only audit. The public full-detail endpoint is now an explicit migration batch; this does not authorize making unrelated endpoints public or removing their checks.
 
 ## Confirmed ORBAT flow
 
@@ -8,13 +8,13 @@ The user confirmed that logged-out visitors must be able to browse operations an
 |---|---|
 | `/orbats` initial page | [Page](../../app/orbats/page.tsx) reads ORBATs directly through Prisma without requiring a session. Personal training-session calendar entries are optional authenticated enrichment. |
 | Calendar updates | [CalendarWithOps](../../app/orbats/components/CalendarWithOps.tsx) subscribes to `GET /api/orbats/events` and refreshes `GET /api/orbats/calendar`. Both allow anonymous ORBAT data; the calendar handles its session as optional. |
-| `/orbats/{id}` initial detail | [Page](../../app/orbats/[id]/page.tsx) loads and serializes operation data directly through Prisma without requiring authentication. |
-| Detail updates | [OrbatDetailClient](../../app/orbats/components/OrbatDetailClient.tsx) subscribes to `GET /api/orbats/{id}/events` and refreshes `GET /api/orbats/{id}/full`. Both currently allow anonymous access; SSE uses the public event projection. |
+| `/orbats/{id}` initial detail | [Page](../../app/orbats/[id]/page.tsx) loads the shared `getPublicOrbat` projection without requiring authentication. |
+| Detail updates | [OrbatDetailClient](../../app/orbats/components/OrbatDetailClient.tsx) subscribes to `GET /api/orbats/{id}/events` and refreshes `GET /api/orbats/{id}/full`. Both allow anonymous access; full detail uses the shared envelope/projection and SSE retains its public event projection. |
 | Roles, requirements, ranks, frequencies | Initial detail and full-refresh responses embed these values. The public detail does not fetch the migrated standalone radio-frequency, subslot-definition, rank, or training catalogs. |
 | Optional user controls | `/api/user/current`, ORBAT eligibility, and qualification-panel requests can fail authentication for anonymous visitors. The client retains ordinary viewing and hides or omits personalized/staff controls. |
 | Editing catalog requests | Migrated radio-frequency/subslot requests occur in administrative [OrbatForm](../../app/components/orbat/OrbatForm.tsx), not the public detail view. |
 
-No regression from the migrated catalog authentication was identified in this confirmed public ORBAT path. Preserve anonymous initial rendering, full refresh, calendar updates, and public event streams during future migrations. Anonymous regression tests for these ORBAT flows are required as part of that future migration; this read-only review does not claim those tests have been added or run.
+No regression from the migrated catalog authentication was identified in this confirmed public ORBAT path. Preserve anonymous initial rendering, full refresh, calendar updates, and public event streams during future migrations. The current public-detail batch adds anonymous regression coverage for full-detail reads and the shared server-rendering projection. Collection/calendar/event regression coverage remains required for their future migration.
 
 ## Additional candidates needing a product decision
 

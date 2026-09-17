@@ -1452,15 +1452,72 @@ paths:
               schema:
                 type: object
   /orbats/{id}/full:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
     get:
       tags:
         - ORBATs
-      summary: Get full ORBAT with signups
+      summary: Get public ORBAT detail
+      description: "Explicitly public: anonymous callers, valid live user sessions, and active bot tokens receive the same
+        visible operation projection. An invalid supplied Authorization header returns 401 without anonymous fallback;
+        stale sessions may read anonymously. No query parameters are accepted (400 if supplied). Shared with
+        server-rendered ORBAT detail. Signup/note user records expose display fields only, without
+        email/accounts/grants. Visible attendance-note reasons/status/minutes remain public. Side operations have no
+        rank/training requirements. All timestamps, including nested notes/frequency dates, are UTC Z strings. Reads
+        audit unique returned signup/note people: exclude a session user’s own ID; anonymous and bot callers include all
+        returned IDs. Audits have actor/target metadata and no snapshots. No people means no general read audit;
+        required audit failure returns 500."
+      security:
+        - {}
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
       responses:
         "200":
-          description: Full ORBAT with signups
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PublicOrbat"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Invalid supplied Authorization credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
         "404":
-          description: ORBAT not found
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
   /orbats/{id}/qualifications:
     get:
       tags:
@@ -7795,3 +7852,282 @@ components:
             - type: "null"
       description: Reduced pending proposal DTO. Rank summaries resolve the proposal’s stored rank IDs; they do not substitute
         the user’s current rank. No email, avatar, Steam/account data, or updatedAt is returned.
+    PublicOrbatRankDisplay:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - abbreviation
+      properties:
+        name: &a19
+          type: string
+        abbreviation: *a19
+    PublicOrbatSignupUser:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - username
+        - rankName
+        - rankAbbreviation
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        rankName: &a19
+          type:
+            - string
+            - "null"
+        rankAbbreviation: *a19
+    PublicOrbatNoteUser:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - username
+        - userRank
+      properties:
+        id:
+          type: integer
+        username:
+          type:
+            - string
+            - "null"
+        userRank:
+          anyOf:
+            - type: object
+              additionalProperties: false
+              required:
+                - currentRank
+              properties:
+                currentRank:
+                  anyOf:
+                    - $ref: "#/components/schemas/PublicOrbatRankDisplay"
+                    - type: "null"
+            - type: "null"
+    PublicOrbatAttendanceNote:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - orbatId
+        - userId
+        - status
+        - reason
+        - lateMinutes
+        - leaveEarlyMinutes
+        - createdAt
+        - updatedAt
+        - user
+      properties:
+        id: &a19
+          type: integer
+        orbatId: *a19
+        userId: *a19
+        status:
+          type: string
+          enum:
+            - absent
+            - unsure
+            - late_unsure
+        reason:
+          type:
+            - string
+            - "null"
+        lateMinutes:
+          type:
+            - integer
+            - "null"
+        leaveEarlyMinutes:
+          type:
+            - integer
+            - "null"
+        createdAt:
+          $ref: "#/components/schemas/UtcTimestamp"
+        updatedAt:
+          $ref: "#/components/schemas/UtcTimestamp"
+        user:
+          $ref: "#/components/schemas/PublicOrbatNoteUser"
+    PublicOrbatSlot:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - orderIndex
+        - maxSignups
+        - squadRoleId
+        - requiredTrainings
+        - requiredRanks
+        - requiredTraining
+        - requiredRank
+        - signups
+      properties:
+        id: &a19
+          type: integer
+        name: &a20
+          type: string
+        orderIndex: *a19
+        maxSignups: *a19
+        squadRoleId:
+          type:
+            - integer
+            - "null"
+        requiredTrainings:
+          type: array
+          items: &a21
+            type: object
+            additionalProperties: false
+            required:
+              - id
+              - name
+            properties:
+              id: *a19
+              name: *a20
+        requiredRanks:
+          type: array
+          items: &a22
+            type: object
+            additionalProperties: false
+            required:
+              - id
+              - name
+              - abbreviation
+            properties:
+              id: *a19
+              name: *a20
+              abbreviation: *a20
+        requiredTraining:
+          anyOf:
+            - *a21
+            - type: "null"
+        requiredRank:
+          anyOf:
+            - *a22
+            - type: "null"
+        signups:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - id
+              - user
+            properties:
+              id: *a19
+              user:
+                anyOf:
+                  - $ref: "#/components/schemas/PublicOrbatSignupUser"
+                  - type: "null"
+    PublicOrbatFrequency:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - orbatId
+        - radioFrequencyId
+        - radioFrequency
+      properties:
+        id: &a19
+          type: integer
+        orbatId: *a19
+        radioFrequencyId: *a19
+        radioFrequency:
+          $ref: "#/components/schemas/RadioFrequency"
+    PublicOrbat:
+      type: object
+      additionalProperties: false
+      required:
+        - isSideOp
+        - id
+        - name
+        - description
+        - eventDate
+        - startTime
+        - endTime
+        - startsAtUtc
+        - endsAtUtc
+        - timezone
+        - bluforCountry
+        - bluforRelationship
+        - opforCountry
+        - opforRelationship
+        - indepCountry
+        - indepRelationship
+        - iedThreat
+        - civilianRelationship
+        - rulesOfEngagement
+        - airspace
+        - inGameTimezone
+        - operationDay
+        - squads
+        - frequencies
+        - attendanceNotes
+        - tempFrequencies
+      properties:
+        isSideOp:
+          type: boolean
+        id: &a20
+          type: integer
+        name: &a21
+          type: string
+        description: &a19
+          type:
+            - string
+            - "null"
+        eventDate:
+          anyOf:
+            - $ref: "#/components/schemas/UtcTimestamp"
+            - type: "null"
+        startTime: *a19
+        endTime: *a19
+        startsAtUtc:
+          anyOf:
+            - $ref: "#/components/schemas/UtcTimestamp"
+            - type: "null"
+        endsAtUtc:
+          anyOf:
+            - $ref: "#/components/schemas/UtcTimestamp"
+            - type: "null"
+        timezone: *a19
+        bluforCountry: *a19
+        bluforRelationship: *a19
+        opforCountry: *a19
+        opforRelationship: *a19
+        indepCountry: *a19
+        indepRelationship: *a19
+        iedThreat: *a19
+        civilianRelationship: *a19
+        rulesOfEngagement: *a19
+        airspace: *a19
+        inGameTimezone: *a19
+        operationDay: *a19
+        squads:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - id
+              - name
+              - orderIndex
+              - slots
+            properties:
+              id: *a20
+              name: *a21
+              orderIndex: *a20
+              slots:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PublicOrbatSlot"
+        frequencies:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicOrbatFrequency"
+        attendanceNotes:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicOrbatAttendanceNote"
+        tempFrequencies:
+          description: Existing JSON temporary-frequency value, retained from the operation.

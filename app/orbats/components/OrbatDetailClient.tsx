@@ -1,5 +1,7 @@
 'use client';
 
+import { apiRequest } from '@/lib/api/client';
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useToast } from '@/app/components/ui/ToastContainer';
@@ -63,7 +65,7 @@ type ClientFrequency = {
     isAdditional: boolean;
     channel?: string | null;
     callsign?: string | null;
-    createdAt: Date;
+    createdAt: string | Date;
   };
 };
 
@@ -376,13 +378,8 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
 
   const refreshOrbat = useCallback(async () => {
     try {
-      const res = await fetch(`/api/orbats/${initialOrbat.id}/full`);
-      if (!res.ok) {
-        return;
-      }
-
-      const updated = await res.json();
-      setOrbat(updated);
+      const { data } = await apiRequest<ClientOrbat>(`/api/orbats/${initialOrbat.id}/full`);
+      setOrbat(data);
     } catch {
       // fallback interval may recover
     }

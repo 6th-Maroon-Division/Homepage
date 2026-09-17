@@ -13,7 +13,7 @@ Public access is an endpoint-level decision. The user confirmed that logged-out 
 
 ## Audit policy
 
-Log creates, updates, deletes, permission changes, token management, and denied API requests. Log reads of another user’s data, including bulk reads and all bot reads of user data. Do not log self-reads or general-information reads. Record actor kind and user/token ID, target user IDs/resources, action, timestamp, outcome, and request correlation ID. A future initiating Discord user is separate context, never a replacement for the authenticated bot identity.
+Log creates, updates, deletes, permission changes, token management, and denied API requests. Log reads of another user’s data, including bulk reads and all bot reads of user data. Do not log self-reads or general-information reads. Public views that return user display data audit anonymous reads with an anonymous actor and the returned target user IDs. Record actor kind and user/token ID, target user IDs/resources, action, timestamp, outcome, and request correlation ID. A future initiating Discord user is separate context, never a replacement for the authenticated bot identity.
 
 Record relevant before/after mutation values with secrets and sensitive content removed. Do not capture tokens, credentials, sensitive message content, or returned personal data in read events. Save successful mutation records in the same database transaction as the mutation; failures roll both back. Denied requests remain security events. Restrict audit viewing to superadmin sessions and active bot tokens; provide no API to edit/delete audit records. The initial retention target is 365 days; enforce it through operational maintenance rather than an endpoint mutation.
 
@@ -163,6 +163,16 @@ All callers require global `rank:manage_promotions`, or an active superadmin bot
 The reduced DTO includes `id`, `userId`, stored `currentRankId`/`nextRankId`, proposal attendance total/delta, `status`, UTC `createdAt`, `user: { id, username, discordId }`, and nullable current/next rank summaries `{ id, name, abbreviation }`. Ranks are resolved from the proposal’s snapshot IDs. Email, avatar, Steam/account fields, and `updatedAt` are excluded.
 
 Audit only returned other-user IDs, excluding the actor and lookahead rows; bots audit all returned users. Empty and self-only pages are not audited. Audit records have request/target metadata and no data snapshots; required audit failure returns 500. Website queue and notification counts use the same shared list, collecting all pages.
+
+## Fifteenth migration batch: public ORBAT detail
+
+`GET /api/orbats/{id}/full` keeps its public URL and visible operation data while adopting the standard `{ data, meta }` envelope, UTC timestamps, and structured errors. `handlePublicApiRequest` supports anonymous callers, valid live user sessions, and active bot tokens with the same public projection. Invalid supplied Authorization credentials return 401 without falling back to anonymous; a stale session can still read anonymously. Invalid/non-Int32 path IDs and any query keys return 400; missing operations return 404.
+
+The shared `getPublicOrbat` projection serves both initial server rendering and API refresh, removing duplicate serialization. It preserves visible operation fields, squads/slots, role and training requirements, signups, frequencies, and attendance notes. Side operations still show no rank/training requirements. All timestamp fields, including nested note and frequency timestamps, use UTC `Z` strings.
+
+Nested signup users contain only display ID/name and rank name/abbreviation. Note users contain display ID/name and the current-rank display projection. Email, accounts, grants, and other unrelated user fields are excluded; visible note reason/status/minute fields remain. Reads audit unique people appearing in returned signups or notes: session users exclude themselves, while anonymous callers and bots include all returned people. These audits have actor/target metadata and no snapshots; anonymous actors are identified as anonymous. Responses with no people do not generate general-read audits.
+
+This batch covers full-detail reads and their shared server-rendering projection. Anonymous regression tests for collection/calendar/event flows remain future work; those routes and editor mutations are unchanged.
 
 ## Verification and remaining rollout
 

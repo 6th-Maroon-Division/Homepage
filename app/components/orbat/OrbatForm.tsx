@@ -1,6 +1,6 @@
 'use client';
 
-import { apiList } from '@/lib/api/client';
+import { apiList, apiRequest } from '@/lib/api/client';
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -410,25 +410,25 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     if (mode === 'edit' && initialData?.id) {
       const fetchOrbatFrequencies = async () => {
         try {
-          const response = await fetch(`/api/orbats/${initialData.id}/full`);
-          if (response.ok) {
-            const orbat = await response.json();
-            if (orbat.frequencies) {
-              const freqIds = orbat.frequencies.map((f: { radioFrequencyId: number }) => f.radioFrequencyId);
-              setSelectedFrequencyIds(freqIds);
-            }
-            if (orbat.tempFrequencies && Array.isArray(orbat.tempFrequencies) && orbat.tempFrequencies.length > 0) {
-              // Load temporary frequencies from the orbat
-              const loadedTempFreqs = orbat.tempFrequencies.map((f: { _id?: string; frequency: string; type: 'SR' | 'LR'; isAdditional: boolean; channel?: string; callsign?: string }) => ({
-                _id: f._id || createClientId(),
-                frequency: f.frequency,
-                type: f.type,
-                isAdditional: f.isAdditional,
-                channel: f.channel || '',
-                callsign: f.callsign || '',
-              }));
-              setTempFrequencies(loadedTempFreqs);
-            }
+          const { data: orbat } = await apiRequest<{
+            frequencies: Array<{ radioFrequencyId: number }>;
+            tempFrequencies: unknown;
+          }>(`/api/orbats/${initialData.id}/full`);
+          if (orbat.frequencies) {
+            const freqIds = orbat.frequencies.map((f: { radioFrequencyId: number }) => f.radioFrequencyId);
+            setSelectedFrequencyIds(freqIds);
+          }
+          if (orbat.tempFrequencies && Array.isArray(orbat.tempFrequencies) && orbat.tempFrequencies.length > 0) {
+            // Load temporary frequencies from the orbat
+            const loadedTempFreqs = orbat.tempFrequencies.map((f: { _id?: string; frequency: string; type: 'SR' | 'LR'; isAdditional: boolean; channel?: string; callsign?: string }) => ({
+              _id: f._id || createClientId(),
+              frequency: f.frequency,
+              type: f.type,
+              isAdditional: f.isAdditional,
+              channel: f.channel || '',
+              callsign: f.callsign || '',
+            }));
+            setTempFrequencies(loadedTempFreqs);
           }
         } catch (error) {
           logClientError('Error fetching orbat frequencies:', error);
