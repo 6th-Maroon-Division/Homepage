@@ -1,6 +1,54 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeTemplateForRead, normalizeTemplateFrequencyIds, normalizeTemplateSlots } from '../lib/orbat-template';
+import { copyOrbatPresetSlots, normalizeTemplateForRead, normalizeTemplateFrequencyIds, normalizeTemplateSlots } from '../lib/orbat-template';
+
+test('previous ORBAT roles load from their relation and can pass form validation', () => {
+  const result = copyOrbatPresetSlots({
+    squads: [{
+      id: 20, name: 'Alpha', orderIndex: 0,
+      slots: [
+        { id: 30, squadRoleId: 7, squadRole: { id: 7, name: 'Medic' }, orderIndex: 0, maxSignups: 2, signups: [{ userId: 1 }] },
+        { id: 31, squadRoleId: 7, squadRole: { id: 7, name: 'Medic' }, orderIndex: 1, maxSignups: 1 },
+      ],
+    }],
+  });
+
+  assert.deepEqual(result, [{
+    name: 'Alpha', orderIndex: 0,
+    subslots: [
+      { squadRoleId: 7, name: 'Medic', orderIndex: 0, maxSignups: 2 },
+      { squadRoleId: 7, name: 'Medic', orderIndex: 1, maxSignups: 1 },
+    ],
+  }]);
+  for (const squad of result) {
+    assert.ok(squad.name.trim());
+    for (const role of squad.subslots) {
+      assert.ok(role.name.trim());
+      assert.ok(Number.isInteger(role.maxSignups) && role.maxSignups > 0);
+    }
+  }
+});
+
+test('saved and legacy presets use the same form shape without source identities', () => {
+  const expected = [{ name: 'Alpha', orderIndex: 0, subslots: [
+    { squadRoleId: 7, name: 'Medic', orderIndex: 0, maxSignups: 1 },
+  ] }];
+  const role = { id: 30, squadRoleId: 7, name: 'Medic', _deleted: true };
+  assert.deepEqual(copyOrbatPresetSlots({ slotsJson: [{ id: 20, name: 'Alpha', slots: [role] }] }), expected);
+  assert.deepEqual(copyOrbatPresetSlots({ slotsJson: JSON.stringify([{ name: 'Alpha', subslots: [role] }]) }), expected);
+  assert.deepEqual(copyOrbatPresetSlots({ slots: [{ name: 'Alpha', subslots: [role] }] }), expected);
+});
+
+test('deleted role definitions and incomplete presets have safe form values', () => {
+  const result = copyOrbatPresetSlots({ squads: [{ name: 'Alpha', slots: [
+    { squadRoleId: null, squadRole: null, maxSignups: null },
+  ] }] });
+  assert.deepEqual(result[0].subslots, [
+    { squadRoleId: null, name: 'Unknown Role', orderIndex: 0, maxSignups: 1 },
+  ]);
+  assert.deepEqual(copyOrbatPresetSlots({}), []);
+  assert.deepEqual(copyOrbatPresetSlots({ slotsJson: '{bad json' }), []);
+});
 
 test('legacy templates are normalized without losing their structure', () => {
   const result = normalizeTemplateForRead({

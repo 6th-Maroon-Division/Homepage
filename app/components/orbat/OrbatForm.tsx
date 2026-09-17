@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '../ui/ToastContainer';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import DualRingTimePicker from '../ui/DualRingTimePicker';
+import { copyOrbatPresetSlots } from '@/lib/orbat-template';
 
 const logClientError = (...args: unknown[]) => {
   if (process.env.NODE_ENV === 'development') {
@@ -294,6 +295,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     
     try {
       const response = await fetch(endpoint);
+      if (!response.ok) throw new Error('Failed to load preset');
       if (response.ok) {
         const data = await response.json();
         
@@ -302,60 +304,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         if (data.description) setDescription(data.description);
         setIsSideOp(Boolean(data.isSideOp));
         
-        // Handle slots - templates use slotsJson as squads with nested slots, orbats use squads
-        let slots = null;
-        interface TemplateSquad {
-          id?: number;
-          name: string;
-          orderIndex: number;
-          slots: TemplateSlot[];
-        }
-        interface TemplateSlot {
-          id?: number;
-          name: string;
-          orderIndex: number;
-          maxSignups?: number;
-          squadRoleId?: number | null;
-        }
-        interface Squad {
-          id?: number;
-          name: string;
-          orderIndex: number;
-          slots: TemplateSlot[];
-        }
-        if (data.slotsJson) {
-          const parsedSlotsJson: unknown = typeof data.slotsJson === 'string' ? JSON.parse(data.slotsJson) : data.slotsJson;
-          const templateSquads = parsedSlotsJson as TemplateSquad[];
-          slots = templateSquads.map((squad) => ({
-            id: squad.id,
-            name: squad.name,
-            orderIndex: squad.orderIndex,
-            subslots: (squad.slots || []).map((slot) => ({
-              id: slot.id,
-              squadRoleId: slot.squadRoleId ?? null,
-              name: slot.name,
-              orderIndex: slot.orderIndex,
-              maxSignups: slot.maxSignups ?? 1,
-            })),
-          }));
-        } else if (data.squads) {
-          const squads = data.squads as unknown as Squad[];
-          slots = squads.map((squad) => ({
-            id: squad.id,
-            name: squad.name,
-            orderIndex: squad.orderIndex,
-            subslots: (squad.slots || []).map((slot) => ({
-              id: slot.id,
-              squadRoleId: slot.squadRoleId ?? null,
-              name: slot.name,
-              orderIndex: slot.orderIndex,
-              maxSignups: slot.maxSignups ?? 1,
-            })),
-          }));
-        } else if (data.slots) {
-          slots = data.slots;
-        }
-        if (slots) setSlots(slots);
+        setSlots(copyOrbatPresetSlots(data));
         
         if (data.bluforCountry) setBluforCountry(data.bluforCountry);
         if (data.bluforRelationship) setBluforRelationship(data.bluforRelationship);
@@ -403,6 +352,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         if (templateId && mode === 'create') {
           try {
             const response = await fetch(`/api/templates/${templateId}`);
+            if (!response.ok) throw new Error('Failed to load template');
             if (response.ok) {
               const template = await response.json();
               
@@ -410,38 +360,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
               if (template.name) setName(`${template.name} - Copy`);
               if (template.description) setDescription(template.description);
               setIsSideOp(Boolean(template.isSideOp));
-              if (template.slotsJson) {
-                const parsedSlotsJson: unknown = typeof template.slotsJson === 'string'
-                  ? JSON.parse(template.slotsJson)
-                  : template.slotsJson;
-                interface TemplateSquad {
-                  id?: number;
-                  name: string;
-                  orderIndex: number;
-                  slots: TemplateSlot[];
-                }
-                interface TemplateSlot {
-                  id?: number;
-                  name: string;
-                  orderIndex: number;
-                  maxSignups?: number;
-                  squadRoleId?: number | null;
-                }
-                const templateSquads = parsedSlotsJson as TemplateSquad[];
-                const mappedSlots = templateSquads.map((squad) => ({
-                  id: squad.id,
-                  name: squad.name,
-                  orderIndex: squad.orderIndex,
-                  subslots: (squad.slots || []).map((slot) => ({
-                    id: slot.id,
-                    squadRoleId: slot.squadRoleId ?? null,
-                    name: slot.name,
-                    orderIndex: slot.orderIndex,
-                    maxSignups: slot.maxSignups ?? 1,
-                  })),
-                }));
-                setSlots(mappedSlots);
-              }
+              setSlots(copyOrbatPresetSlots(template));
               if (template.bluforCountry) setBluforCountry(template.bluforCountry);
               if (template.bluforRelationship) setBluforRelationship(template.bluforRelationship);
               if (template.opforCountry) setOpforCountry(template.opforCountry);
@@ -829,82 +748,73 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     setIsSaving(true);
     setError(null);
 
-    // Validate
-    if (!name.trim()) {
-      setError('OrbAT name is required');
-      setIsSaving(false);
-      return;
-    }
-
-    const startDateTime = buildUtcDateTime(eventDate, startTime);
-    let endDateTime = buildUtcDateTime(eventDate, endTime);
-    const eventDateUtc = buildUtcDateFromLocalDate(eventDate);
-
-    if (eventDate && !eventDateUtc) {
-      setError('Invalid event date');
-      setIsSaving(false);
-      return;
-    }
-
-    if (startDateTime && endDateTime && endDateTime <= startDateTime) {
-      endDateTime.setDate(endDateTime.getDate() + 1);
-    }
-
-    // Prevent creating operations in the past
-    if (mode === 'create' && startDateTime && startDateTime < new Date()) {
-      setError('Cannot create operations in the past');
-      setIsSaving(false);
-      return;
-    }
-
-    if (mode === 'create' && !startDateTime && eventDate) {
-      const [year, month, day] = eventDate.split('-').map(Number);
-      const selectedDate = new Date(year, month - 1, day, 0, 0, 0, 0);
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-
-      if (selectedDate < today) {
-        setError('Cannot create operations with past dates');
-        setIsSaving(false);
-        return;
-      }
-    }
-
-    const activeSlots = slots.filter((s) => !s._deleted);
-    if (activeSlots.length === 0) {
-      setError('At least one slot is required');
-      setIsSaving(false);
-      return;
-    }
-
-    for (const slot of activeSlots) {
-      if (!slot.name.trim()) {
-        setError('All slots must have a name');
-        setIsSaving(false);
-        return;
-      }
-      const activeSubslots = slot.subslots.filter((s) => !s._deleted);
-      if (activeSubslots.length === 0) {
-        setError(`Slot "${slot.name}" must have at least one role`);
-        setIsSaving(false);
-        return;
-      }
-      for (const subslot of activeSubslots) {
-        if (!subslot.name.trim()) {
-          setError('All roles must have a name');
-          setIsSaving(false);
-          return;
-        }
-
-        if (!Number.isInteger(subslot.maxSignups) || subslot.maxSignups < 1) {
-          setError('Max signups must be at least 1 for each role');
-          setIsSaving(false);
-          return;
-        }
-      }
-    }
-
     try {
+      // Validate
+      if (!name.trim()) {
+        setError('OrbAT name is required');
+        return;
+      }
+
+      const startDateTime = buildUtcDateTime(eventDate, startTime);
+      let endDateTime = buildUtcDateTime(eventDate, endTime);
+      const eventDateUtc = buildUtcDateFromLocalDate(eventDate);
+
+      if (eventDate && !eventDateUtc) {
+        setError('Invalid event date');
+        return;
+      }
+
+      if (startDateTime && endDateTime && endDateTime <= startDateTime) {
+        endDateTime.setDate(endDateTime.getDate() + 1);
+      }
+
+      // Prevent creating operations in the past
+      if (mode === 'create' && startDateTime && startDateTime < new Date()) {
+        setError('Cannot create operations in the past');
+        return;
+      }
+
+      if (mode === 'create' && !startDateTime && eventDate) {
+        const [year, month, day] = eventDate.split('-').map(Number);
+        const selectedDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+
+        if (selectedDate < today) {
+          setError('Cannot create operations with past dates');
+          return;
+        }
+      }
+
+      const activeSlots = slots.filter((s) => !s._deleted);
+      if (activeSlots.length === 0) {
+        setError('At least one slot is required');
+        return;
+      }
+
+      for (const slot of activeSlots) {
+        if (!slot.name.trim()) {
+          setError('All slots must have a name');
+          return;
+        }
+        const activeSubslots = slot.subslots.filter((s) => !s._deleted);
+        if (activeSubslots.length === 0) {
+          setError(`Slot "${slot.name}" must have at least one role`);
+          return;
+        }
+        for (const subslot of activeSubslots) {
+          if (!subslot.name.trim()) {
+            setError('All roles must have a name');
+            return;
+          }
+
+          if (!Number.isInteger(subslot.maxSignups) || subslot.maxSignups < 1) {
+            setError('Max signups must be at least 1 for each role');
+            return;
+          }
+        }
+      }
+
       const cleanSquads = (mode === 'edit' ? slots : slots.filter((slot) => !slot._deleted)).map((slot) => ({
         ...(mode === 'edit' && slot.id ? { id: slot.id } : {}),
         name: slot.name,
@@ -962,7 +872,6 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
       if (!response.ok) {
         const data = await response.json().catch(() => ({ error: 'Failed to save OrbAT' }));
         setError(data.error || 'Failed to save OrbAT');
-        setIsSaving(false);
         return;
       }
 
@@ -972,9 +881,10 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
       router.refresh();
     } catch (err) {
       logClientError('Error saving OrbAT:', err);
-      const errorMsg = 'Network error occurred';
+      const errorMsg = 'Failed to save OrbAT. Please check the form and try again.';
       setError(errorMsg);
       showError(errorMsg);
+    } finally {
       setIsSaving(false);
     }
   };
@@ -1006,7 +916,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
             <select
               value={selectedTemplate}
               onChange={(e) => setSelectedTemplate(e.target.value)}
-              disabled={isLoadingTemplates || templates.length === 0}
+              disabled={isLoadingTemplates || (templates.length === 0 && recentOrbats.length === 0)}
               className="border rounded-lg px-3 py-2 text-sm"
               style={{
                 backgroundColor: 'var(--background)',
