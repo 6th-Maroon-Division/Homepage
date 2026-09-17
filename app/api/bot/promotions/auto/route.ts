@@ -1,3 +1,5 @@
+import { parseCursorPagination } from '@/lib/api/validation';
+import { parsePromotionLookback } from '@/lib/api/bot-query-validation';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { validateBotTokenLegacy } from '@/lib/bot-token-validation';
@@ -13,15 +15,12 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const days = parseInt(searchParams.get('days') || '7');
-    const limit = Math.min(Math.max(Number(searchParams.get('limit')) || 100, 1), 100);
-    const cursor = searchParams.get('cursor') ? Number(searchParams.get('cursor')) : null;
-    if (cursor !== null && (!Number.isInteger(cursor) || cursor <= 0)) {
-      return NextResponse.json({ error: 'cursor must be a positive rank-history id' }, { status: 400 });
-    }
-
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - days);
+    const lookback = parsePromotionLookback(searchParams);
+    if (lookback.error !== undefined) return NextResponse.json({ error: lookback.error }, { status: 400 });
+    const { days, cutoffDate } = lookback.data;
+    const pagination = parseCursorPagination(searchParams, { defaultLimit: 100, maxLimit: 100 });
+    if (pagination.error !== undefined) return NextResponse.json({ error: pagination.error }, { status: 400 });
+    const { limit, cursor } = pagination.data;
 
     // Get users who were auto-ranked up (triggeredBy contains 'auto' or 'system')
     const autoPromotions = await prisma.rankHistory.findMany({

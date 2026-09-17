@@ -22,7 +22,11 @@
     "db:push": "prisma db push",
     "swagger": "node scripts/swagger.mjs",
     "swagger:serve": "node scripts/swagger.mjs",
-    "openapi:refresh": "node scripts/openapi-refresh.mjs"
+    "api:inventory": "node scripts/api-inventory.mjs",
+    "openapi:refresh": "node scripts/openapi-refresh.mjs",
+    "test:api": "vitest run",
+    "test:api:coverage": "vitest run --coverage",
+    "test:api:integration": "node scripts/test-api-integration.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
@@ -36,6 +40,7 @@
     "uuid": "^14.0.1"
   },
   "devDependencies": {
+    "@prisma/dev": "^0.24.3",
     "@tailwindcss/postcss": "^4",
     "@types/estree": "^1.0.9",
     "@types/json-schema": "^7.0.15",
@@ -43,6 +48,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/trusted-types": "^2.0.7",
+    "@vitest/coverage-v8": "^5.0.1",
     "babel-plugin-react-compiler": "1.0.0",
     "dotenv": "^17.4.2",
     "eslint": "^10",
@@ -54,6 +60,7 @@
     "tailwindcss": "^4",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
+    "vitest": "^5.0.1",
     "yaml": "^2.9.0"
   }
 }

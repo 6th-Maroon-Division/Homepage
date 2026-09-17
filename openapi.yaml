@@ -47,43 +47,6 @@ tags:
 security:
   - bearerAuth: []
 paths:
-  /admin/bot-tokens:
-    get:
-      tags:
-        - TODO
-      summary: TODO document GET /admin/bot-tokens
-      responses:
-        "200":
-          description: Success
-    post:
-      tags:
-        - TODO
-      summary: TODO document POST /admin/bot-tokens
-      responses:
-        "200":
-          description: Success
-  /admin/bot-tokens/{id}:
-    get:
-      tags:
-        - TODO
-      summary: TODO document GET /admin/bot-tokens/{id}
-      responses:
-        "200":
-          description: Success
-    put:
-      tags:
-        - TODO
-      summary: TODO document PUT /admin/bot-tokens/{id}
-      responses:
-        "200":
-          description: Success
-    delete:
-      tags:
-        - TODO
-      summary: TODO document DELETE /admin/bot-tokens/{id}
-      responses:
-        "200":
-          description: Success
   /admin/catalog/events:
     get:
       tags:
@@ -409,6 +372,29 @@ paths:
           description: Redirect to authentication provider
         "401":
           description: Unauthorized
+      security: []
+    parameters:
+      - name: ...nextauth
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Framework-managed authentication action path.
+    post:
+      tags:
+        - Authentication
+      summary: NextAuth.js authentication action
+      description: Framework-owned CSRF, session, and provider flow; exempt from the business API envelope.
+      security: []
+      responses:
+        "200":
+          description: Framework authentication response
+        "302":
+          description: Authentication redirect
+        "400":
+          description: Invalid authentication request
+        "401":
+          description: Authentication failed
   /auth/steam-callback:
     get:
       tags:
@@ -1330,27 +1316,6 @@ paths:
       tags:
         - TODO
       summary: TODO document GET /bot/users/discord/{discordId}
-      responses:
-        "200":
-          description: Success
-  /bot/users/discord/{discordId}/notification-preferences:
-    get:
-      tags:
-        - Bot
-        - Messaging
-      summary: Get platform-owned notification preferences
-      security:
-        - apiKey: []
-      responses:
-        "200":
-          description: Success
-    patch:
-      tags:
-        - Bot
-        - Messaging
-      summary: Partially update platform-owned notification preferences
-      security:
-        - apiKey: []
       responses:
         "200":
           description: Success
@@ -3042,21 +3007,540 @@ paths:
       responses:
         "200":
           description: User training records
-  /users/me/notification-preferences:
+  /bot-tokens:
+    get:
+      summary: List bot tokens
+      security: &a1
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BotTokenMetadata"
+                  meta:
+                    type: object
+                    required:
+                      - limit
+                      - nextCursor
+                    properties:
+                      limit:
+                        type: integer
+                        minimum: 1
+                        maximum: 100
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+                        description: Last returned token ID when another page exists; null at the end.
+        "400": &a2
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401": &a3
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403": &a4
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404": &a5
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422": &a6
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500": &a7
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+      tags:
+        - Admin
+      description: Requires system:super_admin. Active database bot tokens act as superadmin. Token secrets are returned only
+        on creation. Reads of another user’s creator metadata, including bot reads, are audited. Returns tokens in
+        ascending ID order. Follow meta.nextCursor until null to retrieve all pages.
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+          description: Page size; values above 100 are clamped to 100.
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            pattern: ^[0-9]+$
+          description: Positive token ID from meta.nextCursor; returns tokens with a larger ID.
+    post:
+      summary: Create a bot token
+      security: *a1
+      responses:
+        "201":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    allOf:
+                      - $ref: "#/components/schemas/BotTokenMetadata"
+                      - type: object
+                        required:
+                          - token
+                        properties:
+                          token:
+                            type: string
+                            description: Secret returned only once.
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400": *a2
+        "401": *a3
+        "403": *a4
+        "404": *a5
+        "422": *a6
+        "500": *a7
+      tags:
+        - Admin
+      description: Requires system:super_admin. Active database bot tokens act as superadmin. Token secrets are returned only
+        on creation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                isActive:
+                  type: boolean
+              required:
+                - name
+  /bot-tokens/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+    get:
+      summary: Get bot token metadata
+      security: &a1
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/BotTokenMetadata"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400": &a2
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401": &a3
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403": &a4
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404": &a5
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422": &a6
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500": &a7
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+      tags:
+        - Admin
+      description: Requires system:super_admin. Active database bot tokens act as superadmin. Token secrets are returned only
+        on creation. Reads of another user’s creator metadata, including bot reads, are audited.
+    patch:
+      summary: Update a bot token
+      security: *a1
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/BotTokenMetadata"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400": *a2
+        "401": *a3
+        "403": *a4
+        "404": *a5
+        "422": *a6
+        "500": *a7
+      tags:
+        - Admin
+      description: Requires system:super_admin. Active database bot tokens act as superadmin. Token secrets are returned only
+        on creation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                isActive:
+                  type: boolean
+    delete:
+      summary: Revoke and delete a bot token
+      security: *a1
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: "null"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400": *a2
+        "401": *a3
+        "403": *a4
+        "404": *a5
+        "422": *a6
+        "500": *a7
+      tags:
+        - Admin
+      description: Requires system:super_admin. Active database bot tokens act as superadmin. Token secrets are returned only
+        on creation.
+  /users/{id}/notification-preferences:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          oneOf:
+            - type: integer
+              minimum: 1
+            - type: string
+              enum:
+                - me
+    get:
+      summary: Get user notification preferences
+      security: &a1
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/NotificationPreferences"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400": &a2
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401": &a3
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403": &a4
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404": &a5
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422": &a6
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500": &a7
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+      tags:
+        - Users
+        - Messaging
+      description: A session user can access their own preferences. Accessing another user requires hierarchy-aware user:edit
+        permission or superadmin; active bot tokens are superadmin. The me alias requires a user session. Reads of
+        another user’s preferences are audited.
+    patch:
+      summary: Update user notification preferences
+      security: *a1
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/NotificationPreferences"
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400": *a2
+        "401": *a3
+        "403": *a4
+        "404": *a5
+        "422": *a6
+        "500": *a7
+      tags:
+        - Users
+        - Messaging
+      description: A session user can access their own preferences. Accessing another user requires hierarchy-aware user:edit
+        permission or superadmin; active bot tokens are superadmin. The me alias requires a user session. Reads of
+        another user’s preferences are audited.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                orbatAnnouncements:
+                  type: boolean
+                trainingScheduled:
+                  type: boolean
+                trainingUpdated:
+                  type: boolean
+                trainingCancelled:
+                  type: boolean
+                trainingReminders:
+                  type: boolean
+                promotionAnnouncements:
+                  type: boolean
+                dmEnabled:
+                  type: boolean
+                channelMentionsEnabled:
+                  type: boolean
+  /templates/access:
     get:
       tags:
-        - TODO
-      summary: TODO document GET /users/me/notification-preferences
+        - Templates
+      summary: Get current user template capabilities
+      description: Legacy session-only endpoint; not yet migrated to the unified API contract.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
       responses:
         "200":
-          description: Success
-    patch:
+          description: Template capabilities
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  canCreate:
+                    type: boolean
+                  canEdit:
+                    type: boolean
+                  canDelete:
+                    type: boolean
+                  canRead:
+                    type: boolean
+        "401":
+          description: Unauthorized
+  /audit-logs:
+    get:
       tags:
-        - TODO
-      summary: TODO document PATCH /users/me/notification-preferences
+        - Admin
+      summary: List audit records
+      description: Requires a superadmin user session or active database bot token. Newest ID first. from is inclusive and to
+        exclusive; when both are supplied from must precede to. Reads containing another user’s data are themselves
+        audited. No edit or delete operations are exposed.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+          description: Page size; values above 100 are clamped to 100.
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            pattern: ^[0-9]+$
+          description: Positive record ID from meta.nextCursor; returns records with a smaller ID.
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: ISO 8601 timestamp with Z or explicit offset; normalized to UTC.
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: ISO 8601 timestamp with Z or explicit offset; normalized to UTC.
       responses:
         "200":
-          description: Success
+          description: Audit page
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ApiAuditLog"
+                  meta:
+                    type: object
+                    required:
+                      - limit
+                      - nextCursor
+                    properties:
+                      limit:
+                        type: integer
+                        minimum: 1
+                        maximum: 100
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+        "400":
+          description: Invalid cursor, limit, or timestamp range
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Superadmin permission required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
 components:
   securitySchemes:
     bearerAuth:
@@ -3068,7 +3552,18 @@ components:
       type: http
       scheme: bearer
       bearerFormat: BotToken
-      description: Active bot token stored in the BotToken database table. Use Authorization Bearer; environment tokens and X-BOT-API-TOKEN are not accepted.
+      description: Active bot token stored in the BotToken database table. Use Authorization Bearer; environment tokens and
+        X-BOT-API-TOKEN are not accepted.
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: next-auth.session-token
+      description: Development HTTP session cookie. User permissions and hierarchy are evaluated from the database.
+    secureSessionCookie:
+      type: apiKey
+      in: cookie
+      name: __Secure-next-auth.session-token
+      description: Production HTTPS session cookie. Alternative to the development cookie and bot bearer token.
   schemas:
     User:
       type: object
@@ -3692,3 +4187,160 @@ components:
           type: integer
         orderIndex:
           type: integer
+    UtcTimestamp:
+      type: string
+      format: date-time
+      pattern: Z$
+      description: UTC timestamp serialized with Z; inputs must include Z or an explicit offset and are normalized to UTC.
+    ApiFailure:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+            - details
+            - correlationId
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+            correlationId:
+              type: string
+    BotTokenMetadata:
+      type: object
+      required:
+        - id
+        - name
+        - isActive
+        - createdAt
+        - lastUsedAt
+        - createdBy
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          minLength: 1
+        isActive:
+          type: boolean
+        createdAt:
+          $ref: "#/components/schemas/UtcTimestamp"
+        lastUsedAt:
+          anyOf:
+            - $ref: "#/components/schemas/UtcTimestamp"
+            - type: "null"
+        createdBy:
+          anyOf:
+            - type: object
+              properties:
+                id:
+                  type: integer
+                username:
+                  type:
+                    - string
+                    - "null"
+            - type: "null"
+    NotificationPreferences:
+      type: object
+      additionalProperties: false
+      required:
+        - orbatAnnouncements
+        - trainingScheduled
+        - trainingUpdated
+        - trainingCancelled
+        - trainingReminders
+        - promotionAnnouncements
+        - dmEnabled
+        - channelMentionsEnabled
+      description: Complete preference DTO with eight boolean fields. GET returns defaults when no row exists and does not
+        create a database record. Database IDs and timestamps are not exposed.
+      properties:
+        orbatAnnouncements:
+          type: boolean
+          default: false
+        trainingScheduled:
+          type: boolean
+          default: false
+        trainingUpdated:
+          type: boolean
+          default: false
+        trainingCancelled:
+          type: boolean
+          default: false
+        trainingReminders:
+          type: boolean
+          default: false
+        promotionAnnouncements:
+          type: boolean
+          default: false
+        dmEnabled:
+          type: boolean
+          default: true
+        channelMentionsEnabled:
+          type: boolean
+          default: false
+    ApiAuditLog:
+      type: object
+      required:
+        - id
+        - occurredAt
+        - correlationId
+        - actorType
+        - actorUserId
+        - actorTokenId
+        - action
+        - resource
+        - resourceId
+        - targetUserIds
+        - method
+        - path
+        - outcome
+        - before
+        - after
+      properties:
+        id:
+          type: integer
+        occurredAt:
+          $ref: "#/components/schemas/UtcTimestamp"
+        correlationId:
+          type: string
+        actorType:
+          type: string
+        actorUserId:
+          type:
+            - integer
+            - "null"
+        actorTokenId:
+          type:
+            - integer
+            - "null"
+        action:
+          type: string
+        resource:
+          type: string
+        resourceId:
+          type:
+            - string
+            - "null"
+        targetUserIds:
+          type: array
+          items:
+            type: integer
+        method:
+          type: string
+        path:
+          type: string
+        outcome:
+          type: string
+        before:
+          description: Redacted mutation state; never a read response snapshot.
+        after:
+          description: Redacted mutation state; never a read response snapshot.

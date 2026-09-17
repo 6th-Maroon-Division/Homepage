@@ -30,8 +30,13 @@ export function parseNotificationPatch(body: unknown):
   return { data };
 }
 
-export async function getOrCreateNotificationPreferences(userId: number) {
-  return prisma.userNotificationPreference.upsert({
-    where: { userId }, update: {}, create: { userId },
-  });
+export type NotificationPreferences = Record<NotificationPreferenceField, boolean>;
+
+export function serializeNotificationPreferences(value: Partial<NotificationPreferences> | null): NotificationPreferences {
+  return Object.fromEntries(NOTIFICATION_PREFERENCE_FIELDS.map(field => [field, value?.[field] ?? (field === 'dmEnabled')])) as NotificationPreferences;
+}
+
+export async function getNotificationPreferences(userId: number): Promise<NotificationPreferences> {
+  const stored = await prisma.userNotificationPreference.findUnique({ where: { userId } });
+  return serializeNotificationPreferences(stored);
 }

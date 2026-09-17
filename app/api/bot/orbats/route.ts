@@ -1,3 +1,5 @@
+import { parseCursorPagination } from '@/lib/api/validation';
+import { parseOrbatTimeRange } from '@/lib/api/bot-query-validation';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { validateBotTokenLegacy } from '@/lib/bot-token-validation';
@@ -13,24 +15,13 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const requestedLimit = Number(searchParams.get('limit') || '10');
-    const limit = Math.min(Math.max(Number.isInteger(requestedLimit) ? requestedLimit : 10, 1), 100);
+    const pagination = parseCursorPagination(searchParams, { defaultLimit: 10, maxLimit: 100 });
+    if (pagination.error !== undefined) return NextResponse.json({ error: pagination.error }, { status: 400 });
+    const { limit, cursor: cursorId } = pagination.data;
     const includePast = searchParams.get('includePast') === 'true';
-    const startAtRaw = searchParams.get('startAt');
-    const endBeforeRaw = searchParams.get('endBefore');
-    const cursorRaw = searchParams.get('cursor');
-    const startAt = startAtRaw ? new Date(startAtRaw) : null;
-    const endBefore = endBeforeRaw ? new Date(endBeforeRaw) : null;
-    const cursorId = cursorRaw ? Number(cursorRaw) : null;
-    if ((startAt && Number.isNaN(startAt.getTime())) || (endBefore && Number.isNaN(endBefore.getTime()))) {
-      return NextResponse.json({ error: 'startAt and endBefore must be ISO timestamps' }, { status: 400 });
-    }
-    if (startAt && endBefore && startAt >= endBefore) {
-      return NextResponse.json({ error: 'startAt must be before endBefore' }, { status: 400 });
-    }
-    if (cursorRaw && (!Number.isInteger(cursorId) || cursorId! <= 0)) {
-      return NextResponse.json({ error: 'cursor must be a positive ORBAT id' }, { status: 400 });
-    }
+    const timeRange = parseOrbatTimeRange(searchParams);
+    if (timeRange.error !== undefined) return NextResponse.json({ error: timeRange.error }, { status: 400 });
+    const { startAt, endBefore } = timeRange.data;
 
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);

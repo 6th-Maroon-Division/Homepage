@@ -23,9 +23,11 @@ Current `/bot/*` routes authenticate with:
 Authorization: Bearer <BOT_API_TOKEN>
 ```
 
-The implementation accepts a legacy environment token and database-backed bot tokens. New bot endpoints must use the shared bot-token validator. Documentation and clients must not use the previously proposed `X-BOT-API-TOKEN` header.
+Only active database-backed bot tokens are accepted; legacy environment tokens and `X-BOT-API-TOKEN` are rejected. Migrated business routes accept either a user session or the same bearer token. See the [migration contract](../api/migration-contract.md) for batch status and the shared response, UTC, audit, and test requirements.
 
-Bot tokens may only be administered by users with `system:super_admin`. New endpoints must define whether they require only a valid bot token or a future token scope.
+Active bot tokens have superadmin rights by product decision. Canonical `/bot-tokens` management routes require either a superadmin user session or an active bot token. Per-token scopes are not part of this migration.
+
+The inventory below includes legacy routes awaiting consolidation. “Available” does not mean a route already implements the unified contract; consult the [route inventory](../api/inventory.md) and migration contract. Resolve the numeric platform user ID before calling shared preference routes; `me` is a session-only alias.
 
 ## 3. Current endpoint inventory
 
@@ -56,7 +58,7 @@ The routes referenced in older bot documentation are now available:
 - `GET /bot/orbats/{id}/signups`
 - `GET /bot/users/discord/{discordId}/signups`
 - `GET /bot/ranks/discord-roles`
-- bot notification-preference routes
+- shared user/bot notification-preference routes (`/users/{id}/notification-preferences`)
 - bot availability-note routes
 - a bot-authenticated applied-rank event stream
 
@@ -237,11 +239,11 @@ model UserNotificationPreference {
 
 Do not duplicate `discordUserId` in this model; Discord identity is already represented by linked authentication accounts. Resolve it through the user relation.
 
-### Proposed endpoints
+### Available canonical endpoints
 
 ```http
-GET /bot/users/discord/{discordId}/notification-preferences
-PATCH /bot/users/discord/{discordId}/notification-preferences
+GET /users/{id}/notification-preferences
+PATCH /users/{id}/notification-preferences
 ```
 
 `PATCH` accepts only the fields being changed and returns the complete resulting preferences. Website settings must read and write the same row.

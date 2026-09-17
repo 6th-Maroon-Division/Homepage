@@ -1,3 +1,4 @@
+import { parseCursorPagination } from '@/lib/api/validation';
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateDatabaseBot, botError, parsePositiveId } from '@/lib/bot-api';
 import { prisma } from '@/lib/prisma';
@@ -12,9 +13,9 @@ export async function GET(request: NextRequest, route: Context) {
   if (!orbatId) return botError(400, 'invalid_request', 'Invalid ORBAT id.');
 
   const params = new URL(request.url).searchParams;
-  const limit = Math.min(Math.max(Number(params.get('limit')) || 100, 1), 250);
-  const cursor = params.get('cursor') ? parsePositiveId(params.get('cursor')) : null;
-  if (params.has('cursor') && !cursor) return botError(400, 'invalid_request', 'cursor must be a positive signup id.');
+  const pagination = parseCursorPagination(params, { defaultLimit: 100, maxLimit: 250 });
+  if (pagination.error !== undefined) return botError(400, 'invalid_request', pagination.error);
+  const { limit, cursor } = pagination.data;
 
   const orbat = await prisma.orbat.findUnique({ where: { id: orbatId }, select: { id: true, name: true } });
   if (!orbat) return botError(404, 'not_found', 'ORBAT not found.', { orbatId });

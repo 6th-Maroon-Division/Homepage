@@ -1,3 +1,4 @@
+import { parseCursorPagination } from '@/lib/api/validation';
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateDatabaseBot, botError, parsePositiveId } from '@/lib/bot-api';
 import { prisma } from '@/lib/prisma';
@@ -9,8 +10,9 @@ export async function GET(request: NextRequest, route: Context) {
   const userId = parsePositiveId((await route.params).userId);
   if (!userId) return botError(400, 'invalid_request', 'Invalid user id.');
   const params = new URL(request.url).searchParams;
-  const limit = Math.min(Math.max(Number(params.get('limit')) || 50, 1), 100);
-  const cursor = parsePositiveId(params.get('cursor'));
+  const pagination = parseCursorPagination(params, { defaultLimit: 50, maxLimit: 100 });
+  if (pagination.error !== undefined) return botError(400, 'invalid_request', pagination.error);
+  const { limit, cursor } = pagination.data;
   const exists = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
   if (!exists) return botError(404, 'not_found', 'User not found.');
   const history = await prisma.rankHistory.findMany({

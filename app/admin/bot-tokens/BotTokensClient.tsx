@@ -40,13 +40,21 @@ export default function BotTokensClient({
   const fetchTokens = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('/api/admin/bot-tokens');
-      const data = await response.json();
-      if (response.ok) {
-        setTokens(data.tokens || []);
-      } else {
-        showToast(data.error || 'Failed to fetch tokens', 'error');
-      }
+      const loaded: BotToken[] = [];
+      let cursor: string | null = null;
+      do {
+        const query = new URLSearchParams({ limit: '100' });
+        if (cursor) query.set('cursor', cursor);
+        const response = await fetch(`/api/bot-tokens?${query}`);
+        const data = await response.json();
+        if (!response.ok) {
+          showToast(data.error?.message || 'Failed to fetch tokens', 'error');
+          return;
+        }
+        loaded.push(...data.data);
+        cursor = data.meta.nextCursor;
+      } while (cursor);
+      setTokens(loaded.sort((a, b) => a.name.localeCompare(b.name)));
     } catch {
       showToast('Failed to fetch tokens', 'error');
     } finally {
@@ -62,7 +70,7 @@ export default function BotTokensClient({
 
     setIsCreating(true);
     try {
-      const response = await fetch('/api/admin/bot-tokens', {
+      const response = await fetch('/api/bot-tokens', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newTokenName.trim() }),
@@ -71,12 +79,12 @@ export default function BotTokensClient({
       const data = await response.json();
       if (response.ok) {
         showToast('Token created successfully! Copy the token value below.', 'success');
-        setNewTokenValue(data.token.token);
+        setNewTokenValue(data.data.token);
         setNewTokenName('');
         // Refresh tokens list (without the token value)
         await fetchTokens();
       } else {
-        showToast(data.error || 'Failed to create token', 'error');
+        showToast(data.error?.message || 'Failed to create token', 'error');
       }
     } catch {
       showToast('Failed to create token', 'error');
@@ -103,8 +111,8 @@ export default function BotTokensClient({
 
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/admin/bot-tokens/${editingId}`, {
-        method: 'PUT',
+      const response = await fetch(`/api/bot-tokens/${editingId}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: editingName.trim() }),
       });
@@ -116,7 +124,7 @@ export default function BotTokensClient({
         setEditingName('');
         await fetchTokens();
       } else {
-        showToast(data.error || 'Failed to update token', 'error');
+        showToast(data.error?.message || 'Failed to update token', 'error');
       }
     } catch {
       showToast('Failed to update token', 'error');
@@ -128,8 +136,8 @@ export default function BotTokensClient({
   const handleToggleActive = async (tokenId: number, currentStatus: boolean) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/admin/bot-tokens/${tokenId}`, {
-        method: 'PUT',
+      const response = await fetch(`/api/bot-tokens/${tokenId}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isActive: !currentStatus }),
       });
@@ -139,7 +147,7 @@ export default function BotTokensClient({
         showToast(`Token ${!currentStatus ? 'activated' : 'deactivated'}`, 'success');
         await fetchTokens();
       } else {
-        showToast(data.error || 'Failed to toggle token status', 'error');
+        showToast(data.error?.message || 'Failed to toggle token status', 'error');
       }
     } catch {
       showToast('Failed to toggle token status', 'error');
@@ -161,7 +169,7 @@ export default function BotTokensClient({
 
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/admin/bot-tokens/${deletingId}`, {
+      const response = await fetch(`/api/bot-tokens/${deletingId}`, {
         method: 'DELETE',
       });
 
@@ -171,7 +179,7 @@ export default function BotTokensClient({
         setDeletingId(null);
         await fetchTokens();
       } else {
-        showToast(data.error || 'Failed to delete token', 'error');
+        showToast(data.error?.message || 'Failed to delete token', 'error');
       }
     } catch {
       showToast('Failed to delete token', 'error');

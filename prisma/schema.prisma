@@ -1025,3 +1025,27 @@ model BotEvent {
   @@index([type, id])
   @@index([occurredAt])
 }
+
+// Append-only via application APIs; scalar actor IDs survive account/token deletion.
+model ApiAuditLog {
+  id             Int      @id @default(autoincrement())
+  occurredAt     DateTime @default(now()) @db.Timestamptz(3)
+  correlationId  String
+  actorType      String
+  actorUserId    Int?
+  actorTokenId   Int?
+  action         String
+  resource       String
+  resourceId     String?
+  targetUserIds  Int[]    @default([])
+  method         String
+  path           String
+  outcome        String
+  before         Json?
+  after          Json?
+
+  @@index([occurredAt, id])
+  @@index([actorUserId, occurredAt])
+  @@index([actorTokenId, occurredAt])
+  @@index([resource, resourceId])
+}

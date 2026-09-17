@@ -1,33 +1,9 @@
-import { createHash, randomUUID } from 'node:crypto';
-import { NextResponse } from 'next/server';
+import { createHash } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
 
-export type BotErrorCode =
-  | 'invalid_request'
-  | 'unauthorized'
-  | 'not_found'
-  | 'slot_full'
-  | 'signup_closed'
-  | 'already_signed_up'
-  | 'marked_absent'
-  | 'rank_required'
-  | 'training_required'
-  | 'idempotency_conflict'
-  | 'conflict'
-  | 'validation_failed'
-  | 'internal_error';
-
-export function botError(
-  status: number,
-  code: BotErrorCode,
-  message: string,
-  details?: Record<string, unknown>,
-) {
-  return NextResponse.json(
-    { error: { code, message, details: details ?? {}, correlationId: randomUUID() } },
-    { status },
-  );
-}
+// Backwards-compatible names for the shared API error contract.
+export { apiError as botError } from '@/lib/api/response';
+export type { ApiErrorCode as BotErrorCode } from '@/lib/api/response';
 
 /** New bot contracts intentionally accept only active tokens stored in BotToken. */
 export async function authenticateDatabaseBot(request: Request): Promise<boolean> {
@@ -60,10 +36,8 @@ export function requestHash(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
 
-export function parsePositiveId(value: unknown): number | null {
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
-}
+// Compatibility export; shared with browser-facing API handlers.
+export { parsePositiveId } from '@/lib/api/validation';
 
 export function isDiscordSnowflake(value: unknown): value is string {
   return typeof value === 'string' && /^\d{17,20}$/.test(value);

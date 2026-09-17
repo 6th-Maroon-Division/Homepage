@@ -1,3 +1,4 @@
+import { parseCursorPagination } from '@/lib/api/validation';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { validateBotTokenLegacy } from '@/lib/bot-token-validation';
@@ -17,11 +18,9 @@ export async function GET(request: NextRequest) {
     const activeOnly = searchParams.get('activeOnly') === 'true';
     const hasDiscord = searchParams.get('hasDiscord') === 'true';
     const hasSteam = searchParams.get('hasSteam') === 'true';
-    const limit = Math.min(Math.max(Number(searchParams.get('limit')) || 100, 1), 250);
-    const cursor = searchParams.get('cursor') ? Number(searchParams.get('cursor')) : null;
-    if (cursor !== null && (!Number.isInteger(cursor) || cursor <= 0)) {
-      return NextResponse.json({ error: 'cursor must be a positive user id' }, { status: 400 });
-    }
+    const pagination = parseCursorPagination(searchParams, { defaultLimit: 100, maxLimit: 250 });
+    if (pagination.error !== undefined) return NextResponse.json({ error: pagination.error }, { status: 400 });
+    const { limit, cursor } = pagination.data;
 
     const where: Prisma.UserWhereInput = {
       ...(activeOnly ? { userRank: { retired: false } } : {}),

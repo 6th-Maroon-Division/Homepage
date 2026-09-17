@@ -25,7 +25,7 @@ export default function NotificationPreferencesPanel() {
     void fetch('/api/users/me/notification-preferences')
       .then(async (response) => {
         if (!response.ok) throw new Error('Failed to load notification preferences');
-        setPreferences(await response.json());
+        setPreferences((await response.json()).data);
       })
       .catch((error) => showError(error instanceof Error ? error.message : 'Failed to load notification preferences'));
   }, [showError]);
@@ -54,10 +54,10 @@ export default function NotificationPreferencesPanel() {
           setSaving(true);
           try {
             const response = await fetch('/api/users/me/notification-preferences', {
-              method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(preferences),
+              method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.fromEntries(Object.keys(labels).map(field => [field, preferences[field as keyof Preferences]]))),
             });
-            if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || 'Failed to save preferences');
-            setPreferences(await response.json());
+            if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error?.message || 'Failed to save preferences');
+            setPreferences((await response.json()).data);
             showSuccess('Notification preferences saved');
           } catch (error) {
             showError(error instanceof Error ? error.message : 'Failed to save notification preferences');

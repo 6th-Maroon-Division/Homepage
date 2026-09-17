@@ -1,5 +1,6 @@
+import { parseCursorPagination } from '@/lib/api/validation';
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateDatabaseBot, botError, parsePositiveId, resolveDiscordUser } from '@/lib/bot-api';
+import { authenticateDatabaseBot, botError, resolveDiscordUser } from '@/lib/bot-api';
 import { prisma } from '@/lib/prisma';
 import { resolveOrbatScheduleWindow } from '@/lib/orbat-schedule';
 
@@ -14,9 +15,9 @@ export async function GET(request: NextRequest, route: Context) {
   if (!user) return botError(404, 'not_found', 'Linked Discord user not found.', { discordUserId });
 
   const params = new URL(request.url).searchParams;
-  const limit = Math.min(Math.max(Number(params.get('limit')) || 50, 1), 100);
-  const cursor = params.get('cursor') ? parsePositiveId(params.get('cursor')) : null;
-  if (params.has('cursor') && !cursor) return botError(400, 'invalid_request', 'cursor must be a positive signup id.');
+  const pagination = parseCursorPagination(params, { defaultLimit: 50, maxLimit: 100 });
+  if (pagination.error !== undefined) return botError(400, 'invalid_request', pagination.error);
+  const { limit, cursor } = pagination.data;
   const includePast = params.get('includePast') === 'true';
 
   const rows = await prisma.signup.findMany({

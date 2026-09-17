@@ -1,3 +1,4 @@
+import { parseCursorPagination } from '@/lib/api/validation';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { validateBotTokenLegacy } from '@/lib/bot-token-validation';
@@ -13,11 +14,9 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const limit = Math.min(Math.max(Number(searchParams.get('limit')) || 50, 1), 100);
-    const cursor = searchParams.get('cursor') ? Number(searchParams.get('cursor')) : null;
-    if (cursor !== null && (!Number.isInteger(cursor) || cursor <= 0)) {
-      return NextResponse.json({ error: 'cursor must be a positive proposal id' }, { status: 400 });
-    }
+    const pagination = parseCursorPagination(searchParams, { defaultLimit: 50, maxLimit: 100 });
+    if (pagination.error !== undefined) return NextResponse.json({ error: pagination.error }, { status: 400 });
+    const { limit, cursor } = pagination.data;
 
     const pendingPromotions = await prisma.promotionProposal.findMany({
       where: {
