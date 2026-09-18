@@ -348,6 +348,7 @@ export default function RankMigrationWizard({ ranks }: Props) {
                 </div>
                 <span style={{ color: 'var(--muted-foreground)' }}>→</span>
                 <select
+                  aria-label={`New rank for ${rank.abbreviation} - ${rank.name}`}
                   value={rankMappings.find((m) => m.oldRankId === rank.id)?.newRankId || ''}
                   onChange={(e) => handleMappingChange(rank.id, parseInt(e.target.value))}
                   className="px-3 py-2 rounded text-sm"

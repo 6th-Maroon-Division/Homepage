@@ -1,5 +1,7 @@
 'use client';
 
+import LocalDateTime from '@/app/components/ui/LocalDateTime';
+
 import { apiRequest } from '@/lib/api/client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -527,12 +529,12 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
                 )}
                 {eventDate && (
                   <div className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
-                    <p>Event date: {eventDate.toLocaleDateString(undefined, { dateStyle: 'medium' })}</p>
+                    <p>Event date: {<LocalDateTime value={eventDate.toISOString()} kind="date" />}</p>
                     {(startDateTime || endDateTime || orbat.startTime || orbat.endTime) && (
                       <p>
-                        Time: {startDateTime ? startDateTime.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : (orbat.startTime || '??:??')}
+                        Time: {startDateTime ? <LocalDateTime value={startDateTime.toISOString()} kind="time" /> : (orbat.startTime || '??:??')}
                         {(endDateTime || orbat.endTime)
-                          ? ` - ${endDateTime ? endDateTime.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : orbat.endTime}`
+                          ? <> - {endDateTime ? <LocalDateTime value={endDateTime.toISOString()} kind="time" /> : orbat.endTime}</>
                           : ''}
                       </p>
                     )}

@@ -1,5 +1,7 @@
 'use client';
 
+import LocalDateTime from '@/app/components/ui/LocalDateTime';
+
 import { useSession } from 'next-auth/react';
 import { apiList, apiRequest } from '@/lib/api/client';
 
@@ -545,13 +547,13 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
         {eventDate && (
           <div className="text-xs mt-2" style={{ color: 'var(--muted-foreground)' }}>
             <p>
-              Event date: {eventDate.toLocaleDateString(undefined, { dateStyle: 'medium' })}
+              Event date: {<LocalDateTime value={eventDate.toISOString()} kind="date" />}
             </p>
             {(startDateTime || endDateTime || orbat.startTime || orbat.endTime) && (
               <p>
-                Time: {startDateTime ? startDateTime.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : (orbat.startTime || '??:??')}
+                Time: {startDateTime ? <LocalDateTime value={startDateTime.toISOString()} kind="time" /> : (orbat.startTime || '??:??')}
                 {(endDateTime || orbat.endTime)
-                  ? ` - ${endDateTime ? endDateTime.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : orbat.endTime}`
+                  ? <> - {endDateTime ? <LocalDateTime value={endDateTime.toISOString()} kind="time" /> : orbat.endTime}</>
                   : ''}
               </p>
             )}

@@ -27,7 +27,7 @@ Authenticated scenarios use signed test sessions for seeded users. The applicati
 
 ## Page coverage
 
-Browser scenarios cover all 30 current `app/**/page.tsx` route patterns, including redirect-only pages and dynamic detail pages with seeded IDs. The suite exercises:
+Browser scenarios cover all 30 current `app/**/page.tsx` route patterns, including redirect-only pages and dynamic detail pages with seeded IDs. The 58 scenarios exercise:
 
 | Area | Browser checks |
 | --- | --- |
@@ -35,14 +35,14 @@ Browser scenarios cover all 30 current `app/**/page.tsx` route patterns, includi
 | Member pages | Profile overview, attendance and rank-history tabs, saved notification preferences, leave dates, username changes, training requests and persisted chat messages, access denial for another member's request. Settings, rank-history and trainings aliases redirect to the profile. |
 | Operation administration | Dashboard navigation, operation filtering, creation with a role, copying saved templates and previous ORBATs without copying signups, detail view, editing, deletion confirmation, and anonymous/member access restrictions. |
 | Templates and catalogs | Template list, search, creation with the default slot limit, editing and its legacy alias; reusable slot roles; radio-frequency creation, updates and deletion; appearance information. |
-| Users and training | User directory filtering and local profile edits, training creation and catalog filtering, promotion queue refresh, web notifications, attendance recording and statistics. |
-| Tokens and ranks | Bot-token creation, rename, disable and deletion; rank creation, editing and deletion; rank migration wizard preview. |
+| Users and training | User directory filtering and local profile edits, training creation and catalog filtering, promotion approval/decline with rank history, inbox read state and action navigation, attendance recording and statistics, legacy CSV import previews and user mappings, training category changes, request approval, session scheduling and attendance, qualification failure and reassessment. |
+| Tokens and ranks | Bot-token creation, rename, disable and deletion; rank creation, editing and deletion; rank migration preview and application with persisted history; permission grant/revoke and template create/edit/apply/delete. |
 
 `npm run ui:check` compares the application's page inventory with the literal `coveredPages` exports in browser specs. It fails for missing or stale route declarations. When adding a page, add a scenario that actually opens it and verifies its behavior, then declare its route pattern in the relevant spec. Dynamic patterns retain their source form, for example `/trainings/requests/[id]`.
 
-The inventory check verifies declarations; `npm run test:ui` verifies behavior in Chromium. Coverage of every route does **not** mean every action, error state, permission combination, viewport, or browser is tested. For example, the rank migration scenario previews a strategy without applying it. This is not a claim of 100% UI code coverage or 80% browser coverage; the backend coverage threshold measures backend code separately. Expand scenarios as workflows and regressions require.
+The inventory check verifies declarations; `npm run test:ui` verifies behavior in Chromium. Coverage of every route does **not** mean every action, error state, permission combination, viewport, or browser is tested. This is not a claim of 100% UI code coverage or 80% browser coverage; the backend coverage threshold measures backend code separately. Expand scenarios as workflows and regressions require.
 
-The initial run also exposed a date-format hydration mismatch in the public ORBAT view when server and browser locales differ. React recovers and the functional assertions pass; this suite does not yet fail on every browser console error. That rendering issue remains a follow-up.
+Every scenario fails on uncaught browser errors, including React hydration failures. Date rendering uses stable UTC server output before switching to the browser locale and timezone. Mobile (390px) and desktop (1440px) checks verify operation layout, profile navigation and operation forms without horizontal overflow. Two reviewed operation screenshots provide visual regression baselines. Update these intentionally with `npm run test:ui -- responsive.spec.ts --update-snapshots` and inspect the image changes before committing.
 
 Steam and Discord provider interactions are deliberately excluded from these automated scenarios. Real login redirects, provider approval screens, provider cookies, and external provider actions still need manual checks. Test sessions exercise authenticated website behavior without depending on external accounts or provider availability. Visual appearance and usability also remain useful manual checks.
 

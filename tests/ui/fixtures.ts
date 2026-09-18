@@ -8,7 +8,13 @@ const { PrismaClient } = await import(process.env.UI_TEST_PRISMA_CLIENT) as type
 const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.UI_TEST_DATABASE_URL, max: 1, maxUses: 1 }) });
 
 type Seed = { adminId: number; memberId: number; roleId: number; orbatId: number };
-export const test = base.extend<{ login: (role?: 'admin' | 'member') => Promise<void> }, { seed: Seed; db: typeof db }>({
+export const test = base.extend<{ login: (role?: 'admin' | 'member') => Promise<void>; browserErrors: void }, { seed: Seed; db: typeof db }>({
+  browserErrors: [async ({ context }, use) => {
+    const errors: string[] = [];
+    context.on('page', page => page.on('pageerror', error => errors.push(error.message)));
+    await use();
+    expect(errors, 'No uncaught browser errors').toEqual([]);
+  }, { auto: true }],
   db: [async ({}, use) => { await use(db); await db.$disconnect(); }, { scope: 'worker' }],
   seed: [async ({ db }, use) => {
     for (const [key, metadata] of Object.entries(PERMISSIONS)) {
