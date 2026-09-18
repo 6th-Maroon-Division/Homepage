@@ -1,6 +1,6 @@
 # API migration contract
 
-This is the agreed target for the website and future Discord bot. Migration is incremental: the existing API does not yet satisfy this contract everywhere. The [generated inventory](./inventory.md) records current handlers, static caller evidence, test references, and OpenAPI gaps. A missing caller is not proof of an unused endpoint.
+The full migration is implemented on `work/fixes-and-features`: 103 route files and 155 exported HTTP methods match the canonical OpenAPI contract. Business operations share website/bot contracts; the three browser-auth route files retain their verified protocol transports. The resource-by-resource sections below record the migration history; current batch notes and OpenAPI supersede their earlier rollout status. The [generated inventory](./inventory.md) records current handlers, static caller evidence, test references, and OpenAPI gaps. A missing caller is not proof of an unused endpoint.
 
 ## Shared contract
 
@@ -211,3 +211,12 @@ Every endpoint and supported method must have tests, even once overall coverage 
 The target is an enforced minimum of 80% lines, branches, functions, and statements across API handlers and supporting services, progressing toward 100%. Publish CI reports and gate merges on tests and coverage. A threshold applied only to migrated modules is an interim batch guard, not repository-wide completion. Endpoint tests and actual coverage reports must establish readiness; inventory test references alone do not.
 
 For each remaining resource family, review caller evidence and duplicates, choose canonical operations, migrate handler/service and website consumers together, and update OpenAPI and tests. Preserve distinct operations; avoid deleting routes solely because static search found no caller. Follow-up batches include user administration, ORBATs/signups/availability, attendance, ranks/promotions, training, messaging, templates, and realtime/auth transport review. Build the Discord bot after the shared contracts are ready.
+
+
+## Complete backend verification and retention maintenance
+
+`npm run test:backend` combines unit and isolated Prisma integration projects with one coverage map covering every API route and every library (only declaration files excluded). The enforced initial minimum is 80% statements, branches, functions and lines; the quick unit-only report is no longer the release gate. See [testing](./testing.md) for exact commands and emulator limits.
+
+Audit retention is operational, not an HTTP mutation. `npm run audit:prune` reports records older than 365 elapsed UTC days without deleting them; `npm run audit:prune -- --apply` removes expired records in bounded Prisma batches and prints counts/cutoff only. Schedule the apply command daily in the deployment's existing maintenance runner. Records exactly on the cutoff remain. This migration does not run retention against the developer or production database or install a system scheduler.
+
+Resource batch notes under `docs/api/batches/` and the current OpenAPI/inventory supersede historical rollout notes above. Browser authentication redirects/cookies and SSE framing are explicit transport requirements; business payloads and errors use the canonical contracts.

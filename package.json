@@ -26,7 +26,10 @@
     "openapi:refresh": "node scripts/openapi-refresh.mjs",
     "test:api": "vitest run",
     "test:api:coverage": "vitest run --coverage",
-    "test:api:integration": "node scripts/test-api-integration.mjs"
+    "test:api:integration": "node scripts/test-api-integration.mjs",
+    "test:backend": "node scripts/test-api-integration.mjs --backend",
+    "audit:prune": "tsx scripts/prune-api-audits.ts",
+    "api:check": "node scripts/check-api-contract.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",

@@ -58,7 +58,7 @@ try {
   // Only the newly created ephemeral database is passed to schema and test processes.
   await run('node_modules/prisma/build/index.js', ['db', 'push'], env);
   await run('node_modules/prisma/build/index.js', ['generate'], env);
-  await run('node_modules/vitest/vitest.mjs', ['run', '--config', 'vitest.integration.config.mts'], env);
+  await run('node_modules/vitest/vitest.mjs', process.argv.includes('--backend') ? ['run', '--config', 'vitest.backend.config.mts', '--coverage'] : ['run', '--config', 'vitest.integration.config.mts'], env);
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   failed = true;

@@ -1,6 +1,6 @@
 # Automated API testing
 
-The backend test goal is to verify every endpoint and supported method automatically, starting at 80% lines, branches, functions, and statements and increasing toward 100%. The current suite and coverage gate cover migrated batches, not the entire API. The [inventory](./inventory.md) tracks the remaining route surface; a test reference is not proof of per-method coverage.
+The backend test goal is to verify every endpoint and supported method automatically, starting at 80% lines, branches, functions, and statements and increasing toward 100%. The release gate combines unit and real Prisma integration coverage across every API route and every library file. The [inventory](./inventory.md) tracks the remaining route surface; a test reference is not proof of per-method coverage.
 
 ## Commands
 
@@ -17,13 +17,19 @@ Run the fast unit/handler suite in `tests/api/`:
 npm run test:api
 ```
 
-Run that suite with the enforced coverage threshold:
+Run the fast unit-only coverage report:
 
 ```sh
 npm run test:api:coverage
 ```
 
-Reports are written to `coverage/api/`: HTML (`index.html`), LCOV (`lcov.info`), and JSON summary (`coverage-summary.json`), plus console output. The threshold currently covers `lib/api/`, notification-preference helpers, and the canonical migrated handlers. The [migration contract](./migration-contract.md) tracks each resource batch. Consult [vitest.config.mts](../../vitest.config.mts) for the exact scope. Delegated handlers are tested through their actual routes and included in `lib/api/**` coverage. The ORBAT collection’s GET and POST delegates are now both migrated, and `app/api/orbats/route.ts` is included in the coverage gate. Expand this scope with each migration batch; meeting the current threshold does not establish 80% coverage of all endpoints.
+The unit-only report remains in `coverage/api/` for quick feedback. The complete backend gate is:
+
+```sh
+npm run test:backend
+```
+
+This starts the same isolated Prisma database, runs both Vitest projects, and produces one combined coverage map. [vitest.backend.config.mts](../../vitest.backend.config.mts) includes **all** `app/api/**/route.ts` and `lib/**/*.ts`, including unimported files; only type declaration files are excluded. All four coverage metrics must reach 80%. Reports are written to `coverage/backend/` (HTML, LCOV, full JSON and JSON summary). Generated Prisma/framework code and UI components are outside the backend scope. Passing unit-only coverage does not replace this gate.
 
 Run isolated database integration tests:
 
@@ -37,14 +43,21 @@ The runner starts the database service from pinned `@prisma/dev` 0.24.3 through 
 
 The integration setup supplies a real Prisma Client with the PostgreSQL adapter configured with `max: 1` and `maxUses: 1`. Retiring each checkout avoids reusing a PGlite socket after a constraint error; each interactive transaction keeps its connection until commit or rollback. Application connection pooling is unchanged. These adjustments neither mock database results nor bypass constraints, and tests are not automatically retried. The runner closes both the database and its temporary server state, and preserves failing exit status after cleanup.
 
-Unit tests use controlled doubles for authentication and failure cases; integration tests exercise database relations and transactional behavior through Prisma. PGlite does not establish production deployment, performance, or concurrency guarantees. The integration command is separate from the unit coverage calculation.
+Unit tests use controlled doubles for authentication and failure cases; integration tests exercise database relations and transactional behavior through Prisma. PGlite does not establish production deployment, performance, or concurrency guarantees. The standalone integration command is useful during development; the combined backend command measures both projects together.
 
 ## CI and rollout
 
-The [API tests workflow](../../.github/workflows/api-tests.yml) runs on pull requests and pushes to `main`, `master`, and `work/fixes-and-features`. It installs dependencies, generates Prisma Client, runs the coverage gate and integration suite, and uploads `coverage/api` as the `api-coverage` artifact even after failures. Failing tests or any coverage metric below 80% fail the job. Repository branch protection must require this job to make it a merge gate; the workflow alone does not configure that protection.
+The [API tests workflow](../../.github/workflows/api-tests.yml) runs on pull requests and pushes to `main`, `master`, and `work/fixes-and-features`. It installs dependencies, generates Prisma Client, runs the combined backend test/coverage gate, and uploads `coverage/backend` as the `backend-coverage` artifact even after failures. Failing tests or any coverage metric below 80% fail the job. Repository branch protection must require this job to make it a merge gate; the workflow alone does not configure that protection.
 
 Each migrated endpoint must cover session and bot authentication, invalid/inactive/revoked credentials, permission and ownership/hierarchy checks, argument/payload validation, response contracts, and supported method behavior. Add pagination, UTC conversion/date boundaries, mutation rollback, audit attribution, and redaction checks where applicable. Track gaps before raising thresholds. Regenerate the route report after changes:
 
 ```sh
 npm run api:inventory
 ```
+
+
+## Migration completion check
+
+The final full run passed 1,894 tests across 103 test files. Whole-backend coverage: statements 90.90%, branches 89.10%, functions 91.85%, lines 90.63%. All 19 standalone regression tests and TypeScript checks also passed. These are the completion snapshot; CI computes current values on each change.
+
+`npm run api:check` verifies every exported method has an OpenAPI operation and a direct test import, rejects unfinished or stale operations, and resolves local schema references. This static contract check supplements behavioral coverage; an import alone does not prove adequate testing. The completed inventory contains 103 route files/155 methods with no missing or stale specification operations.

@@ -121,7 +121,7 @@
         }
       }
     },
-    "/auth/{nextauth}": {
+    "/auth/{...nextauth}": {
       "parameters": [
         {
           "name": "nextauth",
@@ -159,6 +159,7 @@
     "schemas": {}
   },
   "removePaths": [
-    "/auth/steam-signin"
+    "/auth/steam-signin",
+    "/auth/{nextauth}"
   ]
 }

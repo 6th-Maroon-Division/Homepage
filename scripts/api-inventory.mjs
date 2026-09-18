@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve, relative, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
@@ -11,6 +11,51 @@ const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap(entry =>
   entry.isDirectory() ? walk(resolve(dir, entry.name)) : [resolve(dir, entry.name)]);
 const rel = file => relative(root, file).replaceAll('\\', '/');
 const spec = YAML.parse(readFileSync(resolve(root, 'openapi.yaml'), 'utf8'));
+// Follow named local calls to a shared wrapper. These are per-method source
+// markers, not proof of authorization, branch reachability, or test coverage.
+const moduleCache = new Map();
+function moduleInfo(file) {
+  if (moduleCache.has(file)) return moduleCache.get(file);
+  const ast = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
+  const imports = new Map(); const functions = new Map();
+  for (const node of ast.statements) {
+    if (ts.isImportDeclaration(node) && node.importClause?.namedBindings && ts.isNamedImports(node.importClause.namedBindings)) {
+      for (const entry of node.importClause.namedBindings.elements) imports.set(entry.name.text, [node.moduleSpecifier.text, entry.propertyName?.text ?? entry.name.text]);
+    }
+    if (ts.isFunctionDeclaration(node) && node.name) functions.set(node.name.text, node);
+    if (ts.isVariableStatement(node)) for (const entry of node.declarationList.declarations) if (entry.initializer) functions.set(entry.name.getText(ast), entry.initializer);
+    if (ts.isExportDeclaration(node) && node.exportClause && ts.isNamedExports(node.exportClause)) for (const entry of node.exportClause.elements) {
+      if (node.moduleSpecifier) imports.set(entry.name.text, [node.moduleSpecifier.text, entry.propertyName?.text ?? entry.name.text]);
+      else functions.set(entry.name.text, entry.propertyName ?? entry.name);
+    }
+  }
+  const result = { imports, functions }; moduleCache.set(file, result); return result;
+}
+function handlerKinds(file, name, visited = new Set()) {
+  const key = file + ':' + name; if (visited.has(key)) return new Set(); visited.add(key);
+  const { imports, functions } = moduleInfo(file); const result = new Set();
+  const imported = imports.get(name);
+  if (imported) {
+    const [path, original] = imported;
+    const target = path.startsWith('@/') ? resolve(root, path.slice(2)) : path.startsWith('.') ? resolve(dirname(file), path) : null;
+    if (!target) return result;
+    if (target === resolve(root, 'lib/api/handler')) {
+      if (original === 'handleApiRequest') result.add('protected');
+      if (original === 'handlePublicApiRequest') result.add('public');
+      return result;
+    }
+    const resolved = [target + '.ts', target + '.tsx', resolve(target, 'index.ts')].find(existsSync);
+    return resolved ? handlerKinds(resolved, original, visited) : result;
+  }
+  const body = functions.get(name); if (!body) return result;
+  const add = called => { for (const kind of handlerKinds(file, called, visited)) result.add(kind); };
+  if (ts.isIdentifier(body)) add(body.text);
+  const visit = node => {
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) add(node.expression.text);
+    ts.forEachChild(node, visit);
+  };
+  visit(body); return result;
+}
 const routes = walk(resolve(root, 'app/api')).filter(file => file.endsWith('/route.ts')).sort().map(file => {
   const source = readFileSync(file, 'utf8');
   const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
@@ -26,31 +71,11 @@ const routes = walk(resolve(root, 'app/api')).filter(file => file.endsWith('/rou
   }
   const path = '/' + rel(file).replace(/^app\//, '').replace(/\/route.ts$/, '').replace(/\[([^\]]+)\]/g, '{$1}');
   const pattern = '^' + path.split('/').map(part => part.startsWith('{...') ? '.+' : part.startsWith('{') ? '[^/]+' : part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('/') + '$';
-  // This known delegate has a migrated public GET and a separate POST contract.
-  // Require its exact file, named import, and single-return GET body; do not
-  // generalize a helper-name mention into method migration certification.
-  const knownPublicListGet = rel(file) === 'app/api/orbats/route.ts'
-    && ast.statements.some(node => ts.isImportDeclaration(node)
-      && node.moduleSpecifier.text === '@/lib/api/orbat-list'
-      && node.importClause?.namedBindings && ts.isNamedImports(node.importClause.namedBindings)
-      && node.importClause.namedBindings.elements.some(element => element.name.text === 'getPublicOrbatList' && (!element.propertyName || element.propertyName.text === 'getPublicOrbatList')))
-    && ast.statements.some(node => ts.isFunctionDeclaration(node) && node.name?.text === 'GET'
-      && node.body?.statements.length === 1 && ts.isReturnStatement(node.body.statements[0])
-      && node.body.statements[0].expression && ts.isCallExpression(node.body.statements[0].expression)
-      && node.body.statements[0].expression.expression.getText(ast) === 'getPublicOrbatList');
-  const knownProtectedOrbatPost = knownPublicListGet
-    && ast.statements.some(node => ts.isFunctionDeclaration(node) && node.name?.text === 'POST'
-      && node.body && /handleApiRequest\s*\(/.test(node.body.getText(ast)));
-  const auth = [
-    knownPublicListGet && (knownProtectedOrbatPost ? 'GET: explicit anonymous access; POST: session/bot with permission check' : 'GET: explicit anonymous access (known public delegate); POST: inspect existing checks'),
-    /handlePublicApiRequest\s*\(/.test(source) && 'explicit anonymous access (public handler)',
-    /getServerSession|requireAuth|withAuth|handleApiRequest/.test(source) && 'session',
-    /validateBotToken|authenticateDatabaseBot|handleApiRequest/.test(source) && 'bot token',
-    /checkPermission|requirePermission|withPermission|handleApiRequest|canAccessApiUser/.test(source) && 'permission check',
-    /NextAuth\(|openid|steamcommunity/.test(source) && 'auth flow',
-  ].filter(Boolean).join(', ') || 'inspect (no direct auth marker)';
-  const style = [knownPublicListGet && 'GET: data/meta and structured errors', /botError\(|apiError\(|handle(?:Public)?ApiRequest/.test(source) && 'structured error', source.includes('apiSuccess(') && 'data/meta envelope', /error:\s*['"`]/.test(source) && 'string error', /text\/event-stream|createBotEventStream/.test(source) && 'SSE', /NextResponse.redirect/.test(source) && 'redirect'].filter(Boolean).join(', ') || 'inspect';
-  const migration = knownProtectedOrbatPost ? 'GET: public migrated; POST: protected migrated' : knownPublicListGet ? 'GET: public delegate migrated; POST: pending' : /handlePublicApiRequest\s*\(/.test(source) ? 'Shared public handler (migrated)' : /handleApiRequest\s*\(/.test(source) ? 'Shared handler (migrated)' : 'Pending migration / transport review';
+  const authProtocol = ['/api/auth/{...nextauth}', '/api/auth/steam-login', '/api/auth/steam-callback'].includes(path);
+  const methodKinds = [...exported].sort().map(method => [method, handlerKinds(file, method)]);
+  const auth = methodKinds.map(([method, kinds]) => `${method}: ${authProtocol ? 'browser authentication protocol' : kinds.has('public') ? 'explicit anonymous/session/bot' : kinds.has('protected') ? 'session/bot with permission review' : 'inspect transport/legacy auth'}`).join('; ');
+  const style = [/botError\(|apiError\(|handle(?:Public)?ApiRequest/.test(source) && 'structured error', source.includes('apiSuccess(') && 'data/meta envelope', /error:\s*['"`]/.test(source) && 'string error', /text\/event-stream|createBotEventStream/.test(source) && 'SSE', /NextResponse.redirect/.test(source) && 'redirect'].filter(Boolean).join(', ') || 'inspect delegate';
+  const migration = methodKinds.map(([method, kinds]) => `${method}: ${authProtocol ? 'authentication protocol exception (see auth tests)' : kinds.size ? [...kinds].sort().join('/') + ' shared handler' : 'pending migration / transport review'}`).join('; ');
   return { file: rel(file), path, regex: new RegExp(pattern), methods: [...exported].sort(), auth, style, migration, refs: new Set(), docs: new Set(), tests: new Set() };
 });
 
@@ -108,14 +133,14 @@ const output = [
   'Generated by `npm run api:inventory`. Do not edit the table by hand.', '',
   `${routes.length} route files; ${operations} exported HTTP handlers; ${referenced} routes with application/script URL references; ${routes.length - referenced} without such references. ${missing.length} handlers missing from OpenAPI.`, '',
   'This is static evidence, not production traffic. URL references are route-level candidates, not proof that every method is called. They include fetch URLs, EventSource URLs, and URLs assigned to variables. Framework-generated auth calls, dynamic URL fragments, external clients, relative documentation paths, and indirect calls can be missed. Dynamic segments can match more than one route. Documentation/test references are not live consumers. Auth/error columns are source markers, not security certification. “Documented” means an operation entry exists without a TODO marker, not that its schema is complete or correct. Do not delete routes based on this report.', '',
-  'Migration status is a route-level source marker: “Shared handler (migrated)” means the file calls `handleApiRequest`; “Shared public handler (migrated)” means it calls `handlePublicApiRequest`, explicitly supporting anonymous access for that operation. The known ORBAT collection delegate is labeled per method: public GET and either pending or shared protected POST, based on its current source. A file can contain partially migrated methods. These markers do not certify every method, permission, audit requirement, or test case; session imports do not establish that all operations require authentication. Test references are not per-method coverage. See [testing](./testing.md) for the current automated coverage scope and [public-access review](./public-access-review.md) for confirmed public flows.', '',
+  'Migration status follows each exported HTTP method through named local calls to the shared protected/public wrappers. These are static source markers, not certification of every branch, permission, audit requirement, or test case. Public and protected methods on one URL are reported separately. Test references are not per-method coverage. See [testing](./testing.md) and [public-access review](./public-access-review.md).', '',
   '| Route and source | Methods | Migration status | Application/script references | Test references | Docs/Bruno references | Auth markers | Response markers | OpenAPI |',
   '|---|---|---|---|---|---|---|---|---|',
   ...routes.map(route => `| [\`${route.path}\`](../../${route.file}) | ${route.methods.join(', ')} | ${route.migration} | ${links(route.refs)} | ${links(route.tests)} | ${links(route.docs)} | ${route.auth} | ${route.style} | ${coverage(route)} |`), '',
-  '## Missing OpenAPI operations', '', ...missing.map(operation => `- \`${operation}\``), '',
+  '## Missing OpenAPI operations', '', ...(missing.length ? missing.map(operation => `- \`${operation}\``) : ['None.']), '',
   '## OpenAPI operations without matching exported handlers', '',
   'These specification entries need review; a documentation entry alone does not prove the operation exists.', '',
-  ...stale.map(operation => `- \`${operation}\``), '',
+  ...(stale.length ? stale.map(operation => `- \`${operation}\``) : ['None.']), '',
 ].join('\n');
-writeFileSync(resolve(root, 'docs/api/inventory.md'), output);
+writeFileSync(resolve(root, 'docs/api/inventory.md'), output.trimEnd() + '\n');
 console.log(`${routes.length} routes, ${operations} handlers, ${referenced} routes referenced by application/scripts, ${missing.length} OpenAPI gaps.`);
