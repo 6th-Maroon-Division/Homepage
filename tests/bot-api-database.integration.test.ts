@@ -5,9 +5,9 @@ const databaseUrl = process.env.BOT_API_TEST_DATABASE_URL;
 
 test('database bot authentication and shared availability notes', { skip: !databaseUrl }, async () => {
   process.env.DATABASE_URL = databaseUrl!;
-  const [{ prisma }, { GET, PUT }] = await Promise.all([
+  const [{ prisma }, { GET, PATCH }] = await Promise.all([
     import('../lib/prisma'),
-    import('../app/api/bot/orbats/[id]/availability/[discordId]/route'),
+    import('../app/api/orbats/[id]/availability/[userId]/route'),
   ]);
   const suffix = `${Date.now()}-${Math.random()}`;
   const user = await prisma.user.create({ data: { username: `bot-api-${suffix}` } });
@@ -19,15 +19,15 @@ test('database bot authentication and shared availability notes', { skip: !datab
     name: `ORBAT ${suffix}`, createdById: user.id, startsAtUtc,
     endsAtUtc: new Date(startsAtUtc.getTime() + 3_600_000),
   } });
-  const route = { params: Promise.resolve({ id: String(orbat.id), discordId }) };
+  const route = { params: Promise.resolve({ id: String(orbat.id), userId: String(user.id) }) };
 
-  const environmentOnly = await GET(new Request(`http://localhost/api/bot/orbats/${orbat.id}/availability/${discordId}`, {
+  const environmentOnly = await GET(new Request(`http://localhost/api/orbats/${orbat.id}/availability/${user.id}`, {
     headers: { authorization: 'Bearer environment-token' },
   }) as never, route);
   assert.equal(environmentOnly.status, 401);
 
-  const saved = await PUT(new Request(`http://localhost/api/bot/orbats/${orbat.id}/availability/${discordId}`, {
-    method: 'PUT', headers: { authorization: `Bearer ${token.token}`, 'content-type': 'application/json' },
+  const saved = await PATCH(new Request(`http://localhost/api/orbats/${orbat.id}/availability/${user.id}`, {
+    method: 'PATCH', headers: { authorization: `Bearer ${token.token}`, 'content-type': 'application/json' },
     body: JSON.stringify({ status: 'absent', reason: 'Shared note' }),
   }) as never, route);
   assert.equal(saved.status, 200);
@@ -36,7 +36,7 @@ test('database bot authentication and shared availability notes', { skip: !datab
   assert.equal(databaseNote?.reason, 'Shared note');
 
   await prisma.botToken.update({ where: { id: token.id }, data: { isActive: false } });
-  const revoked = await GET(new Request(`http://localhost/api/bot/orbats/${orbat.id}/availability/${discordId}`, {
+  const revoked = await GET(new Request(`http://localhost/api/orbats/${orbat.id}/availability/${user.id}`, {
     headers: { authorization: `Bearer ${token.token}` },
   }) as never, route);
   assert.equal(revoked.status, 401);

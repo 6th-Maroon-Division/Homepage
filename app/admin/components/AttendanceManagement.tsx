@@ -96,14 +96,11 @@ function AttendanceForm({
       const fetchData = async () => {
         setIsLoadingSignups(true);
         try {
-          const [signupsRes, users] = await Promise.all([
-            fetch(`/api/orbats/${orbatId}/signups`),
+          const [signupRows, users] = await Promise.all([
+            apiList<typeof signups[number]>(`/api/orbats/${orbatId}/signups`),
             apiList<{ id: number; username: string }>('/api/users'),
           ]);
-          if (signupsRes.ok) {
-            const data = await signupsRes.json();
-            setSignups(data);
-          }
+          setSignups(signupRows);
           setAllUsers(users);
         } catch (error) {
           logClientError('Error fetching data:', error);

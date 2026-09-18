@@ -1,0 +1,1604 @@
+{
+  "paths": {
+    "/signups": {
+      "post": {
+        "summary": "Create signup",
+        "tags": [
+          "Signups"
+        ],
+        "description": "Self signup requires a session only. Other users require live orbat:edit hierarchy. Bots must specify numeric userId. One signup per operation; enforce capacity, schedule, absence, rank and training in Serializable transaction. Side operations skip rank/training only. Slot selection is explicit; no legacy Discord/Steam body aliases. Unknown/repeated query parameters are rejected. All timestamps are UTC ISO strings. Active database bots use superadmin permissions; invalid explicit authorization never falls back to a session.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "description": "Optional actor-scoped key. Receipts expire after 24 hours and commit with mutation/audit/outbox. Replayed requests revalidate current target permission."
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/SignupMutation"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "warnings": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path query header or malformed JSON"
+          },
+          "401": {
+            "description": "Invalid or missing credentials"
+          },
+          "403": {
+            "description": "Permission or target hierarchy denied"
+          },
+          "404": {
+            "description": "Resource or reference not found"
+          },
+          "409": {
+            "description": "Business rule concurrency or idempotency conflict"
+          },
+          "422": {
+            "description": "Invalid payload"
+          },
+          "500": {
+            "description": "Internal failure; mutation rollback or read audit failure"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/signups/{id}": {
+      "patch": {
+        "summary": "Move signup",
+        "tags": [
+          "Signups"
+        ],
+        "description": "Requires orbat:edit and target hierarchy, including own moves requiring the global grant. Same operation only; retained signup/attendance IDs. Explicit overrideRequirements allows staff to bypass rank/training with warnings. It never bypasses capacity, absence, cutoff or cross-operation checks. Unknown/repeated query parameters are rejected. All timestamps are UTC ISO strings. Active database bots use superadmin permissions; invalid explicit authorization never falls back to a session.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "description": "Optional actor-scoped key. Receipts expire after 24 hours and commit with mutation/audit/outbox. Replayed requests revalidate current target permission."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/SignupMutation"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "warnings": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path query header or malformed JSON"
+          },
+          "401": {
+            "description": "Invalid or missing credentials"
+          },
+          "403": {
+            "description": "Permission or target hierarchy denied"
+          },
+          "404": {
+            "description": "Resource or reference not found"
+          },
+          "409": {
+            "description": "Business rule concurrency or idempotency conflict"
+          },
+          "422": {
+            "description": "Invalid payload"
+          },
+          "500": {
+            "description": "Internal failure; mutation rollback or read audit failure"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupMove"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete signup",
+        "tags": [
+          "Signups"
+        ],
+        "description": "Self or live orbat:edit hierarchy. Staff may remove past-operation signups. Audit includes affected user and cascading attendance/session/log IDs, never notes. Unknown/repeated query parameters are rejected. All timestamps are UTC ISO strings. Active database bots use superadmin permissions; invalid explicit authorization never falls back to a session.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "description": "Optional actor-scoped key. Receipts expire after 24 hours and commit with mutation/audit/outbox. Replayed requests revalidate current target permission."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "null"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "warnings": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path query header or malformed JSON"
+          },
+          "401": {
+            "description": "Invalid or missing credentials"
+          },
+          "403": {
+            "description": "Permission or target hierarchy denied"
+          },
+          "404": {
+            "description": "Resource or reference not found"
+          },
+          "409": {
+            "description": "Business rule concurrency or idempotency conflict"
+          },
+          "422": {
+            "description": "Invalid payload"
+          },
+          "500": {
+            "description": "Internal failure; mutation rollback or read audit failure"
+          }
+        }
+      }
+    },
+    "/orbats/{id}/signups": {
+      "get": {
+        "summary": "List operation signups",
+        "tags": [
+          "Signups"
+        ],
+        "description": "Requires orbat:edit or attendance:view. Descending ID cursor, actual lookahead. Other-user data reads are audited only for returned rows, excluding lookahead and session self. Unknown/repeated query parameters are rejected. All timestamps are UTC ISO strings. Active database bots use superadmin permissions; invalid explicit authorization never falls back to a session.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 50
+            },
+            "description": "Capped at 100."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "description": "Positive Int32 keyset cursor."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SignupListItem"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "nextCursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "limit",
+                        "nextCursor"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path query header or malformed JSON"
+          },
+          "401": {
+            "description": "Invalid or missing credentials"
+          },
+          "403": {
+            "description": "Permission or target hierarchy denied"
+          },
+          "404": {
+            "description": "Resource or reference not found"
+          },
+          "409": {
+            "description": "Business rule concurrency or idempotency conflict"
+          },
+          "422": {
+            "description": "Invalid payload"
+          },
+          "500": {
+            "description": "Internal failure; mutation rollback or read audit failure"
+          }
+        }
+      }
+    },
+    "/users/{id}/signups": {
+      "get": {
+        "summary": "List user signups",
+        "tags": [
+          "Signups"
+        ],
+        "description": "Session me alias or numeric user ID. Self or live orbat:edit hierarchy. All past and upcoming signups, descending IDs; legacy includePast alias removed. Targeted other-user reads are audited even when empty. Unknown/repeated query parameters are rejected. All timestamps are UTC ISO strings. Active database bots use superadmin permissions; invalid explicit authorization never falls back to a session.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2147483647
+                },
+                {
+                  "type": "string",
+                  "const": "me"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 50
+            },
+            "description": "Capped at 100."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "description": "Positive Int32 keyset cursor."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SignupListItem"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "nextCursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "limit",
+                        "nextCursor"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path query header or malformed JSON"
+          },
+          "401": {
+            "description": "Invalid or missing credentials"
+          },
+          "403": {
+            "description": "Permission or target hierarchy denied"
+          },
+          "404": {
+            "description": "Resource or reference not found"
+          },
+          "409": {
+            "description": "Business rule concurrency or idempotency conflict"
+          },
+          "422": {
+            "description": "Invalid payload"
+          },
+          "500": {
+            "description": "Internal failure; mutation rollback or read audit failure"
+          }
+        }
+      }
+    },
+    "/orbats/{id}/available-slots": {
+      "get": {
+        "summary": "Public slot capacity list",
+        "tags": [
+          "Signups"
+        ],
+        "description": "Public catalog and aggregate counts only, no participant identities or eligibility. Ascending slot IDs, actual lookahead. No user-read audit. Unknown/repeated query parameters are rejected. All timestamps are UTC ISO strings. Active database bots use superadmin permissions; invalid explicit authorization never falls back to a session.",
+        "security": [
+          {},
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 50
+            },
+            "description": "Capped at 100."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "description": "Positive Int32 keyset cursor."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AvailableOrbatSlot"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "nextCursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "limit",
+                        "nextCursor"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path query header or malformed JSON"
+          },
+          "401": {
+            "description": "Invalid or missing credentials"
+          },
+          "403": {
+            "description": "Permission or target hierarchy denied"
+          },
+          "404": {
+            "description": "Resource or reference not found"
+          },
+          "409": {
+            "description": "Business rule concurrency or idempotency conflict"
+          },
+          "422": {
+            "description": "Invalid payload"
+          },
+          "500": {
+            "description": "Internal failure; mutation rollback or read audit failure"
+          }
+        }
+      }
+    },
+    "/orbats/{id}/eligibility": {
+      "get": {
+        "summary": "Evaluate user slot eligibility",
+        "tags": [
+          "Signups"
+        ],
+        "description": "Self or live orbat:edit target hierarchy. userId defaults to me for sessions; bots must provide numeric ID. Combines rank/training, temporary qualification, schedule, absence and capacity checks. Reports currentSignup for authorized target. Ascending slot IDs; targeted other-user reads are audited even when empty. Unknown/repeated query parameters are rejected. All timestamps are UTC ISO strings. Active database bots use superadmin permissions; invalid explicit authorization never falls back to a session.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 50
+            },
+            "description": "Capped at 100."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "description": "Positive Int32 keyset cursor."
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^(me|[0-9]+)$"
+            },
+            "description": "Defaults to session me; numeric mandatory for bots."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/OrbatSlotEligibility"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "nextCursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "limit",
+                        "nextCursor"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path query header or malformed JSON"
+          },
+          "401": {
+            "description": "Invalid or missing credentials"
+          },
+          "403": {
+            "description": "Permission or target hierarchy denied"
+          },
+          "404": {
+            "description": "Resource or reference not found"
+          },
+          "409": {
+            "description": "Business rule concurrency or idempotency conflict"
+          },
+          "422": {
+            "description": "Invalid payload"
+          },
+          "500": {
+            "description": "Internal failure; mutation rollback or read audit failure"
+          }
+        }
+      }
+    },
+    "/orbats/{id}/availability/{userId}": {
+      "get": {
+        "summary": "Get user operation availability",
+        "tags": [
+          "Signups"
+        ],
+        "description": "Self or live orbat:edit hierarchy. GET returns null when absent and audits other-user reads. PATCH upserts the full note with status required; omitted reason/minute values reset to null. late_unsure requires at least one nonnegative minute estimate. Other statuses clear minute values. Reason trims and is limited to 500 characters. DELETE missing note returns404. Staff may modify past operations; other callers respect cutoff. Mutation audit redacts reasons and commits with outbox. Unknown/repeated query parameters are rejected. All timestamps are UTC ISO strings. Active database bots use superadmin permissions; invalid explicit authorization never falls back to a session.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2147483647
+                },
+                {
+                  "type": "string",
+                  "const": "me"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/OrbatAvailability"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path query header or malformed JSON"
+          },
+          "401": {
+            "description": "Invalid or missing credentials"
+          },
+          "403": {
+            "description": "Permission or target hierarchy denied"
+          },
+          "404": {
+            "description": "Resource or reference not found"
+          },
+          "409": {
+            "description": "Business rule concurrency or idempotency conflict"
+          },
+          "422": {
+            "description": "Invalid payload"
+          },
+          "500": {
+            "description": "Internal failure; mutation rollback or read audit failure"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Patch user operation availability",
+        "tags": [
+          "Signups"
+        ],
+        "description": "Self or live orbat:edit hierarchy. GET returns null when absent and audits other-user reads. PATCH upserts the full note with status required; omitted reason/minute values reset to null. late_unsure requires at least one nonnegative minute estimate. Other statuses clear minute values. Reason trims and is limited to 500 characters. DELETE missing note returns404. Staff may modify past operations; other callers respect cutoff. Mutation audit redacts reasons and commits with outbox. Unknown/repeated query parameters are rejected. All timestamps are UTC ISO strings. Active database bots use superadmin permissions; invalid explicit authorization never falls back to a session.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2147483647
+                },
+                {
+                  "type": "string",
+                  "const": "me"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/OrbatAvailability"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path query header or malformed JSON"
+          },
+          "401": {
+            "description": "Invalid or missing credentials"
+          },
+          "403": {
+            "description": "Permission or target hierarchy denied"
+          },
+          "404": {
+            "description": "Resource or reference not found"
+          },
+          "409": {
+            "description": "Business rule concurrency or idempotency conflict"
+          },
+          "422": {
+            "description": "Invalid payload"
+          },
+          "500": {
+            "description": "Internal failure; mutation rollback or read audit failure"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrbatAvailabilityUpdate"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete user operation availability",
+        "tags": [
+          "Signups"
+        ],
+        "description": "Self or live orbat:edit hierarchy. GET returns null when absent and audits other-user reads. PATCH upserts the full note with status required; omitted reason/minute values reset to null. late_unsure requires at least one nonnegative minute estimate. Other statuses clear minute values. Reason trims and is limited to 500 characters. DELETE missing note returns404. Staff may modify past operations; other callers respect cutoff. Mutation audit redacts reasons and commits with outbox. Unknown/repeated query parameters are rejected. All timestamps are UTC ISO strings. Active database bots use superadmin permissions; invalid explicit authorization never falls back to a session.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2147483647
+                },
+                {
+                  "type": "string",
+                  "const": "me"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "null"
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path query header or malformed JSON"
+          },
+          "401": {
+            "description": "Invalid or missing credentials"
+          },
+          "403": {
+            "description": "Permission or target hierarchy denied"
+          },
+          "404": {
+            "description": "Resource or reference not found"
+          },
+          "409": {
+            "description": "Business rule concurrency or idempotency conflict"
+          },
+          "422": {
+            "description": "Invalid payload"
+          },
+          "500": {
+            "description": "Internal failure; mutation rollback or read audit failure"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "SignupMutation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "slotId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "orbatId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "slotId",
+          "orbatId",
+          "createdAt"
+        ]
+      },
+      "SignupCreate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "slotId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "userId": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2147483647
+              },
+              {
+                "type": "string",
+                "const": "me"
+              }
+            ]
+          }
+        },
+        "required": [
+          "slotId"
+        ]
+      },
+      "SignupMove": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "slotId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "overrideRequirements": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "slotId"
+        ]
+      },
+      "SignupListItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "slotId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "orbatId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "user": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2147483647
+              },
+              "username": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "username"
+            ]
+          },
+          "slot": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2147483647
+              },
+              "orderIndex": {
+                "type": "integer"
+              },
+              "squadRole": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              },
+              "squad": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ]
+              }
+            }
+          },
+          "orbat": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2147483647
+              },
+              "name": {
+                "type": "string"
+              },
+              "startsAtUtc": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "endsAtUtc": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      },
+      "AvailableOrbatSlot": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "slotId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "slotName": {
+            "type": "string"
+          },
+          "squadId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "squadName": {
+            "type": "string"
+          },
+          "capacity": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "signupCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "available": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "slotId",
+          "slotName",
+          "squadId",
+          "squadName",
+          "capacity",
+          "signupCount",
+          "available"
+        ]
+      },
+      "OrbatSlotEligibility": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "slotId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "slotName": {
+            "type": "string"
+          },
+          "squadId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "squadName": {
+            "type": "string"
+          },
+          "capacity": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "signupCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "allowed": {
+            "type": "boolean"
+          },
+          "temporary": {
+            "type": "boolean"
+          },
+          "temporaryTrainings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2147483647
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ]
+            }
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "code",
+                "message"
+              ]
+            }
+          },
+          "currentSignup": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "slotId": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  }
+                },
+                "required": [
+                  "id",
+                  "slotId"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "slotId",
+          "slotName",
+          "squadId",
+          "squadName",
+          "capacity",
+          "signupCount",
+          "available",
+          "allowed",
+          "temporary",
+          "temporaryTrainings",
+          "error",
+          "code",
+          "reasons",
+          "currentSignup"
+        ]
+      },
+      "OrbatAvailabilityUpdate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "absent",
+              "unsure",
+              "late_unsure"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "lateMinutes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "leaveEarlyMinutes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 2147483647
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "OrbatAvailability": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "orbatId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "absent",
+              "unsure",
+              "late_unsure"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "lateMinutes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "leaveEarlyMinutes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "orbatId",
+          "userId",
+          "status",
+          "reason",
+          "lateMinutes",
+          "leaveEarlyMinutes",
+          "createdAt",
+          "updatedAt"
+        ]
+      }
+    }
+  },
+  "removePaths": [
+    "/subslots/{id}/signup",
+    "/signups/{id}/move",
+    "/bot/signups",
+    "/bot/signups/{signupId}",
+    "/bot/orbats/{id}/signups",
+    "/bot/orbats/{id}/available-slots",
+    "/bot/orbats/{id}/availability/{discordId}",
+    "/bot/users/discord/{discordId}/signups",
+    "/orbats/{id}/attendance-notes",
+    "/orbats/{id}/attendance-notes/{noteId}",
+    "/user/current"
+  ]
+}

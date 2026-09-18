@@ -335,20 +335,15 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
   };
 
   const handleMove = async (signupId: number, targetSubslotId: number) => {
-    const res = await fetch(`/api/signups/${signupId}/move`, {
+    const { meta } = await apiRequest(`/api/signups/${signupId}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ targetSlotId: targetSubslotId }),
+      body: JSON.stringify({ slotId: targetSubslotId, overrideRequirements: true }),
     });
 
-    if (!res.ok) {
-      const data = await res.json();
-      throw new Error(data.error || 'Failed to move signup');
-    }
-
-    const data = await res.json();
+    const data = meta;
 
     // Show warnings if any
     if (data.warnings && Array.isArray(data.warnings)) {
@@ -371,18 +366,7 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
     const { signupId, subslotId } = confirmRemove;
 
     try {
-      const res = await fetch(`/api/subslots/${subslotId}/signup`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ signupId }),
-      });
-
-      if (!res.ok) {
-        showError('Failed to remove signup');
-        return;
-      }
+      await apiRequest(`/api/signups/${signupId}`, { method: 'DELETE' });
 
       await refreshOrbat();
       showSuccess('Signup removed successfully');
@@ -479,7 +463,7 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
 
     setIsUpdatingNoteId(note.id);
     try {
-      const res = await fetch(`/api/orbats/${orbat.id}/attendance-notes/${note.id}`, {
+      await apiRequest(`/api/orbats/${orbat.id}/availability/${note.userId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -490,10 +474,6 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
         }),
       });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to update attendance note');
-      }
 
       await refreshOrbat();
       showSuccess('Attendance note updated.');
@@ -512,14 +492,10 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
 
     setIsDeletingNoteId(note.id);
     try {
-      const res = await fetch(`/api/orbats/${orbat.id}/attendance-notes/${note.id}`, {
+      await apiRequest(`/api/orbats/${orbat.id}/availability/${note.userId}`, {
         method: 'DELETE',
       });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to delete attendance note');
-      }
 
       await refreshOrbat();
       showSuccess('Attendance note deleted.');

@@ -600,288 +600,11 @@ paths:
       responses:
         "200":
           description: Success
-  /bot/orbats/{id}/availability/{discordId}:
-    get:
-      tags:
-        - Bot
-        - ORBATs
-      summary: Get the shared website/Discord availability note
-      security:
-        - apiKey: []
-      responses:
-        "200":
-          description: Success
-    put:
-      tags:
-        - Bot
-        - ORBATs
-      summary: Upsert the shared website/Discord availability note
-      security:
-        - apiKey: []
-      responses:
-        "200":
-          description: Success
-    delete:
-      tags:
-        - Bot
-        - ORBATs
-      summary: Clear the shared website/Discord availability note
-      security:
-        - apiKey: []
-      responses:
-        "200":
-          description: Success
-  /bot/orbats/{id}/available-slots:
-    get:
-      tags:
-        - Bot
-        - Signups
-      summary: List authoritative slot availability and user eligibility
-      security:
-        - apiKey: []
-      parameters:
-        - name: discordUserId
-          in: query
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-  /bot/orbats/{id}/signups:
-    get:
-      tags:
-        - Bot
-        - Signups
-      summary: List signups for an ORBAT
-      description: Returns a stable signup-id cursor and linked Discord/Steam identities.
-      security:
-        - apiKey: []
-      responses:
-        "200":
-          description: Success
-  /bot/signups:
-    post:
-      tags:
-        - Bot
-        - Signups
-      summary: Sign up a user for an ORBAT
-      description: |
-        Signs up a user (identified by Discord ID or Steam ID) for a specific ORBAT.
-        If no slotId is provided, the user will be signed up for the first available slot.
-        The bot can use this to automatically sign up users for operations.
-      security:
-        - apiKey: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - orbatId
-              properties:
-                orbatId:
-                  type: integer
-                  description: ID of the ORBAT to sign up for
-                  example: 123
-                discordUserId:
-                  type: string
-                  description: Discord user ID of the user to sign up
-                  example: "123456789012345678"
-                steamId:
-                  type: string
-                  description: Steam64 ID of the user to sign up
-                  example: "76561198000000000"
-                slotId:
-                  type: integer
-                  description: Optional - specific slot ID to sign up for. If omitted, first available slot is used.
-                  example: 456
-      responses:
-        "201":
-          description: User signed up successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  message:
-                    type: string
-                    example: User signed up for ORBAT
-                  signupId:
-                    type: integer
-                    description: ID of the created signup
-                    example: 789
-                  userId:
-                    type: integer
-                    description: Database user ID
-                    example: 42
-                  username:
-                    type: string
-                    description: Username of the signed up user
-                    example: Soldier_John
-                  orbatId:
-                    type: integer
-                    description: ORBAT ID
-                    example: 123
-                  orbatName:
-                    type: string
-                    description: Name of the ORBAT
-                    example: Operation Thunder Strike
-                  eventDate:
-                    type: string
-                    format: date
-                    description: Date of the ORBAT
-                    example: 2024-01-15
-                  slotId:
-                    type: integer
-                    description: ID of the slot the user was signed up for
-                    example: 456
-                  slotName:
-                    type: string
-                    description: Name of the slot/role
-                    example: Rifleman
-                  squadName:
-                    type: string
-                    description: Name of the squad
-                    example: Alpha Squad
-        "400":
-          description: Invalid request (missing orbatId, ORBAT full, slot full, user already signed up)
-        "401":
-          description: Unauthorized - invalid or missing bot API token
-        "404":
-          description: User or ORBAT not found
-        "409":
-          description: User already signed up for this ORBAT
-        "500":
-          description: Internal server error
-    get:
-      tags:
-        - Bot
-        - Signups
-      summary: List signups for an ORBAT
-      description: |
-        Returns all signups for a specific ORBAT, with user details.
-        Useful for the bot to see who is signed up.
-      security:
-        - apiKey: []
-      parameters:
-        - name: orbatId
-          in: query
-          required: true
-          schema:
-            type: integer
-          description: ID of the ORBAT to get signups for
-      responses:
-        "200":
-          description: List of signups for the ORBAT
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  orbatId:
-                    type: integer
-                    example: 123
-                  signups:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        id:
-                          type: integer
-                          example: 789
-                        userId:
-                          type: integer
-                          example: 42
-                        username:
-                          type: string
-                          example: Soldier_John
-                        discordId:
-                          type: string
-                          nullable: true
-                          example: "123456789012345678"
-                        steamId:
-                          type: string
-                          nullable: true
-                          example: "76561198000000000"
-                        rank:
-                          type: object
-                          nullable: true
-                          properties:
-                            name:
-                              type: string
-                            abbreviation:
-                              type: string
-                        slotId:
-                          type: integer
-                          example: 456
-                        slotName:
-                          type: string
-                          example: Rifleman
-                        squadName:
-                          type: string
-                          example: Alpha Squad
-                        createdAt:
-                          type: string
-                          format: date-time
-                          example: 2024-01-14T10:00:00.000Z
-                  total:
-                    type: integer
-                    description: Total number of signups
-                    example: 15
-        "400":
-          description: Missing orbatId parameter
-        "401":
-          description: Unauthorized - invalid or missing bot API token
-        "404":
-          description: ORBAT not found
-        "500":
-          description: Internal server error
-  /bot/signups/{signupId}:
-    put:
-      tags:
-        - Bot
-        - Signups
-      summary: Atomically move a Discord user's signup
-      security:
-        - apiKey: []
-      responses:
-        "200":
-          description: Success
-    delete:
-      tags:
-        - Bot
-        - Signups
-      summary: Cancel a Discord user's signup
-      security:
-        - apiKey: []
-      responses:
-        "200":
-          description: Success
   /bot/training-reminders:
     post:
       tags:
         - TODO
       summary: TODO document POST /bot/training-reminders
-      responses:
-        "200":
-          description: Success
-  /bot/users/discord/{discordId}/signups:
-    get:
-      tags:
-        - Bot
-        - Signups
-      summary: List signups owned by a linked Discord user
-      description: Returns upcoming signups by default. Pass includePast=true for history.
-      security:
-        - apiKey: []
       responses:
         "200":
           description: Success
@@ -1342,36 +1065,6 @@ paths:
       responses:
         "201":
           description: Attendance set
-  /orbats/{id}/attendance-notes:
-    get:
-      tags:
-        - TODO
-      summary: TODO document GET /orbats/{id}/attendance-notes
-      responses:
-        "200":
-          description: Success
-    post:
-      tags:
-        - TODO
-      summary: TODO document POST /orbats/{id}/attendance-notes
-      responses:
-        "200":
-          description: Success
-  /orbats/{id}/attendance-notes/{noteId}:
-    patch:
-      tags:
-        - TODO
-      summary: TODO document PATCH /orbats/{id}/attendance-notes/{noteId}
-      responses:
-        "200":
-          description: Success
-    delete:
-      tags:
-        - TODO
-      summary: TODO document DELETE /orbats/{id}/attendance-notes/{noteId}
-      responses:
-        "200":
-          description: Success
   /orbats/{id}/attendance/automation:
     post:
       tags:
@@ -1389,12 +1082,88 @@ paths:
           description: Attendance ingested
   /orbats/{id}/eligibility:
     get:
+      summary: Evaluate user slot eligibility
       tags:
-        - TODO
-      summary: TODO document GET /orbats/{id}/eligibility
+        - Signups
+      description: Self or live orbat:edit target hierarchy. userId defaults to me for sessions; bots must provide numeric ID.
+        Combines rank/training, temporary qualification, schedule, absence and capacity checks. Reports currentSignup
+        for authorized target. Ascending slot IDs; targeted other-user reads are audited even when empty.
+        Unknown/repeated query parameters are rejected. All timestamps are UTC ISO strings. Active database bots use
+        superadmin permissions; invalid explicit authorization never falls back to a session.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+          description: Capped at 100.
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            pattern: ^[0-9]+$
+          description: Positive Int32 keyset cursor.
+        - name: userId
+          in: query
+          schema:
+            type: string
+            pattern: ^(me|[0-9]+)$
+          description: Defaults to session me; numeric mandatory for bots.
       responses:
         "200":
           description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OrbatSlotEligibility"
+                  meta:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      limit:
+                        type: integer
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+                    required:
+                      - limit
+                      - nextCursor
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Invalid path query header or malformed JSON
+        "401":
+          description: Invalid or missing credentials
+        "403":
+          description: Permission or target hierarchy denied
+        "404":
+          description: Resource or reference not found
+        "409":
+          description: Business rule concurrency or idempotency conflict
+        "422":
+          description: Invalid payload
+        "500":
+          description: Internal failure; mutation rollback or read audit failure
   /orbats/{id}/events:
     get:
       tags:
@@ -1505,57 +1274,82 @@ paths:
         "200":
           description: Success
   /orbats/{id}/signups:
-    post:
-      tags:
-        - ORBATs
-        - Signups
-      summary: Create signup
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                slotId:
-                  type: integer
-                userId:
-                  type: integer
-                position:
-                  type: string
-                notes:
-                  type: string
-      responses:
-        "201":
-          description: Signup created
-        "401":
-          description: Unauthorized
-    delete:
-      tags:
-        - ORBATs
-        - Signups
-      summary: Remove signup
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                signupId:
-                  type: integer
-      responses:
-        "200":
-          description: Signup removed
-        "401":
-          description: Unauthorized
     get:
+      summary: List operation signups
       tags:
-        - TODO
-      summary: TODO document GET /orbats/{id}/signups
+        - Signups
+      description: Requires orbat:edit or attendance:view. Descending ID cursor, actual lookahead. Other-user data reads are
+        audited only for returned rows, excluding lookahead and session self. Unknown/repeated query parameters are
+        rejected. All timestamps are UTC ISO strings. Active database bots use superadmin permissions; invalid explicit
+        authorization never falls back to a session.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+          description: Capped at 100.
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            pattern: ^[0-9]+$
+          description: Positive Int32 keyset cursor.
       responses:
         "200":
           description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SignupListItem"
+                  meta:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      limit:
+                        type: integer
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+                    required:
+                      - limit
+                      - nextCursor
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Invalid path query header or malformed JSON
+        "401":
+          description: Invalid or missing credentials
+        "403":
+          description: Permission or target hierarchy denied
+        "404":
+          description: Resource or reference not found
+        "409":
+          description: Business rule concurrency or idempotency conflict
+        "422":
+          description: Invalid payload
+        "500":
+          description: Internal failure; mutation rollback or read audit failure
   /orbats/calendar:
     get:
       tags:
@@ -3144,32 +2938,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiFailure"
-  /signups/{id}/move:
-    post:
-      tags:
-        - Signups
-      summary: Move signup to different slot
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                targetSlotId:
-                  type: integer
-      responses:
-        "200":
-          description: Signup moved
-        "401":
-          description: Unauthorized
-    patch:
-      tags:
-        - TODO
-      summary: TODO document PATCH /signups/{id}/move
-      responses:
-        "200":
-          description: Success
   /subslot-definitions:
     get:
       tags:
@@ -3495,21 +3263,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiFailure"
-  /subslots/{id}/signup:
-    post:
-      tags:
-        - TODO
-      summary: TODO document POST /subslots/{id}/signup
-      responses:
-        "200":
-          description: Success
-    delete:
-      tags:
-        - TODO
-      summary: TODO document DELETE /subslots/{id}/signup
-      responses:
-        "200":
-          description: Success
   /templates:
     get:
       tags:
@@ -5159,20 +4912,6 @@ paths:
       responses:
         "200":
           description: Success
-  /user/current:
-    get:
-      tags:
-        - Users
-      summary: Get current user
-      responses:
-        "200":
-          description: Current user data
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/User"
-        "401":
-          description: Unauthorized
   /user/events:
     get:
       tags:
@@ -7612,6 +7351,565 @@ paths:
           description: POST strict empty object required
         "500":
           description: Database selection or required history-read audit failure
+  /signups:
+    post:
+      summary: Create signup
+      tags:
+        - Signups
+      description: Self signup requires a session only. Other users require live orbat:edit hierarchy. Bots must specify
+        numeric userId. One signup per operation; enforce capacity, schedule, absence, rank and training in Serializable
+        transaction. Side operations skip rank/training only. Slot selection is explicit; no legacy Discord/Steam body
+        aliases. Unknown/repeated query parameters are rejected. All timestamps are UTC ISO strings. Active database
+        bots use superadmin permissions; invalid explicit authorization never falls back to a session.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+          description: Optional actor-scoped key. Receipts expire after 24 hours and commit with mutation/audit/outbox. Replayed
+            requests revalidate current target permission.
+      responses:
+        "201":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/SignupMutation"
+                  meta:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Invalid path query header or malformed JSON
+        "401":
+          description: Invalid or missing credentials
+        "403":
+          description: Permission or target hierarchy denied
+        "404":
+          description: Resource or reference not found
+        "409":
+          description: Business rule concurrency or idempotency conflict
+        "422":
+          description: Invalid payload
+        "500":
+          description: Internal failure; mutation rollback or read audit failure
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupCreate"
+  /signups/{id}:
+    patch:
+      summary: Move signup
+      tags:
+        - Signups
+      description: Requires orbat:edit and target hierarchy, including own moves requiring the global grant. Same operation
+        only; retained signup/attendance IDs. Explicit overrideRequirements allows staff to bypass rank/training with
+        warnings. It never bypasses capacity, absence, cutoff or cross-operation checks. Unknown/repeated query
+        parameters are rejected. All timestamps are UTC ISO strings. Active database bots use superadmin permissions;
+        invalid explicit authorization never falls back to a session.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+        - name: Idempotency-Key
+          in: header
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+          description: Optional actor-scoped key. Receipts expire after 24 hours and commit with mutation/audit/outbox. Replayed
+            requests revalidate current target permission.
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/SignupMutation"
+                  meta:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Invalid path query header or malformed JSON
+        "401":
+          description: Invalid or missing credentials
+        "403":
+          description: Permission or target hierarchy denied
+        "404":
+          description: Resource or reference not found
+        "409":
+          description: Business rule concurrency or idempotency conflict
+        "422":
+          description: Invalid payload
+        "500":
+          description: Internal failure; mutation rollback or read audit failure
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupMove"
+    delete:
+      summary: Delete signup
+      tags:
+        - Signups
+      description: Self or live orbat:edit hierarchy. Staff may remove past-operation signups. Audit includes affected user
+        and cascading attendance/session/log IDs, never notes. Unknown/repeated query parameters are rejected. All
+        timestamps are UTC ISO strings. Active database bots use superadmin permissions; invalid explicit authorization
+        never falls back to a session.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+        - name: Idempotency-Key
+          in: header
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+          description: Optional actor-scoped key. Receipts expire after 24 hours and commit with mutation/audit/outbox. Replayed
+            requests revalidate current target permission.
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    type: "null"
+                  meta:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Invalid path query header or malformed JSON
+        "401":
+          description: Invalid or missing credentials
+        "403":
+          description: Permission or target hierarchy denied
+        "404":
+          description: Resource or reference not found
+        "409":
+          description: Business rule concurrency or idempotency conflict
+        "422":
+          description: Invalid payload
+        "500":
+          description: Internal failure; mutation rollback or read audit failure
+  /users/{id}/signups:
+    get:
+      summary: List user signups
+      tags:
+        - Signups
+      description: Session me alias or numeric user ID. Self or live orbat:edit hierarchy. All past and upcoming signups,
+        descending IDs; legacy includePast alias removed. Targeted other-user reads are audited even when empty.
+        Unknown/repeated query parameters are rejected. All timestamps are UTC ISO strings. Active database bots use
+        superadmin permissions; invalid explicit authorization never falls back to a session.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            oneOf:
+              - type: integer
+                minimum: 1
+                maximum: 2147483647
+              - type: string
+                const: me
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+          description: Capped at 100.
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            pattern: ^[0-9]+$
+          description: Positive Int32 keyset cursor.
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SignupListItem"
+                  meta:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      limit:
+                        type: integer
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+                    required:
+                      - limit
+                      - nextCursor
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Invalid path query header or malformed JSON
+        "401":
+          description: Invalid or missing credentials
+        "403":
+          description: Permission or target hierarchy denied
+        "404":
+          description: Resource or reference not found
+        "409":
+          description: Business rule concurrency or idempotency conflict
+        "422":
+          description: Invalid payload
+        "500":
+          description: Internal failure; mutation rollback or read audit failure
+  /orbats/{id}/available-slots:
+    get:
+      summary: Public slot capacity list
+      tags:
+        - Signups
+      description: Public catalog and aggregate counts only, no participant identities or eligibility. Ascending slot IDs,
+        actual lookahead. No user-read audit. Unknown/repeated query parameters are rejected. All timestamps are UTC ISO
+        strings. Active database bots use superadmin permissions; invalid explicit authorization never falls back to a
+        session.
+      security:
+        - {}
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+          description: Capped at 100.
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            pattern: ^[0-9]+$
+          description: Positive Int32 keyset cursor.
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AvailableOrbatSlot"
+                  meta:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      limit:
+                        type: integer
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+                    required:
+                      - limit
+                      - nextCursor
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Invalid path query header or malformed JSON
+        "401":
+          description: Invalid or missing credentials
+        "403":
+          description: Permission or target hierarchy denied
+        "404":
+          description: Resource or reference not found
+        "409":
+          description: Business rule concurrency or idempotency conflict
+        "422":
+          description: Invalid payload
+        "500":
+          description: Internal failure; mutation rollback or read audit failure
+  /orbats/{id}/availability/{userId}:
+    get:
+      summary: Get user operation availability
+      tags:
+        - Signups
+      description: Self or live orbat:edit hierarchy. GET returns null when absent and audits other-user reads. PATCH upserts
+        the full note with status required; omitted reason/minute values reset to null. late_unsure requires at least
+        one nonnegative minute estimate. Other statuses clear minute values. Reason trims and is limited to 500
+        characters. DELETE missing note returns404. Staff may modify past operations; other callers respect cutoff.
+        Mutation audit redacts reasons and commits with outbox. Unknown/repeated query parameters are rejected. All
+        timestamps are UTC ISO strings. Active database bots use superadmin permissions; invalid explicit authorization
+        never falls back to a session.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+        - name: userId
+          in: path
+          required: true
+          schema:
+            oneOf:
+              - type: integer
+                minimum: 1
+                maximum: 2147483647
+              - type: string
+                const: me
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    oneOf:
+                      - $ref: "#/components/schemas/OrbatAvailability"
+                      - type: "null"
+                  meta:
+                    type: object
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Invalid path query header or malformed JSON
+        "401":
+          description: Invalid or missing credentials
+        "403":
+          description: Permission or target hierarchy denied
+        "404":
+          description: Resource or reference not found
+        "409":
+          description: Business rule concurrency or idempotency conflict
+        "422":
+          description: Invalid payload
+        "500":
+          description: Internal failure; mutation rollback or read audit failure
+    patch:
+      summary: Patch user operation availability
+      tags:
+        - Signups
+      description: Self or live orbat:edit hierarchy. GET returns null when absent and audits other-user reads. PATCH upserts
+        the full note with status required; omitted reason/minute values reset to null. late_unsure requires at least
+        one nonnegative minute estimate. Other statuses clear minute values. Reason trims and is limited to 500
+        characters. DELETE missing note returns404. Staff may modify past operations; other callers respect cutoff.
+        Mutation audit redacts reasons and commits with outbox. Unknown/repeated query parameters are rejected. All
+        timestamps are UTC ISO strings. Active database bots use superadmin permissions; invalid explicit authorization
+        never falls back to a session.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+        - name: userId
+          in: path
+          required: true
+          schema:
+            oneOf:
+              - type: integer
+                minimum: 1
+                maximum: 2147483647
+              - type: string
+                const: me
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    oneOf:
+                      - $ref: "#/components/schemas/OrbatAvailability"
+                      - type: "null"
+                  meta:
+                    type: object
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Invalid path query header or malformed JSON
+        "401":
+          description: Invalid or missing credentials
+        "403":
+          description: Permission or target hierarchy denied
+        "404":
+          description: Resource or reference not found
+        "409":
+          description: Business rule concurrency or idempotency conflict
+        "422":
+          description: Invalid payload
+        "500":
+          description: Internal failure; mutation rollback or read audit failure
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrbatAvailabilityUpdate"
+    delete:
+      summary: Delete user operation availability
+      tags:
+        - Signups
+      description: Self or live orbat:edit hierarchy. GET returns null when absent and audits other-user reads. PATCH upserts
+        the full note with status required; omitted reason/minute values reset to null. late_unsure requires at least
+        one nonnegative minute estimate. Other statuses clear minute values. Reason trims and is limited to 500
+        characters. DELETE missing note returns404. Staff may modify past operations; other callers respect cutoff.
+        Mutation audit redacts reasons and commits with outbox. Unknown/repeated query parameters are rejected. All
+        timestamps are UTC ISO strings. Active database bots use superadmin permissions; invalid explicit authorization
+        never falls back to a session.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+        - name: userId
+          in: path
+          required: true
+          schema:
+            oneOf:
+              - type: integer
+                minimum: 1
+                maximum: 2147483647
+              - type: string
+                const: me
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    type: "null"
+                  meta:
+                    type: object
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Invalid path query header or malformed JSON
+        "401":
+          description: Invalid or missing credentials
+        "403":
+          description: Permission or target hierarchy denied
+        "404":
+          description: Resource or reference not found
+        "409":
+          description: Business rule concurrency or idempotency conflict
+        "422":
+          description: Invalid payload
+        "500":
+          description: Internal failure; mutation rollback or read audit failure
 components:
   securitySchemes:
     bearerAuth:
@@ -10761,3 +11059,363 @@ components:
             enum:
               - steam
               - discord
+    SignupMutation:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        userId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        slotId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        orbatId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - slotId
+        - orbatId
+        - createdAt
+    SignupCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        slotId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        userId:
+          oneOf:
+            - type: integer
+              minimum: 1
+              maximum: 2147483647
+            - type: string
+              const: me
+      required:
+        - slotId
+    SignupMove:
+      type: object
+      additionalProperties: false
+      properties:
+        slotId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        overrideRequirements:
+          type: boolean
+      required:
+        - slotId
+    SignupListItem:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        userId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        slotId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        orbatId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        createdAt:
+          type: string
+          format: date-time
+        user:
+          type: object
+          additionalProperties: false
+          properties:
+            id:
+              type: integer
+              minimum: 1
+              maximum: 2147483647
+            username:
+              type:
+                - string
+                - "null"
+          required:
+            - id
+            - username
+        slot:
+          type: object
+          additionalProperties: false
+          properties:
+            id:
+              type: integer
+              minimum: 1
+              maximum: 2147483647
+            orderIndex:
+              type: integer
+            squadRole:
+              type:
+                - object
+                - "null"
+              properties:
+                name:
+                  type: string
+            squad:
+              type: object
+              additionalProperties: false
+              properties:
+                id:
+                  type: integer
+                  minimum: 1
+                  maximum: 2147483647
+                name:
+                  type: string
+              required:
+                - id
+                - name
+        orbat:
+          type: object
+          additionalProperties: false
+          properties:
+            id:
+              type: integer
+              minimum: 1
+              maximum: 2147483647
+            name:
+              type: string
+            startsAtUtc:
+              type:
+                - string
+                - "null"
+              format: date-time
+            endsAtUtc:
+              type:
+                - string
+                - "null"
+              format: date-time
+    AvailableOrbatSlot:
+      type: object
+      additionalProperties: false
+      properties:
+        slotId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        slotName:
+          type: string
+        squadId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        squadName:
+          type: string
+        capacity:
+          type:
+            - integer
+            - "null"
+        signupCount:
+          type: integer
+          minimum: 0
+        available:
+          type: boolean
+      required:
+        - slotId
+        - slotName
+        - squadId
+        - squadName
+        - capacity
+        - signupCount
+        - available
+    OrbatSlotEligibility:
+      type: object
+      additionalProperties: false
+      properties:
+        slotId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        slotName:
+          type: string
+        squadId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        squadName:
+          type: string
+        capacity:
+          type:
+            - integer
+            - "null"
+        signupCount:
+          type: integer
+          minimum: 0
+        available:
+          type: boolean
+        allowed:
+          type: boolean
+        temporary:
+          type: boolean
+        temporaryTrainings:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              id:
+                type: integer
+                minimum: 1
+                maximum: 2147483647
+              name:
+                type: string
+            required:
+              - id
+              - name
+        error:
+          type:
+            - string
+            - "null"
+        code:
+          type:
+            - string
+            - "null"
+        reasons:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              code:
+                type: string
+              message:
+                type: string
+            required:
+              - code
+              - message
+        currentSignup:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              properties:
+                id:
+                  type: integer
+                  minimum: 1
+                  maximum: 2147483647
+                slotId:
+                  type: integer
+                  minimum: 1
+                  maximum: 2147483647
+              required:
+                - id
+                - slotId
+            - type: "null"
+      required:
+        - slotId
+        - slotName
+        - squadId
+        - squadName
+        - capacity
+        - signupCount
+        - available
+        - allowed
+        - temporary
+        - temporaryTrainings
+        - error
+        - code
+        - reasons
+        - currentSignup
+    OrbatAvailabilityUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum:
+            - absent
+            - unsure
+            - late_unsure
+        reason:
+          type:
+            - string
+            - "null"
+          maxLength: 500
+        lateMinutes:
+          type:
+            - integer
+            - "null"
+          minimum: 0
+          maximum: 2147483647
+        leaveEarlyMinutes:
+          type:
+            - integer
+            - "null"
+          minimum: 0
+          maximum: 2147483647
+      required:
+        - status
+    OrbatAvailability:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        orbatId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        userId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        status:
+          type: string
+          enum:
+            - absent
+            - unsure
+            - late_unsure
+        reason:
+          type:
+            - string
+            - "null"
+          maxLength: 500
+        lateMinutes:
+          type:
+            - integer
+            - "null"
+          minimum: 0
+          maximum: 2147483647
+        leaveEarlyMinutes:
+          type:
+            - integer
+            - "null"
+          minimum: 0
+          maximum: 2147483647
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - orbatId
+        - userId
+        - status
+        - reason
+        - lateMinutes
+        - leaveEarlyMinutes
+        - createdAt
+        - updatedAt
