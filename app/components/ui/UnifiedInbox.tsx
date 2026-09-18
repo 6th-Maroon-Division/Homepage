@@ -39,6 +39,7 @@ export default function UnifiedInbox() {
   const isOpenRef = useRef(false);
   const fetchMessagesRef = useRef<() => Promise<void>>(async () => undefined);
   const fetchUnreadCountRef = useRef<() => Promise<void>>(async () => undefined);
+  const messageRequest = useRef(0);
 
   useEffect(() => {
     isOpenRef.current = isOpen;
@@ -60,6 +61,7 @@ export default function UnifiedInbox() {
   const fetchMessages = useCallback(async () => {
     if (!session?.user) return;
 
+    const request = ++messageRequest.current;
     setIsLoading(true);
     try {
       const queryParams = new URLSearchParams();
@@ -69,13 +71,16 @@ export default function UnifiedInbox() {
       queryParams.append('limit', '20');
 
       const data = await apiList<Message>(`/api/users/me/messages?${queryParams}`);
+      // A slower request for the previous filter must not replace this view.
+      if (request !== messageRequest.current) return;
       setMessages(data);
       await fetchUnreadCount();
     } catch (error) {
+      if (request !== messageRequest.current) return;
       console.error('Error fetching messages:', error);
       showToast('Failed to load messages', 'error');
     } finally {
-      setIsLoading(false);
+      if (request === messageRequest.current) setIsLoading(false);
     }
   }, [session, filter, showToast, fetchUnreadCount]);
 
@@ -91,6 +96,7 @@ export default function UnifiedInbox() {
     if (isOpen) {
       fetchMessages();
     }
+    return () => { messageRequest.current += 1; };
   }, [isOpen, fetchMessages]);
 
   // Stream-first inbox updates with polling fallback

@@ -140,3 +140,42 @@ test('inbox action opens its operation and records the message as read', async (
   await expect(page.getByRole('heading', { name: 'Browser Public Operation', exact: true })).toBeVisible();
   await expect.poll(async () => (await db.messageRecipient.findUniqueOrThrow({ where: { id: message.recipients[0].id } })).isRead).toBe(true);
 });
+
+test('inbox keeps the unread filter when an older all-messages response arrives last', async ({ page, login, db, seed }) => {
+  const readNotice = await db.message.create({ data: { title: 'UI Inbox Race Already Read', body: 'This must stay out of the unread list', recipients: { create: { userId: seed.memberId, audienceType: 'user', channel: 'web', isRead: true, readAt: new Date() } } } });
+  const unreadNotice = await db.message.create({ data: { title: 'UI Inbox Race Unread', body: 'This belongs in the unread list', recipients: { create: { userId: seed.memberId, audienceType: 'user', channel: 'web' } } } });
+  const held = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  const allMessages = '**/api/users/me/messages?limit=100';
+  try {
+    await login('member');
+    await page.goto('/profile');
+    // Fetch the real API response now, but let the newer unread request finish
+    // before delivering this older all-messages result to the browser.
+    await page.route(allMessages, async route => {
+      const response = await route.fetch();
+      held.resolve();
+      await release.promise;
+      await route.fulfill({ response });
+    });
+    await page.getByRole('button', { name: 'Open inbox', exact: true }).click();
+    await held.promise;
+    await page.getByRole('button', { name: 'Unread', exact: true }).click();
+    await expect(page.getByRole('heading', { name: unreadNotice.title, exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: readNotice.title, exact: true })).toHaveCount(0);
+
+    const staleResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/users/me/messages' && new URL(response.url()).search === '?limit=100');
+    release.resolve();
+    expect((await staleResponse).ok()).toBeTruthy();
+    await (await staleResponse).finished();
+    // Allow the delivered fetch continuation and React paint to complete before
+    // asserting absence; otherwise a negative assertion can pass too early.
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    await expect(page.getByRole('heading', { name: unreadNotice.title, exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: readNotice.title, exact: true })).toHaveCount(0);
+  } finally {
+    release.resolve();
+    await page.unrouteAll({ behavior: 'wait' });
+    await db.message.deleteMany({ where: { id: { in: [readNotice.id, unreadNotice.id] } } });
+  }
+});
