@@ -1,0 +1,375 @@
+{
+  "paths": {
+    "/users/{id}/avatar": {
+      "post": {
+        "summary": "upload user avatar",
+        "description": "Live session or bot token. Self or user:manage plus target hierarchy. Session-only me alias; bots target numeric IDs. Strict query-free request. Upload supports one JPEG/PNG/GIF/WebP file up to 2MiB, MIME and signature must match; filename extension derived from bytes. Refresh resolves linked provider identity on the server. Migration converts supported stored data URLs, or returns changed:false. Database change and redacted target audit commit atomically; staged files removed on failure. Concurrent profile changes conflict. No avatar data or provider secrets in audits.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2147483647
+                },
+                {
+                  "type": "string",
+                  "const": "me"
+                }
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Avatar result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "avatarUrl",
+                        "changed"
+                      ],
+                      "properties": {
+                        "avatarUrl": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "changed": {
+                          "type": "boolean"
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Standard error envelope"
+          },
+          "401": {
+            "description": "Standard error envelope"
+          },
+          "403": {
+            "description": "Standard error envelope"
+          },
+          "404": {
+            "description": "Standard error envelope"
+          },
+          "409": {
+            "description": "Standard error envelope"
+          },
+          "422": {
+            "description": "Standard error envelope"
+          },
+          "500": {
+            "description": "Standard error envelope"
+          },
+          "502": {
+            "description": "Standard error envelope"
+          },
+          "503": {
+            "description": "Standard error envelope"
+          }
+        }
+      }
+    },
+    "/users/{id}/avatar/refresh": {
+      "post": {
+        "summary": "refresh user avatar",
+        "description": "Live session or bot token. Self or user:manage plus target hierarchy. Session-only me alias; bots target numeric IDs. Strict query-free request. Upload supports one JPEG/PNG/GIF/WebP file up to 2MiB, MIME and signature must match; filename extension derived from bytes. Refresh resolves linked provider identity on the server. Migration converts supported stored data URLs, or returns changed:false. Database change and redacted target audit commit atomically; staged files removed on failure. Concurrent profile changes conflict. No avatar data or provider secrets in audits.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2147483647
+                },
+                {
+                  "type": "string",
+                  "const": "me"
+                }
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "provider"
+                ],
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "enum": [
+                      "steam",
+                      "discord"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Avatar result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "avatarUrl",
+                        "changed"
+                      ],
+                      "properties": {
+                        "avatarUrl": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "changed": {
+                          "type": "boolean"
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Standard error envelope"
+          },
+          "401": {
+            "description": "Standard error envelope"
+          },
+          "403": {
+            "description": "Standard error envelope"
+          },
+          "404": {
+            "description": "Standard error envelope"
+          },
+          "409": {
+            "description": "Standard error envelope"
+          },
+          "422": {
+            "description": "Standard error envelope"
+          },
+          "500": {
+            "description": "Standard error envelope"
+          },
+          "502": {
+            "description": "Standard error envelope"
+          },
+          "503": {
+            "description": "Standard error envelope"
+          }
+        }
+      }
+    },
+    "/users/{id}/avatar/migrate": {
+      "post": {
+        "summary": "migrate user avatar",
+        "description": "Live session or bot token. Self or user:manage plus target hierarchy. Session-only me alias; bots target numeric IDs. Strict query-free request. Upload supports one JPEG/PNG/GIF/WebP file up to 2MiB, MIME and signature must match; filename extension derived from bytes. Refresh resolves linked provider identity on the server. Migration converts supported stored data URLs, or returns changed:false. Database change and redacted target audit commit atomically; staged files removed on failure. Concurrent profile changes conflict. No avatar data or provider secrets in audits.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2147483647
+                },
+                {
+                  "type": "string",
+                  "const": "me"
+                }
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Avatar result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "avatarUrl",
+                        "changed"
+                      ],
+                      "properties": {
+                        "avatarUrl": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "changed": {
+                          "type": "boolean"
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Standard error envelope"
+          },
+          "401": {
+            "description": "Standard error envelope"
+          },
+          "403": {
+            "description": "Standard error envelope"
+          },
+          "404": {
+            "description": "Standard error envelope"
+          },
+          "409": {
+            "description": "Standard error envelope"
+          },
+          "422": {
+            "description": "Standard error envelope"
+          },
+          "500": {
+            "description": "Standard error envelope"
+          },
+          "502": {
+            "description": "Standard error envelope"
+          },
+          "503": {
+            "description": "Standard error envelope"
+          }
+        }
+      }
+    }
+  },
+  "removePaths": [
+    "/user/avatar/upload",
+    "/user/avatar/refresh",
+    "/user/avatar/migrate"
+  ],
+  "components": {
+    "schemas": {}
+  }
+}

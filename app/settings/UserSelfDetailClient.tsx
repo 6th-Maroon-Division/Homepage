@@ -1284,17 +1284,7 @@ export default function UserSelfDetailClient({
                     const formData = new FormData();
                     formData.append('file', file);
 
-                    const response = await fetch('/api/user/avatar/upload', {
-                      method: 'POST',
-                      body: formData,
-                    });
-
-                    if (!response.ok) {
-                      const data = await response.json().catch(() => ({}));
-                      throw new Error(data.error || 'Failed to upload profile picture');
-                    }
-
-                    const result = await response.json();
+                    const { data: result } = await apiRequest<{ avatarUrl: string | null; changed: boolean }>('/api/users/me/avatar', { method: 'POST', body: formData, });
                     
                     showSuccess('Profile picture updated');
                     await updateSession();
@@ -1366,18 +1356,7 @@ export default function UserSelfDetailClient({
                 onClick={async () => {
                   setIsRefreshingSteamAvatar(true);
                   try {
-                    const response = await fetch('/api/user/avatar/refresh', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ provider: 'steam' }),
-                    });
-
-                    if (!response.ok) {
-                      const data = await response.json().catch(() => ({}));
-                      throw new Error(data.error || 'Failed to refresh from Steam');
-                    }
-
-                    const data = await response.json();
+                    const { data: data } = await apiRequest<{ avatarUrl: string | null; changed: boolean }>('/api/users/me/avatar/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: 'steam' }), });
                     if (data.avatarUrl) {
                       setProfileImageUrl(data.avatarUrl);
                     }
@@ -1408,23 +1387,14 @@ export default function UserSelfDetailClient({
                   onClick={async () => {
                     setIsSavingAvatar(true);
                     try {
-                      const response = await fetch('/api/user/avatar/migrate', {
-                        method: 'POST',
-                      });
-
-                      if (!response.ok) {
-                        const data = await response.json().catch(() => ({}));
-                        throw new Error(data.error || 'Failed to migrate avatar');
-                      }
-
-                      const result = await response.json();
-                      if (result.migrated) {
+                      const { data: result } = await apiRequest<{ avatarUrl: string | null; changed: boolean }>('/api/users/me/avatar/migrate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}), });
+                      if (result.changed) {
                         showSuccess('Avatar migrated to file storage');
-                        setProfileImageUrl(result.newAvatarUrl || '');
+                        setProfileImageUrl(result.avatarUrl || '');
                         await updateSession();
                         router.refresh();
                       } else {
-                        showSuccess(result.message || 'Avatar is already using file storage');
+                        showSuccess('Avatar is already using file storage');
                       }
                     } catch (error) {
                       showError(error instanceof Error ? error.message : 'Failed to migrate avatar');
