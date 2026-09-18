@@ -363,14 +363,6 @@ paths:
       responses:
         "302":
           description: Redirect to Steam login or back to profile
-  /bot/training-reminders:
-    post:
-      tags:
-        - TODO
-      summary: TODO document POST /bot/training-reminders
-      responses:
-        "200":
-          description: Success
   /orbats:
     get:
       tags:
@@ -11291,6 +11283,95 @@ paths:
                 $ref: "#/components/schemas/ApiFailure"
         "500":
           description: Database or audit failure; no personal data delivered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+  /training-reminders:
+    post:
+      summary: Deliver due 24-hour training reminders
+      description: Requires training:approve_request or training:mark (or active bot superadmin). No query parameters. Claims,
+        inbox messages, per-session outbox and per-recipient audit commit atomically. Repeated runs skip claimed
+        attendees. Discord and realtime delivery occur after commit; their failure does not roll back web delivery.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              maxProperties: 0
+      responses:
+        "200":
+          description: Committed reminder delivery counts
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                      - scanned
+                      - delivered
+                      - discordDelivered
+                      - windowEndsAt
+                    properties:
+                      scanned:
+                        type: integer
+                        minimum: 0
+                      delivered:
+                        type: integer
+                        minimum: 0
+                      discordDelivered:
+                        type: integer
+                        minimum: 0
+                      windowEndsAt:
+                        type: string
+                        format: date-time
+                        description: UTC timestamp ending in Z
+                  meta:
+                    type: object
+        "400":
+          description: Query parameters or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Requires training:approve_request or training:mark
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Concurrent database change; retry request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Body must be an empty object
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Database or audit failure; whole batch rolled back
           content:
             application/json:
               schema:
