@@ -5,6 +5,7 @@ import { useState, useCallback } from 'react';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 import { usePermission } from '@/app/hooks/usePermissions';
+import { apiRequest } from '@/lib/api/client';
 
 type Step = 'confirmation' | 'strategy' | 'mapping' | 'preview' | 'apply';
 type Strategy = 'recalculate' | 'grandfather' | 'map';
@@ -29,7 +30,7 @@ type PreviewChange = {
   currentRankName: string;
   newRankName: string;
   changeType: 'demotion' | 'promotion' | 'unchanged';
-  attendanceSinceLastRank: number;
+  attendanceTotal: number;
 };
 
 type PreviewResult = {
@@ -60,7 +61,7 @@ export default function RankMigrationWizard({ ranks }: Props) {
   const handlePreview = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/ranks/migrate/preview', {
+      const { data } = await apiRequest<PreviewResult>('/api/ranks/migrate/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -69,12 +70,6 @@ export default function RankMigrationWizard({ ranks }: Props) {
         }),
       });
 
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || 'Failed to preview migration');
-      }
-
-      const data = await res.json();
       setPreviewResult(data);
       setStep('preview');
     } catch (error) {
@@ -92,7 +87,7 @@ export default function RankMigrationWizard({ ranks }: Props) {
 
     setApplying(true);
     try {
-      const res = await fetch('/api/ranks/migrate/apply', {
+      const { data } = await apiRequest<{ totalProcessed: number; promoted: number; demoted: number; unchanged: number }>('/api/ranks/migrate/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -101,20 +96,9 @@ export default function RankMigrationWizard({ ranks }: Props) {
         }),
       });
 
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || 'Failed to apply migration');
-      }
-
-      const data = await res.json();
       showSuccess(
         `Migration complete! Processed: ${data.totalProcessed}, Promoted: ${data.promoted}, Demoted: ${data.demoted}, Unchanged: ${data.unchanged}`
       );
-
-      if (data.errors && data.errors.length > 0) {
-        console.warn('Migration errors:', data.errors);
-        showError(`${data.errors.length} errors occurred. Check console for details.`);
-      }
 
       setStep('apply');
     } catch (error) {
@@ -468,7 +452,7 @@ export default function RankMigrationWizard({ ranks }: Props) {
                             {change.username}
                           </span>
                           <span className="text-xs ml-2" style={{ color: 'var(--muted-foreground)' }}>
-                            (Attendance: {change.attendanceSinceLastRank})
+                            (Attendance: {change.attendanceTotal})
                           </span>
                         </div>
                         <div className="flex items-center gap-2">

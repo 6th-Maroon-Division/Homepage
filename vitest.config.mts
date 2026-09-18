@@ -16,6 +16,7 @@ export default defineConfig({
         'app/api/users/[[]id]/leave-of-absences/route.ts', 'app/api/leave-of-absences/[[]id]/route.ts',
         'app/api/ranks/route.ts', 'app/api/ranks/[[]id]/route.ts', 'app/api/ranks/reorder/route.ts',
         'app/api/training-users/route.ts',
+        'app/api/ranks/migrate/preview/route.ts', 'app/api/ranks/migrate/apply/route.ts',
         'app/api/trainings/[[]id]/requirements/route.ts',
         'app/api/trainings/route.ts', 'app/api/trainings/[[]id]/route.ts',
         'app/api/ranks/[[]id]/requirements/route.ts',
