@@ -13,7 +13,7 @@ beforeEach(()=>{vi.resetAllMocks();grants={'system:super_admin':255};m.session.m
 afterEach(()=>vi.useRealTimers());
 test('public streams support anonymous viewers, exclude staff/actor/user payloads and retain calendar fields',async()=>{
  m.session.mockResolvedValue(null);const reader=await consume(await publicAll(req()));publishOrbatEvent({type:'orbat.created',orbatId:1,actorUserId:99,payload:{id:1,name:'Public',description:'Operation',userId:88,token:'secret'}});
- const event=await text(reader);expect(event).toContain('Public');expect(event).not.toContain('99');expect(event).not.toContain('88');expect(event).not.toContain('secret');expect(m.db.apiAuditLog.create).not.toHaveBeenCalled();await reader.cancel();
+ const event=JSON.parse((await text(reader)).split('\n').find(line=>line.startsWith('data: '))!.slice(6)).data;expect(event.payload).toEqual({id:1,name:'Public',description:'Operation'});expect(event).not.toHaveProperty('actorUserId');expect(event).not.toHaveProperty('userId');expect(event).not.toHaveProperty('token');expect(m.db.apiAuditLog.create).not.toHaveBeenCalled();await reader.cancel();
 });
 test('scoped operation validation and explicit invalid token reject',async()=>{
  expect((await publicOne(req(),ctx('1junk'))).status).toBe(400);m.db.orbat.findUnique.mockResolvedValue(null);expect((await publicOne(req(),ctx('1'))).status).toBe(404);m.db.botToken.findFirst.mockResolvedValue(null);expect((await publicAll(req('','Bearer bad'))).status).toBe(401);expect((await publicAll(req('?x=1'))).status).toBe(400);
