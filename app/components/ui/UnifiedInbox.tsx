@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useToast } from '@/app/components/ui/ToastContainer';
+import { apiRequest, apiList } from '@/lib/api/client';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 
 type MessageType = 'orbat' | 'training' | 'rankup' | 'general' | 'alert';
@@ -22,13 +23,6 @@ interface Message {
     id: number;
     username: string | null;
   } | null;
-}
-
-interface InboxData {
-  messages: Message[];
-  unreadCount: number;
-  total: number;
-  hasMore: boolean;
 }
 
 export default function UnifiedInbox() {
@@ -56,13 +50,8 @@ export default function UnifiedInbox() {
     }
 
     try {
-      const response = await fetch('/api/messaging/inbox?unread=true&limit=1');
-      if (!response.ok) {
-        return;
-      }
-
-      const data: InboxData = await response.json();
-      setUnreadCount(data.unreadCount);
+      const { meta } = await apiRequest<Message[]>('/api/users/me/messages?unread=true&limit=1');
+      setUnreadCount(Number(meta.unreadCount));
     } catch (error) {
       console.error('Error fetching unread count:', error);
     }
@@ -79,19 +68,16 @@ export default function UnifiedInbox() {
       }
       queryParams.append('limit', '20');
 
-      const response = await fetch(`/api/messaging/inbox?${queryParams}`);
-      if (!response.ok) throw new Error('Failed to fetch messages');
-
-      const data: InboxData = await response.json();
-      setMessages(data.messages);
-      setUnreadCount(data.unreadCount);
+      const data = await apiList<Message>(`/api/users/me/messages?${queryParams}`);
+      setMessages(data);
+      await fetchUnreadCount();
     } catch (error) {
       console.error('Error fetching messages:', error);
       showToast('Failed to load messages', 'error');
     } finally {
       setIsLoading(false);
     }
-  }, [session, filter, showToast]);
+  }, [session, filter, showToast, fetchUnreadCount]);
 
   useEffect(() => {
     fetchMessagesRef.current = fetchMessages;
@@ -167,11 +153,7 @@ export default function UnifiedInbox() {
 
   const markAsRead = async (messageId: number) => {
     try {
-      const response = await fetch(`/api/messaging/${messageId}/read`, {
-        method: 'PUT',
-      });
-
-      if (!response.ok) throw new Error('Failed to mark as read');
+      await apiRequest(`/api/users/me/messages/${messageId}`, { method: 'PATCH', body: JSON.stringify({ isRead: true }) });
 
       // Update local state
       setMessages(prev =>
@@ -187,11 +169,7 @@ export default function UnifiedInbox() {
 
   const markAllAsRead = async () => {
     try {
-      const response = await fetch('/api/messaging/read-all', {
-        method: 'PUT',
-      });
-
-      if (!response.ok) throw new Error('Failed to mark all as read');
+      await apiRequest('/api/users/me/messages', { method: 'PATCH', body: JSON.stringify({ isRead: true }) });
 
       // Update local state
       setMessages(prev =>
