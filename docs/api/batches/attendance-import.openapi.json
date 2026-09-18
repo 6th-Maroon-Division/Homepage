@@ -1,0 +1,166 @@
+{
+  "paths": {
+    "/orbats/{id}/attendance/import": {
+      "post": {
+        "summary": "Import attendance for one operation",
+        "description": "Requires attendance:edit and live hierarchy access to every imported user. Atomic batch; unique usernames, dates match the operation UTC date, signup belongs to this operation. P is present; A/NA/LOA absent; NO/EO skipped. No query arguments.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttendanceImportInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed import counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceImportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, query or JSON"
+          },
+          "401": {
+            "description": "Missing or invalid identity"
+          },
+          "403": {
+            "description": "Missing permission or target hierarchy denial"
+          },
+          "404": {
+            "description": "Missing operation, user or signup"
+          },
+          "409": {
+            "description": "Side/undated operation, ambiguous username, existing attendance or concurrent change"
+          },
+          "422": {
+            "description": "Invalid records or operation date mismatch"
+          },
+          "500": {
+            "description": "Transaction failed; no rows committed"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AttendanceImportInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "records": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "username": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "date": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "UTC operation calendar date"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "P",
+                    "A",
+                    "NA",
+                    "LOA",
+                    "NO",
+                    "EO"
+                  ]
+                }
+              },
+              "required": [
+                "username",
+                "date",
+                "status"
+              ]
+            }
+          }
+        },
+        "required": [
+          "records"
+        ]
+      },
+      "AttendanceImportResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "imported": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "skipped": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "total": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "imported",
+              "skipped",
+              "total"
+            ]
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {}
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      }
+    }
+  },
+  "removePaths": [
+    "/attendance/import"
+  ]
+}
