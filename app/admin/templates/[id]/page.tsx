@@ -78,7 +78,6 @@ export default function TemplateEditor() {
   const [subslotDefinitions, setSubslotDefinitions] = useState<Array<{
     id: number;
     name: string;
-    maxSignups: number;
     requiredTrainingIds?: number[];
     requiredRankIds?: number[];
     requiredTrainings?: Array<{ id: number; name: string }>;
@@ -284,7 +283,7 @@ export default function TemplateEditor() {
     const newSlot: TemplateSlot = {
       name: definition.name,
       orderIndex: template.slotsJson[squadIndex].slots.length,
-      maxSignups: definition.maxSignups,
+      maxSignups: 1,
       squadRoleId: definition.id,
       requiredTrainingIds:
         definition.requiredTrainingIds && definition.requiredTrainingIds.length > 0

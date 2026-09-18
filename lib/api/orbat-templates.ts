@@ -21,31 +21,40 @@ const templateSlots = (value: unknown) => normalizeTemplateSlots(value) as Squad
 type Input = Partial<Record<typeof texts[number], string | null>> & { name?: string; slotsJson?: Squad[]; frequencyIds?: number[]; tempFrequencies?: NonNullable<ReturnType<typeof parseOrbatCreate>['data']>['tempFrequencies']; isSideOp?: boolean; isActive?: boolean };
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 export function parseOrbatTemplate(body: unknown, creating: boolean): { data: Input; error?: never } | { error: Response; data?: never } {
-  const invalid = () => ({ error: apiError(422, 'validation_failed', 'Invalid template payload. Use canonical fields, numeric references, unique positions and HH:MM time defaults.') });
+  const invalid = (message = 'Invalid template payload. Use canonical fields, numeric references, unique positions and HH:MM time defaults.', field?: string) => ({ error: apiError(422, 'validation_failed', message, field ? { field } : {}) });
   if (!object(body) || !Object.keys(body).length || Object.keys(body).some(key => !['name', 'slotsJson', 'frequencyIds', 'tempFrequencies', 'isSideOp', ...(!creating ? ['isActive'] : []), ...texts].includes(key))) return invalid();
   const data: Input = {};
-  if (creating || 'name' in body) { if (typeof body.name !== 'string' || !body.name.trim()) return invalid(); data.name = body.name.trim(); }
+  if (creating || 'name' in body) { if (typeof body.name !== 'string' || !body.name.trim()) return invalid('Template name is required.', 'name'); data.name = body.name.trim(); }
   for (const key of texts) if (key in body) {
     if (body[key] !== null && typeof body[key] !== 'string') return invalid();
     const value = typeof body[key] === 'string' ? body[key].trim() || null : null;
-    if ((key === 'startTime' || key === 'endTime') && value !== null && !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) return invalid();
+    if ((key === 'startTime' || key === 'endTime') && value !== null && !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) return invalid(`${key === 'startTime' ? 'Start' : 'End'} time must use HH:MM (24-hour time).`, key);
     data[key] = value;
   }
   for (const key of ['isSideOp', 'isActive'] as const) if (key in body) { if (typeof body[key] !== 'boolean') return invalid(); data[key] = body[key]; }
   let squads: unknown = [{ name: 'Validation', orderIndex: 0, slots: [{ orderIndex: 0, maxSignups: 1 }] }];
   if (creating || 'slotsJson' in body) {
     if (!Array.isArray(body.slotsJson)) return invalid();
+    if (!body.slotsJson.length) return invalid('Add at least one squad with a role.', 'slotsJson');
     const converted = [];
-    for (const squad of body.slotsJson) {
+    for (const [squadIndex, squad] of body.slotsJson.entries()) {
       if (!object(squad) || Object.keys(squad).some(key => !['name', 'orderIndex', 'slots'].includes(key)) || !Array.isArray(squad.slots)) return invalid();
+      if (typeof squad.name !== 'string' || !squad.name.trim()) return invalid(`Squad ${squadIndex + 1} needs a name.`, `slotsJson.${squadIndex}.name`);
+      if (!squad.slots.length) return invalid(`Squad ${squadIndex + 1} needs at least one role.`, `slotsJson.${squadIndex}.slots`);
       const slots = [];
-      for (const slot of squad.slots) {
+      for (const [slotIndex, slot] of squad.slots.entries()) {
         if (!object(slot) || Object.keys(slot).some(key => !['name', 'squadRoleId', 'orderIndex', 'maxSignups'].includes(key)) || typeof slot.name !== 'string' || !slot.name.trim()) return invalid();
+        if (typeof slot.maxSignups !== 'number' || !Number.isInteger(slot.maxSignups) || slot.maxSignups < 1 || slot.maxSignups > 2147483647) return invalid(`Role ${slotIndex + 1} in squad ${squadIndex + 1} needs a signup limit of at least 1 (whole number).`, `slotsJson.${squadIndex}.slots.${slotIndex}.maxSignups`);
         const { name: _name, ...fields } = slot; slots.push(fields);
       }
       converted.push({ ...squad, slots });
     }
     squads = converted;
+  }
+  if (Array.isArray(body.tempFrequencies)) {
+    for (const [index, frequency] of body.tempFrequencies.entries()) {
+      if (object(frequency) && (typeof frequency.frequency !== 'string' || !frequency.frequency.trim())) return invalid(`Temporary frequency ${index + 1} needs a frequency value. Fill it in or remove the row.`, `tempFrequencies.${index}.frequency`);
+    }
   }
   const parsed = parseOrbatCreate({ name: 'Validation', squads, ...(body.frequencyIds !== undefined ? { frequencyIds: body.frequencyIds } : {}), ...(body.tempFrequencies !== undefined ? { tempFrequencies: body.tempFrequencies } : {}) });
   if (parsed.error) return invalid();

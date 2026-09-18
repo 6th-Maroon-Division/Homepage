@@ -126,3 +126,18 @@ it('permission templates respect catalog-specific grant ceilings before writing'
   expect(mocks.prisma.apiAuditLog.create).not.toHaveBeenCalled();
   expect((await createPermissions(req('POST', { name: 'At bound', permissions: [{ permissionId: 4, value: 3 }] }))).status).toBe(201);
 });
+
+it.each([
+  [{ ...input, name: '' }, 'name', 'Template name is required.'],
+  [{ ...input, slotsJson: [] }, 'slotsJson', 'Add at least one squad with a role.'],
+  [{ ...input, slotsJson: [{ name: '', orderIndex: 0, slots: input.slotsJson[0].slots }] }, 'slotsJson.0.name', 'Squad 1 needs a name.'],
+  [{ ...input, slotsJson: [{ name: 'Alpha', orderIndex: 0, slots: [] }] }, 'slotsJson.0.slots', 'Squad 1 needs at least one role.'],
+  [{ ...input, slotsJson: [{ name: 'Alpha', orderIndex: 0, slots: [{ name: 'Medic', orderIndex: 0, squadRoleId: 3 }] }] }, 'slotsJson.0.slots.0.maxSignups', 'Role 1 in squad 1 needs a signup limit of at least 1 (whole number).'],
+  [{ ...input, startTime: '25:00' }, 'startTime', 'Start time must use HH:MM (24-hour time).'],
+  [{ ...input, tempFrequencies: [{ frequency: '', type: 'SR', isAdditional: false, channel: '', callsign: '' }] }, 'tempFrequencies.0.frequency', 'Temporary frequency 1 needs a frequency value. Fill it in or remove the row.'],
+])('identifies the field preventing a template save', async (body, field, message) => {
+  const response = await create(req('POST', body));
+  expect(response.status).toBe(422);
+  expect((await response.json()).error).toMatchObject({ code: 'validation_failed', message, details: { field } });
+  expect(mocks.prisma.orbatTemplate.create).not.toHaveBeenCalled();
+});
