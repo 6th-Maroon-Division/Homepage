@@ -107,18 +107,6 @@ paths:
       responses:
         "200":
           description: Mappings saved
-  /admin/orbats/list:
-    get:
-      tags:
-        - Admin
-        - ORBATs
-      summary: Get admin ORBAT list
-      security:
-        - bearerAuth:
-            - orbat:view_all
-      responses:
-        "200":
-          description: Admin ORBAT list
   /admin/users/events:
     get:
       tags:
@@ -677,22 +665,6 @@ paths:
       responses:
         "200":
           description: Success
-  /bot/orbats:
-    get:
-      tags:
-        - TODO
-      summary: TODO document GET /bot/orbats
-      responses:
-        "200":
-          description: Success
-  /bot/orbats/{id}:
-    get:
-      tags:
-        - TODO
-      summary: TODO document GET /bot/orbats/{id}
-      responses:
-        "200":
-          description: Success
   /bot/training-reminders:
     post:
       tags:
@@ -805,13 +777,11 @@ paths:
       tags:
         - ORBATs
       summary: List public ORBATs
-      description: "Public list: anonymous callers, valid live sessions, and active bot tokens receive the same id/name
-        entries. Invalid supplied Authorization credentials return 401 without anonymous fallback; stale sessions can
-        read anonymously. Only one limit and one cursor query key are accepted; unknown/duplicate keys return 400.
-        Descending-ID cursor pages use real lookahead and end with meta.nextCursor:null. The website recent-operation
-        selector explicitly requests limit=5; the API default is 50, capped at 100. This general catalog read creates no
-        user-data audit. POST on this URL is a separate protected orbat:create operation; the public GET contract is
-        unchanged."
+      description: Public minimal ORBAT directory for anonymous callers, live sessions and active bearer tokens. Invalid
+        explicit credentials fail. Strict single limit/cursor/includePast/startAt/endBefore filters; descending ID pages
+        with genuine lookahead. includePast defaults true; false uses current UTC midnight unless explicit startAt
+        supplied. Zoned startAt is inclusive and endBefore exclusive; legacy date-only operations use UTC eventDate when
+        startsAtUtc is absent. No user data read audit. Retrieve full public operation data through /orbats/{id}/full.
       security:
         - {}
         - sessionCookie: []
@@ -831,6 +801,23 @@ paths:
             type: string
             pattern: ^[0-9]+$
           description: Positive Int32 ORBAT ID from meta.nextCursor; returns smaller IDs in descending order.
+        - name: includePast
+          in: query
+          schema:
+            type: boolean
+            default: true
+        - name: startAt
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Explicit timezone required.
+        - name: endBefore
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Explicit timezone required.
       responses:
         "200":
           description: Success
@@ -9437,6 +9424,102 @@ paths:
           description: Requiresuser:manage
         "500":
           description: Database or requiredread auditfailure; personaldata withheld
+  /orbats/management:
+    get:
+      summary: List operations for management
+      description: Live session or bot; any orbat:create/edit/delete permission required. Descending Int32 cursor pages
+        default50 capped100; unknown/repeated queries rejected. Includes operation metadata, minimal creator and counts;
+        excludes participants. Returned other creators audited, fail closed on audit failure. Timestamps UTC Z; nullable
+        creator permits bot-created operations.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+          description: Values above 100 are clamped to 100.
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            pattern: ^[0-9]+$
+          description: Positive Int32 ORBAT ID from meta.nextCursor; returns smaller IDs in descending order.
+      responses:
+        "200":
+          description: Paginated operation management rows
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OrbatManagementItem"
+                  meta:
+                    type: object
+                    required:
+                      - limit
+                      - nextCursor
+                    properties:
+                      limit:
+                        type: integer
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+        "400":
+          description: Standard error envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                properties:
+                  error:
+                    type: object
+        "401":
+          description: Standard error envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                properties:
+                  error:
+                    type: object
+        "403":
+          description: Standard error envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                properties:
+                  error:
+                    type: object
+        "500":
+          description: Standard error envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                properties:
+                  error:
+                    type: object
 components:
   securitySchemes:
     bearerAuth:
@@ -13697,3 +13780,75 @@ components:
         - avgMinutesMissed
         - avgArrivedLatePerMonth
         - avgLeftEarlyPerMonth
+    OrbatManagementItem:
+      type: object
+      required:
+        - id
+        - name
+        - description
+        - startsAtUtc
+        - endsAtUtc
+        - eventDate
+        - startTime
+        - endTime
+        - createdAt
+        - createdBy
+        - slotCount
+        - totalSubslots
+        - totalSignups
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type:
+            - string
+            - "null"
+        startsAtUtc:
+          type:
+            - string
+            - "null"
+          format: date-time
+        endsAtUtc:
+          type:
+            - string
+            - "null"
+          format: date-time
+        eventDate:
+          type:
+            - string
+            - "null"
+          format: date-time
+        startTime:
+          type:
+            - string
+            - "null"
+        endTime:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          oneOf:
+            - type: "null"
+            - type: object
+              required:
+                - id
+                - username
+              properties:
+                id:
+                  type: integer
+                username:
+                  type: string
+        slotCount:
+          type: integer
+          minimum: 0
+        totalSubslots:
+          type: integer
+          minimum: 0
+        totalSignups:
+          type: integer
+          minimum: 0

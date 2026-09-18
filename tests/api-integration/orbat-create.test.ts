@@ -7,7 +7,7 @@ vi.mock('next-auth/next', () => ({ getServerSession: async () => session.userId 
 vi.mock('@/app/api/auth/[...nextauth]/route', () => ({ authOptions: {} }));
 import { prisma } from '@/lib/prisma';
 import { POST } from '@/app/api/orbats/route';
-import { GET as listAdminOrbats } from '@/app/api/admin/orbats/list/route';
+import { GET as listAdminOrbats } from '@/app/api/orbats/management/route';
 let creatorId: number;
 let memberId: number;
 let permissionId: number;
@@ -62,9 +62,9 @@ test('bot creation uses a null human creator and audited token identity while ev
   expect(saved).toMatchObject({ createdById: null, startsAtUtc: null, endsAtUtc: null, eventDate: new Date('2099-10-01T22:30:00Z'), isSideOp: false });
   expect((await audits(response))[0]).toMatchObject({ actorType: 'bot', actorTokenId: tokenId, actorUserId: null });
   session.userId = creatorId;
-  const adminList = await listAdminOrbats();
+  const adminList = await listAdminOrbats(new Request('http://localhost/api/orbats/management'));
   expect(adminList.status).toBe(200);
-  expect((await adminList.json()).find((row: { id: number }) => row.id === data.id)).toMatchObject({ id: data.id, createdBy: null });
+  expect((await adminList.json()).data.find((row: { id: number }) => row.id === data.id)).toMatchObject({ id: data.id, createdBy: null });
 });
 
 test('creation requires live grants and rejects invalid explicit tokens without session fallback', async () => {

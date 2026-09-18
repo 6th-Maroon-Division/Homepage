@@ -1,5 +1,6 @@
 'use client';
 
+import { apiList } from '@/lib/api/client';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import DeleteOrbatButton from '../../../components/orbat/DeleteOrbatButton';
@@ -70,12 +71,7 @@ export default function OrbatManagementClient({ orbats: initialOrbats, canCreate
   useEffect(() => {
     const fetchOrbats = async () => {
       try {
-        const response = await fetch('/api/admin/orbats/list');
-        if (!response.ok) {
-          return;
-        }
-
-        const data = (await response.json()) as Orbat[];
+        const data = await apiList<Orbat>('/api/orbats/management');
         setOrbats(data);
       } catch {
         // keep current local state if sync fails
