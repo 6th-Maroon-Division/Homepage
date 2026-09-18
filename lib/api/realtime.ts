@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma';
 import type { PermissionKey } from '@/lib/permissions';
 import type { ApiPrincipal } from './principal';
 import { handleApiRequest, handlePublicApiRequest } from './handler';
-import { authenticateApi, canAccessApiUser } from './auth';
+import { authenticateApi, canAccessApiUser, createApiPrincipalRevalidator } from './auth';
 import { hasApiPermission } from './permissions';
 import { apiError } from './response';
 import { parsePositiveId } from './validation';
@@ -53,6 +53,7 @@ export function protectedEvents(request:Request,kind:'user'|'users'|'inbox'|'cat
   const id=scoped?(value==='me'&&kind!=='training'&&initial.kind==='user'?initial.userId:idValue(value??'')):undefined;
   if(new URL(request.url).searchParams.size||scoped&&!id)return apiError(400,'invalid_request','Use a positive Int32 ID without query parameters; me requires a session.');
   let principal=initial;let targetUserId:number|undefined;
+  const revalidatePrincipal = await createApiPrincipalRevalidator(initial);
   const allowed=async(p:ApiPrincipal)=>{
    if(kind==='catalog')return some(p,catalogPermissions);
    if(kind==='promotions')return hasApiPermission(p.permissions,'rank:manage_promotions');
@@ -71,7 +72,7 @@ export function protectedEvents(request:Request,kind:'user'|'users'|'inbox'|'cat
   };
   // The handshake only emits connection metadata; target data is audited when delivered.
   const validate=async()=>{
-   const current=await authenticateApi(request);context.principal=current;
+   const current=await revalidatePrincipal();context.principal=current;
    if(!current||!await allowed(current)){
     await writeApiAudit(prisma,context,{action:'access.denied',resource:'event_stream',outcome:'denied'});return false;
    }

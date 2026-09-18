@@ -49,3 +49,23 @@ export async function canAccessApiUser(principal: NonNullable<Awaited<ReturnType
   const grants = parsePermissionGrants(Object.fromEntries(target.map(entry => [entry.permission.key, entry.value]))) ?? {};
   return hasApiHierarchyPermission(principal.permissions, grants, permission);
 }
+
+/** Capture request-owned session expiry once. Event callbacks run in the
+ * publisher's async context, so they must never resolve the ambient session. */
+export async function createApiPrincipalRevalidator(principal: ApiPrincipal): Promise<() => Promise<ApiPrincipal | null>> {
+  if (principal.kind === 'bot') {
+    const tokenId = principal.tokenId;
+    return async () => {
+      const token = await prisma.botToken.findFirst({ where: { id: tokenId, isActive: true }, select: { id: true } });
+      return token ? { kind: 'bot', tokenId, permissions: { 'system:super_admin': 255 } } : null;
+    };
+  }
+  const userId = principal.userId;
+  const session = await getServerSession(authOptions);
+  const expiresAt = session && Number(session.user?.id) === userId ? Date.parse(session.expires) : NaN;
+  return async () => {
+    if (!Number.isFinite(expiresAt) || Date.now() >= expiresAt) return null;
+    const user = await findSessionUser(userId);
+    return user ? { kind: 'user', userId, permissions: user.permissions } : null;
+  };
+}

@@ -9,7 +9,7 @@ const req=(query='',token?:string,signal?:AbortSignal)=>new Request('http://loca
 const consume=async(response:Response)=>{expect(response.status).toBe(200);const reader=response.body!.getReader();await reader.read();await reader.read();return reader};
 const text=async(reader:ReadableStreamDefaultReader<Uint8Array>)=>new TextDecoder().decode((await reader.read()).value);
 let grants:Record<string,number>;
-beforeEach(()=>{vi.resetAllMocks();grants={'system:super_admin':255};m.session.mockResolvedValue({user:{id:4}});m.db.user.findUnique.mockImplementation(async a=>a.select.userPermissions?{userPermissions:Object.entries(grants).map(([key,value])=>({permission:{key},value}))}:{id:4});m.db.userPermission.findMany.mockResolvedValue([]);m.db.botToken.findFirst.mockResolvedValue({id:9});m.db.orbat.findUnique.mockResolvedValue({id:1});m.db.trainingRequest.findUnique.mockResolvedValue({userId:5})});
+beforeEach(()=>{vi.resetAllMocks();grants={'system:super_admin':255};m.session.mockResolvedValue({user:{id:4},expires:'2099-01-01T00:00:00Z'});m.db.user.findUnique.mockImplementation(async a=>a.select.userPermissions?{userPermissions:Object.entries(grants).map(([key,value])=>({permission:{key},value}))}:{id:4});m.db.userPermission.findMany.mockResolvedValue([]);m.db.botToken.findFirst.mockResolvedValue({id:9});m.db.orbat.findUnique.mockResolvedValue({id:1});m.db.trainingRequest.findUnique.mockResolvedValue({userId:5})});
 afterEach(()=>vi.useRealTimers());
 test('public streams support anonymous viewers, exclude staff/actor/user payloads and retain calendar fields',async()=>{
  m.session.mockResolvedValue(null);const reader=await consume(await publicAll(req()));publishOrbatEvent({type:'orbat.created',orbatId:1,actorUserId:99,payload:{id:1,name:'Public',description:'Operation',userId:88,token:'secret'}});
@@ -58,4 +58,14 @@ test('transport cleanup handles abort, cancel, already-aborted request, heartbea
 test('transport bounds pending callbacks and closes if validation throws',async()=>{
  let push:(event:number)=>void=()=>{};const stop=vi.fn();const reader=await consume(eventStream<number>(req(),{subscribe:listener=>{push=listener;return stop},project:async()=>null,validate:async()=>{throw Error('db')}}));push(1);expect((await reader.read()).done).toBe(true);expect(stop).toHaveBeenCalled();
  const bounded=await consume(eventStream<number>(req(),{subscribe:listener=>{push=listener;return stop},project:async()=>null,validate:async()=>true}));for(let i=0;i<101;i++)push(i);expect((await bounded.read()).done).toBe(true);
+});
+
+test('subscriber identity stays bound when a more privileged user publishes',async()=>{
+ grants={'user:manage':10};m.db.user.findUnique.mockImplementation(async a=>a.select.userPermissions?{userPermissions:[{permission:{key:'user:manage'},value:a.where.id===4?10:255}]}:{id:a.where.id});
+ m.db.userPermission.findMany.mockImplementation(async a=>a.where.userId===6?[{permission:{key:'user:manage'},value:10}]:[]);
+ const reader=await consume(await users(req()));m.session.mockResolvedValue({user:{id:99},expires:'2099-01-01T00:00:00Z'});
+ publishUserProfileEvent(6);publishUserProfileEvent(5);const event=await text(reader);expect(event).toContain('"userId":5');expect(event).not.toContain('"userId":6');expect(m.db.apiAuditLog.create.mock.lastCall![0].data.actorUserId).toBe(4);await reader.cancel();
+});
+test('captured session expiration closes even when publisher has a fresh session',async()=>{
+ vi.useFakeTimers();m.session.mockResolvedValue({user:{id:4},expires:new Date(Date.now()+1000).toISOString()});const reader=await consume(await user(req(),ctx()));m.session.mockResolvedValue({user:{id:99},expires:'2099-01-01T00:00:00Z'});await vi.advanceTimersByTimeAsync(1001);publishUserProfileEvent(4);expect((await reader.read()).done).toBe(true);
 });

@@ -1,5 +1,5 @@
 import {afterAll,beforeAll,expect,test,vi} from 'vitest';
-const session=vi.hoisted(()=>({id:null as number|null}));vi.mock('next-auth',()=>({getServerSession:async()=>session.id===null?null:{user:{id:session.id}}}));vi.mock('@/app/api/auth/[...nextauth]/route',()=>({authOptions:{}}));
+const session=vi.hoisted(()=>({id:null as number|null}));vi.mock('next-auth',()=>({getServerSession:async()=>session.id===null?null:{user:{id:session.id},expires:'2099-01-01T00:00:00Z'}}));vi.mock('@/app/api/auth/[...nextauth]/route',()=>({authOptions:{}}));
 import {prisma} from '@/lib/prisma';import {GET as user} from '@/app/api/users/[id]/events/route';import {GET as inbox} from '@/app/api/users/[id]/messages/events/route';import {GET as publicAll} from '@/app/api/orbats/events/route';
 import {publishUserProfileEvent} from '@/lib/realtime/user-events';import {publishInboxEvent} from '@/lib/realtime/inbox-events';import {publishOrbatEvent} from '@/lib/realtime/orbat-events';
 let actor:number,target:number,permissionId:number;
