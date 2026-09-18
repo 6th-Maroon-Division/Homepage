@@ -29,7 +29,8 @@
     "test:api:integration": "node scripts/test-api-integration.mjs",
     "test:backend": "node scripts/test-api-integration.mjs --backend",
     "audit:prune": "tsx scripts/prune-api-audits.ts",
-    "api:check": "node scripts/check-api-contract.mjs"
+    "api:check": "node scripts/check-api-contract.mjs",
+    "test:ui": "node scripts/test-ui.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
@@ -43,6 +44,7 @@
     "uuid": "^14.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@prisma/dev": "0.24.3",
     "@tailwindcss/postcss": "^4",
     "@types/estree": "^1.0.9",

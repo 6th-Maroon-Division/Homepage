@@ -65,3 +65,11 @@ Thumbs.db
 
 # uploaded files
 /public/uploads/
+
+# Browser test output
+/.next-ui-test*/
+/playwright-report/
+/test-results/
+/.tsconfig-ui-test-*.json
+
+/.prisma-ui-test-*/
