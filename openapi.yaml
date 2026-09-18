@@ -1244,59 +1244,157 @@ paths:
                 $ref: "#/components/schemas/ApiFailure"
   /orbats/{id}:
     get:
-      tags:
-        - ORBATs
-      summary: Get ORBAT by ID
+      summary: Get ORBAT editor resource
+      description: orbat:edit required. No query arguments. PATCH preserves omitted fields; squads replaces the full structure
+        retaining supplied owned IDs. Past UTC dates allowed; end must follow merged start. Writes and metadata-only
+        audits/outbox are atomic.
       security:
-        - bearerAuth:
-            - orbat:edit
+        - sessionCookie: []
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
       responses:
         "200":
-          description: ORBAT details
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/OrbatEditor"
+                  meta:
+                    type: object
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Invalid path query or JSON
         "401":
-          description: Unauthorized
+          description: Missing or invalid credentials
         "403":
-          description: Forbidden
+          description: Permission denied
         "404":
-          description: ORBAT not found
+          description: Operation or reference not found
+        "409":
+          description: Concurrent change or constraint conflict
+        "422":
+          description: Invalid payload or timing
+        "500":
+          description: Internal failure
     patch:
-      tags:
-        - ORBATs
-      summary: Update ORBAT
+      summary: Patch ORBAT editor resource
+      description: orbat:edit required. No query arguments. PATCH preserves omitted fields; squads replaces the full structure
+        retaining supplied owned IDs. Past UTC dates allowed; end must follow merged start. Writes and metadata-only
+        audits/outbox are atomic.
       security:
-        - bearerAuth:
-            - orbat:edit
+        - sessionCookie: []
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      id:
+                        type: integer
+                        minimum: 1
+                        maximum: 2147483647
+                    required:
+                      - id
+                  meta:
+                    type: object
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Invalid path query or JSON
+        "401":
+          description: Missing or invalid credentials
+        "403":
+          description: Permission denied
+        "404":
+          description: Operation or reference not found
+        "409":
+          description: Concurrent change or constraint conflict
+        "422":
+          description: Invalid payload or timing
+        "500":
+          description: Internal failure
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/OrbatUpdateInput"
-      responses:
-        "200":
-          description: ORBAT updated
-        "401":
-          description: Unauthorized
-        "403":
-          description: Forbidden
-        "404":
-          description: ORBAT not found
+              $ref: "#/components/schemas/OrbatEditorPatch"
     delete:
-      tags:
-        - ORBATs
-      summary: Delete ORBAT
+      summary: Delete ORBAT editor resource
+      description: orbat:delete required. No query arguments. PATCH preserves omitted fields; squads replaces the full
+        structure retaining supplied owned IDs. Past UTC dates allowed; end must follow merged start. Writes and
+        metadata-only audits/outbox are atomic.
       security:
-        - bearerAuth:
-            - orbat:delete
+        - sessionCookie: []
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
       responses:
         "200":
-          description: ORBAT deleted
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    type: "null"
+                  meta:
+                    type: object
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Invalid path query or JSON
         "401":
-          description: Unauthorized
+          description: Missing or invalid credentials
         "403":
-          description: Forbidden
+          description: Permission denied
         "404":
-          description: ORBAT not found
+          description: Operation or reference not found
+        "409":
+          description: Concurrent change or constraint conflict
+        "422":
+          description: Invalid payload or timing
+        "500":
+          description: Internal failure
   /orbats/{id}/attendance:
     get:
       tags:
@@ -7344,159 +7442,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiFailure"
-  /api/orbats/{id}:
-    get:
-      summary: Get ORBAT editor resource
-      description: orbat:edit required. No query arguments. PATCH preserves omitted fields; squads replaces the full structure
-        retaining supplied owned IDs. Past UTC dates allowed; end must follow merged start. Writes and metadata-only
-        audits/outbox are atomic.
-      security:
-        - sessionCookie: []
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 2147483647
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                properties:
-                  data:
-                    $ref: "#/components/schemas/OrbatEditor"
-                  meta:
-                    type: object
-                required:
-                  - data
-                  - meta
-        "400":
-          description: Invalid path query or JSON
-        "401":
-          description: Missing or invalid credentials
-        "403":
-          description: Permission denied
-        "404":
-          description: Operation or reference not found
-        "409":
-          description: Concurrent change or constraint conflict
-        "422":
-          description: Invalid payload or timing
-        "500":
-          description: Internal failure
-    patch:
-      summary: Patch ORBAT editor resource
-      description: orbat:edit required. No query arguments. PATCH preserves omitted fields; squads replaces the full structure
-        retaining supplied owned IDs. Past UTC dates allowed; end must follow merged start. Writes and metadata-only
-        audits/outbox are atomic.
-      security:
-        - sessionCookie: []
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 2147483647
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                properties:
-                  data:
-                    type: object
-                    additionalProperties: false
-                    properties:
-                      id:
-                        type: integer
-                        minimum: 1
-                        maximum: 2147483647
-                    required:
-                      - id
-                  meta:
-                    type: object
-                required:
-                  - data
-                  - meta
-        "400":
-          description: Invalid path query or JSON
-        "401":
-          description: Missing or invalid credentials
-        "403":
-          description: Permission denied
-        "404":
-          description: Operation or reference not found
-        "409":
-          description: Concurrent change or constraint conflict
-        "422":
-          description: Invalid payload or timing
-        "500":
-          description: Internal failure
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/OrbatEditorPatch"
-    delete:
-      summary: Delete ORBAT editor resource
-      description: orbat:delete required. No query arguments. PATCH preserves omitted fields; squads replaces the full
-        structure retaining supplied owned IDs. Past UTC dates allowed; end must follow merged start. Writes and
-        metadata-only audits/outbox are atomic.
-      security:
-        - sessionCookie: []
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 2147483647
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                properties:
-                  data:
-                    type: "null"
-                  meta:
-                    type: object
-                required:
-                  - data
-                  - meta
-        "400":
-          description: Invalid path query or JSON
-        "401":
-          description: Missing or invalid credentials
-        "403":
-          description: Permission denied
-        "404":
-          description: Operation or reference not found
-        "409":
-          description: Concurrent change or constraint conflict
-        "422":
-          description: Invalid payload or timing
-        "500":
-          description: Internal failure
   /api/ranks/promotions/propose:
     post:
       summary: Propose or immediately apply an eligible promotion

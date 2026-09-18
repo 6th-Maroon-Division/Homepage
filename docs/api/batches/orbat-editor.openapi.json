@@ -1,6 +1,6 @@
 {
   "paths": {
-    "/api/orbats/{id}": {
+    "/orbats/{id}": {
       "get": {
         "summary": "Get ORBAT editor resource",
         "description": "orbat:edit required. No query arguments. PATCH preserves omitted fields; squads replaces the full structure retaining supplied owned IDs. Past UTC dates allowed; end must follow merged start. Writes and metadata-only audits/outbox are atomic.",
