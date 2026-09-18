@@ -40,7 +40,7 @@ function run(script, args, env) {
 
 try {
   console.log('Starting isolated Prisma-managed PGlite database…');
-  // Prisma dev 0.24.3's public launcher also starts a Streams/WAL sidecar.
+  // Prisma dev 0.25.2's public launcher also starts a Streams/WAL sidecar.
   // Its background schema reads share PGlite's session and can interfere with
   // the deliberately failing transactions in this suite. Start only Prisma's
   // database service; the pinned dependency keeps these internal exports stable.
