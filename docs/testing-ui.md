@@ -15,6 +15,8 @@ The first browser installation downloads Chromium. Linux also needs its browser 
 
 The test runner creates a disposable Prisma-managed database, applies the schema with Prisma, seeds fixtures through Prisma Client, starts the application, and runs the browser tests. It supplies the isolated database URL to the application and fixtures. It does not use the development database, require a running development server, or execute raw SQL to prepare test data. Database state is discarded after the run.
 
+The application server runs in UTC while the default browser uses Europe/Berlin, so local runs detect timezone hydration mismatches just like CI. Additional date-display scenarios use Los Angeles and Berlin to verify that untimed operations retain their calendar day while timed operations show local dates and times.
+
 Run one UI suite at a time in a checkout. The runner holds `.ui-test-lock/` while working, so a second run fails immediately instead of overwriting shared Prisma-generated files and browser reports. The database, Next build output, temporary configuration, and fixture client are isolated per run; the application still uses the shared generated Prisma client. Avoid regenerating that client from another command during the run. Normal completion or interruption releases the lock. Remove a leftover lock only after confirming that the previous runner and its child processes have stopped.
 
 To run a focused suite, pass Playwright arguments through the runner:

@@ -113,6 +113,8 @@ try {
   const env = {
     ...process.env,
     NODE_ENV: 'test',
+    // Keep server and browser timezones different, including on developer machines.
+    TZ: 'UTC',
     DATABASE_URL: database.prismaORMConnectionString,
     UI_TEST_DATABASE_URL: database.prismaORMConnectionString,
     UI_TEST_MODE: '1',

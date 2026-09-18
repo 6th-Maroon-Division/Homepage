@@ -84,3 +84,20 @@ test('open public calendar updates after creation, edits and deletion without re
     await expect(calendar.getByRole('button', { name: /^Browser Calendar Renamed/ })).toHaveCount(0, { timeout: 10000 });
   } finally { await observer.close(); }
 });
+
+test('calendar create defaults initialize locally and subsequent form edits keep the selected schedule', async ({ page, login }) => {
+  await login();
+  await page.goto('/admin/orbats/new?date=2099-07-21');
+  await expect(page.locator('#eventDate')).toHaveValue('2099-07-21');
+  await expect(page.locator('#startTime')).toContainText('7:00');
+  await expect(page.locator('#endTime')).toContainText('9:00');
+  await page.locator('#eventDate').fill('2099-07-22');
+  await page.locator('#startTime').click();
+  const dial = page.getByRole('group', { name: 'Start Time clock picker' });
+  await dial.click({ position: { x: 132, y: 240 } });
+  await dial.click({ position: { x: 132, y: 24 } });
+  await page.locator('#name').fill('Calendar editor retained state');
+  await expect(page.locator('#eventDate')).toHaveValue('2099-07-22');
+  await expect(page.locator('#startTime')).toContainText('6:00');
+  await expect(page.locator('#name')).toHaveValue('Calendar editor retained state');
+});

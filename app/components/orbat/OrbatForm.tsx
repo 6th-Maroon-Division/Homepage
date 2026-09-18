@@ -2,7 +2,7 @@
 
 import { apiList, apiRequest } from '@/lib/api/client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '../ui/ToastContainer';
 import LoadingSpinner from '../ui/LoadingSpinner';
@@ -124,7 +124,29 @@ const buildUtcDateFromLocalDate = (dateValue: string): Date | null => {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
-export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
+const subscribeToHydration = () => () => {};
+const browserSnapshot = () => true;
+const serverSnapshot = () => false;
+
+export default function OrbatForm(props: OrbatFormProps) {
+  const isHydrated = useSyncExternalStore(subscribeToHydration, browserSnapshot, serverSnapshot);
+
+  // Date/time defaults depend on the browser timezone and calendar URL. Mount
+  // the stateful form once those are available, before any fields can be edited.
+  // Server rendering and the first browser render share this loading state.
+  if (!isHydrated) {
+    return (
+      <div role="status" className="flex items-center gap-3 py-6">
+        <LoadingSpinner size="sm" />
+        <span>Loading operation editor…</span>
+      </div>
+    );
+  }
+
+  return <HydratedOrbatForm {...props} />;
+}
+
+function HydratedOrbatForm({ mode, initialData }: OrbatFormProps) {
   const router = useRouter();
   const { showSuccess, showError } = useToast();
   const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
@@ -738,7 +760,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
       }
 
       const startDateTime = buildUtcDateTime(eventDate, startTime);
-      let endDateTime = buildUtcDateTime(eventDate, endTime);
+      const endDateTime = buildUtcDateTime(eventDate, endTime);
       const eventDateUtc = !startDateTime
         ? utcOperationDate(eventDate)
         : buildUtcDateFromLocalDate(eventDate);

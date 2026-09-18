@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { subscribeCalendarUpdates } from '@/lib/realtime/calendar-client';
+import LocalDateTime from '@/app/components/ui/LocalDateTime';
 
 type UiOp = {
   id: number;
@@ -60,13 +61,6 @@ function getMonthCalendar(year: number, month: number) {
   return weeks;
 }
 
-function formatHumanDate(date: Date) {
-  return date.toLocaleString('en-GB', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  });
-}
-
 function calendarItemKey(item: UiOp) {
   return `${item.kind ?? 'orbat'}-${item.id}`;
 }
@@ -120,7 +114,7 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
     if (!dateKey) return;
 
     const dayOps = opsByDate.get(dateKey) ?? [];
-    const clickedDate = new Date(dateKey);
+    const clickedDate = new Date(`${dateKey}T00:00:00`);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     clickedDate.setHours(0, 0, 0, 0);
@@ -313,7 +307,8 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
           <div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={() => setShowDayModal(false)}>
             <div className="border rounded-lg p-6 max-w-md w-full mx-4" style={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }} onClick={(e) => e.stopPropagation()}>
               <h3 className="text-xl font-bold mb-4" style={{ color: 'var(--foreground)' }}>
-                {new Date(selectedOps[0].eventDate).toLocaleDateString('en-GB', { 
+                {new Date(selectedDateKey).toLocaleDateString('en-GB', {
+                  timeZone: 'UTC',
                   weekday: 'long', 
                   day: 'numeric', 
                   month: 'long', 
@@ -355,7 +350,7 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
 
               <div className="flex gap-3">
                 {isAdmin && (() => {
-                  const clickedDate = new Date(selectedDateKey);
+                  const clickedDate = new Date(`${selectedDateKey}T00:00:00`);
                   const today = new Date();
                   today.setHours(0, 0, 0, 0);
                   clickedDate.setHours(0, 0, 0, 0);
@@ -391,7 +386,7 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
                 Events on{' '}
-                {formatHumanDate(new Date(selectedOps[0].eventDate))}
+                <LocalDateTime value={selectedDateKey} kind="date" dateOnly />
               </h3>
               <button
                 type="button"
@@ -458,7 +453,8 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
                   )}
                 </div>
                 <div className="text-right text-xs" style={{ color: 'var(--foreground)' }}>
-                  {formatHumanDate(new Date(op.eventDate))}
+                  <LocalDateTime value={op.startsAtUtc ?? op.eventDate} kind="date" dateOnly={!op.startsAtUtc} />
+                  {op.startsAtUtc && <>{', '}<LocalDateTime value={op.startsAtUtc} kind="time" /></>}
                   <div className="text-[10px]" style={{ color: 'var(--muted-foreground)', opacity: 0.7 }}>
                     {op.dateKey}
                   </div>

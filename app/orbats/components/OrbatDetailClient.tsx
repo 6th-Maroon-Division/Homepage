@@ -547,7 +547,7 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
         {eventDate && (
           <div className="text-xs mt-2" style={{ color: 'var(--muted-foreground)' }}>
             <p>
-              Event date: {<LocalDateTime value={eventDate.toISOString()} kind="date" />}
+              Event date: {<LocalDateTime value={eventDate.toISOString()} kind="date" dateOnly={!startDateTime} />}
             </p>
             {(startDateTime || endDateTime || orbat.startTime || orbat.endTime) && (
               <p>
