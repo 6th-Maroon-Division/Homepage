@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiList } from '@/lib/api/client';
+import { subscribeCalendarUpdates } from '@/lib/realtime/calendar-client';
 
 type UiOp = {
   id: number;
@@ -83,95 +83,12 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
   const [currentMonth, setCurrentMonth] = useState(initialMonth); // 0-based
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
   const [showDayModal, setShowDayModal] = useState(false);
-  const fallbackTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     setOpsState(ops);
   }, [ops]);
 
-  useEffect(() => {
-    const appendOrbat = (payload: { id?: number; name?: string; description?: string | null; startsAtUtc?: string | null; eventDate?: string; isSideOp?: boolean }) => {
-      if (!payload.id || !payload.name || (!payload.startsAtUtc && !payload.eventDate)) {
-        return;
-      }
-
-      const rawDate = payload.startsAtUtc ?? payload.eventDate!;
-      const parsedDate = new Date(rawDate);
-      if (Number.isNaN(parsedDate.getTime())) {
-        return;
-      }
-
-      const year = parsedDate.getUTCFullYear();
-      const month = `${parsedDate.getUTCMonth() + 1}`.padStart(2, '0');
-      const day = `${parsedDate.getUTCDate()}`.padStart(2, '0');
-      const dateKey = `${year}-${month}-${day}`;
-
-      setOpsState((previous) => {
-        if (previous.some((item) => (item.kind ?? 'orbat') === 'orbat' && item.id === payload.id)) {
-          return previous;
-        }
-
-        const next: UiOp[] = [
-          ...previous,
-          {
-            id: payload.id!,
-            kind: 'orbat',
-            name: payload.name!,
-            description: payload.description ?? null,
-            startsAtUtc: payload.startsAtUtc ?? null,
-            eventDate: rawDate,
-            dateKey,
-            isSideOp: payload.isSideOp === true,
-          },
-        ];
-
-        return next.sort((a, b) => new Date(a.startsAtUtc ?? a.eventDate).getTime() - new Date(b.startsAtUtc ?? b.eventDate).getTime());
-      });
-    };
-
-    const source = new EventSource('/api/orbats/events');
-    let refreshRequest: AbortController | null = null;
-    const refreshCalendar = async () => {
-      refreshRequest?.abort();
-      const controller = new AbortController();
-      refreshRequest = controller;
-      try {
-        const latest = await apiList<UiOp>('/api/orbats/calendar', { signal: controller.signal });
-        if (controller.signal.aborted) return;
-        setOpsState(latest.sort((a, b) => Date.parse(a.eventDate) - Date.parse(b.eventDate)));
-      } catch {
-        // Keep the last successfully loaded calendar.
-      }
-    };
-    // The SSE event bus is process-local; polling also covers multi-instance
-    // deployments and training-session changes that use a different event bus.
-    fallbackTimerRef.current = setInterval(() => void refreshCalendar(), 30000);
-    source.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data).data as {
-          type?: string;
-          payload?: { id?: number; name?: string; description?: string | null; startsAtUtc?: string | null; eventDate?: string; isSideOp?: boolean };
-        };
-
-        if (data.type === 'orbat.created' && data.payload) {
-          appendOrbat(data.payload);
-        }
-      } catch {
-        // ignore malformed SSE messages
-      }
-    };
-
-    source.onerror = () => undefined;
-
-    return () => {
-      refreshRequest?.abort();
-      source.close();
-      if (fallbackTimerRef.current) {
-        clearInterval(fallbackTimerRef.current);
-        fallbackTimerRef.current = null;
-      }
-    };
-  }, []);
+  useEffect(() => subscribeCalendarUpdates<UiOp>(setOpsState), []);
 
   const weeks = useMemo(
     () => getMonthCalendar(currentYear, currentMonth),
