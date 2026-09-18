@@ -1,5 +1,6 @@
 'use client';
 
+import { apiList } from '@/lib/api/client';
 import React, { useState } from 'react';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
@@ -203,8 +204,7 @@ export function LegacyDataMappingClient({
   const fetchUsers = async () => {
     setIsFetchingUsers(true);
     try {
-      const usersRes = await fetch('/api/users');
-      const usersData = await usersRes.json();
+      const usersData = await apiList<User>('/api/users');
       setUsers(usersData);
     } catch {
       showToast('Failed to fetch users', 'error');

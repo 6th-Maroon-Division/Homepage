@@ -1,5 +1,6 @@
 'use client';
 
+import { apiList } from '@/lib/api/client';
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
@@ -95,18 +96,15 @@ function AttendanceForm({
       const fetchData = async () => {
         setIsLoadingSignups(true);
         try {
-          const [signupsRes, usersRes] = await Promise.all([
+          const [signupsRes, users] = await Promise.all([
             fetch(`/api/orbats/${orbatId}/signups`),
-            fetch(`/api/users`),
+            apiList<{ id: number; username: string }>('/api/users'),
           ]);
           if (signupsRes.ok) {
             const data = await signupsRes.json();
             setSignups(data);
           }
-          if (usersRes.ok) {
-            const data = await usersRes.json();
-            setAllUsers(data);
-          }
+          setAllUsers(users);
         } catch (error) {
           logClientError('Error fetching data:', error);
         } finally {

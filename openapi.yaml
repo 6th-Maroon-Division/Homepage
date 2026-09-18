@@ -966,22 +966,6 @@ paths:
       responses:
         "200":
           description: Success
-  /bot/users:
-    get:
-      tags:
-        - TODO
-      summary: TODO document GET /bot/users
-      responses:
-        "200":
-          description: Success
-  /bot/users/discord/{discordId}:
-    get:
-      tags:
-        - TODO
-      summary: TODO document GET /bot/users/discord/{discordId}
-      responses:
-        "200":
-          description: Success
   /bot/users/discord/{discordId}/signups:
     get:
       tags:
@@ -991,14 +975,6 @@ paths:
       description: Returns upcoming signups by default. Pass includePast=true for history.
       security:
         - apiKey: []
-      responses:
-        "200":
-          description: Success
-  /bot/users/steam/{steamId}:
-    get:
-      tags:
-        - TODO
-      summary: TODO document GET /bot/users/steam/{steamId}
       responses:
         "200":
           description: Success
@@ -4480,17 +4456,106 @@ paths:
     get:
       tags:
         - Users
-      summary: List all users
+      summary: List and resolve users
+      description: Requires live user:manage or active superadmin bot. Visibility hierarchy is filtered before pagination;
+        self is included. activeOnly includes users without a rank record. hasDiscord/hasSteam=true require a linked
+        account; false adds no filter. Discord/Steam lookups use exact string IDs. Unknown or repeated query keys are
+        rejected. Returned other-user IDs are audited without snapshots; self and lookahead are excluded. UTC
+        timestamps. Replaces three bot-only directory/lookup routes.
       security:
-        - bearerAuth:
-            - user:manage
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+          description: Capped at 100.
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            pattern: ^[1-9][0-9]*$
+          description: Exclusive ascending positive Int32 user ID.
+        - name: activeOnly
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: hasDiscord
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: hasSteam
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: discordId
+          in: query
+          schema:
+            type: string
+            pattern: ^[0-9]{1,32}$
+        - name: steamId
+          in: query
+          schema:
+            type: string
+            pattern: ^[0-9]{1,32}$
       responses:
         "200":
-          description: List of users
+          description: Visible user page; missing or inaccessible provider lookups return an empty page.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DirectoryUser"
+                  meta:
+                    type: object
+                    required:
+                      - limit
+                      - nextCursor
+                    properties:
+                      limit:
+                        type: integer
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+        "400":
+          description: Invalid query
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
         "401":
-          description: Unauthorized
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
         "403":
-          description: Forbidden
+          description: Requires user:manage
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal or required audit failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
   /users/{id}:
     get:
       tags:
@@ -8471,3 +8536,49 @@ components:
           type: integer
         name:
           type: string
+    DirectoryUser:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - username
+        - email
+        - avatarUrl
+        - createdAt
+        - isRetired
+        - currentRank
+        - discordId
+        - steamId
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        username: &a53
+          type:
+            - string
+            - "null"
+        email: *a53
+        avatarUrl: *a53
+        createdAt:
+          type: string
+          format: date-time
+        isRetired:
+          type: boolean
+        currentRank:
+          anyOf:
+            - type: object
+              required:
+                - id
+                - name
+                - abbreviation
+              properties:
+                id:
+                  type: integer
+                name:
+                  type: string
+                abbreviation:
+                  type: string
+            - type: "null"
+        discordId: *a53
+        steamId: *a53
