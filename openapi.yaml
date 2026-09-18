@@ -660,155 +660,6 @@ paths:
       responses:
         "200":
           description: Success
-  /bot/promotions/{id}/approve:
-    post:
-      tags:
-        - Bot
-        - Ranks
-      summary: Approve a promotion
-      description: |
-        Approves a pending promotion proposal and updates the user's rank.
-        Also creates a rank history entry and sends a notification message to the user.
-      security:
-        - apiKey: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-          description: ID of the promotion proposal to approve
-      responses:
-        "200":
-          description: Promotion approved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  message:
-                    type: string
-                    example: Promotion approved
-                  promotionId:
-                    type: integer
-                    example: 123
-                  userId:
-                    type: integer
-                    example: 42
-                  username:
-                    type: string
-                    example: Soldier_John
-                  discordId:
-                    type: string
-                    nullable: true
-                    example: "123456789012345678"
-                  previousRank:
-                    type: object
-                    nullable: true
-                    properties:
-                      id:
-                        type: integer
-                      name:
-                        type: string
-                      abbreviation:
-                        type: string
-                  newRank:
-                    type: object
-                    properties:
-                      id:
-                        type: integer
-                      name:
-                        type: string
-                      abbreviation:
-                        type: string
-        "400":
-          description: Invalid promotion ID or promotion already processed
-        "401":
-          description: Unauthorized - invalid or missing bot API token
-        "404":
-          description: Promotion not found
-        "500":
-          description: Internal server error
-  /bot/promotions/{id}/decline:
-    post:
-      tags:
-        - Bot
-        - Ranks
-      summary: Decline a promotion
-      description: |
-        Declines a pending promotion proposal and optionally records a reason.
-        Sends a notification message to the user informing them of the decline.
-      security:
-        - apiKey: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-          description: ID of the promotion proposal to decline
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                reason:
-                  type: string
-                  description: Optional reason for declining the promotion
-                  example: Insufficient attendance
-      responses:
-        "200":
-          description: Promotion declined successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  message:
-                    type: string
-                    example: Promotion declined
-                  promotionId:
-                    type: integer
-                    example: 123
-                  userId:
-                    type: integer
-                    example: 42
-                  username:
-                    type: string
-                    example: Soldier_John
-                  discordId:
-                    type: string
-                    nullable: true
-                    example: "123456789012345678"
-                  proposedRank:
-                    type: object
-                    properties:
-                      id:
-                        type: integer
-                      name:
-                        type: string
-                      abbreviation:
-                        type: string
-                  reason:
-                    type: string
-                    nullable: true
-                    example: Insufficient attendance
-        "400":
-          description: Invalid promotion ID or promotion already processed
-        "401":
-          description: Unauthorized - invalid or missing bot API token
-        "404":
-          description: Promotion not found
-        "500":
-          description: Internal server error
   /bot/promotions/auto:
     get:
       tags:
@@ -2510,26 +2361,6 @@ paths:
           description: Auto-rankup eligibility check result
         "401":
           description: Unauthorized
-  /ranks/bot/promotions:
-    post:
-      tags:
-        - Ranks
-      summary: Create bot promotion
-      security:
-        - apiKey: []
-      responses:
-        "201":
-          description: Bot promotion created
-  /ranks/bot/promotions/{id}/decline:
-    post:
-      tags:
-        - Ranks
-      summary: Decline bot promotion
-      security:
-        - apiKey: []
-      responses:
-        "200":
-          description: Bot promotion declined
   /ranks/migrate/apply:
     post:
       tags:
@@ -2563,24 +2394,174 @@ paths:
     post:
       tags:
         - Ranks
-      summary: Approve promotion
+      summary: Approve a promotion proposal
+      description: Requires live rank:manage_promotions and target hierarchy or an active superadmin bot. No query parameters.
+        Serializable decision checks current rank and recalculates attendance. Notifications run after commit.
       security:
-        - bearerAuth:
-            - ranks:approve_promotion
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
       responses:
         "200":
-          description: Promotion approved
+          description: Decision committed atomically with history, message, and audit.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: "null"
+                  meta:
+                    type: object
+        "400":
+          description: Invalid path, query, or JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Permission or hierarchy denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Reference missing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Stale, handled, or conflicting proposal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
   /ranks/promotions/{id}/decline:
     post:
       tags:
         - Ranks
-      summary: Decline promotion
+      summary: Decline a promotion proposal
+      description: Requires live rank:manage_promotions and target hierarchy or an active superadmin bot. No query parameters.
+        Serializable decision checks current rank and recalculates attendance. Notifications run after commit.
       security:
-        - bearerAuth:
-            - ranks:approve_promotion
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                declineReason:
+                  type:
+                    - string
+                    - "null"
+                  description: Trimmed; empty becomes null.
       responses:
         "200":
-          description: Promotion declined
+          description: Decision committed atomically with history, message, and audit.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: "null"
+                  meta:
+                    type: object
+        "400":
+          description: Invalid path, query, or JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Permission or hierarchy denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Reference missing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Stale, handled, or conflicting proposal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
   /ranks/promotions/events:
     get:
       tags:
@@ -5086,7 +5067,7 @@ paths:
           minimum: 1
     get:
       summary: Get bot token metadata
-      security: &a1
+      security: &a8
         - sessionCookie: []
         - secureSessionCookie: []
         - apiKey: []
@@ -5106,37 +5087,37 @@ paths:
                   meta:
                     type: object
                     additionalProperties: true
-        "400": &a2
+        "400": &a9
           description: Invalid arguments or malformed JSON
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiFailure"
-        "401": &a3
+        "401": &a10
           description: Missing or invalid authentication
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiFailure"
-        "403": &a4
+        "403": &a11
           description: Insufficient permissions
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiFailure"
-        "404": &a5
+        "404": &a12
           description: Resource not found
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiFailure"
-        "422": &a6
+        "422": &a13
           description: Payload validation failed
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiFailure"
-        "500": &a7
+        "500": &a14
           description: Internal server error
           content:
             application/json:
@@ -5148,7 +5129,7 @@ paths:
         on creation. Reads of another user’s creator metadata, including bot reads, are audited.
     patch:
       summary: Update a bot token
-      security: *a1
+      security: *a8
       responses:
         "200":
           description: Success
@@ -5165,12 +5146,12 @@ paths:
                   meta:
                     type: object
                     additionalProperties: true
-        "400": *a2
-        "401": *a3
-        "403": *a4
-        "404": *a5
-        "422": *a6
-        "500": *a7
+        "400": *a9
+        "401": *a10
+        "403": *a11
+        "404": *a12
+        "422": *a13
+        "500": *a14
       tags:
         - Admin
       description: Requires system:super_admin. Active database bot tokens act as superadmin. Token secrets are returned only
@@ -5190,7 +5171,7 @@ paths:
                   type: boolean
     delete:
       summary: Revoke and delete a bot token
-      security: *a1
+      security: *a8
       responses:
         "200":
           description: Success
@@ -5207,12 +5188,12 @@ paths:
                   meta:
                     type: object
                     additionalProperties: true
-        "400": *a2
-        "401": *a3
-        "403": *a4
-        "404": *a5
-        "422": *a6
-        "500": *a7
+        "400": *a9
+        "401": *a10
+        "403": *a11
+        "404": *a12
+        "422": *a13
+        "500": *a14
       tags:
         - Admin
       description: Requires system:super_admin. Active database bot tokens act as superadmin. Token secrets are returned only
@@ -5231,7 +5212,7 @@ paths:
                 - me
     get:
       summary: Get user notification preferences
-      security: &a1
+      security: &a15
         - sessionCookie: []
         - secureSessionCookie: []
         - apiKey: []
@@ -5251,37 +5232,37 @@ paths:
                   meta:
                     type: object
                     additionalProperties: true
-        "400": &a2
+        "400": &a16
           description: Invalid arguments or malformed JSON
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiFailure"
-        "401": &a3
+        "401": &a17
           description: Missing or invalid authentication
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiFailure"
-        "403": &a4
+        "403": &a18
           description: Insufficient permissions
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiFailure"
-        "404": &a5
+        "404": &a19
           description: Resource not found
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiFailure"
-        "422": &a6
+        "422": &a20
           description: Payload validation failed
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiFailure"
-        "500": &a7
+        "500": &a21
           description: Internal server error
           content:
             application/json:
@@ -5295,7 +5276,7 @@ paths:
         another user’s preferences are audited.
     patch:
       summary: Update user notification preferences
-      security: *a1
+      security: *a15
       responses:
         "200":
           description: Success
@@ -5312,12 +5293,12 @@ paths:
                   meta:
                     type: object
                     additionalProperties: true
-        "400": *a2
-        "401": *a3
-        "403": *a4
-        "404": *a5
-        "422": *a6
-        "500": *a7
+        "400": *a16
+        "401": *a17
+        "403": *a18
+        "404": *a19
+        "422": *a20
+        "500": *a21
       tags:
         - Users
         - Messaging
@@ -6553,7 +6534,7 @@ components:
         - updatedAt
         - counts
       properties:
-        id: &a15
+        id: &a22
           type: integer
           minimum: 1
           maximum: 2147483647
@@ -6580,7 +6561,7 @@ components:
           description: Duration in minutes.
         categoryId:
           anyOf:
-            - *a15
+            - *a22
             - type: "null"
         isActive:
           type: boolean
@@ -6634,13 +6615,13 @@ components:
           type: string
           minLength: 1
           description: Trimmed nonempty unique abbreviation.
-        orderIndex: &a13
+        orderIndex: &a23
           type: integer
           minimum: 0
           maximum: 2147483647
         attendanceRequiredSinceLastRank:
           anyOf:
-            - *a13
+            - *a23
             - type: "null"
         autoRankupEnabled:
           type: boolean
@@ -6794,7 +6775,7 @@ components:
         - name
         - squads
       properties:
-        name: &a23
+        name: &a24
           type: string
           minLength: 1
           description: Trimmed nonempty value.
@@ -6809,8 +6790,8 @@ components:
               - orderIndex
               - slots
             properties:
-              name: *a23
-              orderIndex: &a24
+              name: *a24
+              orderIndex: &a25
                 type: integer
                 minimum: 0
                 maximum: 2147483647
@@ -6826,19 +6807,19 @@ components:
                   properties:
                     squadRoleId:
                       anyOf:
-                        - &a25
+                        - &a26
                           type: integer
                           minimum: 1
                           maximum: 2147483647
                         - type: "null"
-                    orderIndex: *a24
-                    maxSignups: *a25
+                    orderIndex: *a25
+                    maxSignups: *a26
                 description: Slot orderIndex values must be unique within this squad.
           description: Squad orderIndex values must be unique.
         frequencyIds:
           type: array
           uniqueItems: true
-          items: *a25
+          items: *a26
           default: []
         tempFrequencies:
           type: array
@@ -6852,7 +6833,7 @@ components:
               - channel
               - callsign
             properties:
-              frequency: *a23
+              frequency: *a24
               type:
                 type: string
                 enum:
@@ -6867,14 +6848,14 @@ components:
                 type: string
                 description: Trimmed; may be empty.
           default: []
-        startsAtUtc: &a26
+        startsAtUtc: &a27
           anyOf:
             - type: string
               format: date-time
               description: Explicit timezone required (Z or offset); normalized to UTC. Plain date-only strings are rejected.
             - type: "null"
-        endsAtUtc: *a26
-        eventDateUtc: *a26
+        endsAtUtc: *a27
+        eventDateUtc: *a27
         isSideOp:
           type: boolean
           default: false
@@ -7106,13 +7087,13 @@ components:
           type: string
           minLength: 1
           description: Trimmed nonempty unique abbreviation.
-        orderIndex: &a13
+        orderIndex: &a28
           type: integer
           minimum: 0
           maximum: 2147483647
         attendanceRequiredSinceLastRank:
           anyOf:
-            - *a13
+            - *a28
             - type: "null"
         autoRankupEnabled:
           type: boolean
@@ -7129,13 +7110,13 @@ components:
           type: string
           minLength: 1
           description: Trimmed nonempty unique abbreviation.
-        orderIndex: &a13
+        orderIndex: &a29
           type: integer
           minimum: 0
           maximum: 2147483647
         attendanceRequiredSinceLastRank:
           anyOf:
-            - *a13
+            - *a29
             - type: "null"
         autoRankupEnabled:
           type: boolean
@@ -7248,13 +7229,13 @@ components:
           type: string
           minLength: 1
           description: Trimmed nonempty name.
-        requiredTrainingIds: &a8
+        requiredTrainingIds: &a30
           type: array
           items:
             type: integer
             minimum: 1
           description: Existing positive numeric IDs; duplicates are deduplicated.
-        requiredRankIds: *a8
+        requiredRankIds: *a30
     SubslotDefinitionUpdateInput:
       type: object
       properties:
@@ -7435,13 +7416,13 @@ components:
           type: string
           minLength: 1
           description: Trimmed nonempty name.
-        requiredTrainingIds: &a8
+        requiredTrainingIds: &a31
           type: array
           items:
             type: integer
             minimum: 1
           description: Existing positive numeric IDs; duplicates are deduplicated.
-        requiredRankIds: *a8
+        requiredRankIds: *a31
         isRetired:
           type: boolean
     SubslotDefinition:
@@ -7453,13 +7434,13 @@ components:
           type: string
           minLength: 1
           description: Trimmed nonempty name.
-        requiredTrainingIds: &a8
+        requiredTrainingIds: &a32
           type: array
           items:
             type: integer
             minimum: 1
           description: Existing positive numeric IDs; duplicates are deduplicated.
-        requiredRankIds: *a8
+        requiredRankIds: *a32
         category:
           type:
             - string
@@ -7486,9 +7467,9 @@ components:
               - id
               - name
             properties:
-              id: &a9
+              id: &a33
                 type: integer
-              name: &a10
+              name: &a34
                 type: string
         requiredRanks:
           type: array
@@ -7500,8 +7481,8 @@ components:
               - abbreviation
               - orderIndex
             properties:
-              id: *a9
-              name: *a10
+              id: *a33
+              name: *a34
               abbreviation:
                 type: string
               orderIndex:
@@ -7606,11 +7587,11 @@ components:
           type: integer
         rankId:
           type: integer
-        guildId: &a11
+        guildId: &a35
           type: string
           pattern: ^\d{17,20}$
           description: Discord snowflake represented as a 17–20 digit string.
-        discordRoleId: *a11
+        discordRoleId: *a35
         isActive:
           type: boolean
         createdAt:
@@ -7687,14 +7668,14 @@ components:
       required:
         - startDate
       properties:
-        startDate: &a12
+        startDate: &a36
           type: string
           format: date-time
           description: ISO 8601 timestamp with Z or an explicit UTC offset. Date-only and timezone-free values are rejected;
             accepted values are normalized to UTC.
         returnDate:
           anyOf:
-            - *a12
+            - *a36
             - type: "null"
         reason:
           type:
@@ -7779,7 +7760,7 @@ components:
       properties:
         minimumRankId:
           anyOf:
-            - &a14
+            - &a37
               type: integer
               minimum: 1
               maximum: 2147483647
@@ -7787,7 +7768,7 @@ components:
         requiredTrainingIds:
           type: array
           uniqueItems: true
-          items: *a14
+          items: *a37
       description: Omitted fields remain unchanged. A provided requiredTrainingIds array replaces the complete prerequisite
         set; [] clears it. minimumRankId:null clears the rank requirement and requires superadmin.
     TrainingRequirements:
@@ -7801,7 +7782,7 @@ components:
       properties:
         minimumRankId:
           anyOf:
-            - &a14
+            - &a38
               type: integer
               minimum: 1
               maximum: 2147483647
@@ -7809,7 +7790,7 @@ components:
         requiredTrainingIds:
           type: array
           uniqueItems: true
-          items: *a14
+          items: *a38
         minimumRank:
           anyOf:
             - $ref: "#/components/schemas/Rank"
@@ -7823,7 +7804,7 @@ components:
               - name
               - category
             properties:
-              id: *a14
+              id: *a38
               name:
                 type: string
               category:
@@ -7861,7 +7842,7 @@ components:
         requiredTrainingIds:
           type: array
           uniqueItems: true
-          items: &a16
+          items: &a39
             type: integer
             minimum: 1
             maximum: 2147483647
@@ -7874,7 +7855,7 @@ components:
               - name
               - category
             properties:
-              id: *a16
+              id: *a39
               name:
                 type: string
               category:
@@ -8045,11 +8026,11 @@ components:
               - userId
               - rankId
             properties:
-              userId: &a17
+              userId: &a40
                 type: integer
                 minimum: 1
                 maximum: 2147483647
-              rankId: *a17
+              rankId: *a40
               reason:
                 type:
                   - string
@@ -8108,7 +8089,7 @@ components:
                 - "null"
         currentRank:
           anyOf:
-            - &a18
+            - &a41
               type: object
               additionalProperties: false
               required:
@@ -8125,7 +8106,7 @@ components:
             - type: "null"
         nextRank:
           anyOf:
-            - *a18
+            - *a41
             - type: "null"
       description: Reduced pending proposal DTO. Rank summaries resolve the proposal’s stored rank IDs; they do not substitute
         the user’s current rank. No email, avatar, Steam/account data, or updatedAt is returned.
@@ -8136,9 +8117,9 @@ components:
         - name
         - abbreviation
       properties:
-        name: &a19
+        name: &a42
           type: string
-        abbreviation: *a19
+        abbreviation: *a42
     PublicOrbatSignupUser:
       type: object
       additionalProperties: false
@@ -8152,11 +8133,11 @@ components:
           type: integer
         username:
           type: string
-        rankName: &a19
+        rankName: &a43
           type:
             - string
             - "null"
-        rankAbbreviation: *a19
+        rankAbbreviation: *a43
     PublicOrbatNoteUser:
       type: object
       additionalProperties: false
@@ -8198,10 +8179,10 @@ components:
         - updatedAt
         - user
       properties:
-        id: &a19
+        id: &a44
           type: integer
-        orbatId: *a19
-        userId: *a19
+        orbatId: *a44
+        userId: *a44
         status:
           type: string
           enum:
@@ -8241,30 +8222,30 @@ components:
         - requiredRank
         - signups
       properties:
-        id: &a19
+        id: &a45
           type: integer
-        name: &a20
+        name: &a46
           type: string
-        orderIndex: *a19
-        maxSignups: *a19
+        orderIndex: *a45
+        maxSignups: *a45
         squadRoleId:
           type:
             - integer
             - "null"
         requiredTrainings:
           type: array
-          items: &a21
+          items: &a47
             type: object
             additionalProperties: false
             required:
               - id
               - name
             properties:
-              id: *a19
-              name: *a20
+              id: *a45
+              name: *a46
         requiredRanks:
           type: array
-          items: &a22
+          items: &a48
             type: object
             additionalProperties: false
             required:
@@ -8272,16 +8253,16 @@ components:
               - name
               - abbreviation
             properties:
-              id: *a19
-              name: *a20
-              abbreviation: *a20
+              id: *a45
+              name: *a46
+              abbreviation: *a46
         requiredTraining:
           anyOf:
-            - *a21
+            - *a47
             - type: "null"
         requiredRank:
           anyOf:
-            - *a22
+            - *a48
             - type: "null"
         signups:
           type: array
@@ -8292,7 +8273,7 @@ components:
               - id
               - user
             properties:
-              id: *a19
+              id: *a45
               user:
                 anyOf:
                   - $ref: "#/components/schemas/PublicOrbatSignupUser"
@@ -8306,10 +8287,10 @@ components:
         - radioFrequencyId
         - radioFrequency
       properties:
-        id: &a19
+        id: &a49
           type: integer
-        orbatId: *a19
-        radioFrequencyId: *a19
+        orbatId: *a49
+        radioFrequencyId: *a49
         radioFrequency:
           $ref: "#/components/schemas/RadioFrequency"
     PublicOrbat:
@@ -8345,11 +8326,11 @@ components:
       properties:
         isSideOp:
           type: boolean
-        id: &a20
+        id: &a51
           type: integer
-        name: &a21
+        name: &a52
           type: string
-        description: &a19
+        description: &a50
           type:
             - string
             - "null"
@@ -8357,8 +8338,8 @@ components:
           anyOf:
             - $ref: "#/components/schemas/UtcTimestamp"
             - type: "null"
-        startTime: *a19
-        endTime: *a19
+        startTime: *a50
+        endTime: *a50
         startsAtUtc:
           anyOf:
             - $ref: "#/components/schemas/UtcTimestamp"
@@ -8367,19 +8348,19 @@ components:
           anyOf:
             - $ref: "#/components/schemas/UtcTimestamp"
             - type: "null"
-        timezone: *a19
-        bluforCountry: *a19
-        bluforRelationship: *a19
-        opforCountry: *a19
-        opforRelationship: *a19
-        indepCountry: *a19
-        indepRelationship: *a19
-        iedThreat: *a19
-        civilianRelationship: *a19
-        rulesOfEngagement: *a19
-        airspace: *a19
-        inGameTimezone: *a19
-        operationDay: *a19
+        timezone: *a50
+        bluforCountry: *a50
+        bluforRelationship: *a50
+        opforCountry: *a50
+        opforRelationship: *a50
+        indepCountry: *a50
+        indepRelationship: *a50
+        iedThreat: *a50
+        civilianRelationship: *a50
+        rulesOfEngagement: *a50
+        airspace: *a50
+        inGameTimezone: *a50
+        operationDay: *a50
         squads:
           type: array
           items:
@@ -8391,9 +8372,9 @@ components:
               - orderIndex
               - slots
             properties:
-              id: *a20
-              name: *a21
-              orderIndex: *a20
+              id: *a51
+              name: *a52
+              orderIndex: *a51
               slots:
                 type: array
                 items:

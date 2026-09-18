@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
-import { apiList } from '@/lib/api/client';
+import { apiList, apiRequest } from '@/lib/api/client';
 
 type Rank = {
   id: number;
@@ -120,23 +120,11 @@ export default function PendingPromotionsClient() {
   };
 
   const approveProposal = async (proposalId: number) => {
-    const res = await fetch(`/api/ranks/promotions/${proposalId}/approve`, {
-      method: 'POST',
-    });
-    if (!res.ok) {
-      throw new Error('Approve failed');
-    }
+    await apiRequest<null>(`/api/ranks/promotions/${proposalId}/approve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
   };
 
   const declineProposal = async (proposalId: number, declineReason: string | null) => {
-    const res = await fetch(`/api/ranks/promotions/${proposalId}/decline`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ declineReason }),
-    });
-    if (!res.ok) {
-      throw new Error('Decline failed');
-    }
+    await apiRequest<null>(`/api/ranks/promotions/${proposalId}/decline`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ declineReason }) });
   };
 
   const handleBulkApprove = async () => {
