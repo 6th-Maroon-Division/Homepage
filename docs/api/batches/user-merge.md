@@ -1,0 +1,17 @@
+# User account merge
+
+Canonical `POST /users/merge` under /api replaces POST/admin/users/merge. Strict exact JSON `{sourceUserId,targetUserId}`, distinct numeric positiveInt32 IDs; no query. Standard data envelope `{mergedIntoUserId,removedUserId,summary}`. Global user:manage and live hierarchy for BOTH users. Humans cannot be source or target themselves. Session callers retain the existing CSRF safeguard: x-csrf-token must match NextAuth CSRF cookie token; active bot Bearer callers do not require browserCSRF. Invalid Bearer never falls back.
+
+To inherit positive source grants absent from target, caller also needs user:manage_permissions. Non-superadmins cannot inherit system:super_admin or any grant >=their corresponding ownpermission level. Inherited grants must be knownpermission keys and satisfy current catalogmaximum/0..255. Existing target grants win duplicates; deleting duplicate source grants does not elevate target. Preflight users, bothhierarchies, inheritedgrants before any mutation.
+
+Whole merge runs Serializable with60second timeout: deduplicate/move authaccounts and related rows, delete source, write canonical user.merged audit atomically. Target retains existing provider account when sameprovider exists; distinct source provider account moves. No credentials/personalsnapshots in audit or response. Audit targetUserIds bothsource/target, beforeIDs only, after IDs/numeric inherited grants/countsummary. ApiAuditLog history remains append-only scalarIDs; it is not rewritten during merges. Existing domain-reference merge policies retained.
+
+Preservation fixes:
+- Deleting duplicate signups no longer cascades away sourceattendance. When targetattendance exists, move source sessions/logs to targetattendance, retain a present targetstatus or source status, maxrecorded minutespresent and target-preferred notes; when targetattendance absent, rebind sourceattendance to targetsignup before duplicate deletion.
+- Duplicate training-session attendee's unique trainingRequestId is freed by deleting sourceattendee before reassigning target within the transaction; source request subsequently moves to targetuser.
+- Higher trainingstatus wins while status-history links move to surviving trainingrow. Latest training-read timestamp wins, website/Discordsubscriptions OR together, strongest attendee status preserved.
+- Source-only notificationpreferences move; existing targetpreferences win. Userrank flags OR, targetrank preferred (source fallback), greaterbaseline and earlier lastRankedUpAt retained as existing mergepolicy.
+
+Summary fields: movedAccounts,discardedAccounts,droppedDuplicateSignups,droppedDuplicateTrainings,droppedDuplicatePermissions,droppedDuplicatePromotionProposals,droppedDuplicateAttendanceNotes,droppedDuplicateMessageRecipients,updatedReferenceColumns,movedReferenceRows. Removed previously hardcoded remainingSourceReferences claim. Missingreference404, malformedJSON/query400, strictbody422, auth401, rights/CSRF/self403, databaseconstraint/serialization409, otherpersistence/audit500. Realtime profileevents postcommit safe. UI uses apiRequest canonicalroute, keeps CSRF fetch, disables self-target merge.
+
+No schema changes.19 focused unit cases passing.5 real Prisma cases cover rich merged graphs, targetprovider policy, attendance/log/session/traininghistory retention, permission bypass prevention, bot identity, full rollback on final auditfailure, and actual databaseFK conflict after providerdeletion proving transactionrollback. Central integration pending.

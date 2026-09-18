@@ -124,14 +124,6 @@ paths:
             text/event-stream:
               schema:
                 type: object
-  /admin/users/merge:
-    post:
-      tags:
-        - TODO
-      summary: TODO document POST /admin/users/merge
-      responses:
-        "200":
-          description: Success
   /attendance:
     get:
       tags:
@@ -9730,6 +9722,130 @@ paths:
           description: Standard error envelope
         "503":
           description: Standard error envelope
+  /users/merge:
+    post:
+      summary: Merge source account into target
+      description: Requires user:manage and livehierarchy on bothusers. Humans cannot targeteither ownaccount. SessionCSRF
+        required, botexempt. Newly inherited positivegrants require user:manage_permissions and non-superadminper-key
+        strictdelegation; targetexisting grants/providers win. Serializable entiremerge and audit atomic;
+        attendance/session/traininghistory preserved. Postcommit events safe. AuditID/count/numericgrants only, no
+        credentials.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - in: header
+          name: x-csrf-token
+          required: false
+          schema:
+            type: string
+          description: Required for sessioncaller; matches NextAuthCSRFcookie token. Omit for botBearer.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - sourceUserId
+                - targetUserId
+              properties:
+                sourceUserId:
+                  type: integer
+                  minimum: 1
+                  maximum: 2147483647
+                targetUserId:
+                  type: integer
+                  minimum: 1
+                  maximum: 2147483647
+      responses:
+        "200":
+          description: Atomicmerge committed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: object
+                    required:
+                      - mergedIntoUserId
+                      - removedUserId
+                      - summary
+                    properties:
+                      mergedIntoUserId:
+                        type: integer
+                        minimum: 1
+                        maximum: 2147483647
+                      removedUserId:
+                        type: integer
+                        minimum: 1
+                        maximum: 2147483647
+                      summary:
+                        type: object
+                        required:
+                          - movedAccounts
+                          - discardedAccounts
+                          - droppedDuplicateSignups
+                          - droppedDuplicateTrainings
+                          - droppedDuplicatePermissions
+                          - droppedDuplicatePromotionProposals
+                          - droppedDuplicateAttendanceNotes
+                          - droppedDuplicateMessageRecipients
+                          - updatedReferenceColumns
+                          - movedReferenceRows
+                        properties:
+                          movedAccounts:
+                            type: integer
+                            minimum: 0
+                          discardedAccounts:
+                            type: integer
+                            minimum: 0
+                          droppedDuplicateSignups:
+                            type: integer
+                            minimum: 0
+                          droppedDuplicateTrainings:
+                            type: integer
+                            minimum: 0
+                          droppedDuplicatePermissions:
+                            type: integer
+                            minimum: 0
+                          droppedDuplicatePromotionProposals:
+                            type: integer
+                            minimum: 0
+                          droppedDuplicateAttendanceNotes:
+                            type: integer
+                            minimum: 0
+                          droppedDuplicateMessageRecipients:
+                            type: integer
+                            minimum: 0
+                          updatedReferenceColumns:
+                            type: integer
+                            minimum: 0
+                          movedReferenceRows:
+                            type: integer
+                            minimum: 0
+                  meta:
+                    type: object
+        "400":
+          description: Invalid JSON/query
+        "401":
+          description: Invalid credentials; invalidBearer nofallback
+        "403":
+          description: Global/target/delegation/self/CSRF guard
+        "404":
+          description: Source/target/reference missing
+        "409":
+          description: Database collision/serialization conflict; wholemerge rolledback
+        "422":
+          description: Invalid strict IDs or inheritedcatalogpermission
+        "500":
+          description: Persistence or audit failure; wholemerge rolledback
 components:
   securitySchemes:
     bearerAuth:

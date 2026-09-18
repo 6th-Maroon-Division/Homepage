@@ -1234,9 +1234,9 @@ export default function UserDetailClient({
                 </select>
                 <button
                   type="button"
-                  disabled={!selectedMergeSourceId || isMergingAccount}
+                  disabled={!selectedMergeSourceId || isMergingAccount || isSelfUser}
                   onClick={async () => {
-                    if (!selectedMergeSourceId) {
+                    if (!selectedMergeSourceId || isSelfUser) {
                       return;
                     }
 
@@ -1268,7 +1268,7 @@ export default function UserDetailClient({
                         throw new Error('Missing CSRF token');
                       }
 
-                      const response = await fetch('/api/admin/users/merge', {
+                      const { data } = await apiRequest<{ summary: { movedAccounts: number } }>('/api/users/merge', {
                         method: 'POST',
                         headers: {
                           'Content-Type': 'application/json',
@@ -1281,12 +1281,6 @@ export default function UserDetailClient({
                         }),
                       });
 
-                      if (!response.ok) {
-                        const data = await response.json().catch(() => ({}));
-                        throw new Error(data.error || 'Failed to merge accounts');
-                      }
-
-                      const data = await response.json();
                       const movedAccounts = Number(data?.summary?.movedAccounts ?? 0);
                       showSuccess(`Accounts merged successfully. Linked providers moved: ${movedAccounts}.`);
                       router.refresh();
