@@ -214,23 +214,12 @@ export default function UserManagementClient({
   const fetchUnrankedUsers = async () => {
     setUnrankedLoading(true);
     try {
-      let interview = 'all';
-      let bct = 'all';
-      let retired = 'all';
-      
-      if (unrankedFilter === 'needsInterview') {
-        interview = 'notDone';
-      } else if (unrankedFilter === 'needsBCT') {
-        bct = 'notDone';
-      } else if (unrankedFilter === 'retired') {
-        retired = 'retired';
-      }
-      
-      const res = await fetch(
-        `/api/admin/users/unranked?interview=${interview}&bct=${bct}&retired=${retired}`
-      );
-      const data = await res.json();
-      setUnrankedUsers(data.users || []);
+      const params = new URLSearchParams();
+      if (unrankedFilter === 'needsInterview') params.set('interviewDone', 'false');
+      else if (unrankedFilter === 'needsBCT') params.set('requiredTrainingsCompleted', 'false');
+      else if (unrankedFilter === 'retired') params.set('retired', 'true');
+      const data = await apiList<{ id: number; username: string | null; userRank: { interviewDone: boolean; retired: boolean } | null; attendanceTotal: number; requiredTrainingsCompleted: boolean }>(`/api/users/onboarding?${params}`);
+      setUnrankedUsers(data.sort((a, b) => (a.username ?? '').localeCompare(b.username ?? '')));
     } catch (e) {
       showError('Failed to load unranked users');
     } finally {
@@ -1518,8 +1507,8 @@ export default function UserManagementClient({
                         </span>
                       </td>
                       <td className="px-6 py-4" style={{ color: 'var(--foreground)' }}>
-                        <span className={user.bctCompleted ? 'text-green-500' : 'text-red-500'}>
-                          {user.bctCompleted ? '✓' : '✗'}
+                        <span className={user.requiredTrainingsCompleted ? 'text-green-500' : 'text-red-500'}>
+                          {user.requiredTrainingsCompleted ? '✓' : '✗'}
                         </span>
                       </td>
                       <td className="px-6 py-4" style={{ color: 'var(--foreground)' }}>
