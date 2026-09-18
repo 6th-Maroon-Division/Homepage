@@ -127,3 +127,28 @@ test('late failing validation after abort keeps cleanup idempotent',async()=>{
  push(1);await new Promise(resolve=>setTimeout(resolve,0));abort.abort();fail(new Error('connection failed'));
  await new Promise(resolve=>setTimeout(resolve,0));expect(stop).toHaveBeenCalledTimes(1);expect((await reader.read()).done).toBe(true);
 });
+
+test('permission revocation reaches the member session as a whitelisted refresh marker',async()=>{
+ const reader=await consume(await user(req(),ctx()));
+ // A live permission loss must still notify the member through their own stream.
+ grants={};
+ publishUserProfileEvent(4,{source:'permissions.updated',permissions:{'system:super_admin':255},token:'private',username:'private'});
+ const frame=await text(reader);
+ const message=JSON.parse(frame.split('\n').find(line=>line.startsWith('data: '))!.slice(6));
+ expect(message).toEqual({data:{id:expect.any(String),type:'user.profile.updated',occurredAt:expect.any(String),userId:4,payload:{source:'permissions.updated'}},meta:{}});
+ expect(frame).not.toContain('private');expect(frame).not.toContain('system:super_admin');
+ expect(m.db.apiAuditLog.create).not.toHaveBeenCalled();await reader.cancel();
+});
+test('staff user feed forwards the permission marker but strips unknown sources and extra payload',async()=>{
+ const reader=await consume(await users(req()));
+ publishUserProfileEvent(5,{source:'permissions.updated',email:'private@example.test'});
+ const permissionFrame=await text(reader);
+ expect(JSON.parse(permissionFrame.split('\n').find(line=>line.startsWith('data: '))!.slice(6)).data.payload).toEqual({source:'permissions.updated'});
+ expect(permissionFrame).not.toContain('private@example.test');
+ publishUserProfileEvent(5,{source:'private-provider-secret',permissions:{'user:manage':255}});
+ const ordinaryFrame=await text(reader);
+ expect(JSON.parse(ordinaryFrame.split('\n').find(line=>line.startsWith('data: '))!.slice(6)).data).not.toHaveProperty('payload');
+ expect(ordinaryFrame).not.toContain('private-provider-secret');
+ expect(m.db.apiAuditLog.create).toHaveBeenCalledWith({data:expect.objectContaining({targetUserIds:[5],action:'user_data.read'})});
+ await reader.cancel();
+});

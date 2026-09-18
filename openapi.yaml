@@ -21633,6 +21633,7 @@ components:
         - name
         - description
         - eventDate
+        - startsAtUtc
         - dateKey
         - href
         - kind
@@ -21648,6 +21649,11 @@ components:
             - "null"
         eventDate:
           $ref: "#/components/schemas/UtcTimestamp"
+        startsAtUtc:
+          anyOf:
+            - $ref: "#/components/schemas/UtcTimestamp"
+            - type: "null"
+          description: Scheduled UTC start instant, or null for date-only operation entries. Training sessions always have a start instant.
         dateKey:
           type: string
           format: date
@@ -21667,6 +21673,7 @@ components:
         - name
         - description
         - eventDate
+        - startsAtUtc
         - dateKey
         - href
         - kind
@@ -21681,6 +21688,11 @@ components:
           type: string
         eventDate:
           $ref: "#/components/schemas/UtcTimestamp"
+        startsAtUtc:
+          anyOf:
+            - $ref: "#/components/schemas/UtcTimestamp"
+            - type: "null"
+          description: Scheduled UTC start instant, or null for date-only operation entries. Training sessions always have a start instant.
         dateKey:
           type: string
           format: date

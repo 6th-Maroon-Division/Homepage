@@ -103,8 +103,9 @@ test('anonymous calendar exposes only operations with UTC start event and creati
   const data = (await response.json()).data;
   expect(data.map((row: { id: number }) => row.id)).toEqual([collisionId, dateOrbatId, startsOrbatId]);
   expect(data[0]).toMatchObject({ kind: 'orbat', isSideOp: true, eventDate: '2026-10-06T12:00:00.000Z', dateKey: '2026-10-06', href: `/orbats/${collisionId}` });
-  expect(data[1].eventDate).toBe('2026-10-03T12:00:00.000Z');
-  expect(data[2]).toMatchObject({ eventDate: '2026-09-30T22:30:00.000Z', dateKey: '2026-09-30' });
+  expect(data[1]).toMatchObject({ eventDate: '2026-10-03T12:00:00.000Z', startsAtUtc: null });
+  expect(data[0].startsAtUtc).toBeNull();
+  expect(data[2]).toMatchObject({ eventDate: '2026-09-30T22:30:00.000Z', startsAtUtc: '2026-09-30T22:30:00.000Z', dateKey: '2026-09-30' });
   expect(await audits(response)).toEqual([]);
   const noTraining = await GET(request(`?cursor=training_session:${collisionId + 1}`));
   expect((await noTraining.json()).data).toEqual([]);
@@ -117,10 +118,10 @@ test('member sessions are filtered before pagination and request links expose on
   const { data, meta } = await response.json();
   expect(data.map((row: { id: number }) => row.id)).toEqual([collisionId, selfTrainerSessionId, ownSessionId]);
   expect(meta.nextCursor).toBeNull();
-  expect(data[0]).toMatchObject({ kind: 'training_session', name: 'Calendar integration course Training', eventDate: '2026-10-06T22:30:00.000Z', dateKey: '2026-10-06', trainerName: 'Calendar other trainer', href: '/profile?tab=trainings' });
+  expect(data[0]).toMatchObject({ kind: 'training_session', name: 'Calendar integration course Training', startsAtUtc: '2026-10-06T22:30:00.000Z', eventDate: '2026-10-06T22:30:00.000Z', dateKey: '2026-10-06', trainerName: 'Calendar other trainer', href: '/profile?tab=trainings' });
   expect(data.find((row: { id: number }) => row.id === ownSessionId).href).toBe(`/trainings/requests/${ownRequestId}`);
   expect(data.find((row: { id: number }) => row.id === selfTrainerSessionId).href).toBe('/profile?tab=trainings');
-  for (const row of data) expect(Object.keys(row).sort()).toEqual(['id', 'kind', 'name', 'description', 'eventDate', 'dateKey', 'status', 'trainerName', 'href'].sort());
+  for (const row of data) expect(Object.keys(row).sort()).toEqual(['id', 'kind', 'name', 'description', 'eventDate', 'startsAtUtc', 'dateKey', 'status', 'trainerName', 'href'].sort());
   expect(JSON.stringify(data)).not.toContain(`/trainings/requests/${privateOtherRequestId}`);
   expect(JSON.stringify(data)).not.toContain('Private calendar instructions');
   expect(JSON.stringify(data)).not.toContain('private-calendar@example.test');

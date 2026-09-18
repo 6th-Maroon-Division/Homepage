@@ -4,7 +4,7 @@ import { hasApiPermission } from './permissions';
 import { TRAINING_STAFF_PERMISSION_KEYS } from '@/lib/training-staff';
 import { parsePositiveId } from './validation';
 export type CalendarPagination = { limit: number; cursor: string | null };
-export type CalendarItem = { id: number; kind: 'orbat'; name: string; description: string | null; eventDate: string; dateKey: string; href: string; isSideOp: boolean } | { id: number; kind: 'training_session'; name: string; description: string; eventDate: string; dateKey: string; href: string; status: string; trainerName: string | null };
+export type CalendarItem = { id: number; kind: 'orbat'; name: string; description: string | null; eventDate: string; startsAtUtc: string | null; dateKey: string; href: string; isSideOp: boolean } | { id: number; kind: 'training_session'; name: string; description: string; eventDate: string; startsAtUtc: string | null; dateKey: string; href: string; status: string; trainerName: string | null };
 export function parseCalendarPagination(params: URLSearchParams): { data: CalendarPagination; error?: never } | { error: string; data?: never } {
   if ([...params.keys()].some(key => !['limit', 'cursor'].includes(key) || params.getAll(key).length !== 1)) return { error: 'Use only one limit and cursor parameter.' };
   const limit = params.has('limit') ? parsePositiveId(params.get('limit')) : 50;
@@ -24,7 +24,7 @@ export async function getCalendarPage(principal: ApiPrincipal | null, pagination
     const orbats = await prisma.orbat.findMany({ where: cursorKind === 'orbat' ? { id: { lt: Number(cursorId) } } : {}, select: { id: true, name: true, description: true, startsAtUtc: true, eventDate: true, createdAt: true, isSideOp: true }, orderBy: { id: 'desc' }, take: limit + 1 });
     for (const orbat of orbats) {
       const date = (orbat.startsAtUtc ?? orbat.eventDate ?? orbat.createdAt).toISOString();
-      data.push({ id: orbat.id, kind: 'orbat', name: orbat.name, description: orbat.description, eventDate: date, dateKey: date.slice(0, 10), href: `/orbats/${orbat.id}`, isSideOp: orbat.isSideOp });
+      data.push({ id: orbat.id, kind: 'orbat', name: orbat.name, description: orbat.description, eventDate: date, startsAtUtc: orbat.startsAtUtc?.toISOString() ?? null, dateKey: date.slice(0, 10), href: `/orbats/${orbat.id}`, isSideOp: orbat.isSideOp });
     }
   }
   const trainers: { itemId: number; userId: number }[] = [];
@@ -39,7 +39,7 @@ export async function getCalendarPage(principal: ApiPrincipal | null, pagination
     for (const session of sessions) {
       const date = session.startsAt!.toISOString();
       const requestId = session.attendees[0]?.trainingRequestId;
-      data.push({ id: session.id, kind: 'training_session', name: `${session.training.name} Training`, description: [session.status.replaceAll('_', ' '), session.trainer?.username ? `Trainer: ${session.trainer.username}` : null, 'Arma3 Training Server'].filter(Boolean).join(' · '), eventDate: date, dateKey: date.slice(0, 10), status: session.status, trainerName: session.trainer?.username ?? null, href: staff ? `/admin/trainings?tab=sessions&session=${session.id}` : requestId ? `/trainings/requests/${requestId}` : '/profile?tab=trainings' });
+      data.push({ id: session.id, kind: 'training_session', name: `${session.training.name} Training`, description: [session.status.replaceAll('_', ' '), session.trainer?.username ? `Trainer: ${session.trainer.username}` : null, 'Arma3 Training Server'].filter(Boolean).join(' · '), eventDate: date, startsAtUtc: date, dateKey: date.slice(0, 10), status: session.status, trainerName: session.trainer?.username ?? null, href: staff ? `/admin/trainings?tab=sessions&session=${session.id}` : requestId ? `/trainings/requests/${requestId}` : '/profile?tab=trainings' });
       if (session.trainer?.username) trainers.push({ itemId: session.id, userId: session.trainer.id });
     }
   }

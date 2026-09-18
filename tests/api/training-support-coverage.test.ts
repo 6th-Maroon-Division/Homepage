@@ -103,3 +103,12 @@ it('Discord successful delivery truncates content to the provider limit', async 
   expect(await sendDiscordTrainingDm(1, 'x'.repeat(2100))).toEqual({ delivered: true });
   expect(JSON.parse(mocks.fetch.mock.calls[1][1].body).content).toHaveLength(2000);
 });
+
+it.each([4, null, undefined])('training notifications preserve user attribution and leave bot/system senders null (%s)', async createdById => {
+  mocks.prisma.message.create.mockResolvedValue({ id: 7 });
+  const notifications: { messageId: number; recipientUserIds: number[] }[] = [];
+  await createSessionNotification({ recipientUserIds: [2, 2], title: 'Training update', body: 'Status changed', createdById }, mocks.prisma as unknown as Prisma.TransactionClient, notifications);
+  expect(mocks.prisma.message.create).toHaveBeenCalledWith({ data: { title: 'Training update', body: 'Status changed', type: 'training', actionUrl: null, createdById: createdById ?? null } });
+  expect(mocks.prisma.messageRecipient.createMany).toHaveBeenCalledWith({ data: [{ messageId: 7, userId: 2, audienceType: 'user', channel: 'web' }], skipDuplicates: true });
+  expect(notifications).toEqual([{ messageId: 7, recipientUserIds: [2] }]);
+});

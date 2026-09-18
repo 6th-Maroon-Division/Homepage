@@ -159,3 +159,26 @@ it('treats an out-of-range session ID as anonymous without querying Prisma', asy
   expect(mocks.db.user.findUnique).not.toHaveBeenCalled();
   expect(mocks.db.trainingSession.findMany).not.toHaveBeenCalled();
 });
+
+it('preserves timed versus date-only calendar entries without changing eventDate fallbacks', async () => {
+  const calendarDate = new Date('2026-09-17T00:00:00Z');
+  mocks.db.orbat.findMany.mockResolvedValue([
+    { ...op, eventDate: calendarDate },
+    { ...op, id: 9, startsAtUtc: null, eventDate: calendarDate },
+    { ...op, id: 8, startsAtUtc: null, eventDate: null },
+  ]);
+  mocks.session.mockResolvedValue({ user: { id: 4 } });
+  const response = await GET(req());
+  expect(response.status).toBe(200);
+  const { data } = await response.json();
+  expect(data.map((item: { eventDate: string; startsAtUtc: string | null }) => ({ eventDate: item.eventDate, startsAtUtc: item.startsAtUtc }))).toEqual([
+    { eventDate: date.toISOString(), startsAtUtc: date.toISOString() },
+    { eventDate: calendarDate.toISOString(), startsAtUtc: null },
+    { eventDate: date.toISOString(), startsAtUtc: null },
+    { eventDate: date.toISOString(), startsAtUtc: date.toISOString() },
+  ]);
+  for (const item of data.slice(0, 3)) {
+    expect(Object.keys(item).sort()).toEqual(['id', 'kind', 'name', 'description', 'eventDate', 'startsAtUtc', 'dateKey', 'href', 'isSideOp'].sort());
+  }
+  expect(Object.keys(data[3]).sort()).toEqual(['id', 'kind', 'name', 'description', 'eventDate', 'startsAtUtc', 'dateKey', 'href', 'status', 'trainerName'].sort());
+});

@@ -80,7 +80,13 @@ export function protectedEvents(request:Request,kind:'user'|'users'|'inbox'|'cat
   };
   if(kind==='user'||kind==='users')return eventStream<UserProfileEvent>(request,{
    subscribe:listener=>kind==='user'?subscribeUserProfileEvents(id!,listener):subscribeAdminUserProfileEvents(listener),validate,
-   project:async event=>{if(!await accessUser(principal,event.userId))return null;await audit(event.userId);return {...eventBase(event),userId:event.userId}},
+   project:async event=>{
+    if(!await accessUser(principal,event.userId))return null;
+    await audit(event.userId);
+    // Session synchronization needs this marker, never arbitrary publisher data.
+    const payload=event.payload?.source==='permissions.updated'?{source:'permissions.updated'}:undefined;
+    return {...eventBase(event),userId:event.userId,...(payload?{payload}:{})};
+   },
   });
   if(kind==='inbox')return eventStream<InboxEvent>(request,{subscribe:listener=>subscribeInboxEvents(id!,listener),validate,project:async event=>{await audit(id!);return {...eventBase(event),userId:id!}}});
   if(kind==='training')return eventStream<TrainingChatEvent>(request,{subscribe:listener=>subscribeTrainingChatEvents(id!,listener),validate,project:async event=>{await audit(targetUserId!);return {...eventBase(event),requestId:id!}}});
