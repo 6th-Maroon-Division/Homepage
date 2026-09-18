@@ -1,13 +1,15 @@
+import { validateQueryParameters, parseCursorPagination } from '@/lib/api/validation';
 import { prisma } from '@/lib/prisma';
 import { handleApiRequest } from '@/lib/api/handler';
 import { apiError, apiSuccess } from '@/lib/api/response';
 import { readJsonBody } from '@/lib/api/request';
-import { parseCursorPagination } from '@/lib/api/validation';
 import { parseTrainingCategoryBody, categoryMutationError } from '@/lib/api/training-categories';
 import { writeApiAudit } from '@/lib/api/audit';
 
 export async function GET(request: Request) {
   return handleApiRequest(request, undefined, async () => {
+    const queryError = validateQueryParameters(request, ['limit', 'cursor']);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
     const pagination = parseCursorPagination(new URL(request.url).searchParams, { defaultLimit: 50, maxLimit: 100 });
     if (pagination.error !== undefined) return apiError(400, 'invalid_request', pagination.error);
     const { limit, cursor } = pagination.data;
@@ -19,6 +21,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   return handleApiRequest(request, 'training:create', async (_principal, audit) => {
+    const queryError = validateQueryParameters(request, []);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
     const parsed = parseTrainingCategoryBody(await readJsonBody(request), true);
     if (parsed.error) return parsed.error;
     try {

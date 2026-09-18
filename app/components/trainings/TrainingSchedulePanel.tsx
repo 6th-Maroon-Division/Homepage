@@ -17,7 +17,7 @@ type TrainingSchedulePanelProps = {
   onSaved: () => void | Promise<void>;
 };
 
-function localDateParts(value: string | null) {
+function utcDateParts(value: string | null) {
   if (!value) return { date: '', time: '' };
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return { date: '', time: '' };
@@ -39,7 +39,7 @@ export default function TrainingSchedulePanel({
   onSaved,
 }: TrainingSchedulePanelProps) {
   const { showError, showSuccess } = useToast();
-  const initialParts = useMemo(() => localDateParts(session?.startsAt ?? null), [session?.startsAt]);
+  const initialParts = useMemo(() => utcDateParts(session?.startsAt ?? null), [session?.startsAt]);
   const [staff, setStaff] = useState<TrainingRequestUser[]>([]);
   const [trainerId, setTrainerId] = useState(session?.trainer?.id?.toString() ?? '');
   const [date, setDate] = useState(initialParts.date);
@@ -53,7 +53,7 @@ export default function TrainingSchedulePanel({
   const [existingSessionId, setExistingSessionId] = useState('');
 
   useEffect(() => {
-    const parts = localDateParts(session?.startsAt ?? null);
+    const parts = utcDateParts(session?.startsAt ?? null);
     setTrainerId(session?.trainer?.id?.toString() ?? '');
     setDate(parts.date);
     setTime(parts.time);
@@ -201,7 +201,7 @@ export default function TrainingSchedulePanel({
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label htmlFor="training-date" className="mb-1 block text-sm font-medium" style={{ color: 'var(--foreground)' }}>Date</label>
+          <label htmlFor="training-date" className="mb-1 block text-sm font-medium" style={{ color: 'var(--foreground)' }}>Date (UTC)</label>
           <input
             id="training-date"
             type="date"
@@ -213,7 +213,7 @@ export default function TrainingSchedulePanel({
         </div>
         <DualRingTimePicker
           id="training-time"
-          label="Time"
+          label="Time (UTC)"
           value={time}
           onChange={setTime}
         />

@@ -1,3 +1,4 @@
+import { validateQueryParameters } from '@/lib/api/validation';
 import { prisma } from '@/lib/prisma';
 import { handleApiRequest } from '@/lib/api/handler';
 import { apiError, apiSuccess } from '@/lib/api/response';
@@ -6,6 +7,8 @@ import { writeApiAudit } from '@/lib/api/audit';
 import { parseRankReorder, rankDatabaseError } from '@/lib/api/ranks';
 export async function PATCH(request: Request) {
   return handleApiRequest(request, 'rank:edit', async (_principal, audit) => {
+    const queryError = validateQueryParameters(request, []);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
     const parsed = parseRankReorder(await readJsonBody(request));
     if (parsed.error) return parsed.error;
     try {

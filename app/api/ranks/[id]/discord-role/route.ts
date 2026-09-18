@@ -1,8 +1,8 @@
+import { validateQueryParameters, parsePositiveId } from '@/lib/api/validation';
 import { prisma } from '@/lib/prisma';
 import { handleApiRequest } from '@/lib/api/handler';
 import { apiError, apiSuccess } from '@/lib/api/response';
 import { readJsonBody } from '@/lib/api/request';
-import { parsePositiveId } from '@/lib/api/validation';
 import { writeApiAudit } from '@/lib/api/audit';
 import { discordRankSelect, isDiscordId, parseDiscordRoleBody, discordRoleSnapshot, discordRoleDatabaseError } from '@/lib/api/rank-discord-roles';
 type Context = { params: Promise<{ id: string }> };
@@ -15,6 +15,8 @@ async function target(request: Request, context: Context) {
 }
 export async function PATCH(request: Request, context: Context) {
   return handleApiRequest(request, 'rank:edit', async (_principal, audit) => {
+    const queryError = validateQueryParameters(request, ['guildId']);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
     const ids = await target(request, context);
     if (ids.error) return ids.error;
     const parsed = parseDiscordRoleBody(await readJsonBody(request));
@@ -36,6 +38,8 @@ export async function PATCH(request: Request, context: Context) {
 }
 export async function DELETE(request: Request, context: Context) {
   return handleApiRequest(request, 'rank:edit', async (_principal, audit) => {
+    const queryError = validateQueryParameters(request, ['guildId']);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
     const ids = await target(request, context);
     if (ids.error) return ids.error;
     try {

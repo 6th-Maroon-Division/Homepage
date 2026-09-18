@@ -1,8 +1,8 @@
+import { validateQueryParameters, parsePositiveId } from '@/lib/api/validation';
 import { prisma } from '@/lib/prisma';
 import { handleApiRequest } from '@/lib/api/handler';
 import { apiError, apiSuccess } from '@/lib/api/response';
 import { readJsonBody } from '@/lib/api/request';
-import { parsePositiveId } from '@/lib/api/validation';
 import { parseRadioFrequencyBody, radioFrequencySnapshot, radioMutationError } from '@/lib/api/radio-frequencies';
 import { writeApiAudit } from '@/lib/api/audit';
 
@@ -10,6 +10,8 @@ type Context = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: Request, context: Context) {
   return handleApiRequest(request, 'orbat:edit', async (_principal, audit) => {
+    const queryError = validateQueryParameters(request, []);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
     const id = parsePositiveId((await context.params).id);
     if (!id || id > 2147483647) return apiError(400, 'invalid_request', 'Invalid frequency id.');
     const parsed = parseRadioFrequencyBody(await readJsonBody(request), false);
@@ -30,6 +32,8 @@ export async function PATCH(request: Request, context: Context) {
 
 export async function DELETE(request: Request, context: Context) {
   return handleApiRequest(request, 'orbat:delete', async (_principal, audit) => {
+    const queryError = validateQueryParameters(request, []);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
     const id = parsePositiveId((await context.params).id);
     if (!id || id > 2147483647) return apiError(400, 'invalid_request', 'Invalid frequency id.');
     try {

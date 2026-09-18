@@ -1,12 +1,14 @@
+import { validateQueryParameters, parsePositiveId, parseCursorPagination } from '@/lib/api/validation';
 import { prisma } from '@/lib/prisma';
 import { handleApiRequest } from '@/lib/api/handler';
 import { apiError, apiSuccess } from '@/lib/api/response';
 import { readJsonBody } from '@/lib/api/request';
-import { parsePositiveId, parseCursorPagination } from '@/lib/api/validation';
 import { writeApiAudit } from '@/lib/api/audit';
 import { parseTrainingBody, trainingDto, trainingCountInclude, trainingSnapshot, trainingDatabaseError } from '@/lib/api/trainings';
 export async function GET(request: Request) {
   return handleApiRequest(request, undefined, async () => {
+    const queryError = validateQueryParameters(request, ['limit', 'cursor', 'activeOnly', 'categoryId']);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
     const params = new URL(request.url).searchParams;
     const activeOnly = params.get('activeOnly');
     if (activeOnly !== null && activeOnly !== 'true' && activeOnly !== 'false') return apiError(400, 'invalid_request', 'activeOnly must be true or false.');
@@ -22,6 +24,8 @@ export async function GET(request: Request) {
 }
 export async function POST(request: Request) {
   return handleApiRequest(request, 'training:create', async (_principal, audit) => {
+    const queryError = validateQueryParameters(request, []);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
     const parsed = parseTrainingBody(await readJsonBody(request), true);
     if (parsed.error) return parsed.error;
     try {

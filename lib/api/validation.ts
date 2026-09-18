@@ -21,3 +21,13 @@ export function parseCursorPagination(
   if (params.has('cursor') && (cursor === null || cursor > 2147483647)) return { error: 'cursor must be a positive 32-bit integer id.' };
   return { data: { limit: Math.min(limit, options.maxLimit), cursor } };
 }
+
+/** Each query key must be declared once; body-only operations pass an empty list. */
+export function validateQueryParameters(request: Request, allowed: readonly string[]): string | null {
+  const params = new URL(request.url).searchParams;
+  for (const key of params.keys()) {
+    if (!allowed.includes(key)) return `Unknown query parameter: ${key}.`;
+    if (params.getAll(key).length !== 1) return `Query parameter ${key} must occur once.`;
+  }
+  return null;
+}

@@ -1,12 +1,14 @@
+import { validateQueryParameters, parseCursorPagination } from '@/lib/api/validation';
 import { prisma } from '@/lib/prisma';
 import { TRAINING_STAFF_PERMISSION_KEYS } from '@/lib/training-staff';
 import { handleApiRequest } from '@/lib/api/handler';
 import { hasApiPermission } from '@/lib/api/permissions';
-import { parseCursorPagination } from '@/lib/api/validation';
 import { apiError, apiSuccess } from '@/lib/api/response';
 import { writeApiAudit } from '@/lib/api/audit';
 export async function GET(request: Request) {
   return handleApiRequest(request, undefined, async (principal, audit) => {
+    const queryError = validateQueryParameters(request, ['limit', 'cursor', 'staffOnly']);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
     if (!TRAINING_STAFF_PERMISSION_KEYS.some(permission => hasApiPermission(principal.permissions, permission))) return apiError(403, 'forbidden', 'Training staff access is required.');
     const params = new URL(request.url).searchParams;
     const staffOnly = params.get('staffOnly');

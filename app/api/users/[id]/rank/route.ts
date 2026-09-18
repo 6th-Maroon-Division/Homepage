@@ -1,5 +1,5 @@
+import { validateQueryParameters, parsePositiveId } from '@/lib/api/validation';
 import { readJsonBody } from '@/lib/api/request';
-import { parsePositiveId } from '@/lib/api/validation';
 import { parseUserRankMutation, updateUserRanks } from '@/lib/api/user-rank-mutations';
 import { prisma } from '@/lib/prisma';
 import { getCurrentAttendance } from '@/lib/rank-eligibility';
@@ -10,6 +10,8 @@ import { shouldAuditUserRead, writeApiAudit } from '@/lib/api/audit';
 type Context = { params: Promise<{ id: string }> };
 export async function GET(request: Request, context: Context) {
   return handleApiRequest(request, undefined, async (principal, audit) => {
+    const queryError = validateQueryParameters(request, []);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
     const target = await resolveRankUser(principal, context);
     if (target.error) return target.error;
     const userRank = await prisma.userRank.findUnique({ where: { userId: target.userId }, include: { currentRank: true } });
@@ -24,6 +26,8 @@ export async function GET(request: Request, context: Context) {
 
 export async function PATCH(request: Request, context: Context) {
   return handleApiRequest(request, 'rank:manage_promotions', async (principal, audit) => {
+    const queryError = validateQueryParameters(request, []);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
     const { id } = await context.params;
     const userId = id === 'me' && principal.kind === 'user' ? principal.userId : parsePositiveId(id);
     if (!userId || userId > 2147483647) return apiError(400, 'invalid_request', 'Use a positive user id; me requires a user session.');

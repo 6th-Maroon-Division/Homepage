@@ -1,13 +1,15 @@
+import { validateQueryParameters, parsePositiveId } from '@/lib/api/validation';
 import { prisma } from '@/lib/prisma';
 import { handleApiRequest } from '@/lib/api/handler';
 import { apiError, apiSuccess } from '@/lib/api/response';
 import { readJsonBody } from '@/lib/api/request';
-import { parsePositiveId } from '@/lib/api/validation';
 import { writeApiAudit } from '@/lib/api/audit';
 import { parseRankRequirements, rankRequirementsSelect, rankRequirementsDto, rankRequirementsDatabaseError } from '@/lib/api/rank-requirements';
 type Context = { params: Promise<{ id: string }> };
 export async function GET(request: Request, context: Context) {
   return handleApiRequest(request, 'rank:edit', async () => {
+    const queryError = validateQueryParameters(request, []);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
     const id = parsePositiveId((await context.params).id);
     if (!id || id > 2147483647) return apiError(400, 'invalid_request', 'Invalid rank id.');
     if (!await prisma.rank.findUnique({ where: { id }, select: { id: true } })) return apiError(404, 'not_found', 'Rank not found.');
@@ -17,6 +19,8 @@ export async function GET(request: Request, context: Context) {
 }
 export async function PATCH(request: Request, context: Context) {
   return handleApiRequest(request, 'rank:edit', async (_principal, audit) => {
+    const queryError = validateQueryParameters(request, []);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
     const id = parsePositiveId((await context.params).id);
     if (!id || id > 2147483647) return apiError(400, 'invalid_request', 'Invalid rank id.');
     const parsed = parseRankRequirements(await readJsonBody(request));

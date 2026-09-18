@@ -1,12 +1,14 @@
+import { validateQueryParameters, parseCursorPagination } from '@/lib/api/validation';
 import { prisma } from '@/lib/prisma';
 import { handleApiRequest } from '@/lib/api/handler';
 import { apiError, apiSuccess } from '@/lib/api/response';
-import { parseCursorPagination } from '@/lib/api/validation';
 import { parseUtcTimestamp } from '@/lib/api/utc';
 import { shouldAuditUserRead, writeApiAudit } from '@/lib/api/audit';
 
 export async function GET(request: Request) {
   return handleApiRequest(request, 'system:super_admin', async (principal, audit) => {
+    const queryError = validateQueryParameters(request, ['limit', 'cursor', 'from', 'to']);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
     const params = new URL(request.url).searchParams;
     const pagination = parseCursorPagination(params, { defaultLimit: 50, maxLimit: 100 });
     if (pagination.error !== undefined) return apiError(400, 'invalid_request', pagination.error);

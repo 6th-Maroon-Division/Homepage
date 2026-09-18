@@ -1,12 +1,14 @@
+import { validateQueryParameters, parseCursorPagination } from '@/lib/api/validation';
 import { prisma } from '@/lib/prisma';
 import { handleApiRequest } from '@/lib/api/handler';
 import { apiError, apiSuccess } from '@/lib/api/response';
-import { parseCursorPagination } from '@/lib/api/validation';
 import { resolveRankUser, rankHistorySelect } from '@/lib/api/user-rank';
 import { shouldAuditUserRead, writeApiAudit } from '@/lib/api/audit';
 type Context = { params: Promise<{ id: string }> };
 export async function GET(request: Request, context: Context) {
   return handleApiRequest(request, undefined, async (principal, audit) => {
+    const queryError = validateQueryParameters(request, ['limit', 'cursor']);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
     const target = await resolveRankUser(principal, context);
     if (target.error) return target.error;
     const params = new URL(request.url).searchParams;

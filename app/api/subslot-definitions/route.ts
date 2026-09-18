@@ -1,15 +1,17 @@
+import { validateQueryParameters, parseCursorPagination } from '@/lib/api/validation';
 import { prisma } from '@/lib/prisma';
 import { handleApiRequest } from '@/lib/api/handler';
 import { apiError, apiSuccess } from '@/lib/api/response';
 import { readJsonBody } from '@/lib/api/request';
 import { hasApiPermission } from '@/lib/api/permissions';
-import { parseCursorPagination } from '@/lib/api/validation';
 import { writeApiAudit } from '@/lib/api/audit';
 import { enrichRoleDefinitions, parseRoleDefinition, roleDatabaseError, roleReadPermissions, validateRolePrerequisites } from '@/lib/api/role-definitions';
 import { publishAdminCatalogEvent } from '@/lib/realtime/admin-catalog-events';
 
 export async function GET(request: Request) {
   return handleApiRequest(request, undefined, async principal => {
+    const queryError = validateQueryParameters(request, ['limit', 'cursor']);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
     if (!roleReadPermissions.some(permission => hasApiPermission(principal.permissions, permission))) return apiError(403, 'forbidden', 'Requires access to role definitions, templates, or ORBAT management.');
     const pagination = parseCursorPagination(new URL(request.url).searchParams, { defaultLimit: 50, maxLimit: 100 });
     if (pagination.error !== undefined) return apiError(400, 'invalid_request', pagination.error);
@@ -22,6 +24,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   return handleApiRequest(request, 'subslot:create', async (principal, audit) => {
+    const queryError = validateQueryParameters(request, []);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
     const parsed = parseRoleDefinition(await readJsonBody(request), true);
     if (parsed.error) return parsed.error;
     try {

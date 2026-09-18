@@ -1,9 +1,9 @@
+import { validateQueryParameters, parsePositiveId, parseCursorPagination } from '@/lib/api/validation';
 import { prisma } from '@/lib/prisma';
 import { handleApiRequest } from '@/lib/api/handler';
 import { canAccessApiUser } from '@/lib/api/auth';
 import { apiError, apiSuccess } from '@/lib/api/response';
 import { readJsonBody } from '@/lib/api/request';
-import { parsePositiveId, parseCursorPagination } from '@/lib/api/validation';
 import { writeApiAudit, shouldAuditUserRead } from '@/lib/api/audit';
 import { parseLeaveBody, leaveSnapshot, leaveDatabaseError } from '@/lib/api/leave-of-absences';
 import type { ApiPrincipal } from '@/lib/api/principal';
@@ -18,6 +18,8 @@ async function target(principal: ApiPrincipal, context: Context) {
 }
 export async function GET(request: Request, context: Context) {
   return handleApiRequest(request, undefined, async (principal, audit) => {
+    const queryError = validateQueryParameters(request, ['limit', 'cursor']);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
     const resolved = await target(principal, context);
     if (resolved.error) return resolved.error;
     const pagination = parseCursorPagination(new URL(request.url).searchParams, { defaultLimit: 50, maxLimit: 100 });
@@ -31,6 +33,8 @@ export async function GET(request: Request, context: Context) {
 }
 export async function POST(request: Request, context: Context) {
   return handleApiRequest(request, undefined, async (principal, audit) => {
+    const queryError = validateQueryParameters(request, []);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
     const resolved = await target(principal, context);
     if (resolved.error) return resolved.error;
     const parsed = parseLeaveBody(await readJsonBody(request), true);

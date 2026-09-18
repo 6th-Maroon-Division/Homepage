@@ -1,4 +1,4 @@
-import { parseCursorPagination } from '@/lib/api/validation';
+import { validateQueryParameters, parseCursorPagination } from '@/lib/api/validation';
 import { writeApiAudit, shouldAuditUserRead } from '@/lib/api/audit';
 import { readJsonBody } from '@/lib/api/request';
 import { randomBytes } from 'node:crypto';
@@ -9,6 +9,8 @@ import { botTokenSelect, parseBotTokenBody } from '@/lib/api/bot-tokens';
 
 export async function GET(request: Request) {
   return handleApiRequest(request, 'system:super_admin', async (principal, audit) => {
+    const queryError = validateQueryParameters(request, ['limit', 'cursor']);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
     const pagination = parseCursorPagination(new URL(request.url).searchParams, { defaultLimit: 50, maxLimit: 100 });
     if (pagination.error !== undefined) return apiError(400, 'invalid_request', pagination.error);
     const { limit, cursor } = pagination.data;
@@ -22,6 +24,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   return handleApiRequest(request, 'system:super_admin', async (principal, context) => {
+    const queryError = validateQueryParameters(request, []);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
     const parsed = parseBotTokenBody(await readJsonBody(request), true);
     if (parsed.error) return parsed.error;
     const token = await prisma.$transaction(async tx => {
