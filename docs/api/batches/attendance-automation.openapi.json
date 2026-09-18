@@ -1,0 +1,792 @@
+{
+  "paths": {
+    "/attendance/events": {
+      "post": {
+        "tags": [
+          "Attendance automation"
+        ],
+        "summary": "Record raw attendance event",
+        "description": "Exactly one numeric userId or provider identity. Unknown identities remain pending for backfill; provider values are not returned or copied to audit. Consecutive identical-direction events are deduplicated only within the same resolved user/provider identity; out-of-order earlier events remain accepted. New event201; duplicate200 with existing event DTO. Global attendance:edit required for live sessions and active database bots. Known targets require current permission hierarchy, even on replay/duplicate resolution. Unknown/repeated query parameters are rejected. Timestamps require explicit offsets and normalize to UTC ISO. Effects and metadata-only audits share one Serializable transaction.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttendanceEventInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AttendanceEventResult"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "duplicate": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "duplicate"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AttendanceEventResult"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "duplicate": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "duplicate"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path query or malformed JSON"
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Missing attendance:edit or target hierarchy denial"
+          },
+          "404": {
+            "description": "Referenced user or operation not found"
+          },
+          "409": {
+            "description": "Concurrent state, identity, chronology or side-operation conflict"
+          },
+          "422": {
+            "description": "Invalid payload or missing schedule"
+          },
+          "500": {
+            "description": "Internal failure; transaction rolled back"
+          }
+        }
+      }
+    },
+    "/attendance/events/backfill": {
+      "post": {
+        "tags": [
+          "Attendance automation"
+        ],
+        "summary": "Link pending attendance events",
+        "description": "Ascending ID processing, default100/max1000 with actual lookahead cursor. All resolved targets are preflighted before any write. Unmatched records stay pending. Conflicting provider/user matches reject409 atomically. Cursor is numeric in payload, string in metadata; start without cursor to revisit previously-unmatched rows. Global attendance:edit required for live sessions and active database bots. Known targets require current permission hierarchy, even on replay/duplicate resolution. Unknown/repeated query parameters are rejected. Timestamps require explicit offsets and normalize to UTC ISO. Effects and metadata-only audits share one Serializable transaction.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttendanceBackfillInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AttendanceBackfillResult"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "limit": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "nextCursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "limit",
+                        "nextCursor"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path query or malformed JSON"
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Missing attendance:edit or target hierarchy denial"
+          },
+          "404": {
+            "description": "Referenced user or operation not found"
+          },
+          "409": {
+            "description": "Concurrent state, identity, chronology or side-operation conflict"
+          },
+          "422": {
+            "description": "Invalid payload or missing schedule"
+          },
+          "500": {
+            "description": "Internal failure; transaction rolled back"
+          }
+        }
+      }
+    },
+    "/attendance/sessions": {
+      "post": {
+        "tags": [
+          "Attendance automation"
+        ],
+        "summary": "Record checkin or checkout session",
+        "description": "Explicit orbatId attaches session to that operation, creating attendance even without signup. Omitted orbatId retains an unattached raw session and recalculates signed-up main operations overlapping its day, including overnight operations. One open session per user/mode; identical open checkin may be repeated, conflicting checkin409, missing checkout source409, checkout before checkin422. New bot session behavior uses shared overlap clipping and first/last-hour grace rather than the removed inconsistent60-minute heuristic. Closed-session retries need application-level event handling; this endpoint has no receipt header. Side operations cannot receive compiled attendance; global raw sessions still persist. UTC sessionDate midnight; raw duration ceil minutes while counted presence uses existing helper math. Global attendance:edit required for live sessions and active database bots. Known targets require current permission hierarchy, even on replay/duplicate resolution. Unknown/repeated query parameters are rejected. Timestamps require explicit offsets and normalize to UTC ISO. Effects and metadata-only audits share one Serializable transaction.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttendanceSessionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AttendanceSessionResult"
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path query or malformed JSON"
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Missing attendance:edit or target hierarchy denial"
+          },
+          "404": {
+            "description": "Referenced user or operation not found"
+          },
+          "409": {
+            "description": "Concurrent state, identity, chronology or side-operation conflict"
+          },
+          "422": {
+            "description": "Invalid payload or missing schedule"
+          },
+          "500": {
+            "description": "Internal failure; transaction rolled back"
+          }
+        }
+      }
+    },
+    "/orbats/{id}/attendance/compile": {
+      "post": {
+        "tags": [
+          "Attendance automation"
+        ],
+        "summary": "Compile raw events for an operation",
+        "description": "Requires start/end window; side operations409. Includes events within a six-hour boundary buffer, clamps segments, preserves original start-only full-presence rule, ignores repeated joins while already joined, and creates deterministic no_show for signups with no joins. All signup targets authorize before writes. Existing records update instead of duplicating. All attendance records, logs and per-user audits are atomic; repeated compile retains record identity though logs/audits record each run. Global attendance:edit required for live sessions and active database bots. Known targets require current permission hierarchy, even on replay/duplicate resolution. Unknown/repeated query parameters are rejected. Timestamps require explicit offsets and normalize to UTC ISO. Effects and metadata-only audits share one Serializable transaction.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AttendanceCompileResult"
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path query or malformed JSON"
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Missing attendance:edit or target hierarchy denial"
+          },
+          "404": {
+            "description": "Referenced user or operation not found"
+          },
+          "409": {
+            "description": "Concurrent state, identity, chronology or side-operation conflict"
+          },
+          "422": {
+            "description": "Invalid payload or missing schedule"
+          },
+          "500": {
+            "description": "Internal failure; transaction rolled back"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AttendanceEventInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "identity": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "provider": {
+                "type": "string",
+                "enum": [
+                  "steam",
+                  "discord"
+                ]
+              },
+              "providerUserId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{16,19}$"
+              }
+            },
+            "required": [
+              "provider",
+              "providerUserId"
+            ]
+          },
+          "isJoin": {
+            "type": "boolean"
+          },
+          "eventTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "isJoin",
+          "eventTime"
+        ],
+        "oneOf": [
+          {
+            "required": [
+              "userId"
+            ],
+            "not": {
+              "required": [
+                "identity"
+              ]
+            }
+          },
+          {
+            "required": [
+              "identity"
+            ],
+            "not": {
+              "required": [
+                "userId"
+              ]
+            }
+          }
+        ]
+      },
+      "AttendanceEventResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "userId": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "isJoin": {
+            "type": "boolean"
+          },
+          "eventTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "processed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "isJoin",
+          "eventTime",
+          "processed"
+        ]
+      },
+      "AttendanceSessionInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "orbatId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "checkinTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "checkoutTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "userId"
+        ],
+        "anyOf": [
+          {
+            "required": [
+              "checkinTime"
+            ]
+          },
+          {
+            "required": [
+              "checkoutTime"
+            ]
+          }
+        ]
+      },
+      "AttendanceAutomationMetrics": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "orbatId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "present",
+              "absent",
+              "late",
+              "gone_early",
+              "partial",
+              "no_show"
+            ]
+          },
+          "totalMinutesPresent": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "minutesLate": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "minutesGoneEarly": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "totalMinutesMissed": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "orbatId",
+          "status",
+          "totalMinutesPresent",
+          "minutesLate",
+          "minutesGoneEarly",
+          "totalMinutesMissed"
+        ]
+      },
+      "AttendanceSessionResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "session": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2147483647
+              },
+              "userId": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2147483647
+              },
+              "attendanceId": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "checkedInAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "checkedOutAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "sessionDate": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "durationMinutes": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "userId",
+              "attendanceId",
+              "checkedInAt",
+              "checkedOutAt",
+              "sessionDate",
+              "durationMinutes"
+            ]
+          },
+          "attendance": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttendanceAutomationMetrics"
+            }
+          }
+        },
+        "required": [
+          "session",
+          "attendance"
+        ]
+      },
+      "AttendanceBackfillInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "default": 100
+          }
+        }
+      },
+      "AttendanceBackfillResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "scannedCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "linkedCount": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "scannedCount",
+          "linkedCount"
+        ]
+      },
+      "AttendanceCompileResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "orbatId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "compiledAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "compiledCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "totalEventsProcessed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "attendance": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2147483647
+                },
+                "userId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2147483647
+                },
+                "orbatId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2147483647
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "present",
+                    "absent",
+                    "late",
+                    "gone_early",
+                    "partial",
+                    "no_show"
+                  ]
+                },
+                "totalMinutesPresent": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "minutesLate": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "minutesGoneEarly": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "totalMinutesMissed": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "notedAbsent": {
+                  "type": "boolean"
+                },
+                "notedLateEarly": {
+                  "type": "boolean"
+                },
+                "notedUnsure": {
+                  "type": "boolean"
+                },
+                "joinCount": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "leaveCount": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "orbatId",
+          "compiledAt",
+          "compiledCount",
+          "totalEventsProcessed",
+          "attendance"
+        ]
+      }
+    }
+  },
+  "removePaths": [
+    "/attendance/automated",
+    "/orbats/{id}/attendance/automation",
+    "/bot/attendance",
+    "/bot/attendance/compile",
+    "/bot/attendance/backfill",
+    "/bot/events"
+  ]
+}

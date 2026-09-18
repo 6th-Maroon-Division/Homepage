@@ -148,3 +148,5 @@ export async function mutateAttendance(request: Request, principal: ApiPrincipal
   }, { isolationLevel: 'Serializable' });
   return apiSuccess(result, { status: method === 'POST' ? 201 : 200 });
 }
+
+export { fail as rejectAttendance, access as requireAttendanceUser };

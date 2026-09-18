@@ -24,8 +24,8 @@ export async function processPendingEventsForUser(
     const unprocessedEvents = await prisma.attendanceEvent.findMany({
       where: {
         OR: [
-          steamId ? { steamId, processed: false } : {},
-          discordId ? { discordId, processed: false } : {},
+          ...(steamId ? [{ steamId, processed: false }] : []),
+          ...(discordId ? [{ discordId, processed: false }] : []),
         ],
       },
       orderBy: { eventTime: 'asc' },
@@ -92,8 +92,8 @@ export async function getUnprocessedEventCount(
   const count = await prisma.attendanceEvent.count({
     where: {
       OR: [
-        steamId ? { steamId, processed: false } : {},
-        discordId ? { discordId, processed: false } : {},
+        ...(steamId ? [{ steamId, processed: false }] : []),
+        ...(discordId ? [{ discordId, processed: false }] : []),
       ],
     },
   });
