@@ -96,7 +96,12 @@ test('rank administration creates, updates and deletes a rank without provider r
   const row = page.locator('[draggable="true"]').filter({ has: page.locator('input[value="Browser Catalog Corporal"]') });
   await expect(row).toBeVisible();
   await row.getByPlaceholder('Attendance', { exact: true }).fill('3');
+  await expect(row.getByPlaceholder('Attendance', { exact: true })).toHaveValue('3');
+  const saved = page.waitForResponse(response => /\/api\/ranks\/\d+$/.test(response.url()) && response.request().method() === 'PATCH');
   await row.getByRole('button', { name: 'Save', exact: true }).click();
+  const response = await saved;
+  expect(response.request().postDataJSON().attendanceRequiredSinceLastRank).toBe(3);
+  expect(response.ok()).toBeTruthy();
   await expect.poll(async () => (await db.rank.findUnique({ where: { abbreviation: 'BCC' } }))?.attendanceRequiredSinceLastRank).toBe(3);
   await row.getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(row).toHaveCount(0);
@@ -118,4 +123,64 @@ test('rank migration wizard previews the grandfather strategy without changing r
   await expect(page.getByText('Total Users', { exact: true })).toBeVisible();
   await expect(page.getByText('Unchanged', { exact: true }).first()).toBeVisible();
   expect(await db.rank.count({ where: { abbreviation: 'BCM' } })).toBe(1);
+});
+
+test('late initial rank responses cannot overwrite a new rank or its unsaved attendance requirement', async ({ page, login, db }) => {
+  await login();
+  const rankListUrl = /\/api\/ranks(?:\?.*)?$/;
+  let holdInitialRequests = true;
+  let capturedSnapshots = 0;
+  let releaseInitialResponses!: () => void;
+  const responseGate = new Promise<void>(resolve => { releaseInitialResponses = resolve; });
+  const pendingResponses: Promise<void>[] = [];
+
+  await page.route(rankListUrl, route => {
+    if (route.request().method() !== 'GET' || !holdInitialRequests) return route.continue();
+    const pending = (async () => {
+      // Fetch the real database snapshot now, then deliver it after a newer
+      // refresh and a user edit. This also holds StrictMode's second request.
+      const response = await route.fetch();
+      expect(response.ok()).toBeTruthy();
+      capturedSnapshots++;
+      await responseGate;
+      await route.fulfill({ response });
+    })();
+    pendingResponses.push(pending);
+    return pending;
+  });
+
+  try {
+    await page.goto('/admin/ranks');
+    await expect.poll(() => capturedSnapshots).toBeGreaterThan(0);
+    await page.getByPlaceholder('Name', { exact: true }).fill('Browser Delayed Rank');
+    await page.getByPlaceholder('Abbreviation', { exact: true }).fill('BDR');
+    holdInitialRequests = false;
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
+    const row = page.locator('[draggable="true"]').filter({ has: page.locator('input[value="Browser Delayed Rank"]') });
+    await expect(row).toBeVisible();
+    const attendance = row.getByPlaceholder('Attendance', { exact: true });
+    await attendance.fill('3');
+    await expect(attendance).toHaveValue('3');
+
+    const received = page.waitForResponse(response => rankListUrl.test(response.url()) && response.request().method() === 'GET');
+    releaseInitialResponses();
+    await Promise.all(pendingResponses);
+    await (await received).finished();
+    // Wait for React to commit any queued response updates, without a timed sleep.
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    await expect(attendance).toHaveValue('3');
+
+    const persisted = await db.rank.findUniqueOrThrow({ where: { abbreviation: 'BDR' } });
+    const saved = page.waitForResponse(response => response.url().endsWith(`/api/ranks/${persisted.id}`) && response.request().method() === 'PATCH');
+    await row.getByRole('button', { name: 'Save', exact: true }).click();
+    const response = await saved;
+    expect(response.request().postDataJSON().attendanceRequiredSinceLastRank).toBe(3);
+    expect(response.ok()).toBeTruthy();
+    expect((await db.rank.findUniqueOrThrow({ where: { id: persisted.id } })).attendanceRequiredSinceLastRank).toBe(3);
+  } finally {
+    releaseInitialResponses();
+    await Promise.allSettled(pendingResponses);
+    await page.unroute(rankListUrl);
+    await db.rank.deleteMany({ where: { abbreviation: 'BDR' } });
+  }
 });

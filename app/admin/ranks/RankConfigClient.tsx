@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { apiList, apiRequest } from '@/lib/api/client';
 import { useToast } from '@/app/components/ui/ToastContainer';
 
@@ -22,6 +22,7 @@ export default function RankConfigClient() {
   const { showToast } = useToast();
   const [ranks, setRanks] = useState<Rank[]>([]);
   const [loading, setLoading] = useState(false);
+  const rankRequest = useRef(0);
   const [dragState, setDragState] = useState<DragState>({ draggedIndex: null, dragOverIndex: null });
   const [discordGuildId, setDiscordGuildId] = useState('');
   const [discordRoles, setDiscordRoles] = useState<Record<number, string>>({});
@@ -35,20 +36,25 @@ export default function RankConfigClient() {
   });
 
   const fetchRanks = async () => {
+    const request = ++rankRequest.current;
     setLoading(true);
     try {
       const data = await apiList<Rank>('/api/ranks');
+      // An earlier initial load must not replace the refreshed list or its edits.
+      if (request !== rankRequest.current) return;
       setRanks(data.sort((a, b) => a.orderIndex - b.orderIndex || a.id - b.id));
     } catch (e) {
+      if (request !== rankRequest.current) return;
       console.error(e);
       showToast('Failed to load ranks', 'error');
     } finally {
-      setLoading(false);
+      if (request === rankRequest.current) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchRanks();
+    return () => { rankRequest.current += 1; };
   }, []);
 
   const createRank = async () => {
