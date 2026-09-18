@@ -122,22 +122,14 @@ export default function TrainingSchedulePanel({
 
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/training-requests/${requestId}/schedule`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      await apiRequest(session ? `/api/training-sessions/${session.id}` : '/api/training-sessions', {
+        method: session ? 'PATCH' : 'POST',
         body: JSON.stringify({
-          assignedTrainerId: Number(trainerId),
-          startsAt: startsAt.toISOString(),
-          durationMinutes,
-          specialInstructions: instructions.trim() || null,
-          confirm,
+          trainerId: Number(trainerId), startsAt: startsAt.toISOString(), durationMinutes,
+          specialInstructions: instructions.trim() || null, status: confirm ? 'scheduled' : 'proposed',
+          ...(!session ? { trainingId, attendeeUserIds: [requestUserId], requestAssignments: [{ userId: requestUserId, trainingRequestId: requestId }] } : {}),
         }),
       });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new Error(error.error || 'Failed to save training schedule');
-      }
 
       showSuccess(confirm ? 'Training schedule confirmed' : 'Schedule draft saved');
       await onSaved();

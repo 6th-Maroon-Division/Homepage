@@ -1,3 +1,5 @@
+import type { Prisma } from '@/generated/prisma/client';
+type TrainingRequirementDatabase = Pick<Prisma.TransactionClient, 'training' | 'userRank' | 'rank' | 'userTraining'>;
 import { prisma } from '@/lib/prisma';
 import {
   evaluateOrbatTrainingAccess,
@@ -86,8 +88,8 @@ export async function getOrbatTrainingAccess(
 /**
  * Get all requirements for a training (rank + training prerequisites)
  */
-export async function getTrainingRequirements(trainingId: number): Promise<TrainingRequirements> {
-  const training = await prisma.training.findUnique({
+export async function getTrainingRequirements(trainingId: number, database: TrainingRequirementDatabase = prisma): Promise<TrainingRequirements> {
+  const training = await database.training.findUnique({
     where: { id: trainingId },
     include: {
       rankRequirement: {
@@ -132,8 +134,8 @@ export async function getTrainingRequirements(trainingId: number): Promise<Train
 /**
  * Check if a user can request a specific training based on requirements
  */
-export async function canRequestTraining(userId: number, trainingId: number): Promise<boolean> {
-  const unmet = await getUnmetRequirements(userId, trainingId);
+export async function canRequestTraining(userId: number, trainingId: number, database: TrainingRequirementDatabase = prisma): Promise<boolean> {
+  const unmet = await getUnmetRequirements(userId, trainingId, database);
   return !unmet.missingRank && unmet.missingTrainings.length === 0;
 }
 
@@ -142,9 +144,10 @@ export async function canRequestTraining(userId: number, trainingId: number): Pr
  */
 export async function getUnmetRequirements(
   userId: number,
-  trainingId: number
+  trainingId: number,
+  database: TrainingRequirementDatabase = prisma
 ): Promise<UnmetRequirements> {
-  const requirements = await getTrainingRequirements(trainingId);
+  const requirements = await getTrainingRequirements(trainingId, database);
 
   const unmet: UnmetRequirements = {
     missingRank: null,
@@ -153,7 +156,7 @@ export async function getUnmetRequirements(
 
   // Check rank requirement
   if (requirements.minimumRank) {
-    const userRank = await prisma.userRank.findUnique({
+    const userRank = await database.userRank.findUnique({
       where: { userId },
       include: {
         currentRank: {
@@ -167,7 +170,7 @@ export async function getUnmetRequirements(
       },
     });
 
-    const minimumRank = await prisma.rank.findUnique({
+    const minimumRank = await database.rank.findUnique({
       where: { id: requirements.minimumRank.id },
       select: { orderIndex: true },
     });
@@ -181,7 +184,7 @@ export async function getUnmetRequirements(
 
   // Check training prerequisites
   if (requirements.requiredTrainings.length > 0) {
-    const userTrainings = await prisma.userTraining.findMany({
+    const userTrainings = await database.userTraining.findMany({
       where: {
         userId,
         trainingId: { in: requirements.requiredTrainings.map((t) => t.id) },

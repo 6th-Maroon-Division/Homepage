@@ -226,17 +226,8 @@ export default function TrainingManagementClient({
 
   const refreshAllRequests = async (_status?: string) => {
     try {
-      const response = await fetch('/api/training-requests', { cache: 'no-store' });
-      if (response.ok) {
-        const data = await response.json();
-        if (Array.isArray(data)) {
-          setAllRequests(data.map((row) => ({
-            ...row,
-            lastMessage: normalizeTrainingMessage(row.lastMessage),
-            session: normalizeTrainingSession(row.session),
-          })));
-        }
-      }
+      const data = await apiList<(typeof allRequests)[number]>('/api/training-requests', { cache: 'no-store' });
+      setAllRequests(data.map(row => ({ ...row, lastMessage: normalizeTrainingMessage(row.lastMessage), session: normalizeTrainingSession(row.session) })));
     } catch (error) {
       logClientError('Error refreshing requests:', error);
     }
@@ -423,21 +414,9 @@ export default function TrainingManagementClient({
   const handleRequestAction = async (requestId: number, status: 'approved' | 'rejected', adminResponse?: string) => {
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/training-requests/${requestId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, adminResponse: adminResponse || null }),
-      });
-
-      if (response.ok) {
-        showSuccess(`Request ${status} successfully`);
-        setRequestActionModal(null);
-        setAdminMessage('');
-        await refreshAllRequests();
-        await refreshTrainings();
-      } else {
-        showError(`Failed to ${status} request`);
-      }
+      await apiRequest(`/api/training-requests/${requestId}`, { method: 'PATCH', body: JSON.stringify({ status, adminResponse: adminResponse || null }) });
+      showSuccess(`Request ${status} successfully`); setRequestActionModal(null); setAdminMessage('');
+      await refreshAllRequests(); await refreshTrainings();
     } catch (error) {
       logClientError('Error updating request:', error);
       showError('Error updating request');

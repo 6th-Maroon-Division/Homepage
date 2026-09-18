@@ -1,10 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { handleApiRequest } from '@/lib/api/handler';
+import { apiError, apiSuccess } from '@/lib/api/response';
+import { readJsonBody } from '@/lib/api/request';
+import { parseCursorPagination } from '@/lib/api/validation';
+import { writeApiAudit } from '@/lib/api/audit';
+import { parseTrainingRequestBody } from '@/lib/api/training-request-contract';
+import { requestActor, isRequestStaff, requestInclude, serializeTrainingRequest, auditTrainingRequestRead, getTrainingRequest, canManageTrainingRequest, requestDatabaseError, publishRequestEvent } from '@/lib/api/training-requests';
+
+
+
 import { prisma } from '@/lib/prisma';
 import { canRequestTraining, getUnmetRequirements } from '@/lib/training-gating';
-import { getEligibleTrainingStaff, isTrainingStaff } from '@/lib/training-staff';
-import { createTrainingNotification } from '@/lib/training-notifications';
+
+import { createSessionNotification, publishSessionNotifications, type SessionNotifications } from '@/lib/api/training-session-notifications';
 import { publishTrainingChatEvent } from '@/lib/realtime/training-chat-events';
 import { TRAINING_REQUEST_STATUSES, type TrainingRequestWorkflowStatus } from '@/lib/training-workflow';
 import { runSerializableTransaction } from '@/lib/serializable-transaction';
@@ -12,159 +19,44 @@ import { canRetryFailedTraining, getFailedTrainingRetryAt } from '@/lib/training
 
 const userSelect = { id: true, username: true, avatarUrl: true } as const;
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const viewerId = Number(session.user.id);
-    const staffViewer = await isTrainingStaff(viewerId);
-    const { searchParams } = new URL(request.url);
-    const statusParam = searchParams.get('status');
-    const status = statusParam && TRAINING_REQUEST_STATUSES.includes(statusParam as TrainingRequestWorkflowStatus)
-      ? statusParam as TrainingRequestWorkflowStatus
-      : null;
-
-    const trainingRequests = await prisma.trainingRequest.findMany({
-      where: {
-        ...(staffViewer ? {} : { userId: viewerId }),
-        ...(status ? { status } : {}),
-      },
-      include: {
-        training: true,
-        user: { select: userSelect },
-        handledByAdmin: { select: userSelect },
-        assignedTrainer: { select: userSelect },
-        messages: {
-          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-          take: 1,
-          include: { sender: { select: userSelect } },
-        },
-        readStates: {
-          where: { userId: viewerId },
-          take: 1,
-        },
-        subscriptions: {
-          where: { userId: viewerId },
-          take: 1,
-        },
-        sessionAttendee: {
-          include: {
-            session: { include: { trainer: { select: userSelect } } },
-          },
-        },
-      },
-      orderBy: { requestedAt: 'desc' },
-    });
-
-    const serialized = trainingRequests.map((item) => {
-      const sessionItem = item.sessionAttendee?.session ?? null;
-      const confirmed = Boolean(
-        sessionItem
-        && ['scheduled', 'in_progress', 'completed'].includes(sessionItem.status)
-        && sessionItem.startsAt,
-      );
-      const lastMessage = item.messages[0] ?? null;
-      const readState = item.readStates[0] ?? null;
-      const unread = Boolean(
-        lastMessage
-        && lastMessage.senderId !== viewerId
-        && (!readState?.lastReadAt || lastMessage.createdAt > readState.lastReadAt),
-      );
-
-      return {
-        id: item.id,
-        userId: item.userId,
-        trainingId: item.trainingId,
-        status: item.status,
-        requestMessage: item.requestMessage,
-        adminResponse: item.adminResponse,
-        requestedAt: item.requestedAt,
-        updatedAt: item.updatedAt,
-        training: item.training,
-        user: item.user,
-        handledByAdmin: staffViewer ? item.handledByAdmin : null,
-        assignedTrainer: staffViewer || confirmed ? item.assignedTrainer : null,
-        lastMessage: lastMessage
-          ? {
-              id: lastMessage.id,
-              body: lastMessage.body,
-              senderRole: lastMessage.senderRole,
-              sender: lastMessage.senderRole === 'STAFF' && !staffViewer
-                ? { id: null, username: 'Staff', avatarUrl: null }
-                : lastMessage.sender,
-              createdAt: lastMessage.createdAt,
-            }
-          : null,
-        unread,
-        subscription: item.subscriptions[0] ?? null,
-        session: staffViewer || confirmed
-          ? sessionItem
-            ? {
-                id: sessionItem.id,
-                startsAt: sessionItem.startsAt,
-                durationMinutes: sessionItem.durationMinutes,
-                status: sessionItem.status,
-                trainer: sessionItem.trainer,
-                specialInstructions: sessionItem.specialInstructions,
-                server: 'Arma3 Training Server',
-                confirmed,
-              }
-            : null
-          : null,
-      };
-    });
-
-    return NextResponse.json(serialized, {
-      headers: {
-        'Cache-Control': 'private, no-cache, no-store, must-revalidate',
-        Pragma: 'no-cache',
-        Expires: '0',
-      },
-    });
-  } catch (error) {
-    console.error('Error fetching training requests:', error);
-    return NextResponse.json({ error: 'Failed to fetch training requests' }, { status: 500 });
-  }
+export async function GET(request: Request) {
+  return handleApiRequest(request, undefined, async (principal, audit) => {
+    const query = new URL(request.url).searchParams;
+    if ([...query.keys()].some(key => !['limit', 'cursor', 'status'].includes(key) || query.getAll(key).length !== 1)) return apiError(400, 'invalid_request', 'Unknown or repeated query parameter.');
+    const paging = parseCursorPagination(query, { defaultLimit: 50, maxLimit: 100 });
+    if (paging.error) return apiError(400, 'invalid_request', paging.error);
+    const status = query.get('status');
+    if (status !== null && !TRAINING_REQUEST_STATUSES.includes(status as TrainingRequestWorkflowStatus)) return apiError(400, 'invalid_request', 'Invalid request status.');
+    const { limit, cursor } = paging.data!;
+    const staff = isRequestStaff(principal);
+    const rows = await prisma.trainingRequest.findMany({ where: { ...(!staff ? { userId: requestActor(principal)! } : {}), ...(status ? { status: status as TrainingRequestWorkflowStatus } : {}), ...(cursor ? { id: { lt: cursor } } : {}) }, include: requestInclude(principal), orderBy: { id: 'desc' }, take: limit + 1 });
+    const data = rows.slice(0, limit).map(row => serializeTrainingRequest(row, principal));
+    await auditTrainingRequestRead(audit, data);
+    const response = apiSuccess(data, { meta: { limit, nextCursor: rows.length > limit ? String(data[limit - 1].id) : null, isStaff: staff } });
+    response.headers.set('Cache-Control', 'private, no-store');
+    return response;
+  });
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
+  return handleApiRequest(request, undefined, async (principal, audit) => {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const userId = Number(session.user.id);
-    const body = await request.json();
-    const trainingId = Number(body.trainingId);
-    const requestMessage = typeof body.requestMessage === 'string'
-      ? body.requestMessage.trim().slice(0, 4000) || null
-      : null;
-
-    if (!Number.isInteger(trainingId) || trainingId <= 0) {
-      return NextResponse.json({ error: 'trainingId is required' }, { status: 400 });
-    }
-
-    const training = await prisma.training.findUnique({ where: { id: trainingId } });
-    if (!training || !training.isActive) {
-      return NextResponse.json({ error: 'Training not found or inactive' }, { status: 404 });
-    }
-
-    if (!(await canRequestTraining(userId, trainingId))) {
-      const unmet = await getUnmetRequirements(userId, trainingId);
-      const details = [
-        ...(unmet.missingRank ? [`Requires rank: ${unmet.missingRank.name}`] : []),
-        ...(unmet.missingTrainings.length
-          ? [`Missing trainings: ${unmet.missingTrainings.map((item) => item.name).join(', ')}`]
-          : []),
-      ];
-      return NextResponse.json({ error: 'Requirements not met', details }, { status: 403 });
-    }
-
+    if (new URL(request.url).searchParams.size) return apiError(400, 'invalid_request', 'Query parameters are not accepted.');
+    const parsed = parseTrainingRequestBody(await readJsonBody(request), 'create');
+    if (parsed.error) return parsed.error;
+    const { userId: requestedUser, trainingId: requestedTraining, requestMessage = null } = parsed.data;
+    const userId = requestedUser!, trainingId = requestedTraining!;
+    const target = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!target) return apiError(404, 'not_found', 'User not found.');
+    if (!(principal.kind === 'user' && principal.userId === userId) && (!isRequestStaff(principal) || !await canManageTrainingRequest(principal, userId))) return apiError(403, 'forbidden', 'Training staff authority over this user is required.');
+    const notifications: SessionNotifications = [];
     const outcome = await runSerializableTransaction(async (tx) => {
+      notifications.length = 0;
+      const training = await tx.training.findUnique({ where: { id: trainingId } });
+      if (!training || !training.isActive) return { response: apiError(404, 'not_found', 'Training not found or inactive.') };
+      if (!(principal.kind === 'user' && principal.userId === userId) && !await canManageTrainingRequest(principal, userId, tx)) return { response: apiError(403, 'forbidden', 'Insufficient training authority over this user.') };
+      const unmet = await getUnmetRequirements(userId, trainingId, tx);
+      if (unmet.missingRank || unmet.missingTrainings.length) return { response: apiError(403, 'forbidden', 'Requirements not met.', { missingRankId: unmet.missingRank?.id ?? null, missingTrainingIds: unmet.missingTrainings.map(item => item.id) }) };
       const [existingCredential, existingRequest] = await Promise.all([
         tx.userTraining.findUnique({
           where: { userId_trainingId: { userId, trainingId } },
@@ -192,7 +84,7 @@ export async function POST(request: NextRequest) {
           existingCredential.statusUpdatedAt,
         );
         return {
-          error: `You can request this training again after ${retryAt.toLocaleString()}.`,
+          error: `You can request this training again after ${retryAt.toISOString()}.`,
           retryAt: retryAt.toISOString(),
         } as const;
       }
@@ -212,6 +104,8 @@ export async function POST(request: NextRequest) {
         include: { training: true, user: { select: userSelect } },
       });
 
+      const senderId = requestActor(principal);
+      const senderRole = senderId === userId ? 'USER' as const : 'STAFF' as const;
       if (requestMessage) {
         const migratedByCompatibilityTrigger = await tx.trainingRequestMessage.count({
           where: {
@@ -221,48 +115,30 @@ export async function POST(request: NextRequest) {
             body: requestMessage,
           },
         });
+        if (migratedByCompatibilityTrigger && senderRole === 'STAFF') await tx.trainingRequestMessage.updateMany({ where: { requestId: created.id, senderId: userId, senderRole: 'USER', body: requestMessage }, data: { senderId, senderRole } });
         if (!migratedByCompatibilityTrigger) {
           await tx.trainingRequestMessage.create({
             data: {
               requestId: created.id,
-              senderId: userId,
-              senderRole: 'USER',
+              senderId,
+              senderRole,
               body: requestMessage,
             },
           });
         }
       }
 
-      return { created } as const;
+      const staff = await tx.user.findMany({ where: { userPermissions: { some: { value: { gt: 0 }, permission: { key: { in: ['training:approve_request', 'training:mark', 'system:super_admin'] } } } } }, select: { id: true } });
+      await createSessionNotification({ recipientUserIds: staff.map(item => item.id), title: `New training request: ${training.name}`, body: `${created.user.username || 'A user'} requested ${training.name}.`, actionUrl: `/trainings/requests/${created.id}` }, tx, notifications);
+      await writeApiAudit(tx, audit, { action: 'training_request.created', resource: 'training_request', resourceId: String(created.id), targetUserIds: [userId], outcome: 'success', after: { id: created.id, userId, trainingId, status: created.status } });
+      return { created: await getTrainingRequest(created.id, principal, tx) } as const;
     });
 
-    if ('error' in outcome) {
-      return NextResponse.json(
-        { error: outcome.error, ...('retryAt' in outcome ? { retryAt: outcome.retryAt } : {}) },
-        { status: 409 },
-      );
-    }
-    const trainingRequest = outcome.created;
-
-    const staff = await getEligibleTrainingStaff();
-    await createTrainingNotification({
-      recipientUserIds: staff.map((item) => item.id),
-      title: `New training request: ${training.name}`,
-      body: `${trainingRequest.user.username || 'A user'} requested ${training.name}.`,
-      actionUrl: `/trainings/requests/${trainingRequest.id}`,
-      createdById: userId,
-    });
-    publishTrainingChatEvent(trainingRequest.id, { source: 'request-created' });
-
-    return NextResponse.json({
-      ...trainingRequest,
-      lastMessage: requestMessage
-        ? { body: requestMessage, senderRole: 'USER', createdAt: trainingRequest.requestedAt }
-        : null,
-      message: 'Your request has been received. Staff will contact you to schedule.',
-    }, { status: 201 });
-  } catch (error) {
-    console.error('Error creating training request:', error);
-    return NextResponse.json({ error: 'Failed to create training request' }, { status: 500 });
-  }
+    if ('response' in outcome) return outcome.response!;
+    if ('error' in outcome) return apiError(409, 'conflict', outcome.error!, 'retryAt' in outcome ? { retryAt: outcome.retryAt } : {});
+    publishSessionNotifications(notifications);
+    publishRequestEvent(() => publishTrainingChatEvent(outcome.created!.id, { source: 'request-created' }));
+    return apiSuccess(outcome.created, { status: 201 });
+  } catch (error) { return requestDatabaseError(error); }
+  });
 }

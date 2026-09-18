@@ -1,5 +1,7 @@
 'use client';
 
+import { apiRequest } from '@/lib/api/client';
+
 import { useEffect, useState } from 'react';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 import { useToast } from '@/app/components/ui/ToastContainer';
@@ -27,16 +29,13 @@ export default function TrainingChatSubscriptionPanel({
   const save = async () => {
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/training-requests/${requestId}/subscription`, {
-        method: 'PUT',
+      await apiRequest(`/api/training-requests/${requestId}/subscriptions/me`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ websiteEnabled, discordEnabled }),
       });
 
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new Error(error.error || 'Failed to update notification subscription');
-      }
+
 
       showSuccess('Chat notification preferences saved');
     } catch (error) {

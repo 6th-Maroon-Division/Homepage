@@ -97,6 +97,7 @@ export async function POST(request: Request) {
     return sessionJson({ error: 'Every attendee id must be a positive integer' }, { status: 400 });
   }
   const attendeeUserIds = Array.from(new Set(parsedAttendeeIds as number[]));
+  const requestAssignments = (body.requestAssignments ?? []) as { userId: number; trainingRequestId: number }[];
 
   if (body.status !== undefined && body.status !== 'proposed' && body.status !== 'scheduled') {
     return sessionJson({ error: 'status must be proposed or scheduled' }, { status: 400 });
@@ -180,7 +181,7 @@ export async function POST(request: Request) {
               id: true,
               userId: true,
               status: true,
-              sessionAttendee: { select: { sessionId: true } },
+              sessionAttendee: { select: { id: true, sessionId: true, status: true, session: { select: { status: true } } } },
             },
             orderBy: [{ requestedAt: 'desc' }, { id: 'desc' }],
           })
@@ -191,7 +192,22 @@ export async function POST(request: Request) {
           activeRequestByUserId.set(trainingRequest.userId, trainingRequest);
         }
       }
+      if (requestAssignments.length) {
+        const selected = await tx.trainingRequest.findMany({ where: { id: { in: requestAssignments.map(item => item.trainingRequestId) } }, select: { id: true, userId: true, trainingId: true, status: true, sessionAttendee: { select: { id: true, sessionId: true, status: true, session: { select: { status: true } } } } } });
+        if (selected.length !== requestAssignments.length) return { error: apiError(404, 'not_found', 'One or more selected training requests do not exist.') };
+        for (const assignment of requestAssignments) {
+          const selectedRequest = selected.find(item => item.id === assignment.trainingRequestId)!;
+          if (selectedRequest.userId !== assignment.userId || selectedRequest.trainingId !== trainingId || !['pending', 'approved', 'in_training'].includes(selectedRequest.status)) throw new SessionConflictError('The selected request must be active and belong to the attendee and training.');
+          activeRequestByUserId.set(assignment.userId, selectedRequest);
+        }
+      }
       for (const trainingRequest of activeRequestByUserId.values()) {
+        if (trainingRequest.sessionAttendee && (trainingRequest.sessionAttendee.status === 'cancelled' || trainingRequest.sessionAttendee.session.status === 'cancelled')) {
+          const released = await tx.trainingSessionAttendee.updateMany({ where: { id: trainingRequest.sessionAttendee.id, trainingRequestId: trainingRequest.id }, data: { trainingRequestId: null, reminder24hSentAt: null } });
+          if (released.count !== 1) throw new SessionConflictError('The previous request assignment changed concurrently.');
+          trainingRequest.sessionAttendee = null;
+        }
+
         if (trainingRequest.sessionAttendee) {
           throw new SessionConflictError(
             `Training Request #${trainingRequest.id} is already linked to another session`,

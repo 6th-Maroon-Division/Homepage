@@ -640,14 +640,7 @@ export default function UserSelfDetailClient({
                               onClick={async () => {
                                 setIsCancellingRequestId(request.id);
                                 try {
-                                  const response = await fetch(`/api/training-requests/${request.id}`, {
-                                    method: 'DELETE',
-                                  });
-
-                                  if (!response.ok) {
-                                    const data = await response.json().catch(() => ({}));
-                                    throw new Error(data.error || 'Failed to cancel request');
-                                  }
+                                  await apiRequest(`/api/training-requests/${request.id}`, { method: 'DELETE' });
 
                                   setRequestRows((prev) => prev.filter((item) => item.id !== request.id));
                                   showSuccess('Training request cancelled');
@@ -800,21 +793,9 @@ export default function UserSelfDetailClient({
 
                                   setIsSubmittingRequest(true);
                                   try {
-                                    const response = await fetch('/api/training-requests', {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({
-                                        trainingId: selectedTrainingId,
-                                        requestMessage: requestMessage.trim() || null,
-                                      }),
+                                    const { data: created } = await apiRequest<{ id: number; trainingId: number; training: { name: string }; status: string; requestMessage: string | null; adminResponse: string | null; requestedAt: string; updatedAt: string }>('/api/training-requests', {
+                                      method: 'POST', body: JSON.stringify({ userId: user.id, trainingId: selectedTrainingId, requestMessage: requestMessage.trim() || null }),
                                     });
-
-                                    if (!response.ok) {
-                                      const data = await response.json().catch(() => ({}));
-                                      throw new Error(data.error || 'Failed to submit request');
-                                    }
-
-                                    const created = await response.json();
                                     setRequestRows((prev) => [
                                       {
                                         id: created.id,

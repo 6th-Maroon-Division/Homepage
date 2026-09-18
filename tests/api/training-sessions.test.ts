@@ -92,7 +92,7 @@ it('creation rejects invalid training capabilities, missing refs, pending reques
   mocks.prisma.training.findUnique.mockResolvedValue(training);
   expect((await create(req('POST', { ...createBody, status: 'scheduled' }))).status).toBe(422);
   mocks.prisma.trainingRequest.findMany.mockResolvedValue([{ id: 6, userId: 3, status: 'pending', sessionAttendee: null }]); expect((await create(req('POST', { ...createBody, startsAt: stamp.toISOString(), status: 'scheduled', attendeeUserIds: [3] }))).status).toBe(409);
-  mocks.prisma.trainingRequest.findMany.mockResolvedValue([{ id: 6, userId: 3, status: 'approved', sessionAttendee: { sessionId: 9 } }]); expect((await create(req('POST', { ...createBody, attendeeUserIds: [3] }))).status).toBe(409);
+  mocks.prisma.trainingRequest.findMany.mockResolvedValue([{ id: 6, userId: 3, status: 'approved', sessionAttendee: { id: 8, sessionId: 9, status: 'scheduled', session: { status: 'scheduled' } } }]); expect((await create(req('POST', { ...createBody, attendeeUserIds: [3] }))).status).toBe(409);
   mocks.prisma.trainingRequest.findMany.mockResolvedValue([]); mocks.prisma.trainingSessionAttendee.findMany.mockResolvedValue([{ userId: 3, sessionId: 9 }]); expect((await create(req('POST', { ...createBody, attendeeUserIds: [3] }))).status).toBe(409);
 });
 it('updates schedule, assigned trainer, cancellation and outbox atomically', async () => {
@@ -147,3 +147,23 @@ it('CAS and audit failures propagate correctly; postcommit notifications cannot 
   mocks.prisma.apiAuditLog.create.mockRejectedValue(new Error('audit')); expect((await create(req('POST', createBody))).status).toBe(500);
 });
 it('maps database races and missing rows', () => { expect(sessionDatabaseError({ code: 'P2025' }).status).toBe(404); for (const code of ['P2002', 'P2003', 'P2034']) expect(sessionDatabaseError({ code }).status).toBe(409); expect(() => sessionDatabaseError(new Error('oops'))).toThrow('oops'); });
+
+it('explicit request assignments select the requested record and validate mapping before writes', async () => {
+  const assignment = { userId: 3, trainingRequestId: 6 };
+  const requestRow = { id: 6, userId: 3, trainingId: 2, status: 'approved', sessionAttendee: null };
+  mocks.prisma.trainingRequest.findMany.mockImplementation(async ({ where }) => where.id ? [requestRow] : [{ ...requestRow, id: 9 }]);
+  const response = await create(req('POST', { ...createBody, attendeeUserIds: [3], requestAssignments: [assignment] })); expect(response.status).toBe(201);
+  expect(mocks.prisma.trainingSession.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ attendees: { create: [{ userId: 3, trainingRequestId: 6 }] } }) }));
+  mocks.prisma.trainingRequest.findMany.mockResolvedValue([]);
+  expect((await create(req('POST', { ...createBody, attendeeUserIds: [3], requestAssignments: [assignment] }))).status).toBe(404);
+  mocks.prisma.trainingRequest.findMany.mockResolvedValue([{ ...requestRow, userId: 7 }]);
+  expect((await create(req('POST', { ...createBody, attendeeUserIds: [3], requestAssignments: [assignment] }))).status).toBe(409);
+});
+it.each([[{ userId: 3, trainingRequestId: '6' }], [{ userId: 4, trainingRequestId: 6 }], [{ userId: 3, trainingRequestId: 6 }, { userId: 3, trainingRequestId: 7 }], [{ userId: 3, trainingRequestId: 6, extra: true }]].map(requestAssignments => ({ requestAssignments })))('rejects malformed explicit assignments %j', async ({ requestAssignments }) => {
+  expect((await create(req('POST', { ...createBody, attendeeUserIds: [3], requestAssignments }))).status).toBe(422);
+});
+it('releases a cancelled previous attendance before attaching an explicitly selected request', async () => {
+  mocks.prisma.trainingRequest.findMany.mockResolvedValue([{ id: 6, userId: 3, trainingId: 2, status: 'approved', sessionAttendee: { id: 8, sessionId: 9, status: 'cancelled', session: { status: 'scheduled' } } }]);
+  const response = await create(req('POST', { ...createBody, attendeeUserIds: [3], requestAssignments: [{ userId: 3, trainingRequestId: 6 }] })); expect(response.status).toBe(201);
+  expect(mocks.prisma.trainingSessionAttendee.updateMany).toHaveBeenCalledWith({ where: { id: 8, trainingRequestId: 6 }, data: { trainingRequestId: null, reminder24hSentAt: null } });
+});

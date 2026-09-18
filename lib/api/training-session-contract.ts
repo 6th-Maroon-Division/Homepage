@@ -20,12 +20,16 @@ export async function validateSessionBody(request: Request, operation: SessionOp
   const body = operation === 'remove' && !(await request.clone().text()).trim() ? {} : await readJsonBody(request.clone());
   const invalid = () => apiError(422, 'validation_failed', 'Invalid training session payload. Use canonical fields, numeric IDs and explicitly zoned timestamps.');
   if (!record(body)) return invalid();
-  const allowed: Record<SessionOperation, string[]> = { create: ['trainingId', 'trainerId', 'attendeeUserIds', 'status', 'startsAt', 'durationMinutes', 'specialInstructions'], update: ['trainerId', 'status', 'startsAt', 'durationMinutes', 'specialInstructions'], add: ['userId', 'trainingRequestId', 'notes', 'advanceTraining'], attendee: ['status', 'notes', 'expectedUpdatedAt'], remove: ['notes', 'expectedUpdatedAt'] };
+  const allowed: Record<SessionOperation, string[]> = { create: ['trainingId', 'trainerId', 'attendeeUserIds', 'requestAssignments', 'status', 'startsAt', 'durationMinutes', 'specialInstructions'], update: ['trainerId', 'status', 'startsAt', 'durationMinutes', 'specialInstructions'], add: ['userId', 'trainingRequestId', 'notes', 'advanceTraining'], attendee: ['status', 'notes', 'expectedUpdatedAt'], remove: ['notes', 'expectedUpdatedAt'] };
   if (Object.keys(body).some(key => !allowed[operation].includes(key)) || operation === 'update' && !Object.keys(body).length) return invalid();
   const required = operation === 'create' ? ['trainingId', 'trainerId'] : operation === 'add' ? ['userId'] : [];
   for (const key of required) if (!integer(body[key])) return invalid();
   for (const key of ['trainingId', 'trainerId', 'userId', 'trainingRequestId']) if (key in body && body[key] !== null && !integer(body[key])) return invalid();
   if ('attendeeUserIds' in body && (!Array.isArray(body.attendeeUserIds) || body.attendeeUserIds.some(id => !integer(id)) || new Set(body.attendeeUserIds).size !== body.attendeeUserIds.length)) return invalid();
+  if ('requestAssignments' in body) {
+    if (!Array.isArray(body.requestAssignments) || body.requestAssignments.some(item => !record(item) || Object.keys(item).some(key => !['userId', 'trainingRequestId'].includes(key)) || !integer(item.userId) || !integer(item.trainingRequestId) || !Array.isArray(body.attendeeUserIds) || !body.attendeeUserIds.includes(item.userId))) return invalid();
+    if (new Set(body.requestAssignments.map(item => item.userId)).size !== body.requestAssignments.length || new Set(body.requestAssignments.map(item => item.trainingRequestId)).size !== body.requestAssignments.length) return invalid();
+  }
   if ('durationMinutes' in body && body.durationMinutes !== null && !integer(body.durationMinutes, 1440)) return invalid();
   for (const key of ['startsAt', 'expectedUpdatedAt']) if (key in body && !(key === 'startsAt' && body[key] === null) && !parseUtcTimestamp(body[key])) return invalid();
   for (const key of ['specialInstructions', 'notes']) if (key in body && body[key] !== null && (typeof body[key] !== 'string' || body[key].trim().length > 4000)) return invalid();
