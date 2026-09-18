@@ -23,7 +23,7 @@ Run that suite with the enforced coverage threshold:
 npm run test:api:coverage
 ```
 
-Reports are written to `coverage/api/`: HTML (`index.html`), LCOV (`lcov.info`), and JSON summary (`coverage-summary.json`), plus console output. The threshold currently covers `lib/api/`, notification-preference helpers, and the canonical migrated handlers. The [migration contract](./migration-contract.md) tracks each resource batch. Consult [vitest.config.mts](../../vitest.config.mts) for the exact scope. Expand this scope with each migration batch; meeting the current threshold does not establish 80% coverage of all endpoints.
+Reports are written to `coverage/api/`: HTML (`index.html`), LCOV (`lcov.info`), and JSON summary (`coverage-summary.json`), plus console output. The threshold currently covers `lib/api/`, notification-preference helpers, and the canonical migrated handlers. The [migration contract](./migration-contract.md) tracks each resource batch. Consult [vitest.config.mts](../../vitest.config.mts) for the exact scope. Mixed files can contain a migrated delegate and legacy methods: ORBAT collection GET is tested through its actual route and covered in `lib/api/orbat-list.ts`, while the mixed `app/api/orbats/route.ts` file remains outside the gate until POST migration. Expand this scope with each migration batch; meeting the current threshold does not establish 80% coverage of all endpoints.
 
 Run isolated database integration tests:
 

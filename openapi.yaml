@@ -1254,16 +1254,79 @@ paths:
     get:
       tags:
         - ORBATs
-      summary: List recent ORBATs
+      summary: List public ORBATs
+      description: "Public list: anonymous callers, valid live sessions, and active bot tokens receive the same id/name
+        entries. Invalid supplied Authorization credentials return 401 without anonymous fallback; stale sessions can
+        read anonymously. Only one limit and one cursor query key are accepted; unknown/duplicate keys return 400.
+        Descending-ID cursor pages use real lookahead and end with meta.nextCursor:null. The website recent-operation
+        selector explicitly requests limit=5; the API default is 50, capped at 100. This general catalog read creates no
+        user-data audit. POST on this URL retains its existing creation contract and is not migrated by this change."
+      security:
+        - {}
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
       parameters:
         - name: limit
           in: query
           schema:
             type: integer
-            default: 5
+            minimum: 1
+            default: 50
+          description: Values above 100 are clamped to 100.
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            pattern: ^[0-9]+$
+          description: Positive Int32 ORBAT ID from meta.nextCursor; returns smaller IDs in descending order.
       responses:
         "200":
-          description: List of ORBATs
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PublicOrbatListItem"
+                  meta:
+                    type: object
+                    required:
+                      - limit
+                      - nextCursor
+                    properties:
+                      limit:
+                        type: integer
+                        minimum: 1
+                        maximum: 100
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Invalid supplied Authorization credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
     post:
       tags:
         - ORBATs
@@ -8270,3 +8333,14 @@ components:
           type:
             - string
             - "null"
+    PublicOrbatListItem:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: integer
+        name:
+          type: string

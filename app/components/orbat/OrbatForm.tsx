@@ -250,11 +250,8 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     // Fetch recent orbats
     const fetchRecentOrbats = async () => {
       try {
-        const response = await fetch('/api/orbats?limit=5');
-        if (response.ok) {
-          const data = await response.json();
-          setRecentOrbats(data);
-        }
+        const { data } = await apiRequest<typeof recentOrbats>('/api/orbats?limit=5');
+        setRecentOrbats(data);
       } catch (error) {
         logClientError('Error fetching recent orbats:', error);
       }

@@ -1,3 +1,4 @@
+import { getPublicOrbatList } from '@/lib/api/orbat-list';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
@@ -76,26 +77,8 @@ const formatUtcTime = (value: Date | null): string | null => {
   return `${hour}:${minute}`;
 };
 
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const limit = Number.parseInt(searchParams.get('limit') || '5', 10);
-    const maxLimit = Math.min(limit, 50);
-
-    const orbats = await prisma.orbat.findMany({
-      take: maxLimit,
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        name: true,
-      },
-    });
-
-    return NextResponse.json(orbats);
-  } catch (error) {
-    console.error('Error fetching OrbATs:', error);
-    return NextResponse.json({ error: 'Failed to fetch OrbATs' }, { status: 500 });
-  }
+export async function GET(request: Request) {
+  return getPublicOrbatList(request);
 }
 
 export async function POST(request: NextRequest) {

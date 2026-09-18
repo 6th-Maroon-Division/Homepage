@@ -1,6 +1,6 @@
 # Public-access review
 
-The user confirmed that logged-out visitors must be able to browse operations and all data shown by the ORBAT view. Public endpoints support anonymous access with the common payload/response/UTC conventions. Mutation authorization is unchanged. The review began as a read-only audit. The public full-detail and calendar endpoints are now explicit migration batches; this does not authorize making unrelated endpoints public or removing their checks.
+The user confirmed that logged-out visitors must be able to browse operations and all data shown by the ORBAT view. Public endpoints support anonymous access with the common payload/response/UTC conventions. Mutation authorization is unchanged. The review began as a read-only audit. The public full-detail, calendar, and collection endpoints are now explicit migration batches; this does not authorize making unrelated endpoints public or removing their checks.
 
 ## Confirmed ORBAT flow
 
@@ -14,11 +14,11 @@ The user confirmed that logged-out visitors must be able to browse operations an
 | Optional user controls | `/api/user/current`, ORBAT eligibility, and qualification-panel requests can fail authentication for anonymous visitors. The client retains ordinary viewing and hides or omits personalized/staff controls. |
 | Editing catalog requests | Migrated radio-frequency/subslot requests occur in administrative [OrbatForm](../../app/components/orbat/OrbatForm.tsx), not the public detail view. |
 
-No regression from the migrated catalog authentication was identified in this confirmed public ORBAT path. Preserve anonymous initial rendering, full refresh, calendar updates, and public event streams during future migrations. Public-detail and calendar batches add anonymous regression coverage for full-detail reads, the shared server-rendering projection, and calendar pages. Collection and event-stream regression coverage remains required for their future migration.
+No regression from the migrated catalog authentication was identified in this confirmed public ORBAT path. Preserve anonymous initial rendering, full refresh, calendar updates, and public event streams during future migrations. Public-detail, calendar, and collection batches add anonymous regression coverage for full-detail reads, the shared server-rendering projection, calendar pages, and the operation list. Event-stream regression coverage remains required for its future migration.
 
 ## Additional candidates needing a product decision
 
-Current source allows anonymous reads for `GET /api/orbats` (a small operation selector), `GET /api/users/{id}/attendance`, and `GET /api/users/{id}/attendance/stats`. The attendance helpers access Prisma directly without an authentication gate. These are observations, not confirmation that each should remain public. Authentication initiation/callback routes are separate transport exceptions, not business-data candidates. Automation routes with token checks through other helpers must not be classified as public from a missing direct session marker.
+The public `GET /api/orbats` selector is now migrated with an explicit anonymous contract; its recent-operation caller keeps `limit=5`. Current source also allows anonymous reads for `GET /api/users/{id}/attendance` and `GET /api/users/{id}/attendance/stats`. The attendance helpers access Prisma directly without an authentication gate. These are observations, not confirmation that each should remain public. Authentication initiation/callback routes are separate transport exceptions, not business-data candidates. Automation routes with token checks through other helpers must not be classified as public from a missing direct session marker.
 
 ## Authentication added by earlier migrations: review, do not automatically undo
 

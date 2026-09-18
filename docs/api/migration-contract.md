@@ -172,7 +172,7 @@ The shared `getPublicOrbat` projection serves both initial server rendering and 
 
 Nested signup users contain only display ID/name and rank name/abbreviation. Note users contain display ID/name and the current-rank display projection. Email, accounts, grants, and other unrelated user fields are excluded; visible note reason/status/minute fields remain. Reads audit unique people appearing in returned signups or notes: session users exclude themselves, while anonymous callers and bots include all returned people. These audits have actor/target metadata and no snapshots; anonymous actors are identified as anonymous. Responses with no people do not generate general-read audits.
 
-This batch covers full-detail reads and their shared server-rendering projection. Calendar coverage is handled in the next batch; collection/event regression tests remain future work. Editor mutations are unchanged.
+This batch covers full-detail reads and their shared server-rendering projection. Calendar coverage is handled in the next batch; event-stream regression tests remain future work; collection coverage is handled in its later batch. Editor mutations are unchanged.
 
 ## Sixteenth migration batch: public and personalized calendar
 
@@ -182,7 +182,15 @@ Only single `limit`/`cursor` query parameters are accepted; unknown/duplicate ke
 
 Both use shared `getCalendarPage`/`getCalendarItems` services and live authentication. Entries retain `id`, `kind`, `name`, `description`, UTC `eventDate`, UTC date-only `dateKey`, and `href`, plus operation `isSideOp` or session `status`/nullable `trainerName`. Operation dates fall back from start time to event date to creation date. Staff links point to administration; other users’ links derive only from their own active attendee request. No attendee records are returned.
 
-Only trainer identities actually displayed to someone else are audited; session users exclude themselves, while bots include all displayed trainers. Public operation-only responses need no user-data audit. Audits contain metadata without snapshots; audit failure returns 500. This batch adds anonymous calendar regressions. Anonymous collection and event-stream regression tests remain for their future migrations.
+Only trainer identities actually displayed to someone else are audited; session users exclude themselves, while bots include all displayed trainers. Public operation-only responses need no user-data audit. Audits contain metadata without snapshots; audit failure returns 500. This batch adds anonymous calendar regressions. Collection regression coverage is handled in the next batch; event-stream regressions remain for their future migration.
+
+## Seventeenth migration batch: public ORBAT list
+
+`GET /api/orbats` remains public and returns only `{ id, name }` entries in the standard envelope. Anonymous callers, valid live sessions, and active bot tokens receive the same list; invalid supplied Authorization credentials return 401 without fallback, while stale sessions can read anonymously. General list reads do not create user-data audits.
+
+Only single `limit`/`cursor` query keys are accepted; unknown or duplicate keys return 400. Entries are descending by ID with actual lookahead, default limit 50/cap 100, and null `meta.nextCursor` on the final page. The recent-operation selector explicitly requests five entries to preserve its UI behavior.
+
+The route delegates GET to the shared public `getPublicOrbatList` handler in `lib/api/orbat-list.ts`. Existing POST creation remains unchanged. Tests import the actual route; coverage includes the delegated handler through `lib/api/**`. The mixed route file is excluded from the coverage gate until POST migration, so its GET/POST status is reported separately in the inventory. Anonymous event-stream regression coverage remains future work.
 
 ## Verification and remaining rollout
 
