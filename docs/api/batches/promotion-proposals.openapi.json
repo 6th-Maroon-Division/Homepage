@@ -1,0 +1,173 @@
+{
+  "paths": {
+    "/api/ranks/promotions/propose": {
+      "post": {
+        "summary": "Propose or immediately apply an eligible promotion",
+        "description": "Requires rank:manage_promotions and strictly higher live target permission (self allowed with global grant); active bots superadmin. Serializable permission/eligibility checks, UTC state, history/outbox/inbox/audit atomic. Manual lanes create or reuse a pending proposal; automatic lanes apply and close an existing pending proposal. No query parameters. Other-user eligibility/reused proposal reads audited without snapshots.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "userId"
+                ],
+                "properties": {
+                  "userId": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Existing pending proposal or applied automatic promotion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "userId",
+                        "outcome",
+                        "proposalId",
+                        "rankId"
+                      ],
+                      "properties": {
+                        "userId": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 2147483647
+                        },
+                        "outcome": {
+                          "type": "string",
+                          "enum": [
+                            "proposed",
+                            "already_pending",
+                            "promoted"
+                          ]
+                        },
+                        "proposalId": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "rankId": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Manual proposal created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "userId",
+                        "outcome",
+                        "proposalId",
+                        "rankId"
+                      ],
+                      "properties": {
+                        "userId": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 2147483647
+                        },
+                        "outcome": {
+                          "type": "string",
+                          "enum": [
+                            "proposed",
+                            "already_pending",
+                            "promoted"
+                          ]
+                        },
+                        "proposalId": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "rankId": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON or unsupported query"
+          },
+          "401": {
+            "description": "Missing or invalid credentials, invalid Bearer never falls back"
+          },
+          "403": {
+            "description": "Missing global permission or target hierarchy"
+          },
+          "404": {
+            "description": "User or required reference missing"
+          },
+          "409": {
+            "description": "Ineligible (details.reason), obsolete proposal or serialization conflict"
+          },
+          "422": {
+            "description": "Strict payload validation failed"
+          },
+          "500": {
+            "description": "Persistence or required audit failure"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {}
+  },
+  "removePaths": []
+}

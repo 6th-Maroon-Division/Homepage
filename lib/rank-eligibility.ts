@@ -108,8 +108,8 @@ export async function getTotalAttendanceWithLegacy(userId: number): Promise<numb
   return newAttendanceCount + legacyAttendanceCount + oldLegacyAttendance;
 }
 
-export async function checkRankupEligibility(userId: number): Promise<EligibilityResult> {
-  const userRank = await prisma.userRank.findUnique({
+export async function checkRankupEligibility(userId: number, database: Pick<typeof prisma, 'userRank' | 'rank' | 'rankTransitionRequirement' | 'userTraining' | 'promotionProposal' | 'attendance' | 'legacyAttendanceData' | 'legacyUserData'> = prisma): Promise<EligibilityResult> {
+  const userRank = await database.userRank.findUnique({
     where: { userId },
     include: {
       currentRank: true,
@@ -178,7 +178,7 @@ export async function checkRankupEligibility(userId: number): Promise<Eligibilit
     };
   }
 
-  const nextRank = await prisma.rank.findFirst({
+  const nextRank = await database.rank.findFirst({
     where: { orderIndex: { gt: userRank.currentRank.orderIndex } },
     orderBy: { orderIndex: 'asc' },
   });
@@ -206,7 +206,7 @@ export async function checkRankupEligibility(userId: number): Promise<Eligibilit
     };
   }
 
-  const currentAttendance = await getCurrentAttendance(userId);
+  const currentAttendance = await getCurrentAttendance(userId, database);
   const requiredAttendance = getRequiredAttendanceForRankup(nextRank.attendanceRequiredSinceLastRank);
   const delta = currentAttendance - userRank.attendanceSinceLastRank;
 
@@ -240,7 +240,7 @@ export async function checkRankupEligibility(userId: number): Promise<Eligibilit
     };
   }
 
-  const transitionRequirement = await prisma.rankTransitionRequirement.findUnique({
+  const transitionRequirement = await database.rankTransitionRequirement.findUnique({
     where: { targetRankId: nextRank.id },
     include: { requiredTrainings: { select: { id: true } } },
   });
@@ -248,7 +248,7 @@ export async function checkRankupEligibility(userId: number): Promise<Eligibilit
   let missingTrainingIds: number[] | undefined;
   if (transitionRequirement && transitionRequirement.requiredTrainings.length > 0) {
     const requiredIds = transitionRequirement.requiredTrainings.map((t) => t.id);
-    const userTrainingIds = await prisma.userTraining.findMany({
+    const userTrainingIds = await database.userTraining.findMany({
       where: { userId },
       select: {
         trainingId: true,
@@ -295,7 +295,7 @@ export async function checkRankupEligibility(userId: number): Promise<Eligibilit
     }
   }
 
-  const existingProposal = await prisma.promotionProposal.findFirst({
+  const existingProposal = await database.promotionProposal.findFirst({
     where: {
       userId,
       nextRankId: nextRank.id,
