@@ -47,6 +47,13 @@ export async function beginSteamLogin(request: NextRequest) {
   try {
     const config = configuration();
     if (request.nextUrl.searchParams.size) return denySteam(config, 'InvalidSteamRequest', '/', '/api/auth/steam-login');
+    // NextURL normalizes loopback aliases to localhost. Compare the original
+    // browser host so the state cookie is set on the callback's actual host.
+    // Only redirect to the configured origin, never to a header-supplied URL.
+    const browserHost = request.headers.get('x-forwarded-host') ?? request.headers.get('host') ?? request.nextUrl.host;
+    if (browserHost.toLowerCase() !== new URL(config.base).host.toLowerCase()) {
+      return redirect(config.base, '/api/auth/steam-login');
+    }
     const userId = await sessionId();
     const state = randomBytes(32).toString('hex');
     await prisma.steamLoginAttempt.deleteMany({ where: { expiresAt: { lte: new Date() } } });

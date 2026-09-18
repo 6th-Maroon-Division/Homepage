@@ -24,7 +24,7 @@ async function begin() {
 function req(patch: Record<string, string> = {}, browserState = state) {
   const url = new URL(returnTo);
   for (const [key, value] of Object.entries({ 'openid.ns': 'http://specs.openid.net/auth/2.0', 'openid.mode': 'id_res', 'openid.op_endpoint': 'https://steamcommunity.com/openid/login', 'openid.claimed_id': `https://steamcommunity.com/openid/id/${steamId}`, 'openid.identity': `https://steamcommunity.com/openid/id/${steamId}`, 'openid.return_to': returnTo, 'openid.response_nonce': `${new Date().toISOString().slice(0, 19)}Ztest${index}`, 'openid.assoc_handle': 'handle', 'openid.signed': 'op_endpoint,claimed_id,identity,return_to,response_nonce,assoc_handle', 'openid.sig': 'test-signature', ...patch })) url.searchParams.set(key, value);
-  return new NextRequest(url, { headers: { cookie: `__Host-steam-state=${browserState}` } });
+  return new NextRequest(url, { headers: { cookie: `${new URL(returnTo).protocol === 'https:' ? '__Host-steam-state' : 'steam-state'}=${browserState}` } });
 }
 beforeEach(() => {
   mocks.userId = null; mocks.pending.mockReset(); mocks.fetch.mockReset();
@@ -93,4 +93,23 @@ test('audit failure rolls back attempt consumption and newly created user/accoun
   expect(await prisma.user.count()).toBe(before);
   expect(await prisma.authAccount.count({ where: { provider: 'steam', providerUserId: steamId } })).toBe(0);
   expect((await callback(req())).headers.get('location')).toBe('https://example.test/orbats');
+});
+
+test('127.0.0.1 login changes host before setting browser state and verifies localhost callback', async () => {
+  vi.stubEnv('NEXTAUTH_URL', 'http://localhost:3000');
+  const before = await prisma.steamLoginAttempt.count();
+  const alias = await login(new NextRequest('http://127.0.0.1:3000/api/auth/steam-login', { headers: { host: '127.0.0.1:3000' } }));
+  expect(alias.headers.get('location')).toBe('http://localhost:3000/api/auth/steam-login');
+  expect(alias.headers.get('set-cookie')).toBeNull();
+  expect(await prisma.steamLoginAttempt.count()).toBe(before);
+  const canonical = await login(new NextRequest(alias.headers.get('location')!, { headers: { host: 'localhost:3000' } }));
+  returnTo = new URL(canonical.headers.get('location')!).searchParams.get('openid.return_to')!;
+  state = new URL(returnTo).searchParams.get('state')!;
+  expect(canonical.cookies.get('steam-state')?.value).toBe(state);
+  const response = await callback(req());
+  expect(response.headers.get('location')).toBe('http://localhost:3000/orbats');
+  const token = response.cookies.get('next-auth.session-token')?.value;
+  expect(token).toBeDefined();
+  const account = await prisma.authAccount.findUniqueOrThrow({ where: { provider_providerUserId: { provider: 'steam', providerUserId: steamId } } });
+  expect(await decode({ token, secret })).toMatchObject({ id: account.userId, provider: 'steam' });
 });

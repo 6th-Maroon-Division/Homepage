@@ -25,7 +25,7 @@ function request(patch: Record<string, string | null> = {}, cookie = state) {
   const url = new URL(returnTo);
   const fields = { 'openid.ns': 'http://specs.openid.net/auth/2.0', 'openid.mode': 'id_res', 'openid.op_endpoint': 'https://steamcommunity.com/openid/login', 'openid.claimed_id': `https://steamcommunity.com/openid/id/${steamId}`, 'openid.identity': `https://steamcommunity.com/openid/id/${steamId}`, 'openid.return_to': returnTo, 'openid.response_nonce': `${new Date().toISOString().slice(0, 19)}Zunique`, 'openid.assoc_handle': 'handle', 'openid.signed': 'op_endpoint,claimed_id,identity,return_to,response_nonce,assoc_handle', 'openid.sig': 'signed', ...patch };
   for (const [key, value] of Object.entries(fields)) if (value === null) url.searchParams.delete(key); else url.searchParams.set(key, value);
-  return new NextRequest(url, { headers: { cookie: `__Host-steam-state=${cookie}` } });
+  return new NextRequest(url, { headers: { cookie: `${new URL(returnTo).protocol === 'https:' ? '__Host-steam-state' : 'steam-state'}=${cookie}` } });
 }
 beforeEach(() => {
   vi.resetAllMocks();
@@ -134,4 +134,29 @@ test('denied callback audits metadata only and remains denied when audit storage
   const log = vi.spyOn(console, 'error').mockImplementation(() => {});
   expect((await callback(request({ userId: '10' }))).headers.get('location')).toContain('error=InvalidSteamResponse');
   expect(mocks.encode).not.toHaveBeenCalled(); log.mockRestore();
+});
+
+test('loopback alias redirects before creating state, then localhost login completes with its own cookie', async () => {
+  vi.stubEnv('NEXTAUTH_URL', 'http://localhost:3000');
+  const alias = new NextRequest('http://127.0.0.1:3000/api/auth/steam-login', { headers: { host: '127.0.0.1:3000' } });
+  expect(alias.nextUrl.hostname).toBe('localhost'); // NextURL normalizes the URL, but not Host.
+  const canonical = await login(alias);
+  expect(canonical.headers.get('location')).toBe('http://localhost:3000/api/auth/steam-login');
+  expect(canonical.headers.get('set-cookie')).toBeNull();
+  expect(mocks.session).not.toHaveBeenCalled();
+  expect(mocks.db.steamLoginAttempt.create).not.toHaveBeenCalled();
+  const started = await login(new NextRequest(canonical.headers.get('location')!, { headers: { host: 'localhost:3000' } }));
+  returnTo = new URL(started.headers.get('location')!).searchParams.get('openid.return_to')!;
+  state = new URL(returnTo).searchParams.get('state')!;
+  expect(started.cookies.get('steam-state')?.value).toBe(state);
+  const completed = await callback(request());
+  expect(completed.headers.get('location')).toBe('http://localhost:3000/orbats');
+  expect(completed.cookies.get('next-auth.session-token')?.value).toBe('encoded-session');
+});
+test('canonical proxy host avoids a redirect loop and unrelated hosts redirect only to configured origin', async () => {
+  const proxied = await login(new NextRequest('http://internal:3000/api/auth/steam-login', { headers: { host: 'internal:3000', 'x-forwarded-host': 'example.test' } }));
+  expect(new URL(proxied.headers.get('location')!).origin).toBe('https://steamcommunity.com');
+  const unrelated = await login(new NextRequest('https://untrusted.test/api/auth/steam-login', { headers: { host: 'untrusted.test' } }));
+  expect(unrelated.headers.get('location')).toBe('https://example.test/api/auth/steam-login');
+  expect(unrelated.headers.get('set-cookie')).toBeNull();
 });
