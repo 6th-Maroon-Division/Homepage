@@ -196,14 +196,8 @@ export default function PendingPromotionsClient() {
 
     setIsRunningAutoRankup(true);
     try {
-      const res = await fetch('/api/ranks/auto-rankup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const { data } = await apiRequest<{ promotedCount: number; errorsCount: number; ineligibleCount: number }>('/api/ranks/promotions/automatic', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
 
-      if (!res.ok) throw new Error('Failed to run auto rankup');
-      const data = await res.json();
-      
       // Build success message
       let message = `${data.promotedCount} promoted`;
       if (data.errorsCount > 0) {
@@ -214,15 +208,7 @@ export default function PendingPromotionsClient() {
       }
       
       showSuccess(`Auto rankup complete: ${message}`);
-      
-      // Log details for debugging
-      if (data.errors && data.errors.length > 0) {
-        console.error('Auto rankup errors:', data.errors);
-      }
-      if (data.ineligible && data.ineligible.length > 0) {
-        console.info('Ineligible users:', data.ineligible);
-      }
-      
+
       await fetchProposals();
     } catch (error) {
       console.error('Error running auto rankup:', error);

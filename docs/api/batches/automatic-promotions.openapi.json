@@ -1,0 +1,267 @@
+{
+  "paths": {
+    "/api/ranks/promotions/automatic": {
+      "get": {
+        "summary": "List automatic promotion history",
+        "description": "Live hierarchy SQL visibility before descending-ID pagination. Audit only displayed other users, no snapshots; bot superadmin. days lookback uses UTC24hour periods. No private account/history fields.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "days",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3650,
+              "default": 7
+            },
+            "description": "UTC lookback days"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647,
+              "default": 50
+            },
+            "description": "Clamped to100"
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "description": "Exclusive descending history ID"
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Invalid JSON/query"
+          },
+          "401": {
+            "description": "Invalid credentials; no invalid Bearer fallback"
+          },
+          "403": {
+            "description": "Requires rank:manage_promotions"
+          },
+          "422": {
+            "description": "POST strict empty object required"
+          },
+          "500": {
+            "description": "Database selection or required history-read audit failure"
+          },
+          "200": {
+            "description": "Minimal history page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "userId",
+                          "previousRankName",
+                          "newRankName",
+                          "createdAt",
+                          "triggeredBy",
+                          "outcome",
+                          "user"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "userId": {
+                            "type": "integer"
+                          },
+                          "previousRankName": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "newRankName": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "UTC ISO8601 ending Z"
+                          },
+                          "triggeredBy": {
+                            "type": "string"
+                          },
+                          "outcome": {
+                            "type": "string"
+                          },
+                          "user": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "username",
+                              "discordId"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "username": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "discordId": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "limit",
+                        "nextCursor"
+                      ],
+                      "properties": {
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "nextCursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Run automatic promotions for all manageable eligible users",
+        "description": "Global rank:manage_promotions; live target hierarchy. No queries. Each user commits independently in Serializable transaction with attendance/history/outbox/message/audit. errorsCount counts rolled-back users; other users may succeed. Postcommit notifications cannot reverse success. No personal result arrays.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "maxProperties": 0
+              }
+            }
+          }
+        },
+        "responses": {
+          "400": {
+            "description": "Invalid JSON/query"
+          },
+          "401": {
+            "description": "Invalid credentials; no invalid Bearer fallback"
+          },
+          "403": {
+            "description": "Requires rank:manage_promotions"
+          },
+          "422": {
+            "description": "POST strict empty object required"
+          },
+          "500": {
+            "description": "Database selection or required history-read audit failure"
+          },
+          "200": {
+            "description": "Counts of committed promoted users, rolled-back users and attendance-short auto lanes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "promotedCount",
+                        "errorsCount",
+                        "ineligibleCount"
+                      ],
+                      "properties": {
+                        "promotedCount": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "errorsCount": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "ineligibleCount": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {}
+  },
+  "removePaths": [
+    "/api/bot/promotions/auto",
+    "/api/ranks/auto-rankup"
+  ]
+}
