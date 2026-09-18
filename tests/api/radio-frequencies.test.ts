@@ -104,3 +104,9 @@ test('out-of-range cursors return400 and concurrent deletion returns404', async 
   mocks.prisma.radioFrequency.delete.mockRejectedValue({ code: 'P2025' });
   expect((await DELETE(req('DELETE'), ctx())).status).toBe(404);
 });
+test('radio callsign can be cleared explicitly with null',()=>{
+ expect(parseRadioFrequencyBody({callsign:null},false)).toEqual({data:{callsign:null}});
+});
+test('blank callsign normalizes to null',()=>{
+ expect(parseRadioFrequencyBody({callsign:'  '},false)).toEqual({data:{callsign:null}});
+});

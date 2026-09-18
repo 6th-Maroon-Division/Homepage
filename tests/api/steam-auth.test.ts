@@ -160,3 +160,66 @@ test('canonical proxy host avoids a redirect loop and unrelated hosts redirect o
   expect(unrelated.headers.get('location')).toBe('https://example.test/api/auth/steam-login');
   expect(unrelated.headers.get('set-cookie')).toBeNull();
 });
+test('login rejects query parameters and invalid or deleted session users before storing state', async () => {
+ expect((await login(new NextRequest('https://example.test/api/auth/steam-login?next=evil'))).headers.get('location')).toContain('InvalidSteamRequest');
+ for (const id of ['invalid', 2147483648, 4]) {
+  mocks.session.mockResolvedValue({ user: { id } }); mocks.db.user.findUnique.mockResolvedValue(null);
+  expect((await login(new NextRequest('https://example.test/api/auth/steam-login'))).status).toBe(503);
+ }
+ expect(mocks.db.steamLoginAttempt.create).not.toHaveBeenCalled();
+});
+test('default development origin is localhost and production requires HTTPS', async () => {
+ vi.stubEnv('NEXTAUTH_URL', '');
+ expect((await login(new NextRequest('http://localhost:3000/api/auth/steam-login'))).headers.get('location')).toContain('https://steamcommunity.com/');
+ vi.stubEnv('NODE_ENV', 'production');
+ expect((await login(new NextRequest('http://localhost:3000/api/auth/steam-login'))).status).toBe(503);
+});
+test.each([
+ { 'openid.claimed_id': null }, { 'openid.signed': null }, { 'openid.assoc_handle': null }, { 'openid.response_nonce': null },
+ { 'openid.response_nonce': 'not-a-date' }, { 'openid.response_nonce': '2026-13-18T00:00:00Znonce' },
+ { 'openid.response_nonce': '2026-02-30T00:00:00Znonce' }, { 'openid.response_nonce': '2099-01-01T00:00:00Znonce' },
+] as Record<string, string | null>[])('Steam rejects missing signed fields or invalid nonces %j', async patch => {
+ await begin(); expect((await callback(request(patch))).headers.get('location')).toContain('InvalidSteamResponse'); expect(mocks.fetch).not.toHaveBeenCalled();
+});
+test('Steam callback without a state cookie fails before reading the attempt', async () => {
+ await begin();
+ const original = request();
+ expect((await callback(new NextRequest(original.url))).headers.get('location')).toContain('InvalidSteamResponse');
+ expect(mocks.db.steamLoginAttempt.findUnique).not.toHaveBeenCalled();
+});
+test('Steam profile retrieval requires configured API access and successful response', async () => {
+ await begin(); vi.stubEnv('STEAM_API_KEY', '');
+ expect((await callback(request())).headers.get('location')).toContain('SteamAuthError');
+ vi.stubEnv('STEAM_API_KEY', 'test');
+ mocks.fetch.mockResolvedValueOnce(new Response('is_valid:true')).mockResolvedValueOnce(new Response('', { status: 503 }));
+ expect((await callback(request())).headers.get('location')).toContain('SteamAPIError');
+});
+test('new Steam accounts use safe profile fallbacks and verified granted permissions', async () => {
+ await begin();
+ mocks.fetch.mockResolvedValueOnce(new Response('is_valid:true')).mockResolvedValueOnce(Response.json({ response: { players: [{ steamid: steamId, personaname: '', avatarfull: 'http://unsafe/avatar' }] } }));
+ mocks.db.authAccount.findUnique.mockResolvedValue(null);
+ mocks.db.user.create.mockResolvedValue({ id: 10 });
+ mocks.db.authAccount.findUniqueOrThrow.mockResolvedValue({ id: 3, userId: 10, user: { id: 10, username: 'Steam User' } });
+ mocks.db.userPermission.findMany.mockResolvedValue([{ permission: { key: 'user:edit' }, value: 5 }]);
+ expect((await callback(request())).headers.get('location')).toContain('/orbats');
+ expect(mocks.db.user.create).toHaveBeenCalledWith({ data: expect.objectContaining({ username: 'Steam User', avatarUrl: null }) });
+ expect(mocks.encode).toHaveBeenCalledWith(expect.objectContaining({ token: expect.objectContaining({ permissions: { 'user:edit': 5 } }) }));
+});
+test('Steam account linking fills missing avatars and aborts when user disappears', async () => {
+ mocks.session.mockResolvedValue({ user: { id: 4 } }); await begin();
+ mocks.db.authAccount.findUnique.mockResolvedValue(null);
+ mocks.db.authAccount.create.mockResolvedValue({ id: 3, userId: 4, user: { id: 4 } });
+ expect((await callback(request())).headers.get('location')).toContain('success=SteamLinked');
+ expect(mocks.db.user.update).toHaveBeenCalledWith({ where: { id: 4 }, data: { avatarUrl: 'https://cdn.example/avatar.png' } });
+ mocks.db.authAccount.findUnique.mockResolvedValue({ id: 3, userId: 4, user: { id: 4 } });
+ mocks.db.user.findUnique.mockResolvedValueOnce({ id: 4 }).mockResolvedValueOnce(null);
+ expect((await callback(request())).headers.get('location')).toContain('SteamAuthError');
+});
+test('already linked Steam account preserves its avatar and requires no new account', async () => {
+ mocks.session.mockResolvedValue({ user: { id: 4 } });
+ mocks.db.user.findUnique.mockResolvedValue({ id: 4, avatarUrl: 'https://existing/avatar' });
+ mocks.db.authAccount.findUnique.mockResolvedValue({ id: 3, userId: 4, user: { id: 4 } });
+ await begin();
+ expect((await callback(request())).headers.get('location')).toContain('success=SteamLinked');
+ expect(mocks.db.authAccount.create).not.toHaveBeenCalled(); expect(mocks.db.user.update).not.toHaveBeenCalled();
+});

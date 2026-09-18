@@ -111,14 +111,16 @@ export async function mutateSignup(request: Request, principal: ApiPrincipal, au
       const another = await tx.signup.findFirst({ where: { userId, slot: { orbatId: slot.orbatId }, ...(old ? { id: { not: old.id } } : {}) }, select: { id: true } });
       if (another) fail(409, 'already_signed_up', 'The user is already signed up for this operation.');
       if (!eligible.rankAllowed) warnings.push('The required rank has not been met.');
-      if (!eligible.training.allowed) warnings.push(formatOrbatTrainingAccessError(eligible.training)?.error ?? 'Required training has not been met.');
+      if (!eligible.training.allowed) warnings.push(formatOrbatTrainingAccessError(eligible.training)!.error);
       if (!body.overrideRequirements) {
         if (!eligible.rankAllowed) fail(409, 'rank_required', warnings[0]);
         if (!eligible.training.allowed) fail(409, 'training_required', warnings.at(-1)!);
       }
     }
+    if (method === 'DELETE') {
+      await tx.signup.delete({ where: { id: old!.id } });
+    }
     const row = method === 'DELETE' ? null : method === 'POST' ? await tx.signup.create({ data: { slotId, userId } }) : await tx.signup.update({ where: { id: old!.id }, data: { slotId } });
-    if (method === 'DELETE') await tx.signup.delete({ where: { id: old!.id } });
     const signupId = row?.id ?? old!.id;
     const payload = { orbatId: slot.orbatId, signupId, userId, oldSlotId: old?.slotId ?? null, slotId: method === 'DELETE' ? null : slotId };
     await appendBotEvent({ type: 'orbat.signup_changed', aggregate: 'orbat', aggregateId: slot.orbatId, payload }, tx);
@@ -169,7 +171,7 @@ export async function slotPage(request: Request, orbatId: number, principal?: Ap
       if (eligibility.absent) reasons.push({ code: 'marked_absent', message: 'The user is marked absent.' });
       if (!base.available && current?.slotId !== slot.id) reasons.push({ code: 'slot_full', message: 'The slot is full.' });
       if (!eligibility.rankAllowed) reasons.push({ code: 'rank_required', message: 'The required rank has not been met.' });
-      if (!eligibility.training.allowed) reasons.push({ code: 'training_required', message: formatOrbatTrainingAccessError(eligibility.training)?.error ?? 'Training is required.' });
+      if (!eligibility.training.allowed) reasons.push({ code: 'training_required', message: formatOrbatTrainingAccessError(eligibility.training)!.error });
       data.push({ ...base, allowed: reasons.length === 0, temporary: eligibility.training.hasTemporaryAccess, temporaryTrainings: eligibility.training.temporaryRequirements.map(row => ({ id: row.id, name: row.name })), error: reasons[0]?.message ?? null, code: reasons[0]?.code ?? null, reasons, currentSignup: current ? { id: current.id, slotId: current.slotId } : null });
     }
   }

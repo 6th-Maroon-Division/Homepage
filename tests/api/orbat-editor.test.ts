@@ -107,3 +107,30 @@ test('audit/outbox failures fail atomically before realtime, listener failures p
   mocks.db.botEvent.create.mockResolvedValue({}); mocks.publish.mockImplementation(() => { throw new Error('listener'); }); mocks.catalog.mockImplementation(() => { throw new Error('listener'); });
   expect((await PATCH(request(), context())).status).toBe(200); expect(mocks.catalog).toHaveBeenCalled(); log.mockRestore();
 });
+
+test.each([{ squads: [{ name: 'A', orderIndex: 0, slots: null }] }, { squads: [{ name: 'A', orderIndex: 0, slots: [null] }] }])('rejects malformed nested slot containers %j', async body => {
+  expect((await PATCH(request('PATCH', body), context())).status).toBe(422);
+});
+test('clearing or replacing timing fields preserves explicit UTC semantics', async () => {
+  mocks.db.orbat.findUnique.mockResolvedValue({ ...saved(), description: null, tempFrequencies: [], eventDate: new Date('2020-01-01Z') });
+  expect((await PATCH(request('PATCH', { startsAtUtc: null, endsAtUtc: null }), context())).status).toBe(200);
+  expect(mocks.db.orbat.update.mock.lastCall![0].data).toMatchObject({ eventDate: new Date('2020-01-01Z'), startTime: null, endTime: null });
+  expect((await PATCH(request('PATCH', { eventDateUtc: '2020-02-01T00:00:00Z' }), context())).status).toBe(200);
+  expect(mocks.db.orbat.update.mock.lastCall![0].data.eventDate).toEqual(new Date('2020-02-01Z'));
+  expect((await PATCH(request('PATCH', { startsAtUtc: '2020-02-01T10:00:00Z', endsAtUtc: '2020-02-01T12:00:00Z' }), context())).status).toBe(200);
+  expect(mocks.db.orbat.update.mock.lastCall![0].data.endTime).toBe('12:00');
+  mocks.db.orbat.findUnique.mockResolvedValue({ ...saved(), startsAtUtc: new Date('2020-02-01T10:00:00Z') });
+  expect((await PATCH(request('PATCH', { endsAtUtc: '2020-02-01T09:00:00Z' }), context())).status).toBe(422);
+});
+test('reordering skips occupied negative staging positions left by historical data', async () => {
+  const existing = saved(); existing.squads[0].slots[0].orderIndex = -1;
+  mocks.db.orbat.findUnique.mockResolvedValue(existing);
+  expect((await PATCH(request('PATCH', replacement()), context())).status).toBe(200);
+  expect(mocks.db.slot.update.mock.calls[0][0].data.orderIndex).toBe(-2);
+});
+test('unexpected database codes return internal errors without publishing', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  mocks.db.$transaction.mockRejectedValue({ code: 'P1001' });
+  expect((await PATCH(request(), context())).status).toBe(500);
+  expect(mocks.publish).not.toHaveBeenCalled(); log.mockRestore();
+});

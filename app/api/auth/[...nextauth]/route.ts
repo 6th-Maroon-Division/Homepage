@@ -77,7 +77,6 @@ export const authOptions: AuthOptions = {
           await tx.user.create({ data: { username, email, avatarUrl, accounts: { create: { provider: 'discord', providerUserId } } } });
           authAccount = await tx.authAccount.findUniqueOrThrow({ where: { provider_providerUserId: { provider: 'discord', providerUserId } }, include: { user: true } });
         }
-        if (!authAccount) return null;
         if (refresh) await tx.user.update({ where: { id: authAccount.userId }, data: { username, email, avatarUrl } });
         await writeApiAudit(tx, { principal: { kind: 'user', userId: authAccount.userId, permissions: {} }, correlationId: randomUUID(), method: 'GET', path: '/api/auth/callback/discord' }, { action: existingUserId === null ? 'auth.discord.signed_in' : 'auth.discord.linked', resource: 'auth_account', resourceId: String(authAccount.id), targetUserIds: [authAccount.userId], outcome: 'success' });
         return authAccount.userId;

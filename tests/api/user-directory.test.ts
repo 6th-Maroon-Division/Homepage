@@ -50,3 +50,9 @@ test('required read audit failure does not expose data', async () => {
   m.db.apiAuditLog.create.mockRejectedValue(new Error('audit unavailable'));
   try { expect((await GET(req('', 'Bearer valid'))).status).toBe(500); } finally { log.mockRestore(); }
 });
+test('visibility helper scopes principals without grants to self and unprivileged targets',async()=>{
+ const {userVisibility}=await import('@/lib/api/user-directory');
+ const userScope=userVisibility({kind:'user',userId:4,permissions:{}});
+ expect(userScope).toEqual({OR:[{id:4},{userPermissions:{none:{OR:[{permission:{key:'system:super_admin'},value:{gt:0}},{permission:{key:'user:manage'},value:{gte:0}}]}}}]});
+ expect(userVisibility({kind:'bot',tokenId:9,permissions:{}})).toEqual({OR:[{id:-1},(userScope.OR as unknown[])[1]]});
+});

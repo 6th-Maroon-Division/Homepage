@@ -134,3 +134,7 @@ it('rejects duplicate names before writes and allows renaming', async () => {
   mocks.db.squadRole.findFirst.mockResolvedValue(null);
   expect((await PATCH(req('PATCH', { name: 'New' }), ctx())).status).toBe(200);
 });
+it('unknown role database code is not converted into a known missing resource error',async()=>{
+ const {roleDatabaseError}=await import('@/lib/api/role-definitions');
+ const failure={code:'P9999'};expect(()=>roleDatabaseError(failure)).toThrow();
+});

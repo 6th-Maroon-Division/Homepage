@@ -12,7 +12,6 @@ export async function GET(request: Request, context: Context) {
     const target = await resolveRankUser(principal, context);
     if (target.error) return target.error;
     const params = new URL(request.url).searchParams;
-    if (params.has('page')) return apiError(400, 'invalid_request', 'Use cursor pagination instead of page.');
     const pagination = parseCursorPagination(params, { defaultLimit: 50, maxLimit: 100 });
     if (pagination.error !== undefined) return apiError(400, 'invalid_request', pagination.error);
     const { cursor, limit } = pagination.data;

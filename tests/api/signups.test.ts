@@ -170,3 +170,62 @@ test('qualification idempotency replay revalidates live authority and qualifying
   expect((await POST(req('POST', body, '', headers))).status).toBe(201); expect(mocks.db.signup.create).toHaveBeenCalledTimes(1);
   mocks.db.userTraining.findUnique.mockResolvedValue({ status: 'qualified' }); expect((await POST(req('POST', body, '', headers))).status).toBe(409);
 });
+
+test('missing resources and invalid pagination return canonical errors', async () => {
+  expect((await signups(req('GET', undefined, '?limit=0'), ctx())).status).toBe(400);
+  mocks.db.user.findUnique.mockResolvedValueOnce({ id: 4, userPermissions: [] }).mockResolvedValueOnce(null);
+  expect((await POST(req('POST', { slotId: 21 }))).status).toBe(404);
+  mocks.db.orbat.findUnique.mockResolvedValue(null);
+  for (const call of [() => signups(req('GET'), ctx()), () => available(req('GET'), ctx()), () => noteGet(req('GET'), noteCtx())]) expect((await call()).status).toBe(404);
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  mocks.db.$transaction.mockRejectedValue({ code: 'P1001' });
+  expect((await POST(req('POST', { slotId: 21 }))).status).toBe(500);
+  log.mockRestore();
+});
+test('qualification self targets require a human and missing slots are rejected', async () => {
+  mocks.db.user.findUnique.mockResolvedValue({ id: 4, userPermissions: [{ permission: { key: 'training:mark' }, value: 2 }] });
+  mocks.db.userTraining.findUnique.mockResolvedValue({ status: 'needs_qualify' });
+  mocks.db.slot.findUnique.mockResolvedValue({ ...slot(), squadRole: { name: 'Role', requiredTrainingIds: [7], requiredRankIds: [] } });
+  mocks.db.userTraining.findMany.mockResolvedValue([{ trainingId: 7, status: 'needs_qualify' }]);
+  expect((await POST(req('POST', { slotId: 21, qualificationTrainingId: 7 }))).status).toBe(201);
+  expect((await POST(req('POST', { slotId: 21, qualificationTrainingId: 7 }, '', { authorization: 'Bearer valid' }))).status).toBe(400);
+  mocks.db.slot.findUnique.mockResolvedValue(null);
+  expect((await POST(req('POST', { slotId: 21, qualificationTrainingId: 7 }))).status).toBe(404);
+});
+test('bot idempotency and availability changes retain bot audit attribution', async () => {
+  const headers = { authorization: 'Bearer valid', 'idempotency-key': 'bot-create' };
+  expect((await POST(req('POST', { slotId: 21, userId: 4 }, '', headers))).status).toBe(201);
+  expect(mocks.db.botIdempotencyReceipt.create).toHaveBeenCalledOnce();
+  expect((await notePatch(req('PATCH', { status: 'late_unsure', reason: ' ', leaveEarlyMinutes: 10 }, '', headers), noteCtx('4'))).status).toBe(200);
+  expect(mocks.db.orbatAttendanceNote.upsert.mock.lastCall![0].update).toEqual({ status: 'late_unsure', reason: null, lateMinutes: null, leaveEarlyMinutes: 10 });
+  expect(mocks.publish.mock.lastCall![0].actorUserId).toBeNull();
+});
+test('closed operations restrict member deletions and note edits but allow staff corrections', async () => {
+  const closed = { ...operation(), startsAtUtc: new Date('2000-01-01T00:00:00Z') };
+  mocks.db.slot.findUnique.mockResolvedValue({ ...slot(), orbat: closed });
+  mocks.db.orbat.findUnique.mockResolvedValue(closed);
+  mocks.db.user.findUnique.mockResolvedValue({ id: 4, userPermissions: [] });
+  expect((await DELETE(req('DELETE'), ctx('30'))).status).toBe(409);
+  expect((await notePatch(req('PATCH', { status: 'unsure' }), noteCtx())).status).toBe(409);
+  mocks.db.user.findUnique.mockResolvedValue({ id: 4, userPermissions: [{ permission: { key: 'orbat:edit' }, value: 2 }] });
+  expect((await DELETE(req('DELETE'), ctx('30'))).status).toBe(200);
+  expect((await notePatch(req('PATCH', { status: 'unsure' }), noteCtx())).status).toBe(200);
+});
+test('eligibility explains every restriction while an existing occupant keeps its capacity', async () => {
+  mocks.db.slot.findMany.mockResolvedValue([{ ...slot(), _count: { signups: 2 }, orbat: { ...operation(), startsAtUtc: new Date('2000-01-01T00:00:00Z') }, squadRole: { name: 'Role', requiredTrainingIds: [7], requiredRankIds: [8] } }]);
+  mocks.db.orbatAttendanceNote.findUnique.mockResolvedValue({ status: 'absent' });
+  const response = await eligibility(req('GET'), ctx());
+  expect(response.status).toBe(200);
+  expect((await response.json()).data[0].reasons.map((r: {code:string}) => r.code)).toEqual(['signup_closed', 'marked_absent', 'slot_full', 'rank_required', 'training_required']);
+  mocks.db.signup.findFirst.mockResolvedValue({ id: 30, slotId: 21 });
+  const own = await (await eligibility(req('GET'), ctx())).json();
+  expect(own.data[0].reasons.map((r: {code:string}) => r.code)).not.toContain('slot_full');
+});
+test('self availability reads avoid audits and missing notes distinguish read from delete', async () => {
+  expect(await (await noteGet(req('GET'), noteCtx())).json()).toEqual({ data: null, meta: {} });
+  expect(mocks.db.apiAuditLog.create).not.toHaveBeenCalled();
+  expect((await noteDelete(req('DELETE'), noteCtx())).status).toBe(404);
+  mocks.db.signup.findMany.mockResolvedValue([{ ...signup(), user: { id: 4, username: 'Member' }, slot: { ...slot(), orbat: { ...operation(), startsAtUtc: null } } }]);
+  const body = await (await userSignups(req('GET'), ctx('me'))).json();
+  expect(body.data[0].orbat.startsAtUtc).toBeNull();
+});

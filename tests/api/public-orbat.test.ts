@@ -71,6 +71,8 @@ describe('public ORBAT projection', () => {
     mocks.db.orbat.findUnique.mockResolvedValue({ ...record, squads: [{ id: 2, name: 'Alpha', orderIndex: 0, slots: [{ ...slot, maxSignups: null, squadRole: null, squadRoleId: null, signups: [{ id: 8, user: null }, { id: 9, user: { id: 5, username: null, userRank: null } }] }] }] });
     const data = await getPublicOrbat(1);
     expect(data?.squads[0].slots[0]).toMatchObject({ name: 'Unassigned Role', maxSignups: 9999, requiredTrainings: [], requiredRanks: [], signups: [{ user: null }, { user: { username: 'Unknown', rankAbbreviation: null, rankName: null } }] });
+    expect((await GET(req(), ctx())).status).toBe(200);
+    expect(mocks.db.apiAuditLog.create.mock.lastCall![0].data.targetUserIds).toEqual([5, 4]);
   });
   it('filters missing training/rank references out of enriched requirements', async () => {
     mocks.db.training.findMany.mockResolvedValue([]);

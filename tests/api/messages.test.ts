@@ -49,3 +49,16 @@ test('audit failures fail closed, serializable conflicts409, notifications canno
  m.db.apiAuditLog.create.mockResolvedValue({});m.publish.mockImplementation(()=>{throw Error('listener')});expect((await POST(req('POST',payload))).status).toBe(201);
  m.db.$transaction.mockRejectedValue({code:'P2034'});expect((await POST(req('POST',payload))).status).toBe(409);expect((await PATCH(req('PATCH',{isRead:true}),ctx())).status).toBe(409);log.mockRestore();
 });
+test('sending with query parameters rejects before delivery',async()=>{
+ expect((await POST(req('POST',payload,'?unexpected=true'))).status).toBe(400);expect(m.db.message.create).not.toHaveBeenCalled();
+});
+test('deleted inbox owner cannot read or mark messages',async()=>{
+ m.db.user.findUnique.mockImplementation(async a=>a.select.userPermissions?{userPermissions:[]} : null);
+ expect((await GET(req(),ctx())).status).toBe(404);
+ expect((await PATCH(req('PATCH',{isRead:true}),ctx())).status).toBe(404);
+ expect(m.db.messageRecipient.updateMany).not.toHaveBeenCalled();
+});
+test('inbox retains a message after its author is deleted without auditing a missing author',async()=>{
+ const notice=row(9);m.db.messageRecipient.findMany.mockResolvedValue([{...notice,message:{...notice.message,createdBy:null}}]);
+ const response=await GET(req(),ctx());expect((await response.json()).data[0].createdBy).toBeNull();expect(m.db.apiAuditLog.create).not.toHaveBeenCalled();
+});

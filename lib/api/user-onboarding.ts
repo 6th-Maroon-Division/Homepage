@@ -5,6 +5,7 @@ import { handleApiRequest } from './handler';
 import { writeApiAudit } from './audit';
 import { apiError, apiSuccess } from './response';
 import { parseCursorPagination } from './validation';
+import { userVisibility } from './user-directory';
 export async function getUserOnboarding(request: Request) {
   return handleApiRequest(request, 'user:manage', async (principal, context) => {
     const params = new URL(request.url).searchParams;
@@ -17,7 +18,7 @@ export async function getUserOnboarding(request: Request) {
     const completedConditions: Prisma.UserWhereInput[] = requirements.map(training => ({ userTrainings: { some: { trainingId: training.id, status: { in: training.requiresOrbatQualification ? ['qualified'] : ['qualified', 'finished'] } } } }));
     const missingConditions: Prisma.UserWhereInput[] = requirements.map(training => ({ userTrainings: { none: { trainingId: training.id, status: { in: training.requiresOrbatQualification ? ['qualified'] : ['qualified', 'finished'] } } } }));
     const filters: Prisma.UserWhereInput[] = [{ OR: [{ userRank: null }, { userRank: { currentRankId: null } }, ...missingConditions] }];
-    if ((principal.permissions['system:super_admin'] ?? 0) <= 0) filters.push({ OR: [{ id: principal.kind === 'user' ? principal.userId : -1 }, { userPermissions: { none: { OR: [{ permission: { key: 'system:super_admin' }, value: { gt: 0 } }, { permission: { key: 'user:manage' }, value: { gte: principal.permissions['user:manage'] ?? 0 } }] } } }] });
+    filters.push(userVisibility(principal));
     for (const key of ['interviewDone', 'retired'] as const) {
       if (params.get(key) === 'true') filters.push({ userRank: { [key]: true } });
       if (params.get(key) === 'false') filters.push({ OR: [{ userRank: null }, { userRank: { [key]: false } }] });

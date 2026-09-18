@@ -72,3 +72,10 @@ test('missing users404, required audit failure500 and postcommit listener failur
     expect((await PATCH(request('PATCH', { username: 'Edited' }), context())).status).toBe(200);
   } finally { log.mockRestore(); }
 });
+test('avatar can be cleared explicitly with null',async()=>{
+ const response=await PATCH(request('PATCH',{avatarUrl:null}),context());expect(response.status).toBe(200);expect((await response.json()).data.avatarUrl).toBeNull();
+});
+test('unknown database code is not misreported as a known conflict',async()=>{
+ m.db.$transaction.mockRejectedValue({code:'P9999'});const log=vi.spyOn(console,'error').mockImplementation(()=>{});
+ try{expect((await PATCH(request('PATCH',{username:'Updated'}),context())).status).toBe(500)}finally{log.mockRestore()}
+});

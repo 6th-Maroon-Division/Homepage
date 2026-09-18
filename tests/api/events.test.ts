@@ -127,3 +127,40 @@ test('SSE closes rather than buffering oversized unread frames indefinitely', as
   await vi.advanceTimersByTimeAsync(15000);
   expect(mocks.db.botEvent.findMany).toHaveBeenCalledTimes(1);
 });
+test('event feed projects nullable fields and rejects arbitrary payloads or event names', async () => {
+ mocks.db.botEvent.findMany.mockResolvedValue([
+  {...row(1),type:'bad\nevent',payload:null},
+  {...row(2),payload:{userId:null,source:null,discordUserId:null,version:null,startsAt:'invalid'}},
+  {...row(3),aggregate:'training',payload:{trainingId:3,title:'Course',websiteUrl:null,endsAt:null}},
+ ]);
+ const body=await (await GET(req())).json();
+ expect(body.data[0]).toMatchObject({type:'unknown',payload:{}});
+ expect(body.data[1].payload).toEqual({userId:null,source:null,discordUserId:null,version:null});
+ expect(body.data[2].payload).toEqual({trainingId:3,title:'Course',websiteUrl:null,endsAt:null});
+});
+test('aborted SSE never schedules a poll and cancellation clears pending timers',async()=>{
+ vi.useFakeTimers();const abort=new AbortController();abort.abort();
+ const closed=await GET(req(undefined,{accept:'text/event-stream'},abort.signal));
+ expect((await closed.body!.getReader().read()).done).toBe(true);
+ const active=await GET(req(undefined,{accept:'text/event-stream'}));
+ await active.body!.cancel();await vi.advanceTimersByTimeAsync(15000);
+ expect(mocks.db.botEvent.findMany).toHaveBeenCalledTimes(2);
+});
+test('aborting during an in-flight database read prevents event delivery or another poll',async()=>{
+ vi.useFakeTimers();const abort=new AbortController();
+ const response=await GET(req(undefined,{accept:'text/event-stream'},abort.signal));
+ const reader=response.body!.getReader();await reader.read();
+ mocks.db.botEvent.findMany.mockImplementation(async()=>{abort.abort();return [row()]});
+ await vi.advanceTimersByTimeAsync(5000);
+ expect((await reader.read()).done).toBe(true);
+ await vi.advanceTimersByTimeAsync(10000);expect(mocks.db.botEvent.findMany).toHaveBeenCalledTimes(2);
+});
+test('an active bot can receive a polled event then revoke on its next revalidation',async()=>{
+ vi.useFakeTimers();
+ const response=await GET(req(undefined,{accept:'text/event-stream',authorization:'Bearer valid'}));
+ const reader=response.body!.getReader();await reader.read();
+ mocks.db.botEvent.findMany.mockResolvedValue([row()]);await vi.advanceTimersByTimeAsync(5000);
+ expect(new TextDecoder().decode((await reader.read()).value)).toContain('user.rank_changed');
+ mocks.db.botToken.findFirst.mockResolvedValue(null);await vi.advanceTimersByTimeAsync(5000);
+ expect((await reader.read()).done).toBe(true);
+});

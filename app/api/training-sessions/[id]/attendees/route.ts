@@ -22,12 +22,6 @@ class AttendeeApiError extends Error {
   }
 }
 
-function isJsonObject(value: unknown): value is JsonObject {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function parsePositiveInteger(value: unknown): number | null { return typeof value === 'string' || typeof value === 'number' ? parseSessionId(String(value)) : null; }
-
 export async function POST(request: Request, context: RouteContext) {
   return handleApiRequest(request, undefined, async (principal, audit) => {
     const path = await context.params;
@@ -41,40 +35,19 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const { id } = await context.params;
-  const sessionId = parsePositiveInteger(id);
-  if (!sessionId) {
-    return sessionJson({ error: 'Invalid training session id' }, { status: 400 });
-  }
+  const sessionId = parseSessionId(id)!;
 
-  let parsedBody: unknown;
-  try {
-    parsedBody = await request.json();
-  } catch {
-    return sessionJson({ error: 'Invalid JSON body' }, { status: 400 });
-  }
-  if (!isJsonObject(parsedBody)) {
-    return sessionJson({ error: 'Request body must be an object' }, { status: 400 });
-  }
-  const body = parsedBody;
-  const userId = parsePositiveInteger(body.userId);
-  if (!userId) {
-    return sessionJson({ error: 'userId must be a positive integer' }, { status: 400 });
-  }
+  // The canonical contract above already validated this body.
+  const body = await request.json() as JsonObject;
+  const userId = body.userId as number;
 
   const hasExplicitRequest = Object.prototype.hasOwnProperty.call(body, 'trainingRequestId');
   const trainingRequestId = body.trainingRequestId === null || body.trainingRequestId === undefined
     ? null
-    : parsePositiveInteger(body.trainingRequestId);
-  if (hasExplicitRequest && body.trainingRequestId !== null && !trainingRequestId) {
-    return sessionJson({ error: 'trainingRequestId must be a positive integer or null' }, { status: 400 });
-  }
-  if (body.notes !== undefined && body.notes !== null && typeof body.notes !== 'string') {
-    return sessionJson({ error: 'notes must be a string or null' }, { status: 400 });
-  }
+    : (body.trainingRequestId as number);
+
   const notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 4000) || null : null;
-  if (body.advanceTraining !== undefined && typeof body.advanceTraining !== 'boolean') {
-    return sessionJson({ error: 'advanceTraining must be a boolean' }, { status: 400 });
-  }
+
   const advanceTraining = body.advanceTraining === true;
 
   const notifications: SessionNotifications = [];
@@ -161,9 +134,6 @@ export async function POST(request: Request, context: RouteContext) {
         });
       }
 
-      if (trainingRequestId && !linkedRequest) {
-        throw new AttendeeApiError('Training request not found', 404);
-      }
       if (linkedRequest) {
         if (linkedRequest.userId !== userId || linkedRequest.trainingId !== trainingSession.trainingId) {
           throw new AttendeeApiError('Training request does not belong to this user and training', 409);

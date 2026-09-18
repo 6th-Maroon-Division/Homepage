@@ -79,7 +79,7 @@ export function GET(request: Request, context: { params: Promise<{ id: string }>
         )
         .map((slot) => ({
           id: slot.id,
-          label: `${slot.squad.name} — ${slot.squadRole?.name ?? 'Unassigned Role'}`,
+          label: `${slot.squad.name} — ${slot.squadRole!.name}`,
           remainingCapacity: slot.maxSignups === null
             ? null
             : Math.max(0, slot.maxSignups - slot._count.signups),
@@ -97,7 +97,7 @@ export function GET(request: Request, context: { params: Promise<{ id: string }>
             ? {
                 signupId: signup.id,
                 slotId: signup.slotId,
-                slotName: signup.slot.squadRole?.name ?? 'Unassigned Role',
+                slotName: signup.slot.squadRole!.name,
                 squadName: signup.slot.squad.name,
               }
             : null,

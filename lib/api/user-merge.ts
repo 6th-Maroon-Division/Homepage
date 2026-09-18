@@ -155,8 +155,7 @@ export async function mergeUsers(request: Request) {
           for (const sourceTraining of duplicateRows) {
             const targetTraining = targetTrainings.find(
               (row) => row.trainingId === sourceTraining.trainingId,
-            );
-            if (!targetTraining) continue;
+            )!; // The source query restricts trainingId to this target set.
 
             if (statusPriority[sourceTraining.status] > statusPriority[targetTraining.status]) {
               await tx.userTraining.update({
@@ -195,8 +194,7 @@ export async function mergeUsers(request: Request) {
         });
         const attendeePriority = { cancelled: 0, scheduled: 1, absent: 1, attended: 2, completed: 3 } as const;
         for (const sourceRow of sourceRows) {
-          const targetRow = targetTrainingSessionAttendances.find((row) => row.sessionId === sourceRow.sessionId);
-          if (!targetRow) continue;
+          const targetRow = targetTrainingSessionAttendances.find((row) => row.sessionId === sourceRow.sessionId)!;
           await tx.trainingSessionAttendee.delete({ where: { id: sourceRow.id } });
           await tx.trainingSessionAttendee.update({
             where: { id: targetRow.id },
@@ -219,8 +217,7 @@ export async function mergeUsers(request: Request) {
           },
         });
         for (const sourceRow of sourceRows) {
-          const targetRow = targetTrainingReadStates.find((row) => row.requestId === sourceRow.requestId);
-          if (!targetRow) continue;
+          const targetRow = targetTrainingReadStates.find((row) => row.requestId === sourceRow.requestId)!;
           const useSource = Boolean(
             sourceRow.lastReadAt && (!targetRow.lastReadAt || sourceRow.lastReadAt > targetRow.lastReadAt),
           );
@@ -242,8 +239,7 @@ export async function mergeUsers(request: Request) {
           },
         });
         for (const sourceRow of sourceRows) {
-          const targetRow = targetTrainingSubscriptions.find((row) => row.requestId === sourceRow.requestId);
-          if (!targetRow) continue;
+          const targetRow = targetTrainingSubscriptions.find((row) => row.requestId === sourceRow.requestId)!;
           await tx.trainingRequestSubscription.update({
             where: { id: targetRow.id },
             data: {

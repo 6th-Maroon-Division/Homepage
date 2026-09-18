@@ -24,3 +24,56 @@ test('apply creates missing state with defaults, skips already applied, refuses 
 test('apply rejects missing records, unmapped state, applied-to-user conflicts and missing rank',async()=>{mocks.db.legacyUserData.findUnique.mockResolvedValue(null);expect((await apply(request('POST',{ids:[7]}))).status).toBe(404);mocks.db.legacyUserData.findUnique.mockResolvedValue(row({isMapped:false}));expect((await apply(request('POST',{ids:[7]}))).status).toBe(409);mocks.db.legacyUserData.findUnique.mockResolvedValue(row());mocks.db.legacyUserData.findFirst.mockResolvedValue({id:8});expect((await apply(request('POST',{ids:[7]}))).status).toBe(409);mocks.db.legacyUserData.findFirst.mockResolvedValue(null);mocks.db.rank.findMany.mockResolvedValue([]);expect((await apply(request('POST',{ids:[7]}))).status).toBe(404);expect(mocks.db.userRank.upsert).not.toHaveBeenCalled();});
 test.each([{ids:[]},{ids:[7,7]},{ids:['7']},{ids:Array(101).fill(7)},{ids:[7],extra:true}])('strict apply payload %#',async body=>{expect((await apply(request('POST',body))).status).toBe(422);});
 test('audit failures fail closed and transactional conflicts return409',async()=>{const log=vi.spyOn(console,'error').mockImplementation(()=>{});mocks.db.apiAuditLog.create.mockRejectedValue(new Error('Private error'));expect((await apply(request('POST',{ids:[7]}))).status).toBe(500);mocks.db.legacyUserData.findMany.mockResolvedValue([row()]);expect((await GET(request())).status).toBe(500);mocks.db.$transaction.mockRejectedValue({code:'P2034'});expect((await apply(request('POST',{ids:[7]}))).status).toBe(409);log.mockRestore();});
+
+test.each([`?search=${'a'.repeat(201)}`, '?isMapped=false&isApplied=true'])('legacy baseline supports boolean filtering and limits text %s', async query => {
+  const response = await GET(request('GET', undefined, undefined, query));
+  expect(response.status).toBe(query.includes('search=') ? 400 : 200);
+  if (response.ok) expect(mocks.db.legacyUserData.findMany.mock.lastCall![0].where).toMatchObject({ isMapped: false, isApplied: true });
+});
+
+test.each([{ csvData: csv, previewOnly: 'yes' }, { csvData: csv, autoMap: 1 }])('legacy baseline rejects non-boolean options %#', async body => {
+  expect((await importCSV(request('POST', body))).status).toBe(422);
+});
+
+test('legacy mapping rejects missing rows and missing targets before writing', async () => {
+  mocks.db.legacyUserData.findUnique.mockResolvedValueOnce(null);
+  expect((await PATCH(request('PATCH', { updates: [{ id: 7, mappedUserId: 5 }] }))).status).toBe(404);
+  mocks.db.user.findUnique.mockResolvedValueOnce({ id: 4, userPermissions: [{ permission: { key: 'system:super_admin' }, value: 255 }] }).mockResolvedValueOnce(null);
+  expect((await PATCH(request('PATCH', { updates: [{ id: 7, mappedUserId: 5 }] }))).status).toBe(404);
+  expect(mocks.db.legacyUserData.update).not.toHaveBeenCalled();
+});
+
+test('legacy baseline rejects missing mapped accounts and invalid stored counters', async () => {
+  mocks.db.user.findUnique.mockResolvedValueOnce({ id: 4, userPermissions: [{ permission: { key: 'system:super_admin' }, value: 255 }] }).mockResolvedValueOnce(null);
+  expect((await apply(request('POST', { ids: [7] }))).status).toBe(404);
+  mocks.db.legacyUserData.findUnique.mockResolvedValue(row({ oldData: -1 }));
+  expect((await apply(request('POST', { ids: [7] }))).status).toBe(422);
+});
+
+test.each([false, true])('missing join date uses existing rank date or current time, existing=%s', async existing => {
+  mocks.db.legacyUserData.findUnique.mockResolvedValue(row({ dateJoined: null }));
+  mocks.db.userRank.findUnique.mockResolvedValue(existing ? { currentRankId: null, currentRank: null, attendanceSinceLastRank: 0, lastRankedUpAt: new Date('2019-01-01T00:00:00Z') } : null);
+  expect((await apply(request('POST', { ids: [7] }))).status).toBe(200);
+  const data = mocks.db.userRank.upsert.mock.lastCall![0].create;
+  expect(data.lastRankedUpAt).toBeInstanceOf(Date);
+  if (existing) expect(data.lastRankedUpAt.toISOString()).toBe('2019-01-01T00:00:00.000Z');
+  expect(mocks.db.rankHistory.create.mock.lastCall![0].data.note).toContain('Date Joined Unknown');
+});
+
+test('legacy apply rejects already-established baselines and ambiguous rank abbreviations', async () => {
+  mocks.db.legacyUserData.findFirst.mockResolvedValueOnce({ id: 9 });
+  expect((await apply(request('POST', { ids: [7] }))).status).toBe(409);
+  mocks.db.rank.findMany.mockResolvedValue([{ id: 2, name: 'Private', abbreviation: 'Pvt' }, { id: 3, name: 'PRIVATE', abbreviation: 'PVT' }]);
+  expect((await apply(request('POST', { ids: [7] }))).status).toBe(409);
+  expect(mocks.db.userRank.upsert).not.toHaveBeenCalled();
+});
+
+test('preview without mapping is read-only while automatic imports audit linked targets', async () => {
+  expect((await importCSV(request('POST', { csvData: csv, previewOnly: true }))).status).toBe(200);
+  expect(mocks.db.apiAuditLog.create).not.toHaveBeenCalled();
+  mocks.db.legacyUserData.createManyAndReturn.mockResolvedValue([{ id: 7, mappedUserId: 5 }]);
+  expect((await importCSV(request('POST', { csvData: csv, autoMap: true }))).status).toBe(200);
+  expect(mocks.db.legacyUserData.createManyAndReturn.mock.lastCall![0].data[0]).toMatchObject({ mappedUserId: 5, isMapped: true });
+  expect(mocks.db.apiAuditLog.create.mock.lastCall![0].data.targetUserIds).toEqual([5]);
+});
+test('legacy user CSV rejects a header without data', () => expect(() => parseLegacyUsers(csv.split('\n')[0])).toThrow());

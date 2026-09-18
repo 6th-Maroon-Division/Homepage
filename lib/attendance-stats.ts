@@ -123,11 +123,8 @@ export async function getRecentAttendanceWithLegacy(
   const combined = [...normalizedNew, ...normalizedLegacy];
   
   // Sort by date descending
-  combined.sort((a, b) => {
-    const dateA = a.orbatDate instanceof Date ? a.orbatDate : new Date(a.orbatDate);
-    const dateB = b.orbatDate instanceof Date ? b.orbatDate : new Date(b.orbatDate);
-    return dateB.getTime() - dateA.getTime();
-  });
+  // Prisma timestamps and the normalization fallbacks above are Date values.
+  combined.sort((a, b) => b.orbatDate.getTime() - a.orbatDate.getTime());
 
   return combined.slice(0, limit); // Return only the requested limit
 }

@@ -2,7 +2,6 @@ import { handleApiRequest } from '@/lib/api/handler';
 import { apiError, apiSuccess } from '@/lib/api/response';
 import { writeApiAudit } from '@/lib/api/audit';
 import { isSessionStaff, sessionActor, sessionId as parseSessionId, validateSessionBody, sessionJson, safeSessionPublish, sessionDatabaseError, auditSessionRead, sessionSnapshot, attendeeSnapshot } from '@/lib/api/training-session-contract';
-import { NextResponse } from 'next/server';
 import { Prisma } from '@/generated/prisma/client';
 import { prisma } from '@/lib/prisma';
 import { publishTrainingChatEvent } from '@/lib/realtime/training-chat-events';
@@ -13,13 +12,6 @@ type RouteContext = { params: Promise<{ id: string; attendeeId: string }> };
 type JsonObject = Record<string, unknown>;
 type AttendeeStatus = 'scheduled' | 'attended' | 'completed' | 'absent' | 'cancelled';
 
-const ATTENDEE_STATUSES: readonly AttendeeStatus[] = [
-  'scheduled',
-  'attended',
-  'completed',
-  'absent',
-  'cancelled',
-];
 const userSelect = { id: true, username: true, avatarUrl: true } as const;
 
 class AttendeeApiError extends Error {
@@ -28,43 +20,11 @@ class AttendeeApiError extends Error {
   }
 }
 
-function isJsonObject(value: unknown): value is JsonObject {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isAttendeeStatus(value: unknown): value is AttendeeStatus {
-  return typeof value === 'string' && (ATTENDEE_STATUSES as readonly string[]).includes(value);
-}
-
-function parsePositiveInteger(value: unknown): number | null { return typeof value === 'string' || typeof value === 'number' ? parseSessionId(String(value)) : null; }
-
 function isStatusAllowedForSession(sessionStatus: string, attendeeStatus: AttendeeStatus) {
   if (sessionStatus === 'cancelled') return attendeeStatus === 'cancelled';
   if (sessionStatus === 'proposed') return attendeeStatus === 'scheduled' || attendeeStatus === 'cancelled';
   if (sessionStatus === 'completed') return attendeeStatus !== 'scheduled';
   return true;
-}
-
-async function readBody(request: Request, required: boolean): Promise<JsonObject | NextResponse> {
-  let rawBody: string;
-  try {
-    rawBody = await request.text();
-  } catch {
-    return sessionJson({ error: 'Unable to read request body' }, { status: 400 });
-  }
-  if (!rawBody.trim()) {
-    return required
-      ? sessionJson({ error: 'Request body is required' }, { status: 400 })
-      : {};
-  }
-  try {
-    const parsed: unknown = JSON.parse(rawBody);
-    return isJsonObject(parsed)
-      ? parsed
-      : sessionJson({ error: 'Request body must be an object' }, { status: 400 });
-  } catch {
-    return sessionJson({ error: 'Invalid JSON body' }, { status: 400 });
-  }
 }
 
 async function mutateAttendee(
@@ -83,32 +43,15 @@ async function mutateAttendee(
     return sessionJson({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const { id, attendeeId: rawAttendeeId } = await context.params;
-  const sessionId = parsePositiveInteger(id);
-  const attendeeId = parsePositiveInteger(rawAttendeeId);
-  if (!sessionId || !attendeeId) {
-    return sessionJson({ error: 'Invalid session or attendee id' }, { status: 400 });
-  }
-
-  const bodyResult = await readBody(request, forcedStatus === undefined);
-  if (bodyResult instanceof NextResponse) return bodyResult;
-  const body = bodyResult;
-  const targetStatus = forcedStatus ?? body.status;
-  if (!isAttendeeStatus(targetStatus)) {
-    return sessionJson({ error: 'Valid attendance status is required' }, { status: 400 });
-  }
-  if (body.notes !== undefined && body.notes !== null && typeof body.notes !== 'string') {
-    return sessionJson({ error: 'notes must be a string or null' }, { status: 400 });
-  }
-  if (body.expectedUpdatedAt !== undefined && typeof body.expectedUpdatedAt !== 'string') {
-    return sessionJson({ error: 'expectedUpdatedAt must be an ISO date string' }, { status: 400 });
-  }
+  // IDs and payload shape were checked by the shared canonical contract.
+  const sessionId = parseSessionId(path.id)!;
+  const attendeeId = parseSessionId(path.attendeeId)!;
+  const rawBody = await request.text();
+  const body = (rawBody.trim() ? JSON.parse(rawBody) : {}) as JsonObject;
+  const targetStatus = (forcedStatus ?? body.status) as AttendeeStatus;
   const expectedUpdatedAt = typeof body.expectedUpdatedAt === 'string'
     ? new Date(body.expectedUpdatedAt)
     : null;
-  if (expectedUpdatedAt && Number.isNaN(expectedUpdatedAt.getTime())) {
-    return sessionJson({ error: 'Invalid expectedUpdatedAt value' }, { status: 400 });
-  }
   const hasNotes = Object.prototype.hasOwnProperty.call(body, 'notes');
   const notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 4000) || null : null;
 

@@ -69,3 +69,7 @@ test('self-only empty pages have no audit; required audit failure withholds pers
   log.mockRestore();
 });
 test.each(['?page=1', '?sort=username', '?bct=done', '?retired=all', '?interviewDone=1', '?requiredTrainingsCompleted=invalid', '?limit=0', '?cursor=2147483648', '?limit=1&limit=2'])('strict query rejects%s', async query => expect((await GET(req(query))).status).toBe(400));
+test('missing-required-training filter with no required trainings matches nobody',async()=>{
+ expect((await GET(req('?requiredTrainingsCompleted=false'))).status).toBe(200);
+ expect(mocks.db.user.findMany).toHaveBeenCalledWith(expect.objectContaining({where:{AND:expect.arrayContaining([{id:-1}])}}));
+});

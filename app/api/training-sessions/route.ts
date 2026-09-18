@@ -19,12 +19,6 @@ type JsonObject = Record<string, unknown>;
 
 class SessionConflictError extends Error {}
 
-function isJsonObject(value: unknown): value is JsonObject {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function parsePositiveInteger(value: unknown): number | null { return typeof value === 'string' || typeof value === 'number' ? parseSessionId(String(value)) : null; }
-
 export async function GET(request: Request) {
   return handleApiRequest(request, undefined, async (principal, audit) => {
     const staffViewer = isSessionStaff(principal);
@@ -69,49 +63,23 @@ export async function POST(request: Request) {
     return sessionJson({ error: 'Forbidden' }, { status: 403 });
   }
 
-  let parsedBody: unknown;
-  try {
-    parsedBody = await request.json();
-  } catch {
-    return sessionJson({ error: 'Invalid JSON body' }, { status: 400 });
-  }
-  if (!isJsonObject(parsedBody)) {
-    return sessionJson({ error: 'Request body must be an object' }, { status: 400 });
-  }
-  const body = parsedBody;
-  const trainingId = parsePositiveInteger(body.trainingId);
-  const trainerId = parsePositiveInteger(body.trainerId);
-  if (!trainingId) {
-    return sessionJson({ error: 'trainingId is required' }, { status: 400 });
-  }
-  if (!trainerId || !(await assertEligibleTrainingStaff(trainerId))) {
+  // The canonical contract above already validated this body.
+  const body = await request.json() as JsonObject;
+  const trainingId = body.trainingId as number;
+  const trainerId = body.trainerId as number;
+
+  if (!(await assertEligibleTrainingStaff(trainerId))) {
     return sessionJson({ error: 'Select an eligible trainer' }, { status: 400 });
   }
 
-  if (body.attendeeUserIds !== undefined && !Array.isArray(body.attendeeUserIds)) {
-    return sessionJson({ error: 'attendeeUserIds must be an array' }, { status: 400 });
-  }
-  const rawAttendeeUserIds = Array.isArray(body.attendeeUserIds) ? body.attendeeUserIds : [];
-  const parsedAttendeeIds = rawAttendeeUserIds.map(parsePositiveInteger);
-  if (parsedAttendeeIds.some((id) => id === null)) {
-    return sessionJson({ error: 'Every attendee id must be a positive integer' }, { status: 400 });
-  }
-  const attendeeUserIds = Array.from(new Set(parsedAttendeeIds as number[]));
+  const attendeeUserIds = (body.attendeeUserIds ?? []) as number[];
   const requestAssignments = (body.requestAssignments ?? []) as { userId: number; trainingRequestId: number }[];
 
-  if (body.status !== undefined && body.status !== 'proposed' && body.status !== 'scheduled') {
-    return sessionJson({ error: 'status must be proposed or scheduled' }, { status: 400 });
-  }
-  if (body.startsAt !== undefined && body.startsAt !== null && typeof body.startsAt !== 'string') {
-    return sessionJson({ error: 'startsAt must be an ISO date string or null' }, { status: 400 });
-  }
   const startsAt = typeof body.startsAt === 'string' && body.startsAt.trim()
     ? new Date(body.startsAt)
     : null;
   const confirmed = body.status === 'scheduled';
-  if (typeof body.startsAt === 'string' && (!body.startsAt.trim() || Number.isNaN(startsAt?.getTime()))) {
-    return sessionJson({ error: 'Invalid startsAt value' }, { status: 400 });
-  }
+
   if (confirmed && !startsAt) {
     return sessionJson({ error: 'startsAt is required for a scheduled session' }, { status: 400 });
   }
@@ -143,21 +111,10 @@ export async function POST(request: Request) {
   }
 
   const hasExplicitDuration = body.durationMinutes !== undefined
-    && body.durationMinutes !== null
-    && body.durationMinutes !== '';
-  const parsedDuration = hasExplicitDuration ? parsePositiveInteger(body.durationMinutes) : null;
-  if (hasExplicitDuration && (parsedDuration === null || parsedDuration > 1440)) {
-    return sessionJson({ error: 'Duration must be between 1 and 1440 minutes' }, { status: 400 });
-  }
-  const durationMinutes = hasExplicitDuration ? parsedDuration : training.duration;
+    && body.durationMinutes !== null;
+  const parsedDuration = hasExplicitDuration ? (body.durationMinutes as number) : null;
 
-  if (
-    body.specialInstructions !== undefined
-    && body.specialInstructions !== null
-    && typeof body.specialInstructions !== 'string'
-  ) {
-    return sessionJson({ error: 'specialInstructions must be a string or null' }, { status: 400 });
-  }
+  const durationMinutes = hasExplicitDuration ? parsedDuration : training.duration;
 
   const notifications: SessionNotifications = [];
   let created;
@@ -355,7 +312,6 @@ export async function POST(request: Request) {
       confirmed,
     }));
   }
-
 
   return sessionJson(
     { ...created.trainingSession, server: 'Arma3 Training Server' },

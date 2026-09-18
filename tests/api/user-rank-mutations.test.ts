@@ -218,3 +218,12 @@ describe('bulk rank atomic preflight and effects', () => {
     log.mockRestore();
   });
 });
+
+it('a user with zero attendance receives a zero baseline and delta', async () => {
+  mocks.db.attendance.count.mockResolvedValue(0);
+  mocks.db.legacyAttendanceData.count.mockResolvedValue(0);
+  mocks.db.legacyUserData.findMany.mockResolvedValue([]);
+  const response = await PATCH(req(), ctx());
+  expect(response.status).toBe(200);
+  expect((await response.json()).data).toMatchObject({ attendanceSinceLastRank: 0, attendanceTotal: 0, attendanceDelta: 0 });
+});

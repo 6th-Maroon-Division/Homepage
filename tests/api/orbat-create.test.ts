@@ -130,3 +130,10 @@ describe('operation creation persistence', () => {
     log.mockRestore();
   });
 });
+
+it('unexpected database errors fail without publishing a created operation', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  mocks.db.$transaction.mockRejectedValue({ code: 'P1001' });
+  expect((await POST(req())).status).toBe(500);
+  expect(mocks.publish).not.toHaveBeenCalled(); log.mockRestore();
+});

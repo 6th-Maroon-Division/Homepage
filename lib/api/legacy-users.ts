@@ -27,7 +27,7 @@ async function readAudit(database: Prisma.TransactionClient, principal: ApiPrinc
   if (targets.length || rows.some(row => row.mappedUserId === null)) await writeApiAudit(database, audit, { action: 'user_data.read', resource: 'legacy_user', targetUserIds: targets, outcome: 'success' });
 }
 export async function listLegacyUsers(request: Request, principal: ApiPrincipal, audit: ApiAuditContext) {
-  const params = query(request, ['cursor','limit','search','isMapped','isApplied']); const page = parseCursorPagination(params, { defaultLimit:50,maxLimit:100 }); if (page.error !== undefined) fail(400,page.error); const {cursor,limit}=page.data; if(cursor&&cursor>2147483647) fail(400,'Invalid cursor.');
+  const params = query(request, ['cursor','limit','search','isMapped','isApplied']); const page = parseCursorPagination(params, { defaultLimit:50,maxLimit:100 }); if (page.error !== undefined) fail(400,page.error); const {cursor,limit}=page.data;
   for (const key of ['isMapped','isApplied']) if(params.has(key)&&!['true','false'].includes(params.get(key)!)) fail(400,`${key} must be true or false.`);
   const search=params.get('search')?.trim();if(search&&search.length>200)fail(400,'search must be at most 200 characters.');
   const where:Prisma.LegacyUserDataWhereInput={...(cursor?{id:{gt:cursor}}:{}),...(search?{OR:[{discordUsername:{contains:search,mode:'insensitive'}},{legacyId:{contains:search,mode:'insensitive'}}]}:{}),...(params.has('isMapped')?{isMapped:params.get('isMapped')==='true'}:{}),...(params.has('isApplied')?{isApplied:params.get('isApplied')==='true'}:{})};

@@ -25,8 +25,9 @@ export function parseRankMigration(body: unknown): MigrationInput | null {
   return { strategy: 'map', rankMappings: value.rankMappings as MigrationInput['rankMappings'] };
 }
 function visibility(principal: ApiPrincipal): Prisma.UserWhereInput {
-  if ((principal.permissions['system:super_admin'] ?? 0) > 0) return {};
-  return { OR: [{ id: principal.kind === 'user' ? principal.userId : -1 }, { userPermissions: { none: { OR: [{ permission: { key: 'system:super_admin' }, value: { gt: 0 } }, { permission: { key: 'rank:edit' }, value: { gte: principal.permissions['rank:edit'] ?? 0 } }] } } }] };
+  // This helper only runs after rank:edit authorization; bots are superadmins.
+  if (principal.kind === 'bot' || (principal.permissions['system:super_admin'] ?? 0) > 0) return {};
+  return { OR: [{ id: principal.userId }, { userPermissions: { none: { OR: [{ permission: { key: 'system:super_admin' }, value: { gt: 0 } }, { permission: { key: 'rank:edit' }, value: { gte: principal.permissions['rank:edit'] } }] } } }] };
 }
 export async function migrateRanks(request: Request, apply: boolean) {
   return handleApiRequest(request, 'rank:edit', async (principal, context) => {
@@ -64,7 +65,7 @@ export async function migrateRanks(request: Request, apply: boolean) {
           const history = await tx.rankHistory.create({ data: { userId: user.userId, previousRankName: user.currentRank!.name, newRankName: next.name, attendanceTotalAtChange: attendanceTotal, attendanceDeltaSinceLastRank: Math.max(0, attendanceTotal - user.attendanceSinceLastRank), triggeredBy: 'system_migration', triggeredByUserId: principal.kind === 'user' ? principal.userId : null, outcome: 'approved', note: `Migration: ${input.strategy} strategy applied` } });
           const discord = await tx.authAccount.findFirst({ where: { userId: user.userId, provider: 'discord' }, orderBy: { id: 'asc' }, select: { providerUserId: true } });
           await appendBotEvent({ type: 'user.rank_changed', aggregate: 'rank', aggregateId: history.id, payload: { rankHistoryId: history.id, userId: user.userId, discordUserId: discord?.providerUserId ?? null, oldRankId: user.currentRankId, newRankId: next.id, changeType, source: 'migration' } }, tx);
-          await writeApiAudit(tx, context, { action: 'user_rank.migrated', resource: 'user_rank', resourceId: String(user.userId), targetUserIds: [user.userId], outcome: 'success', before: { currentRankId: user.currentRankId, attendanceSinceLastRank: user.attendanceSinceLastRank, lastRankedUpAt: user.lastRankedUpAt?.toISOString() ?? null }, after: { currentRankId: next.id, attendanceSinceLastRank: attendanceTotal, lastRankedUpAt: changed.lastRankedUpAt?.toISOString() ?? null, rankHistoryId: history.id, strategy: input.strategy } });
+          await writeApiAudit(tx, context, { action: 'user_rank.migrated', resource: 'user_rank', resourceId: String(user.userId), targetUserIds: [user.userId], outcome: 'success', before: { currentRankId: user.currentRankId, attendanceSinceLastRank: user.attendanceSinceLastRank, lastRankedUpAt: user.lastRankedUpAt.toISOString() }, after: { currentRankId: next.id, attendanceSinceLastRank: attendanceTotal, lastRankedUpAt: changed.lastRankedUpAt.toISOString(), rankHistoryId: history.id, strategy: input.strategy } });
           changedUsers.push(user.userId);
         }
         return { data: { totalProcessed: plan.length, ...counts }, changedUsers };

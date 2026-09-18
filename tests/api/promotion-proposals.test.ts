@@ -20,7 +20,7 @@ beforeEach(() => {
   mocks.db.botToken.findFirst.mockResolvedValue({ id: 9 });
   mocks.eligibility.mockResolvedValue({ eligible: true, reason: 'eligible_manual', currentRank: { id: 10, name: 'Before' }, nextRank: { id: 11, name: 'After' }, attendance: { currentAttendance: 8, delta: 3 }, proposalId: null });
   mocks.db.promotionProposal.create.mockImplementation(async ({ data }) => ({ id: 7, createdAt: new Date('2026-01-01T00:00:00Z'), ...data }));
-  mocks.db.userRank.findUniqueOrThrow.mockResolvedValue({ currentRankId: 10, attendanceSinceLastRank: 5, lastRankedUpAt: null });
+  mocks.db.userRank.findUniqueOrThrow.mockResolvedValue({ currentRankId: 10, attendanceSinceLastRank: 5, lastRankedUpAt: new Date(0) });
   mocks.db.userRank.update.mockImplementation(async ({ data }) => data);
   mocks.db.rankHistory.create.mockResolvedValue({ id: 20 });
   mocks.db.$transaction.mockImplementation(async cb => cb(mocks.db));
@@ -103,4 +103,26 @@ test('audit failure returns500 and no notification', async () => {
 test.each([['P2025', 404], ['P2002', 409], ['P2003', 409], ['P2034', 409]])('maps%s transaction failures', async (code, status) => {
   mocks.db.$transaction.mockRejectedValue({ code });
   expect((await POST(req())).status).toBe(status);
+});
+
+ test('unknown database error codes remain internal failures rather than conflicts', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  mocks.db.$transaction.mockRejectedValue({ code: 'P1001' });
+  try { expect((await POST(req())).status).toBe(500); } finally { log.mockRestore(); }
+});
+
+test('ineligible users checking themselves produce no other-user read audit', async () => {
+  mocks.eligibility.mockResolvedValue({ eligible: false, reason: 'ineligible_interview' });
+  expect((await POST(req({ userId: 4 }))).status).toBe(409);
+  expect(mocks.db.apiAuditLog.create).not.toHaveBeenCalled();
+});
+
+test('automatic promotion without an existing proposal updates rank without fabricating a proposal event', async () => {
+  const eligible = await mocks.eligibility();
+  mocks.eligibility.mockResolvedValue({ ...eligible, reason: 'eligible_auto', proposalId: null });
+  const response = await POST(req());
+  expect(response.status).toBe(200);
+  expect((await response.json()).data).toMatchObject({ outcome: 'promoted', proposalId: null });
+  expect(mocks.db.promotionProposal.update).not.toHaveBeenCalled();
+  expect(mocks.db.apiAuditLog.create.mock.calls.some(([arg]) => arg.data.action === 'promotion_proposal.approved')).toBe(false);
 });

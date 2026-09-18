@@ -69,3 +69,61 @@ test('subscriber identity stays bound when a more privileged user publishes',asy
 test('captured session expiration closes even when publisher has a fresh session',async()=>{
  vi.useFakeTimers();m.session.mockResolvedValue({user:{id:4},expires:new Date(Date.now()+1000).toISOString()});const reader=await consume(await user(req(),ctx()));m.session.mockResolvedValue({user:{id:99},expires:'2099-01-01T00:00:00Z'});await vi.advanceTimersByTimeAsync(1001);publishUserProfileEvent(4);expect((await reader.read()).done).toBe(true);
 });
+test('public scoped events omit private changes and invalidate revoked explicit bot credentials',async()=>{
+ const reader=await consume(await publicOne(req('','Bearer valid'),ctx('1')));
+ publishOrbatEvent({type:'orbat.updated',orbatId:1,visibility:'staff'});
+ publishOrbatEvent({type:'orbat.updated',orbatId:1});
+ expect(await text(reader)).toContain('"payload":null');
+ m.db.botToken.findFirst.mockResolvedValue(null);publishOrbatEvent({type:'orbat.updated',orbatId:1});
+ expect((await reader.read()).done).toBe(true);
+ expect(m.db.apiAuditLog.create).toHaveBeenCalledWith({data:expect.objectContaining({action:'access.denied'})});
+});
+test('missing scoped user denies stream and subslot catalog notifications reach permitted users',async()=>{
+ m.db.user.findUnique.mockImplementation(async a=>a.select.userPermissions?{userPermissions:[{permission:{key:'system:super_admin'},value:255}]}:null);
+ expect((await inbox(req(),ctx('5'))).status).toBe(403);
+ m.db.user.findUnique.mockResolvedValue({userPermissions:[{permission:{key:'subslot:edit'},value:5}]});
+ const reader=await consume(await catalog(req()));publishAdminCatalogEvent({type:'role-definition.changed'});expect(await text(reader)).toContain('role-definition.changed');await reader.cancel();
+});
+test('transport closes on consumer backlog and ignores callbacks retained after unsubscribe',async()=>{
+ let push:(event:number)=>void=()=>{};
+ const response=eventStream<number>(req(),{subscribe:listener=>{push=listener;return()=>{}},validate:async()=>true,project:async id=>({id:String(id),body:'x'.repeat(1024*1024)})});
+ const reader=await consume(response);
+ push(1);await new Promise(resolve=>setTimeout(resolve,0));
+ push(2);await new Promise(resolve=>setTimeout(resolve,0));
+ expect((await reader.read()).done).toBe(false);expect((await reader.read()).done).toBe(true);
+ push(3);expect((await reader.read()).done).toBe(true);
+});
+test('subscription may abort synchronously and is still unsubscribed exactly once',async()=>{
+ const abort=new AbortController(),stop=vi.fn();
+ const reader=await consume(eventStream(req('',undefined,abort.signal),{subscribe:()=>{abort.abort();return stop},project:async()=>null,validate:async()=>true}));
+ expect((await reader.read()).done).toBe(true);expect(stop).toHaveBeenCalledTimes(1);
+});
+
+test('principal revalidation rejects mismatched session identity and deleted users',async()=>{
+ const {createApiPrincipalRevalidator}=await import('@/lib/api/auth');
+ m.session.mockResolvedValue({user:{id:99},expires:'2099-01-01T00:00:00Z'});
+ const mismatched=await createApiPrincipalRevalidator({kind:'user',userId:4,permissions:{}});
+ expect(await mismatched()).toBeNull();
+ m.session.mockResolvedValue({user:{id:4},expires:'2099-01-01T00:00:00Z'});
+ const deleted=await createApiPrincipalRevalidator({kind:'user',userId:4,permissions:{}});
+ m.db.user.findUnique.mockResolvedValue(null);expect(await deleted()).toBeNull();
+});
+test('direct scoped handler rejects absent identity and missing session revalidation',async()=>{
+ const {protectedEvents}=await import('@/lib/api/realtime');
+ expect((await protectedEvents(req(),'user')).status).toBe(400);
+ const {createApiPrincipalRevalidator}=await import('@/lib/api/auth');
+ m.session.mockResolvedValue(null);
+ expect(await (await createApiPrincipalRevalidator({kind:'user',userId:4,permissions:{}}))()).toBeNull();
+});
+test('heartbeat completion after abort cannot write into a closed stream',async()=>{
+ vi.useFakeTimers();const abort=new AbortController();let finish!: (allowed:boolean)=>void;
+ const reader=await consume(eventStream(req('',undefined,abort.signal),{subscribe:()=>()=>{},project:async()=>null,validate:()=>new Promise(resolve=>{finish=resolve})}));
+ await vi.advanceTimersByTimeAsync(15000);abort.abort();finish(true);await vi.advanceTimersByTimeAsync(0);
+ expect((await reader.read()).done).toBe(true);
+});
+test('late failing validation after abort keeps cleanup idempotent',async()=>{
+ const abort=new AbortController();let push:(value:number)=>void=()=>{},fail!:(error:Error)=>void;
+ const stop=vi.fn();const reader=await consume(eventStream<number>(req('',undefined,abort.signal),{subscribe:listener=>{push=listener;return stop},project:async()=>null,validate:()=>new Promise((_resolve,reject)=>{fail=reject})}));
+ push(1);await new Promise(resolve=>setTimeout(resolve,0));abort.abort();fail(new Error('connection failed'));
+ await new Promise(resolve=>setTimeout(resolve,0));expect(stop).toHaveBeenCalledTimes(1);expect((await reader.read()).done).toBe(true);
+});

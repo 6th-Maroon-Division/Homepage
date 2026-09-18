@@ -37,3 +37,26 @@ test('preview and import deduplicate within file and DB, conflicts never write, 
 });
 test('successful import snapshots IDs only and duplicate-only import is a no-op', async () => { expect((await POST(req('POST',{csvData:csv}))).status).toBe(200); expect(mocks.db.apiAuditLog.create.mock.lastCall![0].data.after).toMatchObject({recordIds:[8,9],importedCount:2}); expect(JSON.stringify(mocks.db.apiAuditLog.create.mock.calls)).not.toContain('Doe'); mocks.db.legacyAttendanceData.findMany.mockImplementation(async ({where})=>[{legacyStatus:where.legacyEventDate.getUTCFullYear()===2024?'P':'A',mappedUserId:null}]); const response=await POST(req('POST',{csvData:csv})); expect((await response.json()).data.imported).toBe(0); });
 test('read audit fails closed and writes map concurrency errors', async () => { const log=vi.spyOn(console,'error').mockImplementation(()=>{}); mocks.db.legacyAttendanceData.findMany.mockResolvedValue([row()]); mocks.db.apiAuditLog.create.mockRejectedValue(new Error('private details')); expect((await GET(req())).status).toBe(500); mocks.db.$transaction.mockRejectedValue({code:'P2034'}); expect((await POST(req('POST',{csvData:csv}))).status).toBe(409); log.mockRestore(); });
+
+test.each([`?search=${'a'.repeat(201)}`, '?cursor=2147483648'])('legacy history rejects oversized filters %s', async query => {
+  expect((await GET(req('GET', undefined, undefined, query))).status).toBe(400);
+});
+
+test('self-only legacy records omit read auditing and absent historic dates serialize null', async () => {
+  mocks.db.legacyAttendanceData.findMany.mockResolvedValue([row({ mappedUserId: 4, legacyEventDate: null })]);
+  expect((await (await GET(req())).json()).data[0].legacyEventDate).toBeNull();
+  expect(mocks.db.apiAuditLog.create).not.toHaveBeenCalled();
+});
+
+test('legacy attendance preview rejects invalid flag and omits audits for matching self records', async () => {
+  expect((await POST(req('POST', { csvData: csv, previewOnly: 'yes' }))).status).toBe(422);
+  mocks.db.legacyAttendanceData.findMany.mockResolvedValue([{ legacyStatus: 'P', mappedUserId: 4 }]);
+  expect((await POST(req('POST', { csvData: 'YEAR: 2025\nRANK,NAME,ID,2-Jan\nPvt,Self,4,P', previewOnly: true }))).status).toBe(200);
+  expect(mocks.db.apiAuditLog.create).not.toHaveBeenCalled();
+});
+
+test('viewing another mapped legacy user audits that user once', async () => {
+  mocks.db.legacyAttendanceData.findMany.mockResolvedValue([row({ mappedUserId: 5 }), row({ id: 8, mappedUserId: 5 })]);
+  expect((await GET(req())).status).toBe(200);
+  expect(mocks.db.apiAuditLog.create.mock.lastCall![0].data.targetUserIds).toEqual([5]);
+});

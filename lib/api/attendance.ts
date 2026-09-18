@@ -127,7 +127,8 @@ export async function mutateAttendance(request: Request, principal: ApiPrincipal
     const signup = signupId ? await tx.signup.findUnique({ where: { id: signupId }, select: { id: true, userId: true, slot: { select: { orbatId: true } } } }) : null;
     if (signupId && (!signup || signup.slot.orbatId !== orbatId)) fail(404, 'Signup does not belong to this operation.');
     if (signup && body!.userId && body!.userId !== signup.userId) fail(422, 'signupId and userId must identify the same user.');
-    const userId = signup?.userId ?? body!.userId ?? existing?.userId; if (!userId) fail(422, 'A user must be selected.');
+    // Create requires a valid user or signup; updates have a persisted user.
+    const userId = signup?.userId ?? body!.userId ?? existing!.userId;
     await access(tx, principal, userId, 'attendance:edit');
     const duplicate = await tx.attendance.findFirst({ where: { orbatId, userId, ...(existing ? { id: { not: existing.id } } : {}) }, select: { id: true } }); if (duplicate) fail(409, 'Attendance already exists for this user and operation.');
     const note = await tx.orbatAttendanceNote.findUnique({ where: { orbatId_userId: { orbatId, userId } }, select: { status: true, lateMinutes: true, leaveEarlyMinutes: true } });

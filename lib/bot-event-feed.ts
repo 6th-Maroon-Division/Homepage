@@ -71,10 +71,11 @@ export async function getEventFeed(request: Request) {
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
         close = () => { try { controller.close(); } catch { /* Already cancelled. */ } };
+        // Only send calls enqueue, synchronously after its stopped check.
+        // Cancellation closes through stop; there is no controller.error path.
         const enqueue = (text: string) => {
-          if (stopped) return false;
           const chunk = encoder.encode(text);
-          if ((controller.desiredSize ?? 0) < chunk.byteLength) { stop(); return false; }
+          if (controller.desiredSize! < chunk.byteLength) { stop(); return false; }
           controller.enqueue(chunk);
           return true;
         };
@@ -86,9 +87,10 @@ export async function getEventFeed(request: Request) {
           }
           if (!page.data.length) enqueue(': keepalive\n\n');
         };
+        // stop/cancel clear the timer; once invoked polling runs synchronously
+        // until revalidation, and send rechecks stopped after awaited work.
         const poll = async () => {
           try {
-            if (stopped) return;
             const current = await revalidate();
             context.principal = current;
             if (!current || !hasApiPermission(current.permissions, 'system:super_admin')) {
@@ -105,7 +107,7 @@ export async function getEventFeed(request: Request) {
         send(initial);
         if (!stopped) timer = setTimeout(() => { void poll(); }, 5000);
       },
-      cancel() { stopped = true; if (timer) clearTimeout(timer); request.signal.removeEventListener('abort', stop); },
+      cancel() { stopped = true; clearTimeout(timer); request.signal.removeEventListener('abort', stop); },
     }, { highWaterMark: 1024 * 1024, size: chunk => chunk.byteLength });
     return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive' } });
   });

@@ -131,3 +131,8 @@ describe('atomic requirement writes', () => {
     spy.mockRestore();
   });
 });
+it('unknown database error codes are propagated for canonical internal error handling', async () => {
+  const { requirementsDatabaseError } = await import('@/lib/api/training-requirements');
+  const failure = { code: 'P9999' };
+  expect(() => requirementsDatabaseError(failure)).toThrow();
+});

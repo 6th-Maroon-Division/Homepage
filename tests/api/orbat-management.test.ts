@@ -14,3 +14,14 @@ test('failed required creator audit withholds result',async()=>{const log=vi.spy
 test('public time range uses UTC offsets and event-date fallback without changing minimal response',async()=>{m.session.mockResolvedValue(null);m.db.orbat.findMany.mockResolvedValue([{id:5,name:'Operation'}]);expect((await publicList(req('?startAt=2099-01-01T12:00:00%2B02:00&endBefore=2099-01-02T00:00:00Z'))).status).toBe(200);expect(m.db.orbat.findMany.mock.lastCall![0].where.OR).toEqual([{startsAtUtc:{gte:new Date('2099-01-01T10:00Z'),lt:new Date('2099-01-02Z')}},{startsAtUtc:null,eventDate:{gte:new Date('2099-01-01T10:00Z'),lt:new Date('2099-01-02Z')}}]);});
 test.each(['?includePast=bad','?startAt=2099-01-01','?startAt=2099-01-02T00:00:00Z&endBefore=2099-01-01T00:00:00Z'])('public list rejects %s',async query=>{expect((await publicList(req(query))).status).toBe(400);});
 test('includePast false uses the current UTC day while true leaves the range unrestricted',async()=>{m.db.orbat.findMany.mockResolvedValue([]);await publicList(req('?includePast=false'));const boundary=m.db.orbat.findMany.mock.lastCall![0].where.OR[0].startsAtUtc.gte as Date;expect(boundary.toISOString().slice(11)).toBe('00:00:00.000Z');await publicList(req('?includePast=true'));expect(m.db.orbat.findMany.mock.lastCall![0].where).toEqual({});});
+
+test('undated operations and unnamed creators have explicit fallback values', async () => {
+  m.db.orbat.findMany.mockResolvedValue([{ ...row(5), startsAtUtc: null, createdBy: { id: 4, username: null } }]);
+  const body = await (await GET(req())).json();
+  expect(body.data[0]).toMatchObject({ startsAtUtc: null, createdBy: { id: 4, username: 'Unknown' } });
+});
+test('public list accepts an exclusive upper boundary without a lower boundary', async () => {
+  m.db.orbat.findMany.mockResolvedValue([]);
+  expect((await publicList(req('?includePast=true&endBefore=2099-01-01T00:00:00Z'))).status).toBe(200);
+  expect(m.db.orbat.findMany.mock.lastCall![0].where.OR[0]).toEqual({ startsAtUtc: { lt: new Date('2099-01-01Z') } });
+});

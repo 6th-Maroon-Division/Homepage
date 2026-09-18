@@ -120,3 +120,15 @@ test.each([['P2025', 404], ['P2002', 409], ['P2003', 409], ['P2034', 409]])('map
   mocks.db.$transaction.mockRejectedValue({ code });
   expect((await approve(req(), ctx())).status).toBe(status);
 });
+
+ test('unknown database error codes remain internal failures rather than conflicts', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  mocks.db.$transaction.mockRejectedValue({ code: 'P1001' });
+  try { expect((await approve(req(), ctx())).status).toBe(500); } finally { log.mockRestore(); }
+});
+
+test('approval for an unlinked user emits an outbox entry without a provider identifier', async () => {
+  mocks.db.authAccount.findFirst.mockResolvedValue(null);
+  expect((await approve(req(), ctx())).status).toBe(200);
+  expect(mocks.db.botEvent.create.mock.lastCall![0].data.payload.discordUserId).toBeNull();
+});

@@ -92,3 +92,8 @@ test('postcommit inbox and Discord failures preserve database success', async ()
   expect((await response.json()).data).toMatchObject({ delivered: 1, discordDelivered: 0 });
   log.mockRestore();
 });
+test('unscheduled records returned during a schedule race never generate reminders', async () => {
+  mocks.db.trainingSessionAttendee.findMany.mockResolvedValue([{ ...attendee(), session: { ...attendee().session, startsAt: null } }]);
+  expect((await (await POST(req())).json()).data.delivered).toBe(0);
+  expect(mocks.db.message.create).not.toHaveBeenCalled();
+});

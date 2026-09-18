@@ -124,3 +124,136 @@ it('missing records, CAS errors and audit failures fail consistently; postcommit
   mocks.publish.mockImplementation(() => { throw new Error('publish'); }); expect((await send(req('POST', { body: 'Committed' }), ctx())).status).toBe(201);
   mocks.prisma.apiAuditLog.create.mockRejectedValue(new Error('audit')); expect((await read(req(), ctx())).status).toBe(500); expect((await send(req('POST', { body: 'Must roll back' }), ctx())).status).toBe(500);
 });
+it('serialization distinguishes draft and confirmed schedules without exposing draft trainers to members', async () => {
+  const { serializeTrainingRequest } = await import('@/lib/api/training-requests');
+  const principal = { kind: 'user' as const, userId: 3, permissions: {} };
+  const draft = { id: 8, trainingId: 2, status: 'proposed', startsAt: null, trainer: user, durationMinutes: null, specialInstructions: null };
+  row.sessionAttendee = { status: 'scheduled', session: draft };
+  row.messages = []; row.assignedTrainer = user;
+  expect(serializeTrainingRequest(row as never, principal).session).toBeNull();
+  row.sessionAttendee = { status: 'scheduled', session: { ...draft, status: 'scheduled', startsAt: stamp } };
+  expect(serializeTrainingRequest(row as never, principal)).toMatchObject({ assignedTrainer: user, session: { confirmed: true, startsAt: stamp.toISOString() }, lastMessage: null });
+  row.sessionAttendee = { status: 'scheduled', session: draft };
+  const staff = { ...principal, permissions: { 'training:mark': 1 } };
+  expect(serializeTrainingRequest(row as never, staff).session).toMatchObject({ confirmed: false, startsAt: null });
+  row.sessionAttendee = { session: { ...draft, status: 'scheduled', startsAt: null } };
+  expect(serializeTrainingRequest(row as never, staff).session?.attendeeStatus).toBeNull();
+});
+it('request authority handles malformed target grants without promoting ordinary trainers', async () => {
+  const { canManageTrainingRequest } = await import('@/lib/api/training-requests');
+  mocks.prisma.userPermission.findMany.mockResolvedValue([{ permission: { key: 'training:mark' }, value: 'bad' }]);
+  expect(await canManageTrainingRequest({ kind: 'user', userId: 1, permissions: { 'training:mark': 1 } }, 3)).toBe(false);
+  expect(await canManageTrainingRequest({ kind: 'user', userId: 1, permissions: { 'system:super_admin': 255 } }, 3)).toBe(true);
+});
+it('subscription reads default missing state and reject inaccessible targets', async () => {
+  mocks.prisma.trainingRequestSubscription.findUnique.mockResolvedValue(null);
+  expect((await (await subscription(req(), ctx('1', '3'))).json()).data).toEqual({ websiteEnabled: false, discordEnabled: false });
+  mocks.prisma.user.findUnique.mockImplementation(async ({ where }) => ({ ...user, id: where.id, userPermissions: where.id === 1 ? [{ permission: { key: 'training:mark' }, value: 1 }, { permission: { key: 'user:edit' }, value: 2 }] : [] }));
+  expect((await subscription(req(), ctx('1', '5'))).status).toBe(403);
+});
+it('read state database failures and nullable historical timestamps are canonical', async () => {
+  mocks.prisma.trainingRequestReadState.findUnique.mockResolvedValue({ lastReadMessageId: 12, lastReadAt: null });
+  expect((await (await markRead(req('PATCH', { lastReadMessageId: 10 }), ctx())).json()).data).toEqual({ lastReadMessageId: 12, lastReadAt: null });
+  mocks.prisma.trainingRequestReadState.findUnique.mockResolvedValue(null);
+  mocks.prisma.trainingRequestReadState.upsert.mockResolvedValue({ lastReadMessageId: 10, lastReadAt: null });
+  expect((await (await markRead(req('PATCH', { lastReadMessageId: 10 }), ctx())).json()).data).toEqual({ lastReadMessageId: 10, lastReadAt: null });
+  mocks.prisma.$transaction.mockRejectedValue({ code: 'P2034' });
+  expect((await markRead(req('PATCH', { lastReadMessageId: 10 }), ctx())).status).toBe(409);
+});
+it('request mutations reject unexpected query parameters and cancellation payloads', async () => {
+  expect((await create(req('POST', createBody, false, '?x=1'))).status).toBe(400);
+  expect((await update(req('PATCH', { status: 'approved' }, false, '?x=1'), ctx())).status).toBe(400);
+  expect((await cancel(req('DELETE', undefined, false, '?x=1'), ctx())).status).toBe(400);
+  expect((await cancel(req('DELETE', {}), ctx())).status).toBe(400);
+  expect((await messages(req('GET', undefined, false, '?limit=0'), ctx())).status).toBe(400);
+  expect((await send(req('POST', { body: 'T' }, false, '?x=1'), ctx())).status).toBe(400);
+});
+it('missing target users and missing requests return canonical not found', async () => {
+  mocks.prisma.user.findUnique.mockResolvedValueOnce({ ...user, userPermissions: [{ permission: { key: 'training:mark' }, value: 1 }] }).mockResolvedValueOnce(null);
+  expect((await create(req('POST', createBody))).status).toBe(404);
+  mocks.prisma.trainingRequest.findUnique.mockResolvedValue(null);
+  expect((await update(req('PATCH', { status: 'approved' }), ctx())).status).toBe(404);
+});
+it('mutations recheck target hierarchy and refuse newly elevated targets', async () => {
+  mocks.prisma.userPermission.findMany.mockResolvedValue([{ permission: { key: 'training:approve_request' }, value: 255 }]);
+  expect((await update(req('PATCH', { status: 'approved' }), ctx())).status).toBe(403);
+  expect((await cancel(req('DELETE'), ctx())).status).toBe(403);
+  mocks.prisma.userPermission.findMany.mockResolvedValueOnce([]).mockResolvedValue([{ permission: { key: 'training:approve_request' }, value: 255 }]);
+  expect((await create(req('POST', createBody))).status).toBe(403);
+  expect(mocks.prisma.trainingRequest.updateMany).not.toHaveBeenCalled();
+});
+it('creation repairs trigger-migrated staff messages while preserving member authorship', async () => {
+  mocks.prisma.trainingRequestMessage.count.mockResolvedValue(1);
+  expect((await create(req('POST', createBody))).status).toBe(201);
+  expect(mocks.prisma.trainingRequestMessage.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { senderId: 1, senderRole: 'STAFF' } }));
+  mocks.session.mockResolvedValue({ user: { id: '3' } });
+  mocks.prisma.trainingRequestMessage.updateMany.mockClear();
+  expect((await create(req('POST', createBody))).status).toBe(201);
+  expect(mocks.prisma.trainingRequestMessage.updateMany).not.toHaveBeenCalled();
+});
+it('cancellation reports optimistic conflicts and requester actions accurately', async () => {
+  mocks.prisma.trainingRequest.updateMany.mockResolvedValueOnce({ count: 0 });
+  expect((await cancel(req('DELETE'), ctx())).status).toBe(409);
+  mocks.session.mockResolvedValue({ user: { id: '3' } });
+  mocks.prisma.user.findUnique.mockResolvedValue({ ...user, userPermissions: [] });
+  expect((await cancel(req('DELETE'), ctx())).status).toBe(200);
+  expect(mocks.prisma.trainingRequestMessage.create).toHaveBeenCalledWith({ data: expect.objectContaining({ body: 'The request was cancelled by the requester.' }) });
+});
+it('request update and cancellation normalize storage errors', async () => {
+  mocks.prisma.$transaction.mockRejectedValue({ code: 'P2034' });
+  expect((await update(req('PATCH', { status: 'approved' }), ctx())).status).toBe(409);
+  expect((await cancel(req('DELETE'), ctx())).status).toBe(409);
+});
+it.each([
+  ['approved', 'finished', false, false], ['in_training', 'needs_qualify', true, true],
+  ['needs_qualify', 'qualified', false, true], ['needs_qualify', 'failed', false, true],
+  ['approved', 'in_training', true, false], ['pending', 'rejected', false, false],
+] as const)('request %s to %s writes the appropriate credential lifecycle', async (from, to, session, practical) => {
+  row.status = from; row.training = { ...training, requiresTrainingSession: session, requiresOrbatQualification: practical };
+  mocks.prisma.userTraining.findUnique.mockResolvedValue({ id: 8, status: from, trainerId: 1 });
+  expect((await update(req('PATCH', { status: to, adminResponse: null }), ctx())).status).toBe(200);
+  if (to !== 'rejected') expect(mocks.prisma.userTraining.upsert).toHaveBeenCalledWith(expect.objectContaining({ create: expect.objectContaining({ status: to }) }));
+});
+it('legacy terminal credentials retain their trainer when approving a request', async () => {
+  mocks.prisma.userTraining.findUnique.mockResolvedValue({ id: 8, status: 'qualified', trainerId: 99 });
+  expect((await update(req('PATCH', { status: 'approved' }), ctx())).status).toBe(200);
+  expect(mocks.prisma.userTraining.upsert).toHaveBeenCalledWith(expect.objectContaining({ update: { trainerId: 99 } }));
+});
+it('request creation enforces rank and training prerequisites and rejects invalid bodies', async () => {
+  expect((await create(req('POST', {}))).status).toBe(422);
+  const requiredTraining = { id: 5, name: 'Prerequisite', category: null };
+  mocks.prisma.training.findUnique.mockResolvedValue({ ...training, requiresTrainings: [{ requiredTraining }] });
+  mocks.prisma.userTraining.findMany.mockResolvedValue([]);
+  expect((await create(req('POST', createBody))).status).toBe(403);
+  mocks.prisma.training.findUnique.mockResolvedValue({ ...training, rankRequirement: { minimumRank: { id: 2, name: 'CPL', abbreviation: 'CPL' } } });
+  mocks.prisma.userRank.findUnique.mockResolvedValue(null);
+  mocks.prisma.rank.findUnique.mockResolvedValue({ orderIndex: 2 });
+  expect((await create(req('POST', createBody))).status).toBe(403);
+});
+it('request update rejects skipped workflow stages and allows unchanged pending feedback', async () => {
+  expect((await update(req('PATCH', { status: 'qualified' }), ctx())).status).toBe(409);
+  expect((await update(req('PATCH', { status: 'pending' }), ctx())).status).toBe(200);
+  expect(mocks.prisma.userTraining.upsert).not.toHaveBeenCalled();
+});
+it('legacy approval supplies an absent trainer and preserves trigger-created response messages', async () => {
+  mocks.prisma.userTraining.findUnique.mockResolvedValue({ id: 8, status: 'finished', trainerId: null });
+  mocks.prisma.trainingRequestMessage.count.mockResolvedValue(1);
+  expect((await update(req('PATCH', { status: 'approved', adminResponse: 'Accepted' }), ctx())).status).toBe(200);
+  expect(mocks.prisma.userTraining.upsert).toHaveBeenCalledWith(expect.objectContaining({ update: { trainerId: 1 } }));
+});
+it('missing message targets return 404 and long member messages have concise staff notifications', async () => {
+  mocks.prisma.trainingRequest.findUnique.mockResolvedValueOnce(null);
+  expect((await send(req('POST', { body: 'Text' }), ctx())).status).toBe(404);
+  mocks.session.mockResolvedValue({ user: { id: '3' } });
+  expect((await send(req('POST', { body: 'x'.repeat(200) }), ctx())).status).toBe(201);
+  expect(mocks.prisma.message.create).toHaveBeenCalledWith({ data: expect.objectContaining({ body: `${'x'.repeat(177)}...` }) });
+});
+it('nameless requesters receive a useful notification fallback', async () => {
+  row.user = { ...user, username: '' };
+  expect((await create(req('POST', createBody))).status).toBe(201);
+  expect(mocks.prisma.message.create).toHaveBeenCalledWith({ data: expect.objectContaining({ body: 'A user requested Basic.' }) });
+});
+it('subscription changes reject users without authority over another staff member', async () => {
+  mocks.prisma.user.findUnique.mockImplementation(async ({ where }) => ({ ...user, id: where.id, userPermissions: [{ permission: { key: 'training:mark' }, value: 1 }] }));
+  expect((await subscription(req(), ctx('1', '3'))).status).toBe(403);
+});

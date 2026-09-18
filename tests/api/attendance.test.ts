@@ -49,3 +49,62 @@ test('public empty results still audit target, audit fails closed and missing us
   expect((await stats(req('GET'), operationCtx('4'))).status).toBe(500); log.mockRestore();
   mocks.db.user.findUnique.mockResolvedValue(null); expect((await publicList(req('GET'), operationCtx('4'))).status).toBe(404);
 });
+
+test('unknown database errors are internal failures and missing attendance is not found', async () => {
+  mocks.db.attendance.findUnique.mockResolvedValueOnce(null);
+  expect((await GET(req('GET'), ctx())).status).toBe(404);
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  mocks.db.$transaction.mockRejectedValue({ code: 'P1001' });
+  try { expect((await DELETE(req('DELETE'), ctx())).status).toBe(500); } finally { log.mockRestore(); }
+});
+
+test('attendance access rejects missing target users and operations and invalid pagination', async () => {
+  mocks.db.user.findUnique.mockResolvedValueOnce({ id: 4, userPermissions: [{ permission: { key: 'attendance:view' }, value: 2 }] }).mockResolvedValueOnce(null);
+  expect((await GET(req('GET'), ctx())).status).toBe(404);
+  mocks.db.orbat.findUnique.mockResolvedValue(null);
+  expect((await list(req('GET'), operationCtx())).status).toBe(404);
+  expect((await list(req('GET', undefined, '?limit=0'), operationCtx())).status).toBe(400);
+});
+
+test('filtered empty attendance lists still audit the requested other user', async () => {
+  mocks.db.attendance.findMany.mockResolvedValue([]);
+  expect((await list(req('GET', undefined, '?userId=5'), operationCtx())).status).toBe(200);
+  expect(mocks.db.attendance.findMany.mock.lastCall![0].where.userId).toBe(5);
+  expect(mocks.db.apiAuditLog.create.mock.lastCall![0].data.targetUserIds).toEqual([5]);
+});
+
+test('attendance DTO serializes sessions, nullable role definitions, and unauthored logs', async () => {
+  const stamp = new Date('2020-01-01T00:00:00Z');
+  mocks.db.attendance.findUnique.mockResolvedValue({ ...row(), orbat: { ...operation(), startsAtUtc: null, eventDate: stamp }, signup: { id: 40, slotId: 50, slot: { id: 50, squadRole: null } }, sessions: [{ id: 60, checkedInAt: stamp, checkedOutAt: null, sessionDate: stamp, timestamp: stamp }, { id: 61, checkedInAt: stamp, checkedOutAt: stamp, sessionDate: stamp, timestamp: stamp }], logs: [{ id: 70, timestamp: stamp, changedBy: null }] });
+  const data = (await (await GET(req('GET'), ctx())).json()).data;
+  expect(data.signup.slot.name).toBe('Unassigned Role');
+  expect(data.orbat).toMatchObject({ startsAtUtc: null, eventDate: stamp.toISOString() });
+  expect(data.sessions.map((session: { checkedOutAt: string | null }) => session.checkedOutAt)).toEqual([null, stamp.toISOString()]);
+  mocks.db.attendance.findUnique.mockResolvedValue({ ...row(), signup: { id: 40, slot: { id: 50, squadRole: { name: 'Medic' } } } });
+  expect((await (await GET(req('GET'), ctx())).json()).data.signup.slot.name).toBe('Medic');
+});
+
+test('attendance creation permits explicit null times and normalizes blank notes', async () => {
+  expect((await POST(req('POST', { userId: 4, notes: '  ', checkinTime: null, checkoutTime: null }), operationCtx())).status).toBe(201);
+  expect(mocks.db.attendance.create.mock.lastCall![0].data.notes).toBeNull();
+  expect(mocks.db.attendanceSession.create).not.toHaveBeenCalled();
+  expect((await POST(req('POST', { userId: null, signupId: null }), operationCtx())).status).toBe(422);
+});
+
+test('missing operation blocks mutation and a checkin-only attendance records an open session', async () => {
+  mocks.db.orbat.findUnique.mockResolvedValueOnce(null);
+  expect((await POST(req('POST', { userId: 4 }), operationCtx())).status).toBe(404);
+  expect((await POST(req('POST', { userId: 4, checkinTime: '2020-01-01T10:00:00Z' }), operationCtx())).status).toBe(201);
+  expect(mocks.db.attendanceSession.create.mock.lastCall![0].data).toMatchObject({ checkedOutAt: null, durationMinutes: null });
+  expect(mocks.db.attendance.update.mock.lastCall![0].data.totalMinutesPresent).toBe(0);
+});
+
+test('nullable notes remain null in mutation snapshots and public history paginates nullable schedules', async () => {
+  mocks.db.attendance.findUnique.mockResolvedValue({ ...row(), notes: null });
+  expect((await DELETE(req('DELETE'), ctx())).status).toBe(200);
+  expect(mocks.db.apiAuditLog.create.mock.lastCall![0].data.before.notes).toBeNull();
+  mocks.db.attendance.findMany.mockResolvedValue([{ ...row(), orbat: { ...operation(), startsAtUtc: null, eventDate: new Date('2020-01-01T00:00:00Z') } }, { ...row(), id: 29 }]);
+  const body = await (await publicList(req('GET', undefined, '?cursor=31&limit=1'), { params: Promise.resolve({ id: '4' }) })).json();
+  expect(body.meta.nextCursor).toBe('30');
+  expect(body.data[0].orbat).toMatchObject({ startsAtUtc: null, eventDate: '2020-01-01T00:00:00.000Z' });
+});

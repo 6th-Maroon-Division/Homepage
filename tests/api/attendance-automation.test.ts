@@ -70,3 +70,64 @@ test('duplicate event reads audit other users and bots, omit self, and fail clos
   mocks.db.apiAuditLog.create.mockClear(); mocks.db.attendanceEvent.findFirst.mockResolvedValue(event()); expect((await events(req({ ...body, userId: 4 }))).status).toBe(200); expect(mocks.db.apiAuditLog.create).not.toHaveBeenCalled(); expect((await events(req({ ...body, userId: 4 }, 'Bearer active'))).status).toBe(200); expect(mocks.db.apiAuditLog.create.mock.lastCall![0].data.targetUserIds).toEqual([4]);
   const log = vi.spyOn(console, 'error').mockImplementation(() => {}); mocks.db.apiAuditLog.create.mockRejectedValue(new Error('Private audit failure')); expect((await events(req(body, 'Bearer active'))).status).toBe(500); log.mockRestore();
 });
+
+test('automation rejects query arguments and preserves pending Discord identities', async () => {
+  expect((await events(req({ userId: 4, isJoin: true, eventTime: '2020-01-01T10:00:00Z' }, undefined, '?legacy=1'))).status).toBe(400);
+  expect((await events(req({ identity: { provider: 'discord', providerUserId: '123456789012345678' }, isJoin: true, eventTime: '2020-01-01T10:00:00Z' }))).status).toBe(201);
+  expect(mocks.db.attendanceEvent.findFirst.mock.lastCall![0].where).toEqual({ discordId: '123456789012345678' });
+  expect(mocks.db.attendanceEvent.create.mock.lastCall![0].data).toMatchObject({ userId: null, discordId: '123456789012345678', steamId: null });
+});
+
+test('backfill rejects existing-user conflicts and leaves unmatched identities pending', async () => {
+  mocks.db.attendanceEvent.findMany.mockResolvedValue([{ ...event(), userId: 5, steamId: '76561198000000000', processed: false }]);
+  mocks.db.authAccount.findUnique.mockResolvedValue({ userId: 6 });
+  expect((await backfill(req({}))).status).toBe(409);
+  expect(mocks.db.attendanceEvent.update).not.toHaveBeenCalled();
+  mocks.db.attendanceEvent.findMany.mockResolvedValue([{ ...event(), userId: null, steamId: '76561198000000000', processed: false }]);
+  mocks.db.authAccount.findUnique.mockResolvedValue(null);
+  expect((await (await backfill(req({}))).json()).data).toEqual({ scannedCount: 1, linkedCount: 0 });
+});
+
+test('compiler handles repeated joins, leading leaves and a final unclosed rejoin', () => {
+  const start = new Date('2020-01-01T10:00:00Z'), end = new Date('2020-01-01T12:00:00Z');
+  const rows = [[false, '09:00'], [true, '10:10'], [true, '10:15'], [false, '11:00'], [true, '11:30']] as const;
+  expect(compileEventMetrics(rows.map(([isJoin, time]) => ({ isJoin, eventTime: new Date(`2020-01-01T${time}:00Z`) })), start, end)).toMatchObject({ totalMinutesPresent: 80, minutesLate: 10, minutesGoneEarly: 60, joinCount: 3, leaveCount: 2 });
+});
+
+test('sessions reject missing explicit operations and incomplete schedules but skip unscheduled automatic matches', async () => {
+  mocks.db.orbat.findUnique.mockResolvedValue(null);
+  expect((await sessions(req({ userId: 4, orbatId: 20, checkinTime: '2020-01-01T10:00:00Z' }))).status).toBe(404);
+  for (const schedule of [{ startsAtUtc: null, endsAtUtc: null }, { startsAtUtc: operation().startsAtUtc, endsAtUtc: null }]) {
+    mocks.db.orbat.findUnique.mockResolvedValue({ ...operation(), ...schedule });
+    expect((await sessions(req({ userId: 4, orbatId: 20, checkinTime: '2020-01-01T10:00:00Z' }))).status).toBe(422);
+  }
+  mocks.db.signup.findMany.mockResolvedValue([{ id: 60, slot: { orbat: { ...operation(), startsAtUtc: null, endsAtUtc: null } } }]);
+  expect((await (await sessions(req({ userId: 4, checkinTime: '2020-01-01T10:00:00Z' }))).json()).data.attendance).toEqual([]);
+});
+
+test('same open-session checkin is idempotent and an empty overlap produces no-show metrics', async () => {
+  mocks.db.attendanceSession.findFirst.mockResolvedValue(session());
+  mocks.db.attendanceSession.findMany.mockResolvedValue([]);
+  mocks.db.attendance.findFirst.mockResolvedValue(attendance());
+  expect((await sessions(req({ userId: 4, orbatId: 20, checkinTime: '2020-01-01T10:00:00Z' }))).status).toBe(200);
+  expect(mocks.db.attendanceSession.create).not.toHaveBeenCalled();
+  expect(mocks.db.attendance.update.mock.lastCall![0].data).toMatchObject({ status: 'no_show', totalMinutesPresent: 0 });
+});
+
+test('raw compilation rejects missing start and updates existing attendance', async () => {
+  mocks.db.orbat.findUnique.mockResolvedValueOnce({ ...operation(), startsAtUtc: null, endsAtUtc: null });
+  expect((await compile(req({}), ctx())).status).toBe(422);
+  mocks.db.attendance.findFirst.mockResolvedValue(attendance());
+  mocks.db.attendanceEvent.findMany.mockResolvedValue([event()]);
+  mocks.db.orbatAttendanceNote.findMany.mockResolvedValue([{ userId: 4, status: 'absent', lateMinutes: null, leaveEarlyMinutes: null }]);
+  expect((await compile(req({}), ctx())).status).toBe(200);
+  expect(mocks.db.attendance.update.mock.lastCall![0].data).toMatchObject({ status: 'present', notedAbsent: true });
+});
+
+test('compilation rejects missing operations and explicit sessions allow non-signup attendees', async () => {
+  mocks.db.orbat.findUnique.mockResolvedValueOnce(null);
+  expect((await compile(req({}), ctx())).status).toBe(404);
+  mocks.db.signup.findFirst.mockResolvedValue(null);
+  expect((await sessions(req({ userId: 4, orbatId: 20, checkinTime: '2020-01-01T10:00:00Z' }))).status).toBe(200);
+  expect(mocks.db.attendance.create.mock.calls[0][0].data.signupId).toBeNull();
+});

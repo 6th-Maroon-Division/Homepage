@@ -141,3 +141,45 @@ it.each([
   expect((await response.json()).error).toMatchObject({ code: 'validation_failed', message, details: { field } });
   expect(mocks.prisma.orbatTemplate.create).not.toHaveBeenCalled();
 });
+it('permission template descriptions accept null and missing permissions are rejected during creation', () => {
+  expect(parsePermissionTemplate({ description: null }, false)).toEqual({ data: { description: null } });
+  expect(parsePermissionTemplate({ name: 'Missing permission list' }, true).error?.status).toBe(422);
+});
+it('permission template routes reject malformed data before starting a transaction', async () => {
+  const response = await createPermissions(req('POST', { name: 'Missing permission list' }));
+  expect(response.status).toBe(422);
+  expect(mocks.prisma.$transaction).not.toHaveBeenCalled();
+});
+it('permission template update replaces positive grants and omits zero grants', async () => {
+  mocks.prisma.permission.findMany.mockResolvedValue([{ id: 4, maxValue: 255 }, { id: 5, maxValue: 255 }]);
+  const response = await updatePermissions(req('PATCH', { permissions: [{ permissionId: 4, value: 2 }, { permissionId: 5, value: 0 }] }), ctx());
+  expect(response.status).toBe(200);
+  expect(mocks.prisma.permissionTemplate.update).toHaveBeenCalledWith(expect.objectContaining({ data: { items: { deleteMany: {}, create: [{ permissionId: 4, value: 2 }] } } }));
+});
+it('permission template transaction conflicts return a conflict response', async () => {
+  mocks.prisma.$transaction.mockRejectedValue({ code: 'P2034' });
+  expect((await createPermissions(req('POST', permissionInput))).status).toBe(409);
+});
+
+it.each([
+  { endTime: '24:00' },
+  { slotsJson: [null] },
+  { slotsJson: [{ name: 'Squad', orderIndex: 0, slots: [null] }] },
+])('rejects malformed squad/slot structures and invalid end clock %j', body => {
+  expect(parseOrbatTemplate(body, false).error?.status).toBe(422);
+});
+it('legacy template reads preserve unassigned roles and normalize temporary radios', async () => {
+  const slotsJson = [{ name: 'Squad', orderIndex: 0, slots: [{ name: 'Unassigned', orderIndex: 0, maxSignups: null }] }];
+  mocks.prisma.orbatTemplate.findUnique.mockResolvedValue({ ...template, slotsJson, tempFrequencies: [{ frequency: 42, type: 'LR', channel: '1', callsign: 'Alpha' }, { frequency: '30', type: 'SR' }] });
+  const response = await read(req(), ctx());
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body.data.slotsJson[0].slots[0]).toMatchObject({ name: 'Unassigned', squadRoleId: null, requiredTrainingIds: [], requiredRankIds: [] });
+  expect(body.data.tempFrequencies).toEqual([
+    { frequency: '', type: 'LR', isAdditional: false, channel: '1', callsign: 'Alpha' },
+    { frequency: '30', type: 'SR', isAdditional: false, channel: '', callsign: '' },
+  ]);
+  expect(mocks.prisma.squadRole.findMany).not.toHaveBeenCalled();
+  expect((await update(req('PATCH', { slotsJson: [{ ...slotsJson[0], slots: [{ ...slotsJson[0].slots[0], maxSignups: 1 }] }] }), ctx())).status).toBe(200);
+  expect(mocks.prisma.squadRole.findMany).not.toHaveBeenCalled();
+});

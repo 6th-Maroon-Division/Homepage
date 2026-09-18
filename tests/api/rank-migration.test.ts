@@ -20,7 +20,7 @@ beforeEach(() => {
   mocks.db.botToken.findFirst.mockResolvedValue({ id: 9 });
   mocks.db.userPermission.findMany.mockResolvedValue([]);
   mocks.db.rank.findMany.mockResolvedValue([low, high]);
-  mocks.db.userRank.findMany.mockResolvedValue([{ userId: 5, user: { id: 5, username: 'Target' }, currentRankId: 10, currentRank: low, attendanceSinceLastRank: 1, lastRankedUpAt: null }]);
+  mocks.db.userRank.findMany.mockResolvedValue([{ userId: 5, user: { id: 5, username: 'Target' }, currentRankId: 10, currentRank: low, attendanceSinceLastRank: 1, lastRankedUpAt: new Date(0) }]);
   mocks.db.attendance.count.mockResolvedValue(2);
   mocks.db.legacyAttendanceData.count.mockResolvedValue(1);
   mocks.db.legacyUserData.findMany.mockResolvedValue([{ oldData: 3 }]);
@@ -90,4 +90,30 @@ test('audit failure fails closed and postcommit listener failures retain success
 test.each([['P2025', 404], ['P2002', 409], ['P2003', 409], ['P2034', 409]])('maps%s errors', async (code, status) => {
   mocks.db.$transaction.mockRejectedValue({ code });
   expect((await apply(req())).status).toBe(status);
+});
+
+ test('unknown database error codes remain internal failures rather than conflicts', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  mocks.db.$transaction.mockRejectedValue({ code: 'P1001' });
+  try { expect((await apply(req())).status).toBe(500); } finally { log.mockRestore(); }
+});
+
+test('recalculation keeps current rank when no threshold is met and tolerates missing display usernames', async () => {
+  const state = (await mocks.db.userRank.findMany())[0];
+  mocks.db.userRank.findMany.mockResolvedValue([{ ...state, user: { id: 5, username: null } }]);
+  mocks.db.rank.findMany.mockResolvedValue([{ ...low, attendanceRequiredSinceLastRank: 100 }, { ...high, attendanceRequiredSinceLastRank: 200 }]);
+  const body = await (await preview(req({ strategy: 'recalculate' }))).json();
+  expect(body.data.changes).toEqual([expect.objectContaining({ username: 'Unknown', currentRankName: low.name, newRankName: low.name, changeType: 'unchanged' })]);
+  mocks.db.rank.findMany.mockResolvedValue([{ ...low, attendanceRequiredSinceLastRank: null }, high]);
+  expect((await preview(req({ strategy: 'recalculate' }))).status).toBe(200);
+});
+
+test('partial mappings leave omitted ranks unchanged and allow explicit demotions', async () => {
+  const state = (await mocks.db.userRank.findMany())[0];
+  const untouched = await (await preview(req({ strategy: 'map', rankMappings: [{ oldRankId: 11, newRankId: 10 }] }))).json();
+  expect(untouched.data.unchanged).toBe(1);
+  mocks.db.userRank.findMany.mockResolvedValue([{ ...state, currentRankId: high.id, currentRank: high }]);
+  const demotion = await (await preview(req({ strategy: 'map', rankMappings: [{ oldRankId: 11, newRankId: 10 }] }))).json();
+  expect(demotion.data.demoted).toBe(1);
+  expect(demotion.data.changes[0].newRankName).toBe(low.name);
 });

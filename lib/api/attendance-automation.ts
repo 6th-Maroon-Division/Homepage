@@ -24,8 +24,15 @@ export async function ingestAttendanceEvent(request: Request, principal: ApiPrin
   let identity: { provider: 'steam' | 'discord'; providerUserId: string } | undefined;
   if (input.identity !== undefined) { const parsed = record(input.identity, ['provider', 'providerUserId']); if (!['steam', 'discord'].includes(parsed.provider as string) || typeof parsed.providerUserId !== 'string' || !/^[1-9]\d{16,19}$/.test(parsed.providerUserId)) fail(422, 'Provide a steam or discord identity with a numeric 17–20 digit providerUserId.'); identity = parsed as typeof identity; }
   const result = await prisma.$transaction(async tx => {
-    const userId = input.userId as number | undefined ?? await getIdentityUser(tx, identity!.provider, identity!.providerUserId);
-    if (userId !== null) await requireAttendanceUser(tx, principal, userId, 'attendance:edit');
+    let userId: number | null;
+    if (input.userId === undefined) {
+      userId = await getIdentityUser(tx, identity!.provider, identity!.providerUserId);
+    } else {
+      userId = input.userId as number;
+    }
+    if (userId !== null) {
+      await requireAttendanceUser(tx, principal, userId, 'attendance:edit');
+    }
     const identityWhere = userId !== null ? { userId } : identity!.provider === 'steam' ? { steamId: identity!.providerUserId } : { discordId: identity!.providerUserId };
     const previous = await tx.attendanceEvent.findFirst({ where: identityWhere, orderBy: [{ eventTime: 'desc' }, { id: 'desc' }] });
     if (previous && previous.isJoin === input.isJoin && previous.eventTime <= eventTime) {

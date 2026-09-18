@@ -16,7 +16,7 @@ export default defineConfig({
       exclude: ['lib/**/*.d.ts'],
       reporter: ['text', 'html', 'json-summary', 'json', 'lcov'],
       reportsDirectory: 'coverage/backend',
-      thresholds: { lines: 80, branches: 80, functions: 80, statements: 80 },
+      thresholds: { lines: 100, branches: 100, functions: 100, statements: 100 },
     },
   },
 });

@@ -137,3 +137,7 @@ describe('training audit and deletion', () => {
     spy.mockRestore();
   });
 });
+it('unknown training database failures are not misreported as reference conflicts', async () => {
+  const { trainingDatabaseError } = await import('@/lib/api/trainings');
+  expect(() => trainingDatabaseError({ code: 'P9999' })).toThrow();
+});

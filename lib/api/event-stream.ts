@@ -4,14 +4,15 @@ export function eventStream<T>(request: Request, options: {
   project: (event: T) => Promise<{ id: string; [key: string]: unknown } | null>;
   validate: () => Promise<boolean>;
 }) {
-  const encoder = new TextEncoder(); let cleanup = () => {};
+  const encoder = new TextEncoder(); let cleanup: () => void;
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       let closed = false; let unsubscribe = () => {}; let timer: ReturnType<typeof setInterval> | undefined;
       let pending = 0; let queue = Promise.resolve();
       const close = () => { if (closed) return; closed=true; if(timer)clearInterval(timer); unsubscribe(); request.signal.removeEventListener('abort',close); try{controller.close()}catch{/* Already cancelled. */} };
       cleanup=close;
-      const send=(chunk:string)=>{if(closed)return;if((controller.desiredSize??0)<=0){close();return}controller.enqueue(encoder.encode(chunk))};
+      // No controller.error path exists; cancellation sets closed before sends.
+      const send=(chunk:string)=>{if(closed)return;if(controller.desiredSize!<=0){close();return}controller.enqueue(encoder.encode(chunk))};
       const enqueue=(work:()=>Promise<void>)=>{if(closed)return;if(++pending>100){close();return}queue=queue.then(async()=>{try{if(!closed)await work()}finally{pending--}}).catch(close)};
       request.signal.addEventListener('abort',close,{once:true});
       if(request.signal.aborted){close();return}

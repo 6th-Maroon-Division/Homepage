@@ -110,3 +110,6 @@ it('maps known database errors and lets the shared handler sanitize unknown erro
   expect((await POST(request('POST', { name: 'X' }))).status).toBe(500);
   spy.mockRestore();
 });
+it('invalid category creation is rejected before the transaction',async()=>{
+ expect((await POST(request('POST',{name:''}))).status).toBe(422);expect(mocks.prisma.$transaction).not.toHaveBeenCalled();
+});

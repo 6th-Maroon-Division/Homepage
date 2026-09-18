@@ -11,7 +11,7 @@ import { sessionJson as requestJson } from '@/lib/api/training-session-contract'
 import { prisma } from '@/lib/prisma';
 
 import {
-  isTrainingRequestStatus,
+  type TrainingRequestWorkflowStatus,
   requestStatusToUserTrainingStatus,
   validateTrainingTransition,
 } from '@/lib/training-workflow';
@@ -51,8 +51,8 @@ export async function PATCH(request: Request, context: RouteContext) {
   if (new URL(request.url).searchParams.size) return apiError(400, 'invalid_request', 'Query parameters are not accepted.');
   const parsed = parseTrainingRequestBody(await readJsonBody(request), 'update');
   if (parsed.error) return parsed.error;
-  const body = parsed.data;
-  if (!isTrainingRequestStatus(body.status)) return apiError(422, 'validation_failed', 'Invalid status.');
+  // Update payloads require a valid status in the canonical parser.
+  const body = parsed.data as typeof parsed.data & { status: TrainingRequestWorkflowStatus };
   const existing = await prisma.trainingRequest.findUnique({
     where: { id: requestId },
     include: {

@@ -32,16 +32,6 @@ const ALLOWED_SESSION_TRANSITIONS: Record<SessionStatus, readonly SessionStatus[
   cancelled: [],
 };
 
-function isJsonObject(value: unknown): value is JsonObject {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isSessionStatus(value: unknown): value is SessionStatus {
-  return typeof value === 'string' && (SESSION_STATUSES as readonly string[]).includes(value);
-}
-
-function parsePositiveInteger(value: unknown): number | null { return typeof value === 'string' || typeof value === 'number' ? parseSessionId(String(value)) : null; }
-
 export async function GET(_request: Request, context: RouteContext) {
   return handleApiRequest(_request, undefined, async (principal, audit) => {
     const path = await context.params;
@@ -49,10 +39,8 @@ export async function GET(_request: Request, context: RouteContext) {
 
   if (new URL(_request.url).searchParams.size) return apiError(400, 'invalid_request', 'Query parameters are not accepted.');
   const { id } = await context.params;
-  const sessionId = parsePositiveInteger(id);
-  if (!sessionId) {
-    return sessionJson({ error: 'Invalid training session id' }, { status: 400 });
-  }
+  const sessionId = parseSessionId(id)!;
+
   const viewerId = sessionActor(principal) ?? 0;
   const staffViewer = isSessionStaff(principal);
   const trainingSession = await prisma.trainingSession.findUnique({
@@ -104,10 +92,8 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const { id } = await context.params;
-  const sessionId = parsePositiveInteger(id);
-  if (!sessionId) {
-    return sessionJson({ error: 'Invalid training session id' }, { status: 400 });
-  }
+  const sessionId = parseSessionId(id)!;
+
   const existing = await prisma.trainingSession.findUnique({
     where: { id: sessionId },
     include: {
@@ -118,20 +104,10 @@ export async function PATCH(request: Request, context: RouteContext) {
     return sessionJson({ error: 'Training session not found' }, { status: 404 });
   }
 
-  let parsedBody: unknown;
-  try {
-    parsedBody = await request.json();
-  } catch {
-    return sessionJson({ error: 'Invalid JSON body' }, { status: 400 });
-  }
-  if (!isJsonObject(parsedBody)) {
-    return sessionJson({ error: 'Request body must be an object' }, { status: 400 });
-  }
-  const body = parsedBody;
-  const status = body.status === undefined ? existing.status : body.status;
-  if (!isSessionStatus(status)) {
-    return sessionJson({ error: 'Invalid session status' }, { status: 400 });
-  }
+  // The canonical contract above already validated this body.
+  const body = await request.json() as JsonObject;
+  const status = (body.status === undefined ? existing.status : body.status) as SessionStatus;
+
   if (!ALLOWED_SESSION_TRANSITIONS[existing.status].includes(status)) {
     return sessionJson(
       { error: `Training session cannot move from ${existing.status} to ${status}` },
@@ -144,47 +120,26 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const trainerId = body.trainerId === undefined
     ? existing.trainerId
-    : body.trainerId === null ? null : parsePositiveInteger(body.trainerId);
-  if (body.trainerId !== undefined && body.trainerId !== null && trainerId === null) {
-    return sessionJson({ error: 'trainerId must be a positive integer or null' }, { status: 400 });
-  }
+    : body.trainerId === null ? null : (body.trainerId as number);
+
   if (trainerId !== null && status !== 'cancelled' && !(await assertEligibleTrainingStaff(trainerId))) {
     return sessionJson({ error: 'Select an eligible trainer' }, { status: 400 });
   }
   const selectedTrainer = trainerId === null
     ? null
     : await prisma.user.findUnique({ where: { id: trainerId }, select: userSelect });
-  if (body.startsAt !== undefined && body.startsAt !== null && typeof body.startsAt !== 'string') {
-    return sessionJson({ error: 'startsAt must be an ISO date string or null' }, { status: 400 });
-  }
+
   const startsAt = body.startsAt === undefined
     ? existing.startsAt
     : typeof body.startsAt === 'string' && body.startsAt.trim() ? new Date(body.startsAt) : null;
-  if (typeof body.startsAt === 'string' && (!body.startsAt.trim() || Number.isNaN(startsAt?.getTime()))) {
-    return sessionJson({ error: 'Invalid startsAt value' }, { status: 400 });
-  }
+
   if (['scheduled', 'in_progress', 'completed'].includes(status) && (!startsAt || !trainerId)) {
     return sessionJson({ error: 'Scheduled and active sessions require a trainer and start time' }, { status: 400 });
   }
 
   const durationMinutes = body.durationMinutes === undefined || body.durationMinutes === null
     ? body.durationMinutes === undefined ? existing.durationMinutes : null
-    : parsePositiveInteger(body.durationMinutes);
-  if (
-    body.durationMinutes !== undefined
-    && body.durationMinutes !== null
-    && (durationMinutes === null || durationMinutes > 1440)
-  ) {
-    return sessionJson({ error: 'Duration must be between 1 and 1440 minutes' }, { status: 400 });
-  }
-
-  if (
-    body.specialInstructions !== undefined
-    && body.specialInstructions !== null
-    && typeof body.specialInstructions !== 'string'
-  ) {
-    return sessionJson({ error: 'specialInstructions must be a string or null' }, { status: 400 });
-  }
+    : (body.durationMinutes as number);
 
   const startsAtChanged = existing.startsAt?.getTime() !== startsAt?.getTime();
   const notifications: SessionNotifications = [];
@@ -311,7 +266,7 @@ export async function PATCH(request: Request, context: RouteContext) {
               data: {
                 status: 'in_training',
                 needsRetraining: false,
-                trainerId: trainerId ?? actorId,
+                trainerId: trainerId!,
                 statusUpdatedAt: progressTime,
                 orbatQualifiedAt: null,
                 failedAt: null,
@@ -338,7 +293,7 @@ export async function PATCH(request: Request, context: RouteContext) {
               data: {
                 userId: trainingRequest.userId,
                 trainingId: trainingRequest.trainingId,
-                trainerId: trainerId ?? actorId,
+                trainerId: trainerId!,
                 status: 'in_training',
                 needsRetraining: false,
                 statusUpdatedAt: progressTime,

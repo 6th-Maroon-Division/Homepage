@@ -25,7 +25,7 @@ beforeEach(() => {
  vi.resetAllMocks(); row = initial(); created = false;
  mocks.session.mockResolvedValue({ user: { id: '1' } }); mocks.prisma.botToken.findFirst.mockResolvedValue({ id: 9 });
  mocks.prisma.user.findUnique.mockImplementation(async ({ where }) => ({ ...user, id: where.id, userPermissions: [{ permission: { key: 'training:mark' }, value: 2 }] })); mocks.prisma.userPermission.findMany.mockResolvedValue([]);
- mocks.prisma.training.findUnique.mockResolvedValue(training); mocks.prisma.userTraining.findUnique.mockImplementation(async ({ where }) => where.id || created ? row : null); mocks.prisma.userTraining.findMany.mockResolvedValue([row]);
+ mocks.prisma.training.findUnique.mockResolvedValue(training); mocks.prisma.userTraining.findUnique.mockImplementation(async ({ where }) => where.id || created ? structuredClone(row) : null); mocks.prisma.userTraining.findMany.mockResolvedValue([row]);
  mocks.prisma.userTraining.create.mockImplementation(async ({ data }) => { created = true; Object.assign(row, data); return row; }); mocks.prisma.userTraining.updateMany.mockImplementation(async ({ data }) => { Object.assign(row, data); return { count: 1 }; });
  mocks.prisma.trainingRequest.findFirst.mockResolvedValue(null); mocks.prisma.trainingRequest.findMany.mockResolvedValue([]); mocks.prisma.trainingRequest.updateMany.mockResolvedValue({ count: 1 });
  mocks.prisma.message.create.mockResolvedValue({ id: 11 }); mocks.prisma.$transaction.mockImplementation(work => work(mocks.prisma));
@@ -85,4 +85,92 @@ it('qualifications paginate credential rows and expose existing signup IDs witho
 });
 it('qualification query rejects missing/side operations and invalid query', async () => {
  expect((await qualification(req('GET', undefined, '?foo=1'), ctx())).status).toBe(400); mocks.prisma.orbat.findUnique.mockResolvedValue(null); expect((await qualification(req(), ctx())).status).toBe(404); mocks.prisma.orbat.findUnique.mockResolvedValue({ isSideOp: true }); expect((await qualification(req(), ctx())).status).toBe(409);
+});
+it('ORBAT qualification paging validates limits and shows only relevant occupied and available slots', async () => {
+  expect((await qualification(req('GET', undefined, '?limit=101'), ctx())).status).toBe(400);
+  const slot = { id: 5, maxSignups: null, squad: { name: 'Alpha' }, squadRole: { name: 'Medic', requiredTrainingIds: [2, 7] }, _count: { signups: 10 } };
+  mocks.prisma.slot.findMany.mockResolvedValue([slot, { ...slot, id: 6, maxSignups: 1 }, { ...slot, id: 7, squadRole: null }]);
+  mocks.prisma.userTraining.findMany.mockResolvedValue([row, { ...row, id: 2 }]);
+  mocks.prisma.signup.findMany.mockResolvedValue([{ id: 9, userId: 3, slotId: 5, slot }]);
+  const body = await (await qualification(req('GET', undefined, '?limit=1&cursor=8'), ctx())).json();
+  expect(body.meta).toEqual({ limit: 1, nextCursor: '1' });
+  expect(body.data.groups).toHaveLength(1);
+  expect(body.data.groups[0].availableSlots).toEqual([{ id: 5, label: 'Alpha — Medic', remainingCapacity: null }]);
+  expect(body.data.groups[0].users[0].assignedSlot).toEqual({ signupId: 9, slotId: 5, slotName: 'Medic', squadName: 'Alpha' });
+  mocks.prisma.signup.findMany.mockResolvedValue([{ id: 9, userId: 3, slotId: 5, slot: { ...slot, squadRole: null } }]);
+  expect((await (await qualification(req(), ctx())).json()).data.groups[0].users[0].assignedSlot).toBeNull();
+});
+it('self-only qualification reads do not create other-user read audits', async () => {
+  row.userId = 1;
+  expect((await qualification(req(), ctx())).status).toBe(200);
+  expect(mocks.prisma.apiAuditLog.create).not.toHaveBeenCalled();
+});
+it('credential lookup failures and mutation transport errors return canonical responses', async () => {
+  expect((await create(req('POST', payload, '?x=1'))).status).toBe(400);
+  expect((await remove(req('DELETE', {}), ctx())).status).toBe(400);
+  mocks.prisma.userTraining.findUnique.mockResolvedValue(null);
+  expect((await update(req('PATCH', { notes: null }), ctx())).status).toBe(404);
+  expect((await remove(req('DELETE'), ctx())).status).toBe(404);
+  mocks.prisma.training.findUnique.mockResolvedValue(null);
+  expect((await create(req('POST', payload))).status).toBe(404);
+});
+it('credential assignment validates session references and ORBAT scope before changes', async () => {
+  mocks.prisma.trainingSessionAttendee.count.mockResolvedValue(0);
+  expect((await update(req('PATCH', { trainingSessionId: 9, status: 'qualified' }), ctx())).status).toBe(409);
+  mocks.prisma.orbat.findUnique.mockResolvedValue(null);
+  expect((await update(req('PATCH', { orbatId: 9, status: 'qualified' }), ctx())).status).toBe(404);
+  mocks.prisma.orbat.findUnique.mockResolvedValue({ isSideOp: true });
+  expect((await update(req('PATCH', { orbatId: 9, status: 'qualified' }), ctx())).status).toBe(409);
+});
+it('changed or deleted credentials and related requests are detected atomically', async () => {
+  mocks.prisma.userTraining.findUnique.mockResolvedValueOnce(row).mockResolvedValueOnce(null);
+  expect((await update(req('PATCH', { notes: 'Updated' }), ctx())).status).toBe(409);
+  mocks.prisma.userTraining.findUnique.mockResolvedValue(row);
+  mocks.prisma.trainingRequest.findFirst.mockResolvedValue({ id: 7, status: 'needs_qualify' });
+  mocks.prisma.trainingRequest.updateMany.mockResolvedValue({ count: 0 });
+  expect((await update(req('PATCH', { status: 'qualified' }), ctx())).status).toBe(409);
+});
+it.each(['qualified', 'failed'])('ORBAT qualification %s synchronizes its related request and recorded notes', async status => {
+  mocks.prisma.trainingRequest.findFirst.mockResolvedValue({ id: 7, status: 'needs_qualify' });
+  expect((await update(req('PATCH', { status, orbatId: 9, notes: status === 'qualified' ? 'Passed in mission' : null }), ctx())).status).toBe(200);
+  expect(mocks.prisma.trainingRequestMessage.create).toHaveBeenCalledWith({ data: { requestId: 7, senderRole: 'SYSTEM', body: status === 'qualified' ? 'ORBAT qualification passed: Passed in mission' : 'ORBAT qualification failed.' } });
+});
+it('credential notifications handle theoretical session progress without granting qualification', async () => {
+  row.training = { ...training, requiresTrainingSession: true, requiresOrbatQualification: false }; row.status = 'approved';
+  expect((await update(req('PATCH', { status: 'in_training' }), ctx())).status).toBe(200);
+  expect(mocks.prisma.message.create).toHaveBeenCalledWith({ data: expect.objectContaining({ body: 'Your Training status is now in training.' }) });
+});
+it('credential lists support the current user alias and explicit request links', async () => {
+  expect((await list(req('GET', undefined, '?userId=me', true))).status).toBe(400);
+  mocks.prisma.trainingRequest.findMany.mockResolvedValue([{ id: 10, userId: 99, trainingId: 2 }, { id: 11, userId: 3, trainingId: 2 }]);
+  expect((await (await list(req())).json()).data[0].relatedRequestId).toBe(11);
+  expect((await list(req('GET', undefined, '?userId=me'))).status).toBe(200);
+});
+it('credential writes reject absent users and transitions which skip required training', async () => {
+  mocks.prisma.user.findUnique.mockResolvedValueOnce({ ...user, userPermissions: [{ permission: { key: 'training:mark' }, value: 2 }] }).mockResolvedValueOnce(null);
+  expect((await create(req('POST', payload))).status).toBe(404);
+  row.status = 'approved'; row.training = { ...training, requiresTrainingSession: true };
+  expect((await update(req('PATCH', { status: 'qualified' }), ctx())).status).toBe(409);
+  expect((await update(req('PATCH', { status: 'finished' }), ctx())).status).toBe(409);
+});
+it('new credentials default to qualified with a completed-session timestamp', async () => {
+  expect((await create(req('POST', { userId: 3, trainingId: 2 }))).status).toBe(201);
+  expect(mocks.prisma.userTraining.create).toHaveBeenCalledWith({ data: expect.objectContaining({ status: 'qualified', trainingSessionCompletedAt: expect.any(Date) }) });
+});
+it('non-ORBAT progress synchronizes its request and emits a lifecycle notification', async () => {
+  row.status = 'approved'; row.training = { ...training, requiresTrainingSession: true, requiresOrbatQualification: false };
+  mocks.prisma.trainingRequest.findFirst.mockResolvedValue({ id: 7, status: 'approved' });
+  expect((await update(req('PATCH', { status: 'in_training' }), ctx())).status).toBe(200);
+  expect(mocks.prisma.trainingRequestMessage.create).toHaveBeenCalledWith({ data: { requestId: 7, senderRole: 'SYSTEM', body: 'Training status changed from approved to in_training.' } });
+});
+it('a principal without training rights cannot enumerate credentials using a bot identity', async () => {
+  const { listCredentials } = await import('@/lib/api/user-trainings');
+  const principal = { kind: 'bot' as const, tokenId: 9, permissions: {} };
+  await expect(listCredentials(req(), principal, {} as never)).rejects.toThrow('Only your own credentials');
+});
+it('progressing a record with no session completion retains a null timestamp', async () => {
+  row.status = 'approved'; row.training = { ...training, requiresTrainingSession: true };
+  row.trainingSessionCompletedAt = null as unknown as Date;
+  expect((await update(req('PATCH', { status: 'in_training' }), ctx())).status).toBe(200);
+  expect(mocks.prisma.userTraining.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ trainingSessionCompletedAt: null }) }));
 });

@@ -110,3 +110,7 @@ describe('atomic status changes', () => {
     for (const [, call] of calls) expect((await call()).status).toBe(status);
   });
 });
+it('unknown database codes propagate to canonical internal error',async()=>{
+ mocks.db.$transaction.mockRejectedValue({code:'P9999'});const log=vi.spyOn(console,'error').mockImplementation(()=>{});
+ try{expect((await single(req({retired:true}),ctx())).status).toBe(500)}finally{log.mockRestore()}
+});

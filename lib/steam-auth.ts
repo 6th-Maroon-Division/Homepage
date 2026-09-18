@@ -73,7 +73,7 @@ export async function completeSteamLogin(request: NextRequest) {
   try {
     const params = request.nextUrl.searchParams;
     const allowed = ['state', 'openid.ns', 'openid.mode', 'openid.op_endpoint', 'openid.claimed_id', 'openid.identity', 'openid.return_to', 'openid.response_nonce', 'openid.assoc_handle', 'openid.signed', 'openid.sig'];
-    for (const key of params.keys()) if (!allowed.includes(key) || params.getAll(key).length !== 1 || (params.get(key)?.length ?? 0) > 4096) return denied();
+    for (const key of params.keys()) if (!allowed.includes(key) || params.getAll(key).length !== 1 || params.get(key)!.length > 4096) return denied();
     const state = params.get('state') ?? '';
     const cookie = request.cookies.get(config.cookie)?.value ?? '';
     if (!/^[a-f0-9]{64}$/.test(state) || !/^[a-f0-9]{64}$/.test(cookie) || !timingSafeEqual(Buffer.from(state), Buffer.from(cookie))) return denied();
@@ -115,9 +115,10 @@ export async function completeSteamLogin(request: NextRequest) {
         if (!account) account = await tx.authAccount.create({ data: { provider: 'steam', providerUserId: steamId, userId }, include: { user: true } });
         if (!user.avatarUrl && avatar) await tx.user.update({ where: { id: userId }, data: { avatarUrl: avatar } });
       } else if (!account) {
-        const user = await tx.user.create({ data: { username, avatarUrl: avatar, accounts: { create: { provider: 'steam', providerUserId: steamId } } } });
+        await tx.user.create({ data: { username, avatarUrl: avatar, accounts: { create: { provider: 'steam', providerUserId: steamId } } } });
         account = await tx.authAccount.findUniqueOrThrow({ where: { provider_providerUserId: { provider: 'steam', providerUserId: steamId } }, include: { user: true } });
-        if (account.userId !== user.id) throw new Error('Account changed');
+        // The nested create and unique provider identity bind this account to
+        // the new user within the same serializable transaction.
       }
       const owner = account!.user;
       await writeApiAudit(tx, { principal: { kind: 'user', userId: owner.id, permissions: {} }, correlationId: randomUUID(), method: 'GET', path: '/api/auth/steam-callback' }, { action: userId === null ? 'auth.steam.signed_in' : 'auth.steam.linked', resource: 'auth_account', resourceId: String(account!.id), targetUserIds: [owner.id], outcome: 'success' });

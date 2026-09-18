@@ -72,3 +72,26 @@ test('provider validation errors have canonical responses without secret leaks',
  m.fetch.mockResolvedValueOnce(Response.json({id:'wrong'}));expect((await refresh(request({provider:'discord'}),ctx())).status).toBe(502);
  m.fetch.mockResolvedValueOnce(Response.json({response:{players:[{steamid:'123456789',avatarfull:'javascript:bad'}]}}));expect((await refresh(request({provider:'steam'}),ctx())).status).toBe(502);
 });
+test('missing target users return not found before reading uploads',async()=>{
+ m.db.user.findUnique.mockImplementation(async args=>args.select.userPermissions?{userPermissions:[]} : null);
+ expect((await upload(request(form()),ctx())).status).toBe(404);expect(m.fs.writeFile).not.toHaveBeenCalled();
+});
+test('null existing avatar migration returns unchanged',async()=>{
+ stored=null;const response=await migrate(request(),ctx());expect(await response.json()).toEqual({data:{avatarUrl:null,changed:false},meta:{}});
+});
+test('permission revoked during avatar staging prevents update and removes temporary file',async()=>{
+ m.db.userPermission.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([{permission:{key:'user:manage'},value:10}]);
+ expect((await upload(request(form()),ctx('5'))).status).toBe(403);expect(m.fs.unlink).toHaveBeenCalled();expect(m.db.user.updateMany).not.toHaveBeenCalled();
+});
+test('serialization failures return conflict and unlink failure does not obscure it',async()=>{
+ m.db.$transaction.mockRejectedValue({code:'P2034'});m.fs.unlink.mockRejectedValue(new Error('file already removed'));
+ expect((await upload(request(form()),ctx())).status).toBe(409);
+});
+test('unrecognized storage errors become internal errors',async()=>{
+ m.db.$transaction.mockRejectedValue({code:'OTHER'});
+ const log=vi.spyOn(console,'error').mockImplementation(()=>{});
+ try{expect((await upload(request(form()),ctx())).status).toBe(500)}finally{log.mockRestore()}
+});
+test('refresh refuses obsolete extra fields in its JSON payload',async()=>{
+ const response=await refresh(request({provider:'steam',legacy:true}),ctx());expect(response.status).toBe(422);expect((await response.json()).error.message).toBe('Use only provider: steam or discord.');
+});

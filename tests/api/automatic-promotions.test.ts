@@ -21,7 +21,7 @@ beforeEach(() => {
   mocks.db.userRank.findMany.mockResolvedValue([{ userId: 5 }]);
   mocks.db.rankHistory.findMany.mockResolvedValue([]);
   mocks.eligibility.mockResolvedValue({ eligible: true, reason: 'eligible_auto', currentRank: { id: 10, name: 'Before' }, nextRank: { id: 11, name: 'After', autoRankupEnabled: true }, attendance: { currentAttendance: 8, delta: 3 }, proposalId: null });
-  mocks.db.userRank.findUniqueOrThrow.mockResolvedValue({ currentRankId: 10, attendanceSinceLastRank: 5, lastRankedUpAt: null });
+  mocks.db.userRank.findUniqueOrThrow.mockResolvedValue({ currentRankId: 10, attendanceSinceLastRank: 5, lastRankedUpAt: new Date(0) });
   mocks.db.userRank.update.mockImplementation(async ({ data }) => data);
   mocks.db.rankHistory.create.mockResolvedValue({ id: 20 });
   mocks.db.$transaction.mockImplementation(async cb => cb(mocks.db));
@@ -104,3 +104,14 @@ test('GET audit storage failure withholds returned history', async () => {
   log.mockRestore();
 });
 test.each(['?days=0', '?days=3651', '?days=bad', '?days=2&days=3', '?page=1', '?cursor=2147483648', '?limit=0'])('GET rejects invalid query%s', async query => expect((await GET(req('GET', {}, false, query))).status).toBe(400));
+
+test('stale automatic proposals are counted as failures without changing rank', async () => {
+  const eligibility = await mocks.eligibility();
+  mocks.eligibility.mockResolvedValue({ ...eligibility, proposalId: 30 });
+  mocks.db.promotionProposal.findUnique.mockResolvedValue({ id: 30, currentRankId: 999 });
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    expect((await (await POST(req())).json()).data).toEqual({ promotedCount: 0, errorsCount: 1, ineligibleCount: 0 });
+    expect(mocks.db.userRank.update).not.toHaveBeenCalled();
+  } finally { log.mockRestore(); }
+});

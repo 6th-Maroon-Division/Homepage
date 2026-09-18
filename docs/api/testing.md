@@ -1,6 +1,6 @@
 # Automated API testing
 
-The backend test goal is to verify every endpoint and supported method automatically, starting at 80% lines, branches, functions, and statements and increasing toward 100%. The release gate combines unit and real Prisma integration coverage across every API route and every library file. The [inventory](./inventory.md) tracks the remaining route surface; a test reference is not proof of per-method coverage.
+The backend test goal is to verify every endpoint and supported method automatically, with an enforced 100% lines, branches, functions, and statements requirement. The release gate combines unit and real Prisma integration coverage across every API route and every library file. The [inventory](./inventory.md) tracks the remaining route surface; a test reference is not proof of per-method coverage.
 
 ## Commands
 
@@ -29,7 +29,7 @@ The unit-only report remains in `coverage/api/` for quick feedback. The complete
 npm run test:backend
 ```
 
-This starts the same isolated Prisma database, runs both Vitest projects, and produces one combined coverage map. [vitest.backend.config.mts](../../vitest.backend.config.mts) includes **all** `app/api/**/route.ts` and `lib/**/*.ts`, including unimported files; only type declaration files are excluded. All four coverage metrics must reach 80%. Reports are written to `coverage/backend/` (HTML, LCOV, full JSON and JSON summary). Generated Prisma/framework code and UI components are outside the backend scope. Passing unit-only coverage does not replace this gate.
+This starts the same isolated Prisma database, runs both Vitest projects, and produces one combined coverage map. [vitest.backend.config.mts](../../vitest.backend.config.mts) includes **all** `app/api/**/route.ts` and `lib/**/*.ts`, including unimported files; only type declaration files are excluded. All four coverage metrics must reach 100%. Reports are written to `coverage/backend/` (HTML, LCOV, full JSON and JSON summary). Generated Prisma/framework code and UI components are outside the backend scope. Passing unit-only coverage does not replace this gate.
 
 Run isolated database integration tests:
 
@@ -47,7 +47,7 @@ Unit tests use controlled doubles for authentication and failure cases; integrat
 
 ## CI and rollout
 
-The [API tests workflow](../../.github/workflows/api-tests.yml) runs on pull requests and pushes to `main`, `master`, and `work/fixes-and-features`. It installs dependencies, generates Prisma Client, runs the combined backend test/coverage gate, and uploads `coverage/backend` as the `backend-coverage` artifact even after failures. Failing tests or any coverage metric below 80% fail the job. Repository branch protection must require this job to make it a merge gate; the workflow alone does not configure that protection.
+The [API tests workflow](../../.github/workflows/api-tests.yml) runs on pull requests and pushes to `main`, `master`, and `work/fixes-and-features`. It installs dependencies, generates Prisma Client, runs the combined backend test/coverage gate, and uploads `coverage/backend` as the `backend-coverage` artifact even after failures. Failing tests or any coverage metric below 100% fail the job. Repository branch protection must require this job to make it a merge gate; the workflow alone does not configure that protection.
 
 Each migrated endpoint must cover session and bot authentication, invalid/inactive/revoked credentials, permission and ownership/hierarchy checks, argument/payload validation, response contracts, and supported method behavior. Add pagination, UTC conversion/date boundaries, mutation rollback, audit attribution, and redaction checks where applicable. Track gaps before raising thresholds. Regenerate the route report after changes:
 
@@ -58,6 +58,8 @@ npm run api:inventory
 
 ## Migration completion check
 
-The final full run passed 1,894 tests across 103 test files. Whole-backend coverage: statements 90.90%, branches 89.10%, functions 91.85%, lines 90.63%. All 19 standalone regression tests and TypeScript checks also passed. These are the completion snapshot; CI computes current values on each change.
+The verified run passed 2,242 tests across 116 test files with 100% statements, branches, functions and lines. TypeScript and all 19 standalone regression tests also passed.
+
+The expanded suite covers authentication and permissions, request validation, UTC boundaries, transaction conflicts and rollback, legacy imports, operation presets and signups, attendance, training workflows, ranks, audit privacy, notification failures and stream cancellation. Coverage includes every route and library, without new exclusions or ignored branches. The 100% code-coverage gate measures execution of those paths; it does not prove every possible input or production behavior. CI computes current results on each change.
 
 `npm run api:check` verifies every exported method has an OpenAPI operation and a direct test import, rejects unfinished or stale operations, and resolves local schema references. This static contract check supplements behavioral coverage; an import alone does not prove adequate testing. The completed inventory contains 103 route files/155 methods with no missing or stale specification operations.

@@ -114,3 +114,24 @@ test.each([['P2025', 404], ['P2002', 409], ['P2003', 409], ['P2034', 409]])('map
   mocks.db.$transaction.mockRejectedValue({ code });
   expect((await PATCH(req('PATCH'), ctx())).status).toBe(status);
 });
+test('modifying an existing nonzero grant records MODIFY rather than revoke', async () => {
+  mocks.db.userPermission.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([{ permissionId: 10, value: 2 }]);
+  expect((await PATCH(req('PATCH'), ctx())).status).toBe(200);
+  expect(mocks.db.permissionAuditLog.create).toHaveBeenCalledWith({ data: expect.objectContaining({ action: 'MODIFY', oldValue: 2, newValue: 3 }) });
+});
+test('audit supports self reads without auditing and parameterized history filters', async () => {
+  expect((await audit(req(), ctx('me'))).status).toBe(200);
+  expect(mocks.db.apiAuditLog.create).not.toHaveBeenCalled();
+  expect((await audit(req('GET', undefined, true), ctx('me'))).status).toBe(400);
+  expect((await audit(req('GET', undefined, false, '?cursor=10&action=MODIFY'), ctx())).status).toBe(200);
+  expect(mocks.db.permissionAuditLog.findMany).toHaveBeenLastCalledWith(expect.objectContaining({ where: { targetUserId: 5, id: { lt: 10 }, action: 'MODIFY' } }));
+});
+test('unexpected Prisma errors propagate to shared server error envelope', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    mocks.db.$transaction.mockRejectedValue({ code: 'P9999' });
+    const response = await PATCH(req('PATCH'), ctx());
+    expect(response.status).toBe(500);
+    expect((await response.json()).error.code).toBe('internal_error');
+  } finally { log.mockRestore(); }
+});

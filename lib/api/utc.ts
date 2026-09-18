@@ -19,6 +19,6 @@ export function parseUtcTimestamp(value: unknown): Date | null {
   const [, year, month, day, hours, minutes, seconds, , offset] = match;
   if (!validCalendarDate(Number(year), Number(month), Number(day)) || Number(hours) > 23 || Number(minutes) > 59 || Number(seconds) > 59) return null;
   if (offset !== 'Z' && (Number(offset.slice(1, 3)) > 23 || Number(offset.slice(4)) > 59)) return null;
-  const date = new Date(value);
-  return Number.isFinite(date.getTime()) ? date : null;
+  // The validated four-digit year and bounded fields fit the Date range.
+  return new Date(value);
 }

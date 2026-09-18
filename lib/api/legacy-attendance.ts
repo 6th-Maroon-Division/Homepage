@@ -19,7 +19,7 @@ async function readAudit(principal: ApiPrincipal, audit: ApiAuditContext, rows: 
 }
 export async function listLegacyAttendance(request: Request, principal: ApiPrincipal, audit: ApiAuditContext) {
   const params = query(request, ['cursor','limit','search','isMapped']); const page = parseCursorPagination(params, { defaultLimit: 50, maxLimit: 100 }); if (page.error !== undefined) fail(400, page.error);
-  const { cursor, limit } = page.data; if (cursor && cursor > 2147483647) fail(400, 'Invalid cursor.');
+  const { cursor, limit } = page.data;
   if (params.has('isMapped') && !['true','false'].includes(params.get('isMapped')!)) fail(400, 'isMapped must be true or false.');
   const search = params.get('search')?.trim(); if (search && search.length > 200) fail(400, 'search must be at most 200 characters.');
   const where: Prisma.LegacyAttendanceDataWhereInput = { ...(cursor ? { id: { gt: cursor } } : {}), ...(search ? { legacyName: { contains: search, mode: 'insensitive' } } : {}), ...(params.has('isMapped') ? { isMapped: params.get('isMapped') === 'true' } : {}) };

@@ -72,7 +72,7 @@ async function writeCredential(db: Prisma.TransactionClient, principal: ApiPrinc
   const training = existing?.training ?? await db.training.findUnique({ where: { id: trainingId } }); if (!training) fail(404, 'Training not found.');
   const status = input.status ?? existing?.status ?? 'qualified';
   if (status === 'in_training' && !training.requiresTrainingSession || status === 'needs_qualify' && !training.requiresOrbatQualification || status === 'finished' && training.requiresOrbatQualification) fail(409, 'Status does not match the training workflow configuration.');
-  if (existing && status !== existing.status) { const transition = validateTrainingTransition(existing.status as TrainingRequestWorkflowStatus, status as TrainingRequestWorkflowStatus, training); if (!transition.valid) fail(409, transition.reason || 'Invalid transition.'); }
+  if (existing && status !== existing.status) { const transition = validateTrainingTransition(existing.status as TrainingRequestWorkflowStatus, status as TrainingRequestWorkflowStatus, training); if (!transition.valid) fail(409, transition.reason); }
   if (input.trainingSessionId && !await db.trainingSessionAttendee.count({ where: { userId, sessionId: input.trainingSessionId, session: { trainingId } } })) fail(409, 'Training session does not belong to this user and training.');
   if (input.orbatId) {
     const orbat = await db.orbat.findUnique({ where: { id: input.orbatId }, select: { isSideOp: true } }); if (!orbat) fail(404, 'Operation not found.');
