@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
-import { apiList } from '@/lib/api/client';
+import { apiList, apiRequest } from '@/lib/api/client';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import TrainingScheduleSummary from './TrainingScheduleSummary';
 import DualRingTimePicker from '@/app/components/ui/DualRingTimePicker';
@@ -75,12 +75,8 @@ export default function TrainingSchedulePanel({
 
   useEffect(() => {
     if (session) return;
-    void fetch(`/api/training-sessions?trainingId=${trainingId}`, { cache: 'no-store' })
-      .then(async (response) => response.ok ? response.json() : { sessions: [] })
-      .then((payload) => setExistingSessions(
-        (Array.isArray(payload.sessions) ? payload.sessions : [])
-          .filter((item: { status?: string }) => ['proposed', 'scheduled', 'in_progress'].includes(item.status || '')),
-      ))
+    void apiList<(typeof existingSessions)[number]>(`/api/training-sessions?trainingId=${trainingId}`, { cache: 'no-store' })
+      .then((rows) => setExistingSessions(rows.filter(item => ['proposed', 'scheduled', 'in_progress'].includes(item.status)).sort((a, b) => b.id - a.id)))
       .catch(() => setExistingSessions([]));
   }, [session, trainingId]);
 
@@ -88,13 +84,11 @@ export default function TrainingSchedulePanel({
     if (!existingSessionId) return;
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/training-sessions/${existingSessionId}/attendees`, {
+      await apiRequest(`/api/training-sessions/${existingSessionId}/attendees`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: requestUserId, trainingRequestId: requestId }),
       });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || 'Failed to assign existing session');
       showSuccess('Existing session assigned');
       await onSaved();
     } catch (error) {

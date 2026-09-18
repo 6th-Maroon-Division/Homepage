@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { handleApiRequest } from '@/lib/api/handler';
+import { apiError, apiSuccess } from '@/lib/api/response';
+import { writeApiAudit } from '@/lib/api/audit';
+import { isSessionStaff, sessionActor, sessionId as parseSessionId, validateSessionBody, sessionJson, safeSessionPublish, sessionDatabaseError, auditSessionRead, sessionSnapshot, attendeeSnapshot } from '@/lib/api/training-session-contract';
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { assertEligibleTrainingStaff, isTrainingStaff } from '@/lib/training-staff';
-import { createTrainingNotification } from '@/lib/training-notifications';
+import { assertEligibleTrainingStaff } from '@/lib/training-staff';
+import { createSessionNotification, publishSessionNotifications, type SessionNotifications } from '@/lib/api/training-session-notifications';
 import { publishTrainingChatEvent } from '@/lib/realtime/training-chat-events';
 import { publishUserProfileEvent } from '@/lib/realtime/user-events';
 import { appendBotEvent } from '@/lib/bot-events';
@@ -38,38 +40,33 @@ function isSessionStatus(value: unknown): value is SessionStatus {
   return typeof value === 'string' && (SESSION_STATUSES as readonly string[]).includes(value);
 }
 
-function parsePositiveInteger(value: unknown): number | null {
-  if (typeof value !== 'number' && typeof value !== 'string') return null;
-  const normalized = typeof value === 'string' ? value.trim() : value;
-  if (typeof normalized === 'string' && !/^\d+$/.test(normalized)) return null;
-  const parsed = Number(normalized);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
-}
+function parsePositiveInteger(value: unknown): number | null { return typeof value === 'string' || typeof value === 'number' ? parseSessionId(String(value)) : null; }
 
-export async function GET(_request: NextRequest, context: RouteContext) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export async function GET(_request: Request, context: RouteContext) {
+  return handleApiRequest(_request, undefined, async (principal, audit) => {
+    const path = await context.params;
+    if (!parseSessionId(path.id)) return apiError(400, 'invalid_request', 'Invalid session or attendee ID.');
+
+  if (new URL(_request.url).searchParams.size) return apiError(400, 'invalid_request', 'Query parameters are not accepted.');
   const { id } = await context.params;
   const sessionId = parsePositiveInteger(id);
   if (!sessionId) {
-    return NextResponse.json({ error: 'Invalid training session id' }, { status: 400 });
+    return sessionJson({ error: 'Invalid training session id' }, { status: 400 });
   }
-  const viewerId = Number(session.user.id);
-  const staffViewer = await isTrainingStaff(viewerId);
+  const viewerId = sessionActor(principal) ?? 0;
+  const staffViewer = isSessionStaff(principal);
   const trainingSession = await prisma.trainingSession.findUnique({
     where: { id: sessionId },
     include: {
       training: true,
       trainer: { select: userSelect },
       attendees: {
-        include: { user: { select: userSelect }, trainingRequest: { select: { id: true } } },
+        include: { user: { select: userSelect }, trainingRequest: { select: { id: true, status: true } } },
       },
     },
   });
   if (!trainingSession) {
-    return NextResponse.json({ error: 'Training session not found' }, { status: 404 });
+    return sessionJson({ error: 'Training session not found' }, { status: 404 });
   }
   if (
     !staffViewer
@@ -77,12 +74,13 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       (item) => item.userId === viewerId && item.status !== 'cancelled',
     )
   ) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return sessionJson({ error: 'Forbidden' }, { status: 403 });
   }
   if (!staffViewer && ['proposed', 'cancelled'].includes(trainingSession.status)) {
-    return NextResponse.json({ error: 'Training session not found' }, { status: 404 });
+    return sessionJson({ error: 'Training session not found' }, { status: 404 });
   }
-  return NextResponse.json({
+  await auditSessionRead(audit, [{ ...trainingSession, attendees: staffViewer ? trainingSession.attendees : trainingSession.attendees.filter(item => item.userId === viewerId) }], String(sessionId));
+  return sessionJson({
     ...trainingSession,
     attendees: staffViewer
       ? trainingSession.attendees
@@ -90,22 +88,25 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     server: 'Arma3 Training Server',
     isStaff: staffViewer,
   });
+  });
 }
 
-export async function PUT(request: NextRequest, context: RouteContext) {
-  const authSession = await getServerSession(authOptions);
-  if (!authSession?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  const actorId = Number(authSession.user.id);
-  if (!(await isTrainingStaff(actorId))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+export async function PATCH(request: Request, context: RouteContext) {
+  return handleApiRequest(request, undefined, async (principal, audit) => {
+    const path = await context.params;
+    if (!parseSessionId(path.id)) return apiError(400, 'invalid_request', 'Invalid session or attendee ID.');
+
+    const invalid = await validateSessionBody(request, 'update');
+    if (invalid) return invalid;
+  const actorId = sessionActor(principal);
+  if (!(isSessionStaff(principal))) {
+    return sessionJson({ error: 'Forbidden' }, { status: 403 });
   }
 
   const { id } = await context.params;
   const sessionId = parsePositiveInteger(id);
   if (!sessionId) {
-    return NextResponse.json({ error: 'Invalid training session id' }, { status: 400 });
+    return sessionJson({ error: 'Invalid training session id' }, { status: 400 });
   }
   const existing = await prisma.trainingSession.findUnique({
     where: { id: sessionId },
@@ -114,56 +115,56 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     },
   });
   if (!existing) {
-    return NextResponse.json({ error: 'Training session not found' }, { status: 404 });
+    return sessionJson({ error: 'Training session not found' }, { status: 404 });
   }
 
   let parsedBody: unknown;
   try {
     parsedBody = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    return sessionJson({ error: 'Invalid JSON body' }, { status: 400 });
   }
   if (!isJsonObject(parsedBody)) {
-    return NextResponse.json({ error: 'Request body must be an object' }, { status: 400 });
+    return sessionJson({ error: 'Request body must be an object' }, { status: 400 });
   }
   const body = parsedBody;
   const status = body.status === undefined ? existing.status : body.status;
   if (!isSessionStatus(status)) {
-    return NextResponse.json({ error: 'Invalid session status' }, { status: 400 });
+    return sessionJson({ error: 'Invalid session status' }, { status: 400 });
   }
   if (!ALLOWED_SESSION_TRANSITIONS[existing.status].includes(status)) {
-    return NextResponse.json(
+    return sessionJson(
       { error: `Training session cannot move from ${existing.status} to ${status}` },
       { status: 409 },
     );
   }
   if (!existing.training.isActive && status !== 'cancelled') {
-    return NextResponse.json({ error: 'Inactive training sessions can only be cancelled' }, { status: 409 });
+    return sessionJson({ error: 'Inactive training sessions can only be cancelled' }, { status: 409 });
   }
 
   const trainerId = body.trainerId === undefined
     ? existing.trainerId
     : body.trainerId === null ? null : parsePositiveInteger(body.trainerId);
   if (body.trainerId !== undefined && body.trainerId !== null && trainerId === null) {
-    return NextResponse.json({ error: 'trainerId must be a positive integer or null' }, { status: 400 });
+    return sessionJson({ error: 'trainerId must be a positive integer or null' }, { status: 400 });
   }
   if (trainerId !== null && status !== 'cancelled' && !(await assertEligibleTrainingStaff(trainerId))) {
-    return NextResponse.json({ error: 'Select an eligible trainer' }, { status: 400 });
+    return sessionJson({ error: 'Select an eligible trainer' }, { status: 400 });
   }
   const selectedTrainer = trainerId === null
     ? null
     : await prisma.user.findUnique({ where: { id: trainerId }, select: userSelect });
   if (body.startsAt !== undefined && body.startsAt !== null && typeof body.startsAt !== 'string') {
-    return NextResponse.json({ error: 'startsAt must be an ISO date string or null' }, { status: 400 });
+    return sessionJson({ error: 'startsAt must be an ISO date string or null' }, { status: 400 });
   }
   const startsAt = body.startsAt === undefined
     ? existing.startsAt
     : typeof body.startsAt === 'string' && body.startsAt.trim() ? new Date(body.startsAt) : null;
   if (typeof body.startsAt === 'string' && (!body.startsAt.trim() || Number.isNaN(startsAt?.getTime()))) {
-    return NextResponse.json({ error: 'Invalid startsAt value' }, { status: 400 });
+    return sessionJson({ error: 'Invalid startsAt value' }, { status: 400 });
   }
   if (['scheduled', 'in_progress', 'completed'].includes(status) && (!startsAt || !trainerId)) {
-    return NextResponse.json({ error: 'Scheduled and active sessions require a trainer and start time' }, { status: 400 });
+    return sessionJson({ error: 'Scheduled and active sessions require a trainer and start time' }, { status: 400 });
   }
 
   const durationMinutes = body.durationMinutes === undefined || body.durationMinutes === null
@@ -174,7 +175,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     && body.durationMinutes !== null
     && (durationMinutes === null || durationMinutes > 1440)
   ) {
-    return NextResponse.json({ error: 'Duration must be between 1 and 1440 minutes' }, { status: 400 });
+    return sessionJson({ error: 'Duration must be between 1 and 1440 minutes' }, { status: 400 });
   }
 
   if (
@@ -182,13 +183,20 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     && body.specialInstructions !== null
     && typeof body.specialInstructions !== 'string'
   ) {
-    return NextResponse.json({ error: 'specialInstructions must be a string or null' }, { status: 400 });
+    return sessionJson({ error: 'specialInstructions must be a string or null' }, { status: 400 });
   }
 
   const startsAtChanged = existing.startsAt?.getTime() !== startsAt?.getTime();
+  const notifications: SessionNotifications = [];
   let outcome;
   try {
     outcome = await prisma.$transaction(async (tx) => {
+      const currentTraining = await tx.training.findUnique({ where: { id: existing.trainingId } });
+      if (!currentTraining || !currentTraining.isActive && status !== 'cancelled') throw new SessionUpdateError('Training no longer accepts session changes.', 409);
+      if (trainerId !== null && status !== 'cancelled') {
+        const eligible = await tx.userPermission.findFirst({ where: { userId: trainerId, value: { gt: 0 }, permission: { key: { in: ['training:approve_request', 'training:mark', 'system:super_admin'] } } }, select: { id: true } });
+        if (!eligible) throw new SessionUpdateError('The selected trainer is no longer eligible.', 409);
+      }
       const updateResult = await tx.trainingSession.updateMany({
         where: { id: sessionId, status: existing.status, updatedAt: existing.updatedAt },
         data: {
@@ -402,34 +410,17 @@ export async function PUT(request: NextRequest, context: RouteContext) {
         include: {
           training: true,
           trainer: { select: userSelect },
-          attendees: { include: { trainingRequest: { select: { id: true } } } },
+          attendees: { include: { user: { select: userSelect }, trainingRequest: { select: { id: true, status: true } } } },
         },
       });
-      return { trainingSession, linkedRequestIds, attendeeIds };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-  } catch (error) {
-    if (error instanceof SessionUpdateError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
-    }
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
-      return NextResponse.json(
-        { error: 'Training session changed concurrently. Refresh and try again.' },
-        { status: 409 },
-      );
-    }
-    throw error;
-  }
-
-  const updated = outcome.trainingSession;
-  const attendeeIds = outcome.attendeeIds;
   if (status === 'cancelled' && existing.status !== 'cancelled') {
-    await createTrainingNotification({
+    await createSessionNotification({
       recipientUserIds: attendeeIds,
       title: `${existing.training.name} training cancelled`,
       body: 'Your scheduled training session was cancelled. Open the training chat to coordinate a new time.',
       actionUrl: '/profile?tab=trainings',
       createdById: actorId,
-    });
+    }, tx, notifications);
   } else if (
     ['scheduled', 'in_progress'].includes(status)
     && startsAt
@@ -440,34 +431,28 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       || existing.durationMinutes !== durationMinutes
     )
   ) {
-    await createTrainingNotification({
+    await createSessionNotification({
       recipientUserIds: attendeeIds,
       title: `${existing.training.name} training updated`,
       body: `The session is scheduled for ${startsAt.toLocaleString('en-GB', { timeZone: 'UTC' })} UTC.`,
       actionUrl: '/profile?tab=trainings',
       createdById: actorId,
-    });
+    }, tx, notifications);
   }
   if (
     status !== 'cancelled'
     && trainerId
     && trainerId !== existing.trainerId
   ) {
-    await createTrainingNotification({
+    await createSessionNotification({
       recipientUserIds: [trainerId],
       title: `Assigned: ${existing.training.name} training`,
       body: `You were assigned to Training Session #${sessionId}.`,
       actionUrl: `/admin/trainings?tab=sessions&session=${sessionId}`,
       createdById: actorId,
-    });
+    }, tx, notifications);
   }
 
-  for (const attendeeId of attendeeIds) {
-    publishUserProfileEvent(attendeeId, { source: 'training-session.updated', sessionId });
-  }
-  for (const requestId of outcome.linkedRequestIds) {
-    publishTrainingChatEvent(requestId, { source: 'schedule', sessionId, status });
-  }
   if (status === 'cancelled' || (startsAt && ['scheduled', 'in_progress'].includes(status))) {
     await appendBotEvent({
       type: status === 'cancelled' ? 'training.cancelled' : 'training.updated',
@@ -475,9 +460,36 @@ export async function PUT(request: NextRequest, context: RouteContext) {
         trainingId: existing.trainingId, sessionId, title: existing.training.name,
         startsAt: startsAt?.toISOString() ?? null,
         endsAt: startsAt && durationMinutes !== null ? new Date(startsAt.getTime() + durationMinutes * 60_000).toISOString() : null,
-        websiteUrl: `/trainings/sessions/${sessionId}`, version: updated.updatedAt.toISOString(),
+        websiteUrl: `/trainings/sessions/${sessionId}`, version: trainingSession.updatedAt.toISOString(),
       },
-    });
+    }, tx);
   }
-  return NextResponse.json({ ...updated, server: 'Arma3 Training Server' });
+
+      await writeApiAudit(tx, audit, { action: 'training_session.updated', resource: 'training_session', resourceId: String(trainingSession.id), targetUserIds: attendeeIds, outcome: 'success', before: sessionSnapshot(existing), after: sessionSnapshot(trainingSession) });
+      return { trainingSession, linkedRequestIds, attendeeIds };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  } catch (error) {
+    if (error instanceof SessionUpdateError) {
+      return sessionJson({ error: error.message }, { status: error.status });
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
+      return sessionJson(
+        { error: 'Training session changed concurrently. Refresh and try again.' },
+        { status: 409 },
+      );
+    }
+    return sessionDatabaseError(error);
+  }
+
+  publishSessionNotifications(notifications);
+  const updated = outcome.trainingSession;
+  const attendeeIds = outcome.attendeeIds;
+  for (const attendeeId of attendeeIds) {
+    safeSessionPublish(() => publishUserProfileEvent(attendeeId, { source: 'training-session.updated', sessionId }));
+  }
+  for (const requestId of outcome.linkedRequestIds) {
+    safeSessionPublish(() => publishTrainingChatEvent(requestId, { source: 'schedule', sessionId, status }));
+  }
+  return sessionJson({ ...updated, server: 'Arma3 Training Server' });
+  });
 }

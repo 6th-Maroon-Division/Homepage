@@ -1,12 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { handleApiRequest } from '@/lib/api/handler';
+import { apiError, apiSuccess } from '@/lib/api/response';
+import { writeApiAudit } from '@/lib/api/audit';
+import { isSessionStaff, sessionActor, sessionId as parseSessionId, validateSessionBody, sessionJson, safeSessionPublish, sessionDatabaseError, auditSessionRead, sessionSnapshot, attendeeSnapshot } from '@/lib/api/training-session-contract';
+import { NextResponse } from 'next/server';
 import { Prisma } from '@/generated/prisma/client';
 import { prisma } from '@/lib/prisma';
 import { publishTrainingChatEvent } from '@/lib/realtime/training-chat-events';
 import { publishUserProfileEvent } from '@/lib/realtime/user-events';
-import { createTrainingNotification } from '@/lib/training-notifications';
-import { isTrainingStaff } from '@/lib/training-staff';
+import { createSessionNotification, publishSessionNotifications, type SessionNotifications } from '@/lib/api/training-session-notifications';
 
 type RouteContext = { params: Promise<{ id: string; attendeeId: string }> };
 type JsonObject = Record<string, unknown>;
@@ -35,13 +36,7 @@ function isAttendeeStatus(value: unknown): value is AttendeeStatus {
   return typeof value === 'string' && (ATTENDEE_STATUSES as readonly string[]).includes(value);
 }
 
-function parsePositiveInteger(value: unknown): number | null {
-  if (typeof value !== 'number' && typeof value !== 'string') return null;
-  const normalized = typeof value === 'string' ? value.trim() : value;
-  if (typeof normalized === 'string' && !/^\d+$/.test(normalized)) return null;
-  const parsed = Number(normalized);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
-}
+function parsePositiveInteger(value: unknown): number | null { return typeof value === 'string' || typeof value === 'number' ? parseSessionId(String(value)) : null; }
 
 function isStatusAllowedForSession(sessionStatus: string, attendeeStatus: AttendeeStatus) {
   if (sessionStatus === 'cancelled') return attendeeStatus === 'cancelled';
@@ -50,47 +45,49 @@ function isStatusAllowedForSession(sessionStatus: string, attendeeStatus: Attend
   return true;
 }
 
-async function readBody(request: NextRequest, required: boolean): Promise<JsonObject | NextResponse> {
+async function readBody(request: Request, required: boolean): Promise<JsonObject | NextResponse> {
   let rawBody: string;
   try {
     rawBody = await request.text();
   } catch {
-    return NextResponse.json({ error: 'Unable to read request body' }, { status: 400 });
+    return sessionJson({ error: 'Unable to read request body' }, { status: 400 });
   }
   if (!rawBody.trim()) {
     return required
-      ? NextResponse.json({ error: 'Request body is required' }, { status: 400 })
+      ? sessionJson({ error: 'Request body is required' }, { status: 400 })
       : {};
   }
   try {
     const parsed: unknown = JSON.parse(rawBody);
     return isJsonObject(parsed)
       ? parsed
-      : NextResponse.json({ error: 'Request body must be an object' }, { status: 400 });
+      : sessionJson({ error: 'Request body must be an object' }, { status: 400 });
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    return sessionJson({ error: 'Invalid JSON body' }, { status: 400 });
   }
 }
 
 async function mutateAttendee(
-  request: NextRequest,
+  request: Request,
   context: RouteContext,
   forcedStatus?: AttendeeStatus,
 ) {
-  const authSession = await getServerSession(authOptions);
-  if (!authSession?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  const actorId = Number(authSession.user.id);
-  if (!(await isTrainingStaff(actorId))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  return handleApiRequest(request, undefined, async (principal, audit) => {
+    const path = await context.params;
+    if (!parseSessionId(path.id) || !parseSessionId(path.attendeeId)) return apiError(400, 'invalid_request', 'Invalid session or attendee ID.');
+
+    const invalid = await validateSessionBody(request, forcedStatus ? 'remove' : 'attendee');
+    if (invalid) return invalid;
+  const actorId = sessionActor(principal);
+  if (!(isSessionStaff(principal))) {
+    return sessionJson({ error: 'Forbidden' }, { status: 403 });
   }
 
   const { id, attendeeId: rawAttendeeId } = await context.params;
   const sessionId = parsePositiveInteger(id);
   const attendeeId = parsePositiveInteger(rawAttendeeId);
   if (!sessionId || !attendeeId) {
-    return NextResponse.json({ error: 'Invalid session or attendee id' }, { status: 400 });
+    return sessionJson({ error: 'Invalid session or attendee id' }, { status: 400 });
   }
 
   const bodyResult = await readBody(request, forcedStatus === undefined);
@@ -98,23 +95,24 @@ async function mutateAttendee(
   const body = bodyResult;
   const targetStatus = forcedStatus ?? body.status;
   if (!isAttendeeStatus(targetStatus)) {
-    return NextResponse.json({ error: 'Valid attendance status is required' }, { status: 400 });
+    return sessionJson({ error: 'Valid attendance status is required' }, { status: 400 });
   }
   if (body.notes !== undefined && body.notes !== null && typeof body.notes !== 'string') {
-    return NextResponse.json({ error: 'notes must be a string or null' }, { status: 400 });
+    return sessionJson({ error: 'notes must be a string or null' }, { status: 400 });
   }
   if (body.expectedUpdatedAt !== undefined && typeof body.expectedUpdatedAt !== 'string') {
-    return NextResponse.json({ error: 'expectedUpdatedAt must be an ISO date string' }, { status: 400 });
+    return sessionJson({ error: 'expectedUpdatedAt must be an ISO date string' }, { status: 400 });
   }
   const expectedUpdatedAt = typeof body.expectedUpdatedAt === 'string'
     ? new Date(body.expectedUpdatedAt)
     : null;
   if (expectedUpdatedAt && Number.isNaN(expectedUpdatedAt.getTime())) {
-    return NextResponse.json({ error: 'Invalid expectedUpdatedAt value' }, { status: 400 });
+    return sessionJson({ error: 'Invalid expectedUpdatedAt value' }, { status: 400 });
   }
   const hasNotes = Object.prototype.hasOwnProperty.call(body, 'notes');
   const notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 4000) || null : null;
 
+  const notifications: SessionNotifications = [];
   try {
     const result = await prisma.$transaction(async (tx) => {
       const existing = await tx.trainingSessionAttendee.findFirst({
@@ -155,6 +153,10 @@ async function mutateAttendee(
         );
       }
 
+      if (existing.status === 'cancelled' && targetStatus !== 'cancelled') {
+        const conflict = await tx.trainingSessionAttendee.findFirst({ where: { id: { not: attendeeId }, userId: existing.userId, status: { not: 'cancelled' }, session: { trainingId: existing.session.trainingId, status: { in: ['proposed', 'scheduled', 'in_progress'] } } }, select: { id: true } });
+        if (conflict) throw new AttendeeApiError('User is already assigned to another open training session.', 409);
+      }
       const now = new Date();
       const updateResult = await tx.trainingSessionAttendee.updateMany({
         where: { id: attendeeId, sessionId, updatedAt: existing.updatedAt },
@@ -171,7 +173,7 @@ async function mutateAttendee(
         throw new AttendeeApiError('Attendee changed while it was being updated. Refresh and try again.', 409);
       }
 
-      const attendee = await tx.trainingSessionAttendee.findUniqueOrThrow({
+      let attendee = await tx.trainingSessionAttendee.findUniqueOrThrow({
         where: { id: attendeeId },
         include: {
           user: { select: userSelect },
@@ -287,6 +289,28 @@ async function mutateAttendee(
         requestStarted = true;
       }
 
+      attendee = await tx.trainingSessionAttendee.findUniqueOrThrow({ where: { id: attendeeId }, include: { user: { select: userSelect }, trainingRequest: { select: { id: true, status: true } } } });
+
+    if (existing.status !== targetStatus) {
+      const notificationText: Record<AttendeeStatus, string> = {
+        scheduled: 'You are listed as scheduled for this session.',
+        attended: 'Your attendance was recorded. This does not change your qualification status.',
+        completed: 'Your session attendance was marked complete. Qualification remains a separate trainer action.',
+        absent: 'You were marked absent from this session.',
+        cancelled: 'You were removed from this training session.',
+      };
+      await createSessionNotification({
+        recipientUserIds: [attendee.userId],
+        title: `${existing.session.training.name}: attendance updated`,
+        body: notificationText[targetStatus],
+        actionUrl: existing.trainingRequest?.id
+          ? `/trainings/requests/${existing.trainingRequest?.id}`
+          : '/profile?tab=trainings',
+        createdById: actorId,
+      }, tx, notifications);
+    }
+
+      await writeApiAudit(tx, audit, { action: 'training_session_attendee.updated', resource: 'training_session_attendee', resourceId: String(attendee.id), targetUserIds: [existing.userId], outcome: 'success', before: attendeeSnapshot(existing), after: attendeeSnapshot(attendee) });
       return {
         attendee,
         previousStatus: existing.status,
@@ -296,63 +320,45 @@ async function mutateAttendee(
       };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
-    if (result.previousStatus !== targetStatus) {
-      const notificationText: Record<AttendeeStatus, string> = {
-        scheduled: 'You are listed as scheduled for this session.',
-        attended: 'Your attendance was recorded. This does not change your qualification status.',
-        completed: 'Your session attendance was marked complete. Qualification remains a separate trainer action.',
-        absent: 'You were marked absent from this session.',
-        cancelled: 'You were removed from this training session.',
-      };
-      await createTrainingNotification({
-        recipientUserIds: [result.attendee.userId],
-        title: `${result.trainingName}: attendance updated`,
-        body: notificationText[targetStatus],
-        actionUrl: result.linkedRequestId
-          ? `/trainings/requests/${result.linkedRequestId}`
-          : '/profile?tab=trainings',
-        createdById: actorId,
-      });
-    }
-
-    publishUserProfileEvent(result.attendee.userId, {
+  publishSessionNotifications(notifications);
+    safeSessionPublish(() => publishUserProfileEvent(result.attendee.userId, {
       source: 'training-session.attendee-updated',
       sessionId,
       attendeeId,
       status: targetStatus,
-    });
+    }));
     if (result.linkedRequestId) {
-      publishTrainingChatEvent(result.linkedRequestId, {
+      safeSessionPublish(() => publishTrainingChatEvent(result.linkedRequestId!, {
         source: 'session-attendee',
         sessionId,
         attendeeId,
         status: targetStatus,
-      });
+      }));
     }
 
-    return NextResponse.json({
+    return sessionJson({
       attendee: result.attendee,
       removed: forcedStatus === 'cancelled',
     });
   } catch (error) {
     if (error instanceof AttendeeApiError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
+      return sessionJson({ error: error.message }, { status: error.status });
     }
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
-      return NextResponse.json(
+      return sessionJson(
         { error: 'The attendee changed concurrently. Refresh and try again.' },
         { status: 409 },
       );
     }
-    console.error('Error updating training session attendee:', error);
-    return NextResponse.json({ error: 'Failed to update attendee' }, { status: 500 });
+    return sessionDatabaseError(error);
   }
+  });
 }
 
-export async function PUT(request: NextRequest, context: RouteContext) {
+export async function PATCH(request: Request, context: RouteContext) {
   return mutateAttendee(request, context);
 }
 
-export async function DELETE(request: NextRequest, context: RouteContext) {
+export async function DELETE(request: Request, context: RouteContext) {
   return mutateAttendee(request, context, 'cancelled');
 }

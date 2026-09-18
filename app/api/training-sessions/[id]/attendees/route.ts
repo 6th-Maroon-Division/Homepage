@@ -1,12 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { handleApiRequest } from '@/lib/api/handler';
+import { apiError, apiSuccess } from '@/lib/api/response';
+import { writeApiAudit } from '@/lib/api/audit';
+import { isSessionStaff, sessionActor, sessionId as parseSessionId, validateSessionBody, sessionJson, safeSessionPublish, sessionDatabaseError, auditSessionRead, sessionSnapshot, attendeeSnapshot } from '@/lib/api/training-session-contract';
+import { NextResponse } from 'next/server';
 import { Prisma } from '@/generated/prisma/client';
 import { prisma } from '@/lib/prisma';
 import { publishTrainingChatEvent } from '@/lib/realtime/training-chat-events';
 import { publishUserProfileEvent } from '@/lib/realtime/user-events';
-import { createTrainingNotification } from '@/lib/training-notifications';
-import { isTrainingStaff } from '@/lib/training-staff';
+import { createSessionNotification, publishSessionNotifications, type SessionNotifications } from '@/lib/api/training-session-notifications';
 
 type RouteContext = { params: Promise<{ id: string }> };
 type JsonObject = Record<string, unknown>;
@@ -25,43 +26,39 @@ function isJsonObject(value: unknown): value is JsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function parsePositiveInteger(value: unknown): number | null {
-  if (typeof value !== 'number' && typeof value !== 'string') return null;
-  const normalized = typeof value === 'string' ? value.trim() : value;
-  if (typeof normalized === 'string' && !/^\d+$/.test(normalized)) return null;
-  const parsed = Number(normalized);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
-}
+function parsePositiveInteger(value: unknown): number | null { return typeof value === 'string' || typeof value === 'number' ? parseSessionId(String(value)) : null; }
 
-export async function POST(request: NextRequest, context: RouteContext) {
-  const authSession = await getServerSession(authOptions);
-  if (!authSession?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  const actorId = Number(authSession.user.id);
-  if (!(await isTrainingStaff(actorId))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+export async function POST(request: Request, context: RouteContext) {
+  return handleApiRequest(request, undefined, async (principal, audit) => {
+    const path = await context.params;
+    if (!parseSessionId(path.id)) return apiError(400, 'invalid_request', 'Invalid session or attendee ID.');
+
+    const invalid = await validateSessionBody(request, 'add');
+    if (invalid) return invalid;
+  const actorId = sessionActor(principal);
+  if (!(isSessionStaff(principal))) {
+    return sessionJson({ error: 'Forbidden' }, { status: 403 });
   }
 
   const { id } = await context.params;
   const sessionId = parsePositiveInteger(id);
   if (!sessionId) {
-    return NextResponse.json({ error: 'Invalid training session id' }, { status: 400 });
+    return sessionJson({ error: 'Invalid training session id' }, { status: 400 });
   }
 
   let parsedBody: unknown;
   try {
     parsedBody = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    return sessionJson({ error: 'Invalid JSON body' }, { status: 400 });
   }
   if (!isJsonObject(parsedBody)) {
-    return NextResponse.json({ error: 'Request body must be an object' }, { status: 400 });
+    return sessionJson({ error: 'Request body must be an object' }, { status: 400 });
   }
   const body = parsedBody;
   const userId = parsePositiveInteger(body.userId);
   if (!userId) {
-    return NextResponse.json({ error: 'userId must be a positive integer' }, { status: 400 });
+    return sessionJson({ error: 'userId must be a positive integer' }, { status: 400 });
   }
 
   const hasExplicitRequest = Object.prototype.hasOwnProperty.call(body, 'trainingRequestId');
@@ -69,17 +66,18 @@ export async function POST(request: NextRequest, context: RouteContext) {
     ? null
     : parsePositiveInteger(body.trainingRequestId);
   if (hasExplicitRequest && body.trainingRequestId !== null && !trainingRequestId) {
-    return NextResponse.json({ error: 'trainingRequestId must be a positive integer or null' }, { status: 400 });
+    return sessionJson({ error: 'trainingRequestId must be a positive integer or null' }, { status: 400 });
   }
   if (body.notes !== undefined && body.notes !== null && typeof body.notes !== 'string') {
-    return NextResponse.json({ error: 'notes must be a string or null' }, { status: 400 });
+    return sessionJson({ error: 'notes must be a string or null' }, { status: 400 });
   }
   const notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 4000) || null : null;
   if (body.advanceTraining !== undefined && typeof body.advanceTraining !== 'boolean') {
-    return NextResponse.json({ error: 'advanceTraining must be a boolean' }, { status: 400 });
+    return sessionJson({ error: 'advanceTraining must be a boolean' }, { status: 400 });
   }
   const advanceTraining = body.advanceTraining === true;
 
+  const notifications: SessionNotifications = [];
   try {
     const result = await prisma.$transaction(async (tx) => {
       const trainingSession = await tx.trainingSession.findUnique({
@@ -148,6 +146,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
             orderBy: [{ requestedAt: 'desc' }, { id: 'desc' }],
           });
 
+      if (trainingRequestId && !linkedRequest) throw new AttendeeApiError('Training request not found', 404);
       if (!linkedRequest && advanceTraining) {
         linkedRequest = await tx.trainingRequest.create({
           data: {
@@ -350,6 +349,22 @@ export async function POST(request: NextRequest, context: RouteContext) {
         },
       });
 
+    const scheduleText = trainingSession.status === 'proposed'
+      ? 'Staff will confirm the date and trainer when scheduling is complete.'
+      : trainingSession.startsAt
+        ? `The session starts ${trainingSession.startsAt.toLocaleString('en-GB', { timeZone: 'UTC' })} UTC on the Arma3 Training Server.`
+        : 'Open your training page for the latest session details.';
+    await createSessionNotification({
+      recipientUserIds: [userId],
+      title: `Added to ${trainingSession.training.name} training`,
+      body: scheduleText,
+      actionUrl: linkedRequest?.id
+        ? `/trainings/requests/${linkedRequest?.id}`
+        : '/profile?tab=trainings',
+      createdById: actorId,
+    }, tx, notifications);
+
+      await writeApiAudit(tx, audit, { action: 'training_session_attendee.created', resource: 'training_session_attendee', resourceId: String(currentAttendee.id), targetUserIds: [userId], outcome: 'success', after: attendeeSnapshot(currentAttendee) });
       return {
         attendee: currentAttendee,
         linkedRequestId: linkedRequest?.id ?? null,
@@ -359,48 +374,34 @@ export async function POST(request: NextRequest, context: RouteContext) {
       };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
-    const scheduleText = result.sessionStatus === 'proposed'
-      ? 'Staff will confirm the date and trainer when scheduling is complete.'
-      : result.startsAt
-        ? `The session starts ${result.startsAt.toLocaleString('en-GB', { timeZone: 'UTC' })} UTC on the Arma3 Training Server.`
-        : 'Open your training page for the latest session details.';
-    await createTrainingNotification({
-      recipientUserIds: [userId],
-      title: `Added to ${result.trainingName} training`,
-      body: scheduleText,
-      actionUrl: result.linkedRequestId
-        ? `/trainings/requests/${result.linkedRequestId}`
-        : '/profile?tab=trainings',
-      createdById: actorId,
-    });
-
-    publishUserProfileEvent(userId, { source: 'training-session.attendee-added', sessionId });
+  publishSessionNotifications(notifications);
+    safeSessionPublish(() => publishUserProfileEvent(userId, { source: 'training-session.attendee-added', sessionId }));
     if (result.linkedRequestId) {
-      publishTrainingChatEvent(result.linkedRequestId, {
+      safeSessionPublish(() => publishTrainingChatEvent(result.linkedRequestId!, {
         source: 'session-attendee',
         sessionId,
         attendeeId: result.attendee.id,
         status: result.attendee.status,
-      });
+      }));
     }
 
-    return NextResponse.json({ attendee: result.attendee }, { status: 201 });
+    return sessionJson({ attendee: result.attendee }, { status: 201 });
   } catch (error) {
     if (error instanceof AttendeeApiError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
+      return sessionJson({ error: error.message }, { status: error.status });
     }
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2002') {
-        return NextResponse.json({ error: 'User or training request is already linked to a session' }, { status: 409 });
+        return sessionJson({ error: 'User or training request is already linked to a session' }, { status: 409 });
       }
       if (error.code === 'P2034') {
-        return NextResponse.json(
+        return sessionJson(
           { error: 'The session changed while adding the attendee. Refresh and try again.' },
           { status: 409 },
         );
       }
     }
-    console.error('Error adding training session attendee:', error);
-    return NextResponse.json({ error: 'Failed to add attendee' }, { status: 500 });
+    return sessionDatabaseError(error);
   }
+  });
 }
