@@ -172,7 +172,17 @@ The shared `getPublicOrbat` projection serves both initial server rendering and 
 
 Nested signup users contain only display ID/name and rank name/abbreviation. Note users contain display ID/name and the current-rank display projection. Email, accounts, grants, and other unrelated user fields are excluded; visible note reason/status/minute fields remain. Reads audit unique people appearing in returned signups or notes: session users exclude themselves, while anonymous callers and bots include all returned people. These audits have actor/target metadata and no snapshots; anonymous actors are identified as anonymous. Responses with no people do not generate general-read audits.
 
-This batch covers full-detail reads and their shared server-rendering projection. Anonymous regression tests for collection/calendar/event flows remain future work; those routes and editor mutations are unchanged.
+This batch covers full-detail reads and their shared server-rendering projection. Calendar coverage is handled in the next batch; collection/event regression tests remain future work. Editor mutations are unchanged.
+
+## Sixteenth migration batch: public and personalized calendar
+
+`GET /api/orbats/calendar` uses the shared public handler and standard envelope. Anonymous callers receive operations. Live session users also receive scheduled training sessions where their own attendee record is not cancelled and the session is neither proposed nor cancelled. Staff with positive `training:approve_request`, `training:mark`, or superadmin grants, including active bot tokens, see every session with a start time, including proposed/cancelled sessions. Stale sessions receive anonymous access only.
+
+Only single `limit`/`cursor` query parameters are accepted; unknown/duplicate keys return 400. The default limit is 50, capped at 100. Typed cursors are `orbat:<positiveInt32>` or `training_session:<positiveInt32>`. Pagination returns all operations by descending ID, then visible training sessions by descending ID, using real lookahead across the kind boundary. `meta.nextCursor` is null only when no more visible items remain. The website and server-rendered page collect all pages and sort chronologically for display.
+
+Both use shared `getCalendarPage`/`getCalendarItems` services and live authentication. Entries retain `id`, `kind`, `name`, `description`, UTC `eventDate`, UTC date-only `dateKey`, and `href`, plus operation `isSideOp` or session `status`/nullable `trainerName`. Operation dates fall back from start time to event date to creation date. Staff links point to administration; other users’ links derive only from their own active attendee request. No attendee records are returned.
+
+Only trainer identities actually displayed to someone else are audited; session users exclude themselves, while bots include all displayed trainers. Public operation-only responses need no user-data audit. Audits contain metadata without snapshots; audit failure returns 500. This batch adds anonymous calendar regressions. Anonymous collection and event-stream regression tests remain for their future migrations.
 
 ## Verification and remaining rollout
 

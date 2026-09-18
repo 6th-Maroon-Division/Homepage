@@ -1597,21 +1597,89 @@ paths:
     get:
       tags:
         - ORBATs
-      summary: Get ORBAT calendar feed
+      summary: Get the public and personalized calendar
+      description: Anonymous callers receive operation entries. Valid session users also receive their own scheduled training
+        sessions with an active (not cancelled) attendance record and a session status other than proposed/cancelled.
+        Positive training:approve_request, training:mark, or superadmin grants identify staff; staff and active bot
+        tokens see all sessions with startsAt set, including proposed/cancelled sessions. Invalid supplied Authorization
+        credentials return 401 without anonymous fallback; stale sessions have anonymous access only. Only one limit and
+        one cursor query parameter are accepted; unknown/duplicate keys return 400. Cursor order is all ORBATs
+        descending by ID, then eligible training sessions descending by ID, with real lookahead across the boundary.
+        Clients collect pages and sort chronologically for display. Operation dates fall back from startsAtUtc to
+        eventDate to createdAt; all event dates and dateKey use UTC. Staff links point to administration; nonstaff links
+        use only their own active attendee request. No attendee data is returned. Only displayed trainer IDs other than
+        the session user are audited; bots audit all displayed trainers. Anonymous operation reads have no user-data
+        audit. Audit records contain metadata without snapshots; audit failure returns 500.
+      security:
+        - {}
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
       parameters:
-        - name: start
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+          description: Page size, capped at 100.
+        - name: cursor
           in: query
           schema:
             type: string
-            format: date-time
-        - name: end
-          in: query
-          schema:
-            type: string
-            format: date-time
+            pattern: ^(orbat|training_session):[1-9][0-9]*$
+          description: Kind plus positive Int32 ID without leading zeros, exactly as returned by meta.nextCursor. No cursor starts
+            at the ORBAT collection. A training_session cursor skips the ORBAT collection.
       responses:
         "200":
-          description: Calendar feed data
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      oneOf:
+                        - $ref: "#/components/schemas/OrbatCalendarItem"
+                        - $ref: "#/components/schemas/TrainingSessionCalendarItem"
+                  meta:
+                    type: object
+                    required:
+                      - limit
+                      - nextCursor
+                    properties:
+                      limit:
+                        type: integer
+                        minimum: 1
+                        maximum: 100
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+                        description: orbat:<id> or training_session:<id> when another visible item exists; null at the end.
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Invalid supplied Authorization credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
   /orbats/events:
     get:
       tags:
@@ -8131,3 +8199,74 @@ components:
             $ref: "#/components/schemas/PublicOrbatAttendanceNote"
         tempFrequencies:
           description: Existing JSON temporary-frequency value, retained from the operation.
+    OrbatCalendarItem:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - description
+        - eventDate
+        - dateKey
+        - href
+        - kind
+        - isSideOp
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type:
+            - string
+            - "null"
+        eventDate:
+          $ref: "#/components/schemas/UtcTimestamp"
+        dateKey:
+          type: string
+          format: date
+          description: UTC calendar date derived from eventDate.
+        href:
+          type: string
+        kind:
+          type: string
+          const: orbat
+        isSideOp:
+          type: boolean
+    TrainingSessionCalendarItem:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - description
+        - eventDate
+        - dateKey
+        - href
+        - kind
+        - status
+        - trainerName
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        eventDate:
+          $ref: "#/components/schemas/UtcTimestamp"
+        dateKey:
+          type: string
+          format: date
+          description: UTC calendar date derived from eventDate.
+        href:
+          type: string
+        kind:
+          type: string
+          const: training_session
+        status:
+          type: string
+        trainerName:
+          type:
+            - string
+            - "null"

@@ -2,20 +2,30 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import type { PermissionKey } from '@/lib/permissions';
-import { resolveApiPrincipal } from './principal';
+import { resolveApiPrincipal, type ApiPrincipal } from './principal';
+import { parsePositiveId } from './validation';
 import { parsePermissionGrants, hasApiPermission, hasApiHierarchyPermission } from './permissions';
 import { apiError } from './response';
 
+async function sessionUserId() { return (await getServerSession(authOptions))?.user?.id; }
+async function findSessionUser(id: number) {
+  if (id > 2147483647) return null;
+  const user = await prisma.user.findUnique({ where: { id }, select: {
+    userPermissions: { select: { value: true, permission: { select: { key: true } } } },
+  } });
+  if (!user) return null;
+  return { permissions: parsePermissionGrants(Object.fromEntries(user.userPermissions.map(entry => [entry.permission.key, entry.value]))) ?? {} };
+}
+export async function getApiSessionPrincipal(): Promise<Extract<ApiPrincipal, { kind: 'user' }> | null> {
+  const userId = parsePositiveId(await sessionUserId());
+  if (userId === null) return null;
+  const user = await findSessionUser(userId);
+  return user ? { kind: 'user', userId, permissions: user.permissions } : null;
+}
 export async function authenticateApi(request: Request) {
   return resolveApiPrincipal(request, {
-    sessionUserId: async () => (await getServerSession(authOptions))?.user?.id,
-    findUser: async id => {
-      const user = await prisma.user.findUnique({ where: { id }, select: {
-        userPermissions: { select: { value: true, permission: { select: { key: true } } } },
-      } });
-      if (!user) return null;
-      return { permissions: parsePermissionGrants(Object.fromEntries(user.userPermissions.map(entry => [entry.permission.key, entry.value]))) ?? {} };
-    },
+    sessionUserId,
+    findUser: findSessionUser,
     findBot: async token => {
       const bot = await prisma.botToken.findFirst({ where: { token, isActive: true }, select: { id: true } });
       return bot ? { id: bot.id, permissions: { 'system:super_admin': 255 } } : null;

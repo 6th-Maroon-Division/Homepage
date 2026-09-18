@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { apiList } from '@/lib/api/client';
 
 type UiOp = {
   id: number;
@@ -129,12 +130,15 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
     };
 
     const source = new EventSource('/api/orbats/events');
+    let refreshRequest: AbortController | null = null;
     const refreshCalendar = async () => {
+      refreshRequest?.abort();
+      const controller = new AbortController();
+      refreshRequest = controller;
       try {
-        const res = await fetch('/api/orbats/calendar');
-        if (!res.ok) return;
-        const latest = (await res.json()) as UiOp[];
-        setOpsState(latest);
+        const latest = await apiList<UiOp>('/api/orbats/calendar', { signal: controller.signal });
+        if (controller.signal.aborted) return;
+        setOpsState(latest.sort((a, b) => Date.parse(a.eventDate) - Date.parse(b.eventDate)));
       } catch {
         // Keep the last successfully loaded calendar.
       }
@@ -160,6 +164,7 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
     source.onerror = () => undefined;
 
     return () => {
+      refreshRequest?.abort();
       source.close();
       if (fallbackTimerRef.current) {
         clearInterval(fallbackTimerRef.current);
