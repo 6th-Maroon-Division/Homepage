@@ -5,7 +5,7 @@ export function stripHtmlComments(body) {
   const visible = [];
   let depth = 0;
   let start = 0;
-  for (const token of body.matchAll(/<!--|-->/g)) {
+  for (const token of body.matchAll(/<!--|--!?>/g)) {
     if (token[0] === '<!--') {
       if (depth === 0) {
         // Keep a boundary so removal cannot join text into new comment markers

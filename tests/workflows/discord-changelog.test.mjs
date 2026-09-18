@@ -8,6 +8,9 @@ import { stripHtmlComments } from '../../.github/scripts/changelog-text.mjs';
 for (const [name, input, expected] of [
   ['plain descriptions', ':cl: Example\nfix: A change', ':cl: Example\nfix: A change'],
   ['multiline comments', 'before<!-- hidden\nfix: Hidden -->after', 'before\nafter'],
+  ['alternative comment endings', 'before<!-- hidden --!>after', 'before\nafter'],
+  ['mixed nested comment endings', 'before<!-- outer <!-- inner --!> hidden -->after', 'before\nafter'],
+  ['alternative nested outer endings', 'before<!-- outer <!-- inner --> hidden --!>after', 'before\nafter'],
   ['adjacent comments', 'before<!-- one --><!-- two -->after', 'before\n\nafter'],
   ['nested comments', 'before<!-- outer <!-- inner -->\nfix: Hidden -->after', 'before\nafter'],
   ['unterminated comments', 'before<!--\nfix: Hidden', 'before\n'],
@@ -57,6 +60,13 @@ test('real script sends only visible entries and preserves grouping and author f
   assert.equal(embed.author.name, 'Changes by test-author');
   assert.deepEqual(embed.fields.map(field => field.value), ['• New feature', '• Visible correction']);
   assert.equal(embed.footer.text, 'Merged on 2026-09-18');
+});
+
+test('real script preserves visible entries after alternative comment endings', () => {
+  const result = runChangelog('<!-- :cl: Hidden\nfix: Hidden --!>\n:cl:\nfix: Visible correction');
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.messages.length, 1);
+  assert.deepEqual(result.messages[0].embeds[0].fields.map(field => field.value), ['• Visible correction']);
 });
 
 test('real script does not send empty, commented, malformed or unmerged changelogs', () => {
