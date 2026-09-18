@@ -16,6 +16,7 @@ export default defineConfig({
         'app/api/users/[[]id]/leave-of-absences/route.ts', 'app/api/leave-of-absences/[[]id]/route.ts',
         'app/api/ranks/route.ts', 'app/api/ranks/[[]id]/route.ts', 'app/api/ranks/reorder/route.ts',
         'app/api/training-users/route.ts',
+        'app/api/events/route.ts', 'lib/bot-event-feed.ts',
         'app/api/orbats/[[]id]/attendance/import/route.ts',
         'app/api/orbats/events/route.ts', 'app/api/orbats/[[]id]/events/route.ts',
         'app/api/users/events/route.ts', 'app/api/users/[[]id]/events/route.ts', 'app/api/users/[[]id]/messages/events/route.ts',
