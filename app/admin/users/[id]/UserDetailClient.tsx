@@ -872,16 +872,11 @@ export default function UserDetailClient({
                     permissionId: permission.id,
                     value: permission.currentValue,
                   }));
-                  const res = await fetch(`/api/users/${user.id}/permissions`, {
-                    method: 'PUT',
+                  await apiRequest<null>(`/api/users/${user.id}/permissions`, {
+                    method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ permissions: payload }),
                   });
-
-                  if (!res.ok) {
-                    const data = await res.json().catch(() => ({}));
-                    throw new Error(data.error || 'Failed to save permissions');
-                  }
 
                   showSuccess('Permissions updated');
                   router.refresh();

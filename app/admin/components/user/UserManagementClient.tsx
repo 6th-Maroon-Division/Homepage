@@ -168,12 +168,7 @@ export default function UserManagementClient({
   const fetchUserPermissions = async (userId: number) => {
     setLoadingPermissions(true);
     try {
-      const res = await fetch(`/api/users/${userId}/permissions`);
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Failed to fetch permissions');
-      }
-      const data = await res.json();
+      const { data } = await apiRequest<{ permissions: typeof userPermissions }>(`/api/users/${userId}/permissions`);
       setUserPermissions(data.permissions || []);
     } catch (e) {
       showError(e instanceof Error ? e.message : 'Failed to load permissions');
@@ -194,15 +189,11 @@ export default function UserManagementClient({
         value: p.currentValue,
       }));
       
-      const res = await fetch(`/api/users/${permissionsModalData.userId}/permissions`, {
-        method: 'PUT',
+      await apiRequest<null>(`/api/users/${permissionsModalData.userId}/permissions`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ permissions }),
       });
-      
-      if (!res.ok) {
-        throw new Error('Failed to save permissions');
-      }
       
       showSuccess(`Permissions updated for ${permissionsModalData.username}`);
       setPermissionsModalData(null);
@@ -1070,7 +1061,7 @@ export default function UserManagementClient({
                             ?.trainings.find((t) => t.trainingId === parseInt(trainingModalData.trainingId))?.id
                         }`,
                         {
-                          method: 'PUT',
+                          method: 'PATCH',
                           headers: {
                             'Content-Type': 'application/json',
                           },

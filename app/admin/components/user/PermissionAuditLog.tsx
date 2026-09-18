@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
+import { apiList } from '@/lib/api/client';
 
 type AuditLog = {
   id: number;
@@ -18,10 +19,9 @@ type AuditLog = {
   actor: {
     id: number;
     username: string | null;
-    avatarUrl: string | null;
-  };
+  } | null;
+  actorType: 'user' | 'bot' | 'deleted_user';
   createdAt: string;
-  metadata: Record<string, unknown> | null;
 };
 
 type PermissionAuditLogProps = {
@@ -44,15 +44,9 @@ export default function PermissionAuditLog({ userId, username }: PermissionAudit
         params.append('action', filter);
       }
 
-      const response = await fetch(`/api/users/${userId}/permissions/audit?${params}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch audit logs');
-      }
-
-      const data = await response.json();
-      setLogs(data.logs);
-      setTotalCount(data.pagination.total);
+      const data = await apiList<AuditLog>(`/api/users/${userId}/permissions/audit?${params}`);
+      setLogs(data);
+      setTotalCount(data.length);
     } catch (error) {
       console.error('Error fetching audit logs:', error);
       showError('Failed to load permission history');
@@ -192,19 +186,10 @@ export default function PermissionAuditLog({ userId, username }: PermissionAudit
 
                   {/* Actor */}
                   <div className="flex items-center gap-2 mt-2">
-                    {log.actor.avatarUrl && (
-                      <img
-                        src={log.actor.avatarUrl}
-                        alt={log.actor.username || 'Actor'}
-                        width={20}
-                        height={20}
-                        className="rounded-full"
-                      />
-                    )}
                     <span className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
                       by{' '}
                       <span style={{ color: 'var(--foreground)' }}>
-                        {log.actor.username || `User ${log.actor.id}`}
+                        {log.actor ? log.actor.username || `User ${log.actor.id}` : log.actorType === 'bot' ? 'Bot' : 'Deleted user'}
                       </span>
                     </span>
                   </div>

@@ -166,8 +166,8 @@ enum PermissionAction {
 
 model PermissionAuditLog {
   id           Int              @id @default(autoincrement())
-  actor        User             @relation("PermissionActor", fields: [actorId], references: [id], onDelete: Cascade)
-  actorId      Int // Who made the change
+  actor        User?            @relation("PermissionActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorId      Int? // Human actor; null for bot or deleted actor (API audit retains token identity)
   targetUser   User             @relation("PermissionTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
   targetUserId Int // Whose permissions changed
   permission   Permission       @relation(fields: [permissionId], references: [id], onDelete: Cascade)

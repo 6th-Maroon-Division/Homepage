@@ -5522,48 +5522,332 @@ paths:
                 type: object
   /users/{id}/permissions:
     get:
-      tags:
-        - Users
-      summary: Get user permissions
+      summary: Read user permission resource
+      description: Requires user:manage_permissions plus target hierarchy (self allowed). Bots superadmin. No query. Zero for
+        absent grants; other-target read audited.
       security:
-        - bearerAuth:
-            - user:manage_permissions
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            oneOf:
+              - type: integer
+                minimum: 1
+                maximum: 2147483647
+              - type: string
+                const: me
+          description: Positive Int32 user ID or session-only me
       responses:
         "200":
-          description: User permissions
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: object
+                    required:
+                      - user
+                      - permissions
+                    properties:
+                      user:
+                        type: object
+                        required:
+                          - id
+                          - username
+                        properties:
+                          id:
+                            type: integer
+                            minimum: 1
+                            maximum: 2147483647
+                          username:
+                            type:
+                              - string
+                              - "null"
+                      permissions:
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - id
+                            - key
+                            - description
+                            - defaultValue
+                            - maxValue
+                            - currentValue
+                          properties:
+                            id:
+                              type: integer
+                              minimum: 1
+                              maximum: 2147483647
+                            key:
+                              type: string
+                            description:
+                              type:
+                                - string
+                                - "null"
+                            defaultValue:
+                              type: integer
+                            maxValue:
+                              type: integer
+                            currentValue:
+                              type: integer
+                  meta:
+                    type: object
+        "400":
+          description: Invalid target/query/JSON
         "401":
-          description: Unauthorized
+          description: Invalid credentials; no invalidBearer fallback
         "403":
-          description: Forbidden
-    put:
-      tags:
-        - Users
-      summary: Update user permissions
+          description: Global permission, target hierarchy, no-self mutation or delegation guard
+        "404":
+          description: User or permission reference missing
+        "409":
+          description: Concurrent state changed
+        "422":
+          description: Strict payload, unknown catalog key or value out of range
+        "500":
+          description: Required audit or database failure
+    patch:
+      summary: Partially update user permissions
+      description: Requires user:manage_permissions plus target hierarchy; no human self edits. Non-superadmins cannot change
+        superadmin grants or old/new grant levels >= their own corresponding level. Preflight every entry; Serializable
+        grants/history/audit atomic. Omitted grants preserved;0 revokes; unchanged no-op.
       security:
-        - bearerAuth:
-            - user:manage_permissions
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            oneOf:
+              - type: integer
+                minimum: 1
+                maximum: 2147483647
+              - type: string
+                const: me
+          description: Positive Int32 user ID or session-only me
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - permissions
+              properties:
+                permissions:
+                  type: array
+                  minItems: 1
+                  description: UniquepermissionId; values also capped by catalogmaxValue
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required:
+                      - permissionId
+                      - value
+                    properties:
+                      permissionId:
+                        type: integer
+                        minimum: 1
+                        maximum: 2147483647
+                      value:
+                        type: integer
+                        minimum: 0
+                        maximum: 255
       responses:
         "200":
-          description: Permissions updated
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: "null"
+                  meta:
+                    type: object
+        "400":
+          description: Invalid target/query/JSON
         "401":
-          description: Unauthorized
+          description: Invalid credentials; no invalidBearer fallback
         "403":
-          description: Forbidden
+          description: Global permission, target hierarchy, no-self mutation or delegation guard
+        "404":
+          description: User or permission reference missing
+        "409":
+          description: Concurrent state changed
+        "422":
+          description: Strict payload, unknown catalog key or value out of range
+        "500":
+          description: Required audit or database failure
   /users/{id}/permissions/audit:
     get:
-      tags:
-        - Users
-      summary: Get permission audit log
+      summary: Read user permission change history
+      description: Same globalpermission and targethierarchy. DescIDcursor,50default100cap, real lookahead. Returns nullable
+        human actor plus actorType; no IP/user-agent metadata/avatar. Read audit includes returned target/actor IDs
+        otherthan sessionactor, no snapshots. Bots superadmin.
       security:
-        - bearerAuth:
-            - user:manage_permissions
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            oneOf:
+              - type: integer
+                minimum: 1
+                maximum: 2147483647
+              - type: string
+                const: me
+          description: Positive Int32 user ID or session-only me
+        - in: query
+          name: action
+          schema:
+            type: string
+            enum:
+              - GRANT
+              - REVOKE
+              - MODIFY
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+            default: 50
+          description: Capped100
+        - in: query
+          name: cursor
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
       responses:
         "200":
-          description: Permission audit log
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - id
+                        - action
+                        - oldValue
+                        - newValue
+                        - reason
+                        - createdAt
+                        - actor
+                        - actorType
+                        - permission
+                      properties:
+                        id:
+                          type: integer
+                          minimum: 1
+                          maximum: 2147483647
+                        action:
+                          type: string
+                          enum:
+                            - GRANT
+                            - REVOKE
+                            - MODIFY
+                        oldValue:
+                          type:
+                            - integer
+                            - "null"
+                        newValue:
+                          type:
+                            - integer
+                            - "null"
+                        reason:
+                          type:
+                            - string
+                            - "null"
+                        createdAt:
+                          type: string
+                          format: date-time
+                          description: UTCZ
+                        actor:
+                          oneOf:
+                            - type: object
+                              required:
+                                - id
+                                - username
+                              properties:
+                                id:
+                                  type: integer
+                                  minimum: 1
+                                  maximum: 2147483647
+                                username:
+                                  type:
+                                    - string
+                                    - "null"
+                            - type: "null"
+                        actorType:
+                          type: string
+                          enum:
+                            - user
+                            - bot
+                            - deleted_user
+                        permission:
+                          type: object
+                          properties:
+                            key:
+                              type: string
+                            description:
+                              type:
+                                - string
+                                - "null"
+                  meta:
+                    type: object
+                    required:
+                      - limit
+                      - nextCursor
+                    properties:
+                      limit:
+                        type: integer
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+        "400":
+          description: Invalid target/query/JSON
         "401":
-          description: Unauthorized
+          description: Invalid credentials; no invalidBearer fallback
         "403":
-          description: Forbidden
+          description: Global permission, target hierarchy, no-self mutation or delegation guard
+        "404":
+          description: User or permission reference missing
+        "409":
+          description: Concurrent state changed
+        "422":
+          description: Strict payload, unknown catalog key or value out of range
+        "500":
+          description: Required audit or database failure
   /users/{id}/rank:
     parameters:
       - name: id
