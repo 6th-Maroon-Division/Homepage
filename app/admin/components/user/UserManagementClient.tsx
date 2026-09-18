@@ -353,14 +353,14 @@ export default function UserManagementClient({
           userId,
           trainingId: parseInt(trainingId),
           notes: notes || null,
-          needsRetraining,
+          status: needsRetraining ? 'failed' : 'qualified',
           isHidden,
         }),
       });
 
       if (!res.ok) {
         const data = await res.json();
-        showError(data.error || 'Failed to assign training');
+        showError(data.error?.message || 'Failed to assign training');
         return;
       }
 
@@ -837,7 +837,7 @@ export default function UserManagementClient({
                                       userId: user.id,
                                       trainingId: parseInt(trainingId as string),
                                       notes: notes || null,
-                                      needsRetraining,
+                                      status: needsRetraining ? 'failed' : 'qualified',
                                       isHidden,
                                     }),
                                   });
@@ -849,7 +849,7 @@ export default function UserManagementClient({
                                     window.location.reload();
                                   } else {
                                     const data = await res.json();
-                                    showError(data.error || 'Failed to assign training');
+                                    showError(data.error?.message || 'Failed to assign training');
                                   }
                                 } catch (error) {
                                   logClientError('Error assigning training:', error);
@@ -1056,14 +1056,14 @@ export default function UserManagementClient({
                           },
                           body: JSON.stringify({
                             notes: trainingModalData.notes || null,
-                            needsRetraining: trainingModalData.needsRetraining,
+                            ...(trainingModalData.needsRetraining !== users.find(u => u.id === trainingModalData.userId)?.trainings.find(t => t.trainingId === parseInt(trainingModalData.trainingId))?.needsRetraining ? { status: trainingModalData.needsRetraining ? 'failed' : 'qualified' } : {}),
                             isHidden: trainingModalData.isHidden,
                           }),
                         }
                       );
 
                       if (res.ok) {
-                        const updatedTraining = await res.json();
+                        const { data: updatedTraining } = await res.json();
                         setUsers(
                           users.map((u) =>
                             u.id === trainingModalData.userId

@@ -140,3 +140,33 @@ test('audit/outbox failures fail closed and realtime failure preserves committed
   mocks.db.botEvent.create.mockResolvedValue({}); mocks.publish.mockImplementation(() => { throw new Error('listener'); }); expect((await POST(req('POST', { slotId: 21 }))).status).toBe(201);
   expect((await notePatch(req('PATCH', { status: 'unsure' }), noteCtx())).status).toBe(200); log.mockRestore();
 });
+
+test('qualification assignment grants narrowly scoped training staff authority and preserves normal guards', async () => {
+  mocks.db.user.findUnique.mockResolvedValue({ id: 4, userPermissions: [{ permission: { key: 'training:mark' }, value: 2 }] });
+  mocks.db.userTraining.findUnique.mockResolvedValue({ status: 'needs_qualify' });
+  mocks.db.slot.findUnique.mockResolvedValue({ ...slot(), squadRole: { name: 'R', requiredTrainingIds: [7], requiredRankIds: [] } });
+  mocks.db.training.findMany.mockResolvedValue([{ id: 7, name: 'Training', requiresOrbatQualification: true }]); mocks.db.userTraining.findMany.mockResolvedValue([{ trainingId: 7, status: 'needs_qualify' }]);
+  expect((await POST(req('POST', { slotId: 21, userId: 5, qualificationTrainingId: 7 }))).status).toBe(201);
+  expect((await PATCH(req('PATCH', { slotId: 21, qualificationTrainingId: 7 }), ctx('30'))).status).toBe(200);
+  expect((await PATCH(req('PATCH', { slotId: 21, qualificationTrainingId: 7, overrideRequirements: true }), ctx('30'))).status).toBe(422);
+  mocks.db.orbatAttendanceNote.findUnique.mockResolvedValue({ status: 'absent' }); expect((await POST(req('POST', { slotId: 21, userId: 5, qualificationTrainingId: 7 }))).status).toBe(409);
+});
+test('qualification assignment rejects wrong state, role, side operation and target hierarchy', async () => {
+  mocks.db.user.findUnique.mockResolvedValue({ id: 4, userPermissions: [{ permission: { key: 'training:mark' }, value: 2 }] });
+  const body = { slotId: 21, userId: 5, qualificationTrainingId: 7 };
+  expect((await POST(req('POST', { ...body, qualificationTrainingId: '7' }))).status).toBe(422);
+  mocks.db.userTraining.findUnique.mockResolvedValue({ status: 'qualified' }); expect((await POST(req('POST', body))).status).toBe(409);
+  mocks.db.userTraining.findUnique.mockResolvedValue({ status: 'needs_qualify' }); expect((await POST(req('POST', body))).status).toBe(409);
+  mocks.db.slot.findUnique.mockResolvedValue({ ...slot(), orbat: { ...operation(), isSideOp: true }, squadRole: { requiredTrainingIds: [7] } }); expect((await POST(req('POST', body))).status).toBe(409);
+  mocks.db.userPermission.findMany.mockResolvedValue([{ value: 3, permission: { key: 'training:mark' } }]); expect((await POST(req('POST', body))).status).toBe(403);
+});
+test('qualification idempotency replay revalidates live authority and qualifying credential', async () => {
+  mocks.db.user.findUnique.mockResolvedValue({ id: 4, userPermissions: [{ permission: { key: 'training:mark' }, value: 2 }] });
+  mocks.db.userTraining.findUnique.mockResolvedValue({ status: 'needs_qualify' });
+  mocks.db.slot.findUnique.mockResolvedValue({ ...slot(), squadRole: { name: 'R', requiredTrainingIds: [7], requiredRankIds: [] } });
+  mocks.db.training.findMany.mockResolvedValue([{ id: 7, name: 'Training', requiresOrbatQualification: true }]); mocks.db.userTraining.findMany.mockResolvedValue([{ trainingId: 7, status: 'needs_qualify' }]);
+  const body = { slotId: 21, userId: 5, qualificationTrainingId: 7 }; const headers = { 'idempotency-key': 'qualified' };
+  expect((await POST(req('POST', body, '', headers))).status).toBe(201); mocks.db.botIdempotencyReceipt.findUnique.mockResolvedValue(mocks.db.botIdempotencyReceipt.create.mock.lastCall![0].data);
+  expect((await POST(req('POST', body, '', headers))).status).toBe(201); expect(mocks.db.signup.create).toHaveBeenCalledTimes(1);
+  mocks.db.userTraining.findUnique.mockResolvedValue({ status: 'qualified' }); expect((await POST(req('POST', body, '', headers))).status).toBe(409);
+});

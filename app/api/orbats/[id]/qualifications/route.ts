@@ -1,75 +1,38 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
-import { isTrainingStaff } from '@/lib/training-staff';
-import { createTrainingNotification } from '@/lib/training-notifications';
-import { publishTrainingChatEvent } from '@/lib/realtime/training-chat-events';
-import { publishUserProfileEvent } from '@/lib/realtime/user-events';
-
-type RouteContext = { params: Promise<{ id: string }> };
-const userSelect = { id: true, username: true, avatarUrl: true } as const;
-
+import { credentialRoute, credentialId } from '@/lib/api/user-trainings';
+import { isRequestStaff, requestUserSelect as userSelect } from '@/lib/api/training-requests';
+import { apiError, apiSuccess } from '@/lib/api/response';
+import { writeApiAudit } from '@/lib/api/audit';
 async function getRelevantTrainingIds(orbatId: number) {
-  const slots = await prisma.slot.findMany({
-    where: { orbatId },
-    select: { squadRole: { select: { requiredTrainingIds: true } } },
-  });
-  return Array.from(new Set(slots.flatMap((slot) => slot.squadRole?.requiredTrainingIds ?? [])));
+  const slots = await prisma.slot.findMany({ where: { orbatId }, select: { squadRole: { select: { requiredTrainingIds: true } } } });
+  return [...new Set(slots.flatMap(slot => slot.squadRole?.requiredTrainingIds ?? []))];
 }
-
-async function authorize(context: RouteContext) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) } as const;
-  }
-  const actorId = Number(session.user.id);
-  if (!(await isTrainingStaff(actorId))) {
-    return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) } as const;
-  }
-  const { id } = await context.params;
-  const orbatId = Number(id);
-  if (!Number.isInteger(orbatId) || orbatId <= 0) {
-    return { error: NextResponse.json({ error: 'Invalid ORBAT id' }, { status: 400 }) } as const;
-  }
-  const orbat = await prisma.orbat.findUnique({
-    where: { id: orbatId },
-    select: { isSideOp: true },
-  });
-  if (!orbat) {
-    return { error: NextResponse.json({ error: 'ORBAT not found' }, { status: 404 }) } as const;
-  }
-  if (orbat.isSideOp) {
-    return {
-      error: NextResponse.json(
-        {
-          error: 'Training qualifications are disabled for side operations.',
-          code: 'side_op_qualification_disabled',
-        },
-        { status: 409 },
-      ),
-    } as const;
-  }
-  return { actorId, orbatId } as const;
-}
-
-export async function GET(_request: NextRequest, context: RouteContext) {
-  const access = await authorize(context);
-  if ('error' in access) return access.error;
-
+export function GET(request: Request, context: { params: Promise<{ id: string }> }) {
+ return credentialRoute(request, async (principal, audit) => {
+  if (!isRequestStaff(principal)) return apiError(403, 'forbidden', 'Training staff rights required.');
+  const orbatId = credentialId((await context.params).id);
+  const query = new URL(request.url).searchParams;
+  for (const key of query.keys()) if (!['limit','cursor'].includes(key) || query.getAll(key).length !== 1) return apiError(400, 'invalid_request', 'Invalid query.');
+  const limit = query.has('limit') ? credentialId(query.get('limit')!) : 50;
+  const cursor = query.has('cursor') ? credentialId(query.get('cursor')!) : undefined;
+  if (limit > 100) return apiError(400, 'invalid_request', 'limit cannot exceed 100.');
+  const orbat = await prisma.orbat.findUnique({ where: { id: orbatId }, select: { isSideOp: true } });
+  if (!orbat) return apiError(404, 'not_found', 'Operation not found.');
+  if (orbat.isSideOp) return apiError(409, 'conflict', 'Side operations do not evaluate qualifications.');
+  const access = { orbatId };
   const trainingIds = await getRelevantTrainingIds(access.orbatId);
   if (trainingIds.length === 0) {
-    return NextResponse.json({ groups: [], total: 0 });
+    return apiSuccess({ groups: [], total: 0, orbatId }, { meta: { limit, nextCursor: null } });
   }
 
   const [credentials, signups, slots] = await Promise.all([
     prisma.userTraining.findMany({
-      where: { trainingId: { in: trainingIds }, status: 'needs_qualify' },
+      where: { trainingId: { in: trainingIds }, status: 'needs_qualify', ...(cursor ? { id: { lt: cursor } } : {}) },
       include: {
         training: true,
         user: { select: userSelect },
       },
-      orderBy: [{ training: { name: 'asc' } }, { user: { username: 'asc' } }],
+      orderBy: { id: 'desc' }, take: limit + 1,
     }),
     prisma.signup.findMany({
       where: { slot: { orbatId: access.orbatId } },
@@ -95,9 +58,13 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     }),
   ]);
 
+  const hasMore = credentials.length > limit;
+  const visible = credentials.slice(0, limit);
+  const targets = [...new Set(visible.map(row => row.userId))].filter(id => principal.kind === 'bot' || principal.userId !== id);
+  if (targets.length) await writeApiAudit(prisma, audit, { action: 'user_data.read', resource: 'orbat_qualification', resourceId: String(orbatId), targetUserIds: targets, outcome: 'success' });
   const signupByUserId = new Map(signups.map((signup) => [signup.userId, signup]));
   const groups = trainingIds.map((trainingId) => {
-    const rows = credentials.filter((credential) => credential.trainingId === trainingId);
+    const rows = visible.filter((credential) => credential.trainingId === trainingId);
     const training = rows[0]?.training;
     return {
       training: training ? {
@@ -122,6 +89,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
         const slotRelevant = signup?.slot.squadRole?.requiredTrainingIds.includes(trainingId) ?? false;
         return {
           userTrainingId: credential.id,
+          existingSignupId: signup?.id ?? null,
           user: credential.user,
           status: credential.status,
           notes: credential.notes,
@@ -138,135 +106,10 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     };
   }).filter((group) => group.users.length > 0);
 
-  return NextResponse.json({
+  return apiSuccess({
     groups,
-    total: credentials.length,
+    total: visible.length,
     orbatId: access.orbatId,
-  });
-}
-
-export async function PUT(request: NextRequest, context: RouteContext) {
-  const access = await authorize(context);
-  if ('error' in access) return access.error;
-
-  const body = await request.json();
-  const userTrainingId = Number(body.userTrainingId);
-  if (!Number.isInteger(userTrainingId) || userTrainingId <= 0) {
-    return NextResponse.json({ error: 'userTrainingId is required' }, { status: 400 });
-  }
-  if (!['qualified', 'failed'].includes(body.status)) {
-    return NextResponse.json({ error: 'Status must be qualified or failed' }, { status: 400 });
-  }
-
-  const relevantTrainingIds = await getRelevantTrainingIds(access.orbatId);
-  const credential = await prisma.userTraining.findUnique({
-    where: { id: userTrainingId },
-    include: { training: true, user: { select: userSelect } },
-  });
-  if (!credential || !relevantTrainingIds.includes(credential.trainingId)) {
-    return NextResponse.json({ error: 'Qualification is not relevant to this ORBAT' }, { status: 404 });
-  }
-  if (!credential.training.requiresOrbatQualification) {
-    return NextResponse.json(
-      { error: 'This training does not use ORBAT qualification' },
-      { status: 409 },
-    );
-  }
-  if (credential.status !== 'needs_qualify') {
-    return NextResponse.json(
-      { error: `Qualification is ${credential.status}; only needs_qualify records can be decided` },
-      { status: 409 },
-    );
-  }
-
-  const notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 4000) || null : null;
-  const now = new Date();
-  const relatedRequest = await prisma.trainingRequest.findFirst({
-    where: {
-      userId: credential.userId,
-      trainingId: credential.trainingId,
-      status: 'needs_qualify',
-    },
-    orderBy: { requestedAt: 'desc' },
-  });
-
-  const updated = await prisma.$transaction(async (tx) => {
-    const credentialUpdate = await tx.userTraining.updateMany({
-      where: {
-        id: userTrainingId,
-        status: 'needs_qualify',
-        statusUpdatedAt: credential.statusUpdatedAt,
-      },
-      data: {
-        status: body.status,
-        trainerId: access.actorId,
-        notes,
-        needsRetraining: body.status === 'failed',
-        statusUpdatedAt: now,
-        orbatQualifiedAt: body.status === 'qualified' ? now : null,
-        failedAt: body.status === 'failed' ? now : null,
-      },
-    });
-    if (credentialUpdate.count !== 1) {
-      return null;
-    }
-    await tx.userTrainingStatusHistory.create({
-      data: {
-        userTrainingId,
-        fromStatus: 'needs_qualify',
-        toStatus: body.status,
-        changedById: access.actorId,
-        orbatId: access.orbatId,
-        notes,
-      },
-    });
-    if (relatedRequest) {
-      const requestUpdate = await tx.trainingRequest.updateMany({
-        where: { id: relatedRequest.id, status: 'needs_qualify' },
-        data: { status: body.status, handledByAdminId: access.actorId },
-      });
-      if (requestUpdate.count === 1) {
-        await tx.trainingRequestMessage.create({
-          data: {
-            requestId: relatedRequest.id,
-            senderRole: 'SYSTEM',
-            body: body.status === 'qualified'
-              ? `ORBAT qualification passed${notes ? `: ${notes}` : '.'}`
-              : `ORBAT qualification failed${notes ? `: ${notes}` : '.'}`,
-          },
-        });
-      }
-    }
-    return tx.userTraining.findUnique({
-      where: { id: userTrainingId },
-      include: { training: true, user: { select: userSelect } },
-    });
-  });
-
-  if (!updated) {
-    return NextResponse.json(
-      { error: 'This qualification was already updated. Refresh to see the latest status.' },
-      { status: 409 },
-    );
-  }
-
-  await createTrainingNotification({
-    recipientUserIds: [credential.userId],
-    title: `${credential.training.name} qualification ${body.status}`,
-    body: body.status === 'qualified'
-      ? `You are now fully qualified for ${credential.training.name}.`
-      : `Your ${credential.training.name} qualification was marked as failed. Contact a trainer for another attempt.`,
-    actionUrl: relatedRequest ? `/trainings/requests/${relatedRequest.id}` : `/orbats/${access.orbatId}`,
-    createdById: access.actorId,
-  });
-  if (relatedRequest) {
-    publishTrainingChatEvent(relatedRequest.id, { source: 'qualification', status: body.status });
-  }
-  publishUserProfileEvent(credential.userId, {
-    source: 'orbat-qualification.updated',
-    trainingId: credential.trainingId,
-    orbatId: access.orbatId,
-    status: body.status,
-  });
-  return NextResponse.json(updated);
+  }, { meta: { limit, nextCursor: hasMore ? String(visible.at(-1)!.id) : null } });
+ });
 }

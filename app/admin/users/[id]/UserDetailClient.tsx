@@ -616,10 +616,10 @@ export default function UserDetailClient({
 
                           if (!response.ok) {
                             const data = await response.json().catch(() => ({}));
-                            throw new Error(data.error || 'Failed to assign training');
+                            throw new Error(data.error?.message || 'Failed to assign training');
                           }
 
-                          const created = await response.json();
+                          const { data: created } = await response.json();
                           const createdRow: UserTraining = {
                             id: created.id,
                             trainingId: created.trainingId,
@@ -755,7 +755,7 @@ export default function UserDetailClient({
                                 setIsUpdatingTrainingById((previous) => ({ ...previous, [training.id]: true }));
                                 try {
                                   const response = await fetch(`/api/user-trainings/${training.id}`, {
-                                    method: 'PUT',
+                                    method: 'PATCH',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({
                                       status: action.status,
@@ -763,10 +763,9 @@ export default function UserDetailClient({
                                       isHidden: training.isHidden,
                                     }),
                                   });
-                                  const updated = await response.json().catch(() => ({}));
-                                  if (!response.ok) {
-                                    throw new Error(updated.error || 'Failed to update training');
-                                  }
+                                  const payload = await response.json().catch(() => ({}));
+                                  if (!response.ok) throw new Error(payload.error?.message || 'Failed to update training');
+                                  const updated = payload.data;
                                   setTrainingRows((previous) => previous.map((row) =>
                                     row.id === training.id
                                       ? {
@@ -815,7 +814,7 @@ export default function UserDetailClient({
 
                                 if (!response.ok) {
                                   const data = await response.json().catch(() => ({}));
-                                  throw new Error(data.error || 'Failed to remove training');
+                                  throw new Error(data.error?.message || 'Failed to remove training');
                                 }
 
                                 setTrainingRows((previous) => previous.filter((row) => row.id !== training.id));

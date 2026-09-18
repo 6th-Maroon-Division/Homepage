@@ -1,3 +1,4 @@
+import { isRequestStaff, canManageTrainingRequest } from './training-requests';
 import { createHash } from 'node:crypto';
 import type { Prisma } from '@/generated/prisma/client';
 import { prisma } from '@/lib/prisma';
@@ -39,6 +40,15 @@ async function target(principal: ApiPrincipal, value: unknown, db: DB) {
   if (!await db.user.findUnique({ where: { id }, select: { id: true } })) fail(404, 'not_found', 'User not found.');
   return id;
 }
+async function qualificationTarget(principal: ApiPrincipal, value: unknown, trainingId: number, slotId: number, db: DB) {
+  const userId = value === 'me' || value === undefined ? principal.kind === 'user' ? principal.userId : fail(400, 'invalid_request', 'Bots require numeric user IDs.') : signupId(value);
+  if (!isRequestStaff(principal) || !await canManageTrainingRequest(principal, userId, db)) fail(403, 'forbidden', 'Training staff rights and target hierarchy are required.');
+  const credential = await db.userTraining.findUnique({ where: { userId_trainingId: { userId, trainingId } }, select: { status: true } });
+  const slot = await db.slot.findUnique({ where: { id: slotId }, select: { orbat: { select: { isSideOp: true } }, squadRole: { select: { requiredTrainingIds: true } } } });
+  if (!slot) fail(404, 'not_found', 'Slot not found.');
+  if (credential?.status !== 'needs_qualify' || slot.orbat.isSideOp || !slot.squadRole?.requiredTrainingIds.includes(trainingId)) fail(409, 'conflict', 'This slot cannot evaluate the pending qualification.');
+  return userId;
+}
 const slotInclude = { orbat: true, squad: { select: { id: true, name: true } }, squadRole: { select: { name: true, requiredTrainingIds: true, requiredRankIds: true } }, _count: { select: { signups: true } } } as const;
 type Slot = Prisma.SlotGetPayload<{ include: typeof slotInclude }>;
 async function access(db: DB, userId: number, slot: Slot) {
@@ -60,29 +70,31 @@ function signupDto(row: { id: number; slotId: number; userId: number; createdAt:
 function notify(principal: ApiPrincipal, audit: ApiAuditContext, orbatId: number, type: 'signup.created' | 'signup.moved' | 'signup.deleted', payload: Record<string, unknown>) { try { publishOrbatEvent({ type, orbatId, actorUserId: principal.kind === 'user' ? principal.userId : null, payload }); } catch { console.error('Signup notification failed', { correlationId: audit.correlationId, timestamp: new Date().toISOString() }); } }
 export async function mutateSignup(request: Request, principal: ApiPrincipal, audit: ApiAuditContext, method: 'POST' | 'PATCH' | 'DELETE', id?: number) {
   query(request, []);
-  const body = method === 'DELETE' ? {} : object(await readJsonBody(request), method === 'POST' ? ['slotId', 'userId'] : ['slotId', 'overrideRequirements']);
+  const body = method === 'DELETE' ? {} : object(await readJsonBody(request), method === 'POST' ? ['slotId', 'userId', 'qualificationTrainingId'] : ['slotId', 'overrideRequirements', 'qualificationTrainingId']);
   if (method !== 'DELETE' && !numeric(body.slotId)) fail(422, 'validation_failed', 'slotId must be a numeric positive 32-bit ID.');
   if (body.userId !== undefined && body.userId !== 'me' && !numeric(body.userId)) fail(422, 'validation_failed', 'userId must be a numeric positive 32-bit ID or me.');
   if (body.overrideRequirements !== undefined && typeof body.overrideRequirements !== 'boolean') fail(422, 'validation_failed', 'overrideRequirements must be boolean.');
-  if (method === 'PATCH' && !hasApiPermission(principal.permissions, 'orbat:edit')) fail(403, 'forbidden', 'Moving signups requires orbat:edit.');
+  if (body.qualificationTrainingId !== undefined && !numeric(body.qualificationTrainingId)) fail(422, 'validation_failed', 'qualificationTrainingId must be a numeric ID.');
+  if (body.qualificationTrainingId !== undefined && body.overrideRequirements === true) fail(422, 'validation_failed', 'Qualification assignment cannot override requirements.');
+  if (method === 'PATCH' && body.qualificationTrainingId === undefined && !hasApiPermission(principal.permissions, 'orbat:edit')) fail(403, 'forbidden', 'Moving signups requires orbat:edit.');
   const key = request.headers.get('idempotency-key');
   if (key !== null && (!key.trim() || key.length > 200)) fail(400, 'invalid_request', 'Idempotency-Key must contain 1–200 characters.');
   const receiptKey = key === null ? null : createHash('sha256').update(`${principal.kind}:${principal.kind === 'user' ? principal.userId : principal.tokenId}:${key}`).digest('hex');
-  const hash = createHash('sha256').update(JSON.stringify({ method, id, slotId: body.slotId, userId: body.userId ?? 'me', overrideRequirements: body.overrideRequirements ?? false })).digest('hex');
+  const hash = createHash('sha256').update(JSON.stringify({ method, id, slotId: body.slotId, userId: body.userId ?? 'me', overrideRequirements: body.overrideRequirements ?? false, qualificationTrainingId: body.qualificationTrainingId ?? null })).digest('hex');
   const result = await prisma.$transaction(async tx => {
     if (receiptKey) {
       const receipt = await tx.botIdempotencyReceipt.findUnique({ where: { idempotencyKey: receiptKey } });
       if (receipt && receipt.expiresAt > new Date()) {
         if (receipt.requestHash !== hash || receipt.operation !== `canonical.signup.${method}`) fail(409, 'idempotency_conflict', 'Idempotency key was used for a different request.');
         const saved = receipt.responseBody as { data: Prisma.JsonValue; meta: { warnings: string[] }; targetUserId: number };
-        await target(principal, saved.targetUserId, tx);
+        if (body.qualificationTrainingId !== undefined) await qualificationTarget(principal, saved.targetUserId, body.qualificationTrainingId as number, body.slotId as number, tx); else await target(principal, saved.targetUserId, tx);
         return { data: saved.data, meta: saved.meta, status: receipt.responseStatus, replay: true, orbatId: 0, payload: {} };
       }
       if (receipt) await tx.botIdempotencyReceipt.delete({ where: { idempotencyKey: receiptKey } });
     }
     const old = method === 'POST' ? null : await tx.signup.findUnique({ where: { id }, include: { slot: { select: { orbatId: true } }, attendance: { select: { id: true, sessions: { select: { id: true } }, logs: { select: { id: true } } } } } });
     if (method !== 'POST' && !old) fail(404, 'not_found', 'Signup not found.');
-    const userId = await target(principal, old?.userId ?? body.userId, tx);
+    const userId = body.qualificationTrainingId !== undefined ? await qualificationTarget(principal, old?.userId ?? body.userId, body.qualificationTrainingId as number, body.slotId as number, tx) : await target(principal, old?.userId ?? body.userId, tx);
     const slotId = method === 'DELETE' ? old!.slotId : body.slotId as number;
     const slot = await tx.slot.findUnique({ where: { id: slotId }, include: slotInclude });
     if (!slot) fail(404, 'not_found', 'Slot not found.');
@@ -110,7 +122,7 @@ export async function mutateSignup(request: Request, principal: ApiPrincipal, au
     const signupId = row?.id ?? old!.id;
     const payload = { orbatId: slot.orbatId, signupId, userId, oldSlotId: old?.slotId ?? null, slotId: method === 'DELETE' ? null : slotId };
     await appendBotEvent({ type: 'orbat.signup_changed', aggregate: 'orbat', aggregateId: slot.orbatId, payload }, tx);
-    await writeApiAudit(tx, audit, { action: method === 'POST' ? 'signup.created' : method === 'PATCH' ? 'signup.moved' : 'signup.deleted', resource: 'signup', resourceId: String(signupId), targetUserIds: [userId], outcome: 'success', before: old ? { id: old.id, slotId: old.slotId, attendanceId: old.attendance?.id ?? null, attendanceSessionIds: old.attendance?.sessions.map(session => session.id) ?? [], attendanceLogIds: old.attendance?.logs.map(log => log.id) ?? [] } : {}, after: row ? { id: row.id, slotId: row.slotId, overrideRequirements: body.overrideRequirements === true } : { deleted: true } });
+    await writeApiAudit(tx, audit, { action: method === 'POST' ? 'signup.created' : method === 'PATCH' ? 'signup.moved' : 'signup.deleted', resource: 'signup', resourceId: String(signupId), targetUserIds: [userId], outcome: 'success', before: old ? { id: old.id, slotId: old.slotId, attendanceId: old.attendance?.id ?? null, attendanceSessionIds: old.attendance?.sessions.map(session => session.id) ?? [], attendanceLogIds: old.attendance?.logs.map(log => log.id) ?? [] } : {}, after: row ? { id: row.id, slotId: row.slotId, overrideRequirements: body.overrideRequirements === true, qualificationTrainingId: (body.qualificationTrainingId as number | undefined) ?? null } : { deleted: true } });
     const data = row ? signupDto(row, slot.orbatId) : null; const meta = { warnings }; const status = method === 'POST' ? 201 : 200;
     if (receiptKey) await tx.botIdempotencyReceipt.create({ data: { idempotencyKey: receiptKey, operation: `canonical.signup.${method}`, requestHash: hash, responseStatus: status, responseBody: { data, meta, targetUserId: userId }, expiresAt: new Date(Date.now() + 86400000) } });
     return { data, meta, status, replay: false, orbatId: slot.orbatId, payload };

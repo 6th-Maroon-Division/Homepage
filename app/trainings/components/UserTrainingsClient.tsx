@@ -94,14 +94,11 @@ export default function UserTrainingsClient({
   const refreshData = async () => {
     try {
       const [trainingsRes, requestsRes] = await Promise.all([
-        fetch('/api/user-trainings', { cache: 'no-store' }),
+        apiList<UserTraining>('/api/user-trainings?userId=me', { cache: 'no-store' }),
         apiList<TrainingRequest>('/api/training-requests', { cache: 'no-store' }),
       ]);
 
-      if (trainingsRes.ok) {
-        const data = await trainingsRes.json();
-        setUserTrainings(data);
-      }
+      setUserTrainings(trainingsRes);
 
       setTrainingRequests(requestsRes);
     } catch (error) {
