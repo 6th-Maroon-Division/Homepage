@@ -32,7 +32,8 @@
     "api:check": "node scripts/check-api-contract.mjs",
     "test:ui": "node scripts/test-ui.mjs",
     "ui:check": "node scripts/check-ui-coverage.mjs",
-    "typecheck": "tsc --noEmit --incremental false"
+    "typecheck": "tsc --noEmit --incremental false",
+    "test:workflows": "node --test tests/workflows/*.test.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

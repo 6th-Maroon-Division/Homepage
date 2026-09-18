@@ -1,7 +1,9 @@
 // Discord Changelog Bot
 // Parses PR body for changelog entries and sends formatted message to Discord
 
-// Use built-in fetch (Node.js 20+)
+import { stripHtmlComments } from './changelog-text.mjs';
+
+// Use built-in fetch (Node.js 24 LTS)
 const githubHeaders = {};
 if (process.env.GITHUB_TOKEN) {
   githubHeaders['Authorization'] = `Bearer ${process.env.GITHUB_TOKEN}`;
@@ -10,7 +12,6 @@ if (process.env.GITHUB_TOKEN) {
 // Regexes
 const HeaderRegex = /^\s*(?::cl:|🆑) *([a-z0-9_\- ]+)?\s+/im; // :cl: or 🆑 [0] followed by optional author name [1]
 const EntryRegex = /^ *[*-]? *(add|remove|tweak|fix): *([^\n\r]+)\r?$/img; // * or - followed by change type [0] and change message [1]
-const CommentRegex = /<!--.*?-->/gs; // HTML comments
 
 // Emoji for each type
 const typeEmojis = {
@@ -39,7 +40,7 @@ async function main() {
     const { merged_at, body, user, html_url, title } = prData;
 
     // Remove comments from the body
-    const commentlessBody = body.replace(CommentRegex, '');
+    const commentlessBody = stripHtmlComments(body);
 
     // Get author
     const headerMatch = HeaderRegex.exec(commentlessBody);

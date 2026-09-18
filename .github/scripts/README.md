@@ -23,7 +23,7 @@ You only need to add **one secret** manually:
 5. Paste the Discord webhook URL you copied
 6. Click "Add secret"
 
-**Note:** `GITHUB_TOKEN` is automatically provided by GitHub Actions and has all the permissions needed to read PR details.
+**Note:** GitHub Actions provides `GITHUB_TOKEN`. The workflow explicitly grants only `contents: read` for checkout and `pull-requests: read` for fetching PR details. It runs on Node.js 24 LTS.
 
 ### 3. Enable Workflow
 
@@ -84,7 +84,15 @@ Merged on: 2024-01-15
 
 ## Testing
 
-To test the script locally:
+Run the automated regression tests without contacting GitHub or Discord:
+
+```bash
+npm run test:workflows
+```
+
+These run in the API test workflow and cover workflow permissions, comment filtering, empty descriptions and the complete script with mocked HTTP responses. Comments are replaced with line boundaries so removing them cannot reconstruct comment markers or changelog entries. Nested comments are hidden; an unclosed comment hides the remaining text.
+
+To send a real test message locally:
 
 ```bash
 # Set environment variables
@@ -99,3 +107,5 @@ node .github/scripts/discord-changelog.mjs
 
 - `.github/workflows/discord-changelog.yml` - GitHub Actions workflow
 - `.github/scripts/discord-changelog.mjs` - Main script
+- `.github/scripts/changelog-text.mjs` - Comment filtering
+- `tests/workflows/discord-changelog.test.mjs` - Offline regression tests
