@@ -660,99 +660,6 @@ paths:
       responses:
         "200":
           description: Success
-  /bot/promotions/auto:
-    get:
-      tags:
-        - Bot
-        - Ranks
-      summary: Get recent auto-promotions
-      description: |
-        Returns a list of users who were automatically promoted within a specified timeframe.
-        Useful for the bot to announce promotions in Discord.
-      security:
-        - apiKey: []
-      parameters:
-        - name: days
-          in: query
-          schema:
-            type: integer
-            default: 7
-          description: Number of days to look back for auto-promotions
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 100
-          description: Maximum number of auto-promotions to return
-      responses:
-        "200":
-          description: List of recent auto-promotions
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  autoPromotions:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        id:
-                          type: integer
-                          example: 456
-                        userId:
-                          type: integer
-                          example: 42
-                        username:
-                          type: string
-                          example: Soldier_John
-                        discordId:
-                          type: string
-                          nullable: true
-                          example: "123456789012345678"
-                        steamId:
-                          type: string
-                          nullable: true
-                          example: "76561198000000000"
-                        previousRank:
-                          type: object
-                          nullable: true
-                          properties:
-                            id:
-                              type: integer
-                            name:
-                              type: string
-                            abbreviation:
-                              type: string
-                        newRank:
-                          type: object
-                          properties:
-                            id:
-                              type: integer
-                            name:
-                              type: string
-                            abbreviation:
-                              type: string
-                        changedAt:
-                          type: string
-                          format: date-time
-                          example: 2024-01-15T10:00:00.000Z
-                        reason:
-                          type: string
-                          nullable: true
-                  total:
-                    type: integer
-                    example: 10
-                  daysBack:
-                    type: integer
-                    example: 7
-        "401":
-          description: Unauthorized - invalid or missing bot API token
-        "500":
-          description: Internal server error
   /bot/signups:
     post:
       tags:
@@ -2729,16 +2636,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiFailure"
-  /ranks/auto-rankup:
-    post:
-      tags:
-        - Ranks
-      summary: Check auto-rankup eligibility
-      responses:
-        "200":
-          description: Auto-rankup eligibility check result
-        "401":
-          description: Unauthorized
   /ranks/migrate/apply:
     post:
       tags:
@@ -3060,15 +2957,117 @@ paths:
                 $ref: "#/components/schemas/ApiFailure"
   /ranks/promotions/propose:
     post:
-      tags:
-        - Ranks
-      summary: Propose promotion
+      summary: Propose or immediately apply an eligible promotion
+      description: Requires rank:manage_promotions and strictly higher live target permission (self allowed with global
+        grant); active bots superadmin. Serializable permission/eligibility checks, UTC state,
+        history/outbox/inbox/audit atomic. Manual lanes create or reuse a pending proposal; automatic lanes apply and
+        close an existing pending proposal. No query parameters. Other-user eligibility/reused proposal reads audited
+        without snapshots.
       security:
-        - bearerAuth:
-            - ranks:propose_promotion
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - userId
+              properties:
+                userId:
+                  type: integer
+                  minimum: 1
+                  maximum: 2147483647
       responses:
+        "200":
+          description: Existing pending proposal or applied automatic promotion
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: object
+                    required:
+                      - userId
+                      - outcome
+                      - proposalId
+                      - rankId
+                    properties:
+                      userId:
+                        type: integer
+                        minimum: 1
+                        maximum: 2147483647
+                      outcome:
+                        type: string
+                        enum:
+                          - proposed
+                          - already_pending
+                          - promoted
+                      proposalId:
+                        type:
+                          - integer
+                          - "null"
+                      rankId:
+                        type: integer
+                  meta:
+                    type: object
         "201":
-          description: Promotion proposed
+          description: Manual proposal created
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: object
+                    required:
+                      - userId
+                      - outcome
+                      - proposalId
+                      - rankId
+                    properties:
+                      userId:
+                        type: integer
+                        minimum: 1
+                        maximum: 2147483647
+                      outcome:
+                        type: string
+                        enum:
+                          - proposed
+                          - already_pending
+                          - promoted
+                      proposalId:
+                        type:
+                          - integer
+                          - "null"
+                      rankId:
+                        type: integer
+                  meta:
+                    type: object
+        "400":
+          description: Invalid JSON or unsupported query
+        "401":
+          description: Missing or invalid credentials, invalid Bearer never falls back
+        "403":
+          description: Missing global permission or target hierarchy
+        "404":
+          description: User or required reference missing
+        "409":
+          description: Ineligible (details.reason), obsolete proposal or serialization conflict
+        "422":
+          description: Strict payload validation failed
+        "500":
+          description: Persistence or required audit failure
   /ranks/reorder:
     patch:
       tags:
@@ -7442,14 +7441,126 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiFailure"
-  /api/ranks/promotions/propose:
+  /ranks/promotions/automatic:
+    get:
+      summary: List automatic promotion history
+      description: Live hierarchy SQL visibility before descending-ID pagination. Audit only displayed other users, no
+        snapshots; bot superadmin. days lookback uses UTC24hour periods. No private account/history fields.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - in: query
+          name: days
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 3650
+            default: 7
+          description: UTC lookback days
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+            default: 50
+          description: Clamped to100
+        - in: query
+          name: cursor
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+          description: Exclusive descending history ID
+      responses:
+        "200":
+          description: Minimal history page
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - id
+                        - userId
+                        - previousRankName
+                        - newRankName
+                        - createdAt
+                        - triggeredBy
+                        - outcome
+                        - user
+                      properties:
+                        id:
+                          type: integer
+                        userId:
+                          type: integer
+                        previousRankName:
+                          type:
+                            - string
+                            - "null"
+                        newRankName:
+                          type: string
+                        createdAt:
+                          type: string
+                          format: date-time
+                          description: UTC ISO8601 ending Z
+                        triggeredBy:
+                          type: string
+                        outcome:
+                          type: string
+                        user:
+                          type: object
+                          required:
+                            - id
+                            - username
+                            - discordId
+                          properties:
+                            id:
+                              type: integer
+                            username:
+                              type:
+                                - string
+                                - "null"
+                            discordId:
+                              type:
+                                - string
+                                - "null"
+                  meta:
+                    type: object
+                    required:
+                      - limit
+                      - nextCursor
+                    properties:
+                      limit:
+                        type: integer
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+        "400":
+          description: Invalid JSON/query
+        "401":
+          description: Invalid credentials; no invalid Bearer fallback
+        "403":
+          description: Requires rank:manage_promotions
+        "422":
+          description: POST strict empty object required
+        "500":
+          description: Database selection or required history-read audit failure
     post:
-      summary: Propose or immediately apply an eligible promotion
-      description: Requires rank:manage_promotions and strictly higher live target permission (self allowed with global
-        grant); active bots superadmin. Serializable permission/eligibility checks, UTC state,
-        history/outbox/inbox/audit atomic. Manual lanes create or reuse a pending proposal; automatic lanes apply and
-        close an existing pending proposal. No query parameters. Other-user eligibility/reused proposal reads audited
-        without snapshots.
+      summary: Run automatic promotions for all manageable eligible users
+      description: Global rank:manage_promotions; live target hierarchy. No queries. Each user commits independently in
+        Serializable transaction with attendance/history/outbox/message/audit. errorsCount counts rolled-back users;
+        other users may succeed. Postcommit notifications cannot reverse success. No personal result arrays.
       security:
         - sessionCookie: []
         - secureSessionCookie: []
@@ -7461,16 +7572,10 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required:
-                - userId
-              properties:
-                userId:
-                  type: integer
-                  minimum: 1
-                  maximum: 2147483647
+              maxProperties: 0
       responses:
         "200":
-          description: Existing pending proposal or applied automatic promotion
+          description: Counts of committed promoted users, rolled-back users and attendance-short auto lanes
           content:
             application/json:
               schema:
@@ -7482,79 +7587,31 @@ paths:
                   data:
                     type: object
                     required:
-                      - userId
-                      - outcome
-                      - proposalId
-                      - rankId
+                      - promotedCount
+                      - errorsCount
+                      - ineligibleCount
                     properties:
-                      userId:
+                      promotedCount:
                         type: integer
-                        minimum: 1
-                        maximum: 2147483647
-                      outcome:
-                        type: string
-                        enum:
-                          - proposed
-                          - already_pending
-                          - promoted
-                      proposalId:
-                        type:
-                          - integer
-                          - "null"
-                      rankId:
+                        minimum: 0
+                      errorsCount:
                         type: integer
-                  meta:
-                    type: object
-        "201":
-          description: Manual proposal created
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                  - data
-                  - meta
-                properties:
-                  data:
-                    type: object
-                    required:
-                      - userId
-                      - outcome
-                      - proposalId
-                      - rankId
-                    properties:
-                      userId:
+                        minimum: 0
+                      ineligibleCount:
                         type: integer
-                        minimum: 1
-                        maximum: 2147483647
-                      outcome:
-                        type: string
-                        enum:
-                          - proposed
-                          - already_pending
-                          - promoted
-                      proposalId:
-                        type:
-                          - integer
-                          - "null"
-                      rankId:
-                        type: integer
+                        minimum: 0
                   meta:
                     type: object
         "400":
-          description: Invalid JSON or unsupported query
+          description: Invalid JSON/query
         "401":
-          description: Missing or invalid credentials, invalid Bearer never falls back
+          description: Invalid credentials; no invalid Bearer fallback
         "403":
-          description: Missing global permission or target hierarchy
-        "404":
-          description: User or required reference missing
-        "409":
-          description: Ineligible (details.reason), obsolete proposal or serialization conflict
+          description: Requires rank:manage_promotions
         "422":
-          description: Strict payload validation failed
+          description: POST strict empty object required
         "500":
-          description: Persistence or required audit failure
+          description: Database selection or required history-read audit failure
 components:
   securitySchemes:
     bearerAuth:

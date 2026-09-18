@@ -1,6 +1,6 @@
 {
   "paths": {
-    "/api/ranks/promotions/automatic": {
+    "/ranks/promotions/automatic": {
       "get": {
         "summary": "List automatic promotion history",
         "description": "Live hierarchy SQL visibility before descending-ID pagination. Audit only displayed other users, no snapshots; bot superadmin. days lookback uses UTC24hour periods. No private account/history fields.",
@@ -50,21 +50,6 @@
           }
         ],
         "responses": {
-          "400": {
-            "description": "Invalid JSON/query"
-          },
-          "401": {
-            "description": "Invalid credentials; no invalid Bearer fallback"
-          },
-          "403": {
-            "description": "Requires rank:manage_promotions"
-          },
-          "422": {
-            "description": "POST strict empty object required"
-          },
-          "500": {
-            "description": "Database selection or required history-read audit failure"
-          },
           "200": {
             "description": "Minimal history page",
             "content": {
@@ -167,6 +152,21 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Invalid JSON/query"
+          },
+          "401": {
+            "description": "Invalid credentials; no invalid Bearer fallback"
+          },
+          "403": {
+            "description": "Requires rank:manage_promotions"
+          },
+          "422": {
+            "description": "POST strict empty object required"
+          },
+          "500": {
+            "description": "Database selection or required history-read audit failure"
           }
         }
       },
@@ -197,21 +197,6 @@
           }
         },
         "responses": {
-          "400": {
-            "description": "Invalid JSON/query"
-          },
-          "401": {
-            "description": "Invalid credentials; no invalid Bearer fallback"
-          },
-          "403": {
-            "description": "Requires rank:manage_promotions"
-          },
-          "422": {
-            "description": "POST strict empty object required"
-          },
-          "500": {
-            "description": "Database selection or required history-read audit failure"
-          },
           "200": {
             "description": "Counts of committed promoted users, rolled-back users and attendance-short auto lanes",
             "content": {
@@ -252,6 +237,21 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Invalid JSON/query"
+          },
+          "401": {
+            "description": "Invalid credentials; no invalid Bearer fallback"
+          },
+          "403": {
+            "description": "Requires rank:manage_promotions"
+          },
+          "422": {
+            "description": "POST strict empty object required"
+          },
+          "500": {
+            "description": "Database selection or required history-read audit failure"
           }
         }
       }
@@ -261,7 +261,7 @@
     "schemas": {}
   },
   "removePaths": [
-    "/api/bot/promotions/auto",
-    "/api/ranks/auto-rankup"
+    "/bot/promotions/auto",
+    "/ranks/auto-rankup"
   ]
 }

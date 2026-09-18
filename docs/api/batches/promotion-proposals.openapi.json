@@ -1,6 +1,6 @@
 {
   "paths": {
-    "/api/ranks/promotions/propose": {
+    "/ranks/promotions/propose": {
       "post": {
         "summary": "Propose or immediately apply an eligible promotion",
         "description": "Requires rank:manage_promotions and strictly higher live target permission (self allowed with global grant); active bots superadmin. Serializable permission/eligibility checks, UTC state, history/outbox/inbox/audit atomic. Manual lanes create or reuse a pending proposal; automatic lanes apply and close an existing pending proposal. No query parameters. Other-user eligibility/reused proposal reads audited without snapshots.",
