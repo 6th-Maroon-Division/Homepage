@@ -245,7 +245,7 @@ export default function UserSelfDetailClient({
   }, [user.username]);
 
   useEffect(() => {
-    const source = new EventSource('/api/user/events');
+    const source = new EventSource('/api/users/me/events');
 
     source.onmessage = () => {
       if (refreshTimerRef.current) {

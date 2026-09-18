@@ -89,10 +89,10 @@ export default function OrbatManagementClient({ orbats: initialOrbats, canCreate
       }, 250);
     };
 
-    const source = new EventSource('/api/admin/catalog/events');
+    const source = new EventSource('/api/catalog/events');
     source.onmessage = (event) => {
       try {
-        const payload = JSON.parse(event.data) as { type?: string };
+        const payload = JSON.parse(event.data).data as { type?: string };
         if (payload.type === 'orbat.changed') {
           queueSync();
         }

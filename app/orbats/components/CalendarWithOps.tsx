@@ -148,7 +148,7 @@ export default function CalendarWithOps({ initialYear, initialMonth, ops, isAdmi
     fallbackTimerRef.current = setInterval(() => void refreshCalendar(), 30000);
     source.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data) as {
+        const data = JSON.parse(event.data).data as {
           type?: string;
           payload?: { id?: number; name?: string; description?: string | null; startsAtUtc?: string | null; eventDate?: string; isSideOp?: boolean };
         };

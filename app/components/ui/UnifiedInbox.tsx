@@ -97,7 +97,7 @@ export default function UnifiedInbox() {
   useEffect(() => {
     if (!session?.user?.id) return;
 
-    const source = new EventSource('/api/messaging/events');
+    const source = new EventSource('/api/users/me/messages/events');
     streamRef.current = source;
 
     source.onopen = () => {
@@ -107,7 +107,7 @@ export default function UnifiedInbox() {
 
     source.onmessage = (event) => {
       try {
-        const payload = JSON.parse(event.data) as { type?: string };
+        const payload = JSON.parse(event.data).data as { type?: string };
         if (payload.type === 'stream.connected') {
           return;
         }

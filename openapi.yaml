@@ -47,23 +47,6 @@ tags:
 security:
   - bearerAuth: []
 paths:
-  /admin/catalog/events:
-    get:
-      tags:
-        - Admin
-        - Realtime
-      summary: Admin catalog SSE stream
-      security:
-        - bearerAuth:
-            - orbat:view_all
-            - templates:view
-      responses:
-        "200":
-          description: SSE stream
-          content:
-            text/event-stream:
-              schema:
-                type: object
   /admin/import/legacy-user-data:
     get:
       tags:
@@ -107,23 +90,6 @@ paths:
       responses:
         "200":
           description: Mappings saved
-  /admin/users/events:
-    get:
-      tags:
-        - Admin
-        - Users
-        - Realtime
-      summary: Admin users list SSE stream
-      security:
-        - bearerAuth:
-            - user:manage
-      responses:
-        "200":
-          description: SSE stream
-          content:
-            text/event-stream:
-              schema:
-                type: object
   /attendance:
     get:
       tags:
@@ -461,19 +427,6 @@ paths:
       responses:
         "200":
           description: Success
-  /messaging/events:
-    get:
-      tags:
-        - Messaging
-        - Realtime
-      summary: Inbox SSE stream
-      responses:
-        "200":
-          description: SSE stream
-          content:
-            text/event-stream:
-              schema:
-                type: object
   /orbats:
     get:
       tags:
@@ -1040,23 +993,47 @@ paths:
           description: Internal failure; mutation rollback or read audit failure
   /orbats/{id}/events:
     get:
-      tags:
-        - ORBATs
-        - Realtime
-      summary: ORBAT-specific SSE stream
+      summary: public realtime event stream
+      description: Transient SSE transport with canonical {data,meta} JSON frames, UTC occurredAt, event IDs, initial
+        stream.connected, retry3000 and heartbeat15seconds. Strict no-query contract. Last-Event-ID does not provide
+        replay; fetch canonical resources on reconnect. Public ORBAT stream preserves anonymous access and calendar
+        fields, discards staff events and actor/private payload fields. Protected streams require live session/bot and
+        scope permissions, revalidated on every delivered event and heartbeat; revocation or required audit failure
+        closes stream. Profile events require self or allowed staff hierarchy; inbox owner/superadmin; training request
+        owner/training staff; promotion queue rank:manage_promotions; catalog scoped create/edit/delete. Only minimal
+        event metadata is delivered, with returned other-user target reads audited before delivery. Abort, cancellation,
+        errors and queue/backpressure limits release listeners/timers.
+      security:
+        - {}
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
       parameters:
         - name: id
           in: path
           required: true
           schema:
-            type: integer
+            oneOf:
+              - type: integer
+                minimum: 1
+                maximum: 2147483647
       responses:
         "200":
-          description: SSE stream
+          description: "SSE frames: data is minimal event metadata; meta is empty. Not a JSON document."
           content:
             text/event-stream:
               schema:
-                type: object
+                type: string
+        "400":
+          description: Canonical JSON error envelope before stream opens
+        "401":
+          description: Canonical JSON error envelope before stream opens
+        "403":
+          description: Canonical JSON error envelope before stream opens
+        "404":
+          description: Canonical JSON error envelope before stream opens
+        "500":
+          description: Canonical JSON error envelope before stream opens
   /orbats/{id}/full:
     parameters:
       - name: id
@@ -1313,17 +1290,39 @@ paths:
                 $ref: "#/components/schemas/ApiFailure"
   /orbats/events:
     get:
-      tags:
-        - ORBATs
-        - Realtime
-      summary: Global ORBAT SSE stream
+      summary: public realtime event stream
+      description: Transient SSE transport with canonical {data,meta} JSON frames, UTC occurredAt, event IDs, initial
+        stream.connected, retry3000 and heartbeat15seconds. Strict no-query contract. Last-Event-ID does not provide
+        replay; fetch canonical resources on reconnect. Public ORBAT stream preserves anonymous access and calendar
+        fields, discards staff events and actor/private payload fields. Protected streams require live session/bot and
+        scope permissions, revalidated on every delivered event and heartbeat; revocation or required audit failure
+        closes stream. Profile events require self or allowed staff hierarchy; inbox owner/superadmin; training request
+        owner/training staff; promotion queue rank:manage_promotions; catalog scoped create/edit/delete. Only minimal
+        event metadata is delivered, with returned other-user target reads audited before delivery. Abort, cancellation,
+        errors and queue/backpressure limits release listeners/timers.
+      security:
+        - {}
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters: []
       responses:
         "200":
-          description: SSE stream
+          description: "SSE frames: data is minimal event metadata; meta is empty. Not a JSON document."
           content:
             text/event-stream:
               schema:
-                type: object
+                type: string
+        "400":
+          description: Canonical JSON error envelope before stream opens
+        "401":
+          description: Canonical JSON error envelope before stream opens
+        "403":
+          description: Canonical JSON error envelope before stream opens
+        "404":
+          description: Canonical JSON error envelope before stream opens
+        "500":
+          description: Canonical JSON error envelope before stream opens
   /permissions/templates:
     get:
       tags:
@@ -2711,20 +2710,38 @@ paths:
                 $ref: "#/components/schemas/ApiFailure"
   /ranks/promotions/events:
     get:
-      tags:
-        - Ranks
-        - Realtime
-      summary: Promotions queue SSE stream
+      summary: promotions realtime event stream
+      description: Transient SSE transport with canonical {data,meta} JSON frames, UTC occurredAt, event IDs, initial
+        stream.connected, retry3000 and heartbeat15seconds. Strict no-query contract. Last-Event-ID does not provide
+        replay; fetch canonical resources on reconnect. Public ORBAT stream preserves anonymous access and calendar
+        fields, discards staff events and actor/private payload fields. Protected streams require live session/bot and
+        scope permissions, revalidated on every delivered event and heartbeat; revocation or required audit failure
+        closes stream. Profile events require self or allowed staff hierarchy; inbox owner/superadmin; training request
+        owner/training staff; promotion queue rank:manage_promotions; catalog scoped create/edit/delete. Only minimal
+        event metadata is delivered, with returned other-user target reads audited before delivery. Abort, cancellation,
+        errors and queue/backpressure limits release listeners/timers.
       security:
-        - bearerAuth:
-            - ranks:manage_promotions
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters: []
       responses:
         "200":
-          description: SSE stream
+          description: "SSE frames: data is minimal event metadata; meta is empty. Not a JSON document."
           content:
             text/event-stream:
               schema:
-                type: object
+                type: string
+        "400":
+          description: Canonical JSON error envelope before stream opens
+        "401":
+          description: Canonical JSON error envelope before stream opens
+        "403":
+          description: Canonical JSON error envelope before stream opens
+        "404":
+          description: Canonical JSON error envelope before stream opens
+        "500":
+          description: Canonical JSON error envelope before stream opens
   /ranks/promotions/pending:
     get:
       tags:
@@ -4559,12 +4576,46 @@ paths:
             maximum: 2147483647
   /training-requests/{id}/events:
     get:
-      tags:
-        - TODO
-      summary: TODO document GET /training-requests/{id}/events
+      summary: training realtime event stream
+      description: Transient SSE transport with canonical {data,meta} JSON frames, UTC occurredAt, event IDs, initial
+        stream.connected, retry3000 and heartbeat15seconds. Strict no-query contract. Last-Event-ID does not provide
+        replay; fetch canonical resources on reconnect. Public ORBAT stream preserves anonymous access and calendar
+        fields, discards staff events and actor/private payload fields. Protected streams require live session/bot and
+        scope permissions, revalidated on every delivered event and heartbeat; revocation or required audit failure
+        closes stream. Profile events require self or allowed staff hierarchy; inbox owner/superadmin; training request
+        owner/training staff; promotion queue rank:manage_promotions; catalog scoped create/edit/delete. Only minimal
+        event metadata is delivered, with returned other-user target reads audited before delivery. Abort, cancellation,
+        errors and queue/backpressure limits release listeners/timers.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            oneOf:
+              - type: integer
+                minimum: 1
+                maximum: 2147483647
       responses:
         "200":
-          description: Success
+          description: "SSE frames: data is minimal event metadata; meta is empty. Not a JSON document."
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "400":
+          description: Canonical JSON error envelope before stream opens
+        "401":
+          description: Canonical JSON error envelope before stream opens
+        "403":
+          description: Canonical JSON error envelope before stream opens
+        "404":
+          description: Canonical JSON error envelope before stream opens
+        "500":
+          description: Canonical JSON error envelope before stream opens
   /training-requests/{id}/messages:
     get:
       tags:
@@ -6134,19 +6185,6 @@ paths:
       responses:
         "200":
           description: Success
-  /user/events:
-    get:
-      tags:
-        - Users
-        - Realtime
-      summary: User profile SSE stream
-      responses:
-        "200":
-          description: SSE stream
-          content:
-            text/event-stream:
-              schema:
-                type: object
   /users:
     get:
       tags:
@@ -6660,20 +6698,48 @@ paths:
           description: Internal failure; writes rolled back and read audits fail closed
   /users/{id}/events:
     get:
-      tags:
-        - Users
-        - Realtime
-      summary: Admin user SSE stream
+      summary: profile realtime event stream
+      description: Transient SSE transport with canonical {data,meta} JSON frames, UTC occurredAt, event IDs, initial
+        stream.connected, retry3000 and heartbeat15seconds. Strict no-query contract. Last-Event-ID does not provide
+        replay; fetch canonical resources on reconnect. Public ORBAT stream preserves anonymous access and calendar
+        fields, discards staff events and actor/private payload fields. Protected streams require live session/bot and
+        scope permissions, revalidated on every delivered event and heartbeat; revocation or required audit failure
+        closes stream. Profile events require self or allowed staff hierarchy; inbox owner/superadmin; training request
+        owner/training staff; promotion queue rank:manage_promotions; catalog scoped create/edit/delete. Only minimal
+        event metadata is delivered, with returned other-user target reads audited before delivery. Abort, cancellation,
+        errors and queue/backpressure limits release listeners/timers.
       security:
-        - bearerAuth:
-            - user:manage
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            oneOf:
+              - type: integer
+                minimum: 1
+                maximum: 2147483647
+              - type: string
+                const: me
       responses:
         "200":
-          description: SSE stream
+          description: "SSE frames: data is minimal event metadata; meta is empty. Not a JSON document."
           content:
             text/event-stream:
               schema:
-                type: object
+                type: string
+        "400":
+          description: Canonical JSON error envelope before stream opens
+        "401":
+          description: Canonical JSON error envelope before stream opens
+        "403":
+          description: Canonical JSON error envelope before stream opens
+        "404":
+          description: Canonical JSON error envelope before stream opens
+        "500":
+          description: Canonical JSON error envelope before stream opens
   /users/{id}/permissions:
     get:
       summary: Read user permission resource
@@ -11025,6 +11091,118 @@ paths:
                 minimum: 1
                 maximum: 2147483647
               - const: me
+  /users/events:
+    get:
+      summary: profiles realtime event stream
+      description: Transient SSE transport with canonical {data,meta} JSON frames, UTC occurredAt, event IDs, initial
+        stream.connected, retry3000 and heartbeat15seconds. Strict no-query contract. Last-Event-ID does not provide
+        replay; fetch canonical resources on reconnect. Public ORBAT stream preserves anonymous access and calendar
+        fields, discards staff events and actor/private payload fields. Protected streams require live session/bot and
+        scope permissions, revalidated on every delivered event and heartbeat; revocation or required audit failure
+        closes stream. Profile events require self or allowed staff hierarchy; inbox owner/superadmin; training request
+        owner/training staff; promotion queue rank:manage_promotions; catalog scoped create/edit/delete. Only minimal
+        event metadata is delivered, with returned other-user target reads audited before delivery. Abort, cancellation,
+        errors and queue/backpressure limits release listeners/timers.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters: []
+      responses:
+        "200":
+          description: "SSE frames: data is minimal event metadata; meta is empty. Not a JSON document."
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "400":
+          description: Canonical JSON error envelope before stream opens
+        "401":
+          description: Canonical JSON error envelope before stream opens
+        "403":
+          description: Canonical JSON error envelope before stream opens
+        "404":
+          description: Canonical JSON error envelope before stream opens
+        "500":
+          description: Canonical JSON error envelope before stream opens
+  /users/{id}/messages/events:
+    get:
+      summary: inbox realtime event stream
+      description: Transient SSE transport with canonical {data,meta} JSON frames, UTC occurredAt, event IDs, initial
+        stream.connected, retry3000 and heartbeat15seconds. Strict no-query contract. Last-Event-ID does not provide
+        replay; fetch canonical resources on reconnect. Public ORBAT stream preserves anonymous access and calendar
+        fields, discards staff events and actor/private payload fields. Protected streams require live session/bot and
+        scope permissions, revalidated on every delivered event and heartbeat; revocation or required audit failure
+        closes stream. Profile events require self or allowed staff hierarchy; inbox owner/superadmin; training request
+        owner/training staff; promotion queue rank:manage_promotions; catalog scoped create/edit/delete. Only minimal
+        event metadata is delivered, with returned other-user target reads audited before delivery. Abort, cancellation,
+        errors and queue/backpressure limits release listeners/timers.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            oneOf:
+              - type: integer
+                minimum: 1
+                maximum: 2147483647
+              - type: string
+                const: me
+      responses:
+        "200":
+          description: "SSE frames: data is minimal event metadata; meta is empty. Not a JSON document."
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "400":
+          description: Canonical JSON error envelope before stream opens
+        "401":
+          description: Canonical JSON error envelope before stream opens
+        "403":
+          description: Canonical JSON error envelope before stream opens
+        "404":
+          description: Canonical JSON error envelope before stream opens
+        "500":
+          description: Canonical JSON error envelope before stream opens
+  /catalog/events:
+    get:
+      summary: catalog realtime event stream
+      description: Transient SSE transport with canonical {data,meta} JSON frames, UTC occurredAt, event IDs, initial
+        stream.connected, retry3000 and heartbeat15seconds. Strict no-query contract. Last-Event-ID does not provide
+        replay; fetch canonical resources on reconnect. Public ORBAT stream preserves anonymous access and calendar
+        fields, discards staff events and actor/private payload fields. Protected streams require live session/bot and
+        scope permissions, revalidated on every delivered event and heartbeat; revocation or required audit failure
+        closes stream. Profile events require self or allowed staff hierarchy; inbox owner/superadmin; training request
+        owner/training staff; promotion queue rank:manage_promotions; catalog scoped create/edit/delete. Only minimal
+        event metadata is delivered, with returned other-user target reads audited before delivery. Abort, cancellation,
+        errors and queue/backpressure limits release listeners/timers.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters: []
+      responses:
+        "200":
+          description: "SSE frames: data is minimal event metadata; meta is empty. Not a JSON document."
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "400":
+          description: Canonical JSON error envelope before stream opens
+        "401":
+          description: Canonical JSON error envelope before stream opens
+        "403":
+          description: Canonical JSON error envelope before stream opens
+        "404":
+          description: Canonical JSON error envelope before stream opens
+        "500":
+          description: Canonical JSON error envelope before stream opens
 components:
   securitySchemes:
     bearerAuth:

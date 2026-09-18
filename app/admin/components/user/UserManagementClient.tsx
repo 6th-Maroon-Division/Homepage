@@ -107,7 +107,7 @@ export default function UserManagementClient({
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
     let fallbackTimer: ReturnType<typeof setInterval> | null = null;
 
-    const source = new EventSource('/api/admin/users/events');
+    const source = new EventSource('/api/users/events');
 
     const scheduleRefresh = () => {
       if (refreshTimer) {
@@ -129,7 +129,7 @@ export default function UserManagementClient({
 
     source.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data) as { type?: string };
+        const data = JSON.parse(event.data).data as { type?: string };
         if (data.type === 'stream.connected') {
           return;
         }

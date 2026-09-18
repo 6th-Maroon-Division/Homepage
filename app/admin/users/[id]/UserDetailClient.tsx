@@ -355,7 +355,7 @@ export default function UserDetailClient({
 
     source.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data) as { type?: string };
+        const data = JSON.parse(event.data).data as { type?: string };
         if (data.type === 'stream.connected') {
           return;
         }

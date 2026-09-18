@@ -28,13 +28,13 @@ export default function PermissionSessionSync() {
       return;
     }
 
-    const source = new EventSource('/api/user/events');
+    const source = new EventSource('/api/users/me/events');
 
     source.onmessage = async (event) => {
       let payload: UserEventPayload | null = null;
 
       try {
-        payload = JSON.parse(event.data) as UserEventPayload;
+        payload = JSON.parse(event.data).data as UserEventPayload;
       } catch {
         return;
       }
