@@ -28,7 +28,10 @@ export async function ingestAttendanceEvent(request: Request, principal: ApiPrin
     if (userId !== null) await requireAttendanceUser(tx, principal, userId, 'attendance:edit');
     const identityWhere = userId !== null ? { userId } : identity!.provider === 'steam' ? { steamId: identity!.providerUserId } : { discordId: identity!.providerUserId };
     const previous = await tx.attendanceEvent.findFirst({ where: identityWhere, orderBy: [{ eventTime: 'desc' }, { id: 'desc' }] });
-    if (previous && previous.isJoin === input.isJoin && previous.eventTime <= eventTime) return { data: { id: previous.id, userId: previous.userId, isJoin: previous.isJoin, eventTime: previous.eventTime.toISOString(), processed: previous.processed }, duplicate: true };
+    if (previous && previous.isJoin === input.isJoin && previous.eventTime <= eventTime) {
+      if (previous.userId !== null && (principal.kind === 'bot' || principal.userId !== previous.userId)) await writeApiAudit(tx, audit, { action: 'user_data.read', resource: 'attendance_event', resourceId: String(previous.id), targetUserIds: [previous.userId], outcome: 'success' });
+      return { data: { id: previous.id, userId: previous.userId, isJoin: previous.isJoin, eventTime: previous.eventTime.toISOString(), processed: previous.processed }, duplicate: true };
+    }
     const created = await tx.attendanceEvent.create({ data: { userId, steamId: identity?.provider === 'steam' ? identity.providerUserId : null, discordId: identity?.provider === 'discord' ? identity.providerUserId : null, isJoin: input.isJoin as boolean, eventTime, processed: userId !== null } });
     await writeApiAudit(tx, audit, { action: 'attendance_event.created', resource: 'attendance_event', resourceId: String(created.id), targetUserIds: userId === null ? [] : [userId], outcome: 'success', after: { id: created.id, userId, isJoin: created.isJoin, eventTime: created.eventTime.toISOString(), processed: created.processed } });
     return { data: { id: created.id, userId, isJoin: created.isJoin, eventTime: created.eventTime.toISOString(), processed: created.processed }, duplicate: false };

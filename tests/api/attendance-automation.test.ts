@@ -63,3 +63,10 @@ test('session chronology rejects missing checkout source, duplicate open session
   mocks.db.orbat.findUnique.mockResolvedValue({ ...operation(), isSideOp: true }); expect((await sessions(req({ userId: 4, orbatId: 20, checkinTime: '2020-01-01T10:00:00Z' }))).status).toBe(409);
 });
 test('automation effects and audits fail atomically with safe errors', async () => { const log = vi.spyOn(console, 'error').mockImplementation(() => {}); mocks.db.apiAuditLog.create.mockRejectedValue(new Error('private failure')); expect((await events(req({ userId: 4, isJoin: true, eventTime: '2020-01-01T10:00:00Z' }))).status).toBe(500); expect((await sessions(req({ userId: 4, checkinTime: '2020-01-01T10:00:00Z' }))).status).toBe(500); expect((await compile(req({}), ctx())).status).toBe(500); log.mockRestore(); });
+test('duplicate event reads audit other users and bots, omit self, and fail closed on audit outage', async () => {
+  mocks.db.attendanceEvent.findFirst.mockResolvedValue({ ...event(), userId: 5 });
+  const body = { userId: 5, isJoin: true, eventTime: '2020-01-01T10:01:00Z' };
+  expect((await events(req(body))).status).toBe(200); expect(mocks.db.apiAuditLog.create.mock.lastCall![0].data).toMatchObject({ action: 'user_data.read', resource: 'attendance_event', targetUserIds: [5] }); expect(mocks.db.attendanceEvent.create).not.toHaveBeenCalled();
+  mocks.db.apiAuditLog.create.mockClear(); mocks.db.attendanceEvent.findFirst.mockResolvedValue(event()); expect((await events(req({ ...body, userId: 4 }))).status).toBe(200); expect(mocks.db.apiAuditLog.create).not.toHaveBeenCalled(); expect((await events(req({ ...body, userId: 4 }, 'Bearer active'))).status).toBe(200); expect(mocks.db.apiAuditLog.create.mock.lastCall![0].data.targetUserIds).toEqual([4]);
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {}); mocks.db.apiAuditLog.create.mockRejectedValue(new Error('Private audit failure')); expect((await events(req(body, 'Bearer active'))).status).toBe(500); log.mockRestore();
+});
