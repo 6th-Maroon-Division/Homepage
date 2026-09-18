@@ -191,34 +191,159 @@ paths:
     get:
       tags:
         - Attendance
-      summary: Get specific attendance record
+      summary: Read attendance record
+      description: Requires global attendance:view and target hierarchy (self allowed after global permission). Minimal
+        display users and log actors only; other-user reads, including actor display names, are audited.
+        Unknown/repeated query arguments rejected. All returned timestamps UTC ISO. Active bot tokens share the same
+        endpoint; explicit invalid Authorization never falls back.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: attendanceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
       responses:
         "200":
-          description: Attendance record
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AttendanceRecord"
+                  meta:
+                    type: object
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Invalid path query or JSON
+        "401":
+          description: Missing or invalid credentials
+        "403":
+          description: Permission or hierarchy denied
+        "404":
+          description: Resource or reference missing
+        "409":
+          description: Duplicate attendance side-operation or concurrency conflict
+        "422":
+          description: Invalid payload or timing
+        "500":
+          description: Internal failure; writes rolled back and read audits fail closed
     patch:
       tags:
         - Attendance
       summary: Update attendance record
+      description: Requires global attendance:edit and live hierarchy against previous and new users. Side operations reject
+        edits. Serializable transaction updates record, owner-linked sessions, note flags, manual attendance log and
+        redacted audit. Status and notes retain omitted values. Unknown/repeated query arguments rejected. All returned
+        timestamps UTC ISO. Active bot tokens share the same endpoint; explicit invalid Authorization never falls back.
       security:
-        - bearerAuth:
-            - attendance:manage
-      responses:
-        "200":
-          description: Attendance updated
-    put:
-      tags:
-        - TODO
-      summary: TODO document PUT /attendance/{attendanceId}
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: attendanceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
       responses:
         "200":
           description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AttendanceRecord"
+                  meta:
+                    type: object
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Invalid path query or JSON
+        "401":
+          description: Missing or invalid credentials
+        "403":
+          description: Permission or hierarchy denied
+        "404":
+          description: Resource or reference missing
+        "409":
+          description: Duplicate attendance side-operation or concurrency conflict
+        "422":
+          description: Invalid payload or timing
+        "500":
+          description: Internal failure; writes rolled back and read audits fail closed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttendancePatch"
     delete:
       tags:
-        - TODO
-      summary: TODO document DELETE /attendance/{attendanceId}
+        - Attendance
+      summary: Delete attendance record
+      description: Requires global attendance:edit and target hierarchy. Deletes attendance with cascading sessions/logs;
+        durable audit preserves affected record IDs and user IDs without private note text. Side-operation stale
+        attendance can be deleted. Unknown/repeated query arguments rejected. All returned timestamps UTC ISO. Active
+        bot tokens share the same endpoint; explicit invalid Authorization never falls back.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: attendanceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
       responses:
         "200":
           description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    type: "null"
+                  meta:
+                    type: object
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Invalid path query or JSON
+        "401":
+          description: Missing or invalid credentials
+        "403":
+          description: Permission or hierarchy denied
+        "404":
+          description: Resource or reference missing
+        "409":
+          description: Duplicate attendance side-operation or concurrency conflict
+        "422":
+          description: Invalid payload or timing
+        "500":
+          description: Internal failure; writes rolled back and read audits fail closed
   /attendance/automated:
     post:
       tags:
@@ -1028,43 +1153,150 @@ paths:
   /orbats/{id}/attendance:
     get:
       tags:
-        - ORBATs
         - Attendance
-      summary: Get ORBAT attendance
+      summary: List operation attendance
+      description: Requires attendance:view. Optional user filter checks live hierarchy. Side operations reject attendance
+        lists. Filters precede descending-ID pagination. Returned other users/log actors audited, lookahead excluded.
+        Unknown/repeated query arguments rejected. All returned timestamps UTC ISO. Active bot tokens share the same
+        endpoint; explicit invalid Authorization never falls back.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+          description: Capped at100.
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            pattern: ^[0-9]+$
+          description: Descending positiveInt32 record ID keyset.
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Optional valid UTC calendar date filters createdAt [midnight,next midnight). Omit for all dates.
+        - name: userId
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
       responses:
         "200":
-          description: ORBAT attendance records
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AttendanceRecord"
+                  meta:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      limit:
+                        type: integer
+                        minimum: 0
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+                    required:
+                      - limit
+                      - nextCursor
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Invalid path query or JSON
+        "401":
+          description: Missing or invalid credentials
+        "403":
+          description: Permission or hierarchy denied
+        "404":
+          description: Resource or reference missing
+        "409":
+          description: Duplicate attendance side-operation or concurrency conflict
+        "422":
+          description: Invalid payload or timing
+        "500":
+          description: Internal failure; writes rolled back and read audits fail closed
     post:
       tags:
-        - ORBATs
         - Attendance
-      summary: Set ORBAT attendance
+      summary: Create manual attendance
+      description: Requires attendance:edit and target hierarchy. Signup must belong to operation and match explicit user.
+        Duplicate user/operation attendance409. Sideops409. Existing attendance duration/status rules apply when checkin
+        supplied; sessionDate UTCmidnight. Note flags reflect current availability. Record/session/manual log/audit
+        commit atomically. Unknown/repeated query arguments rejected. All returned timestamps UTC ISO. Active bot tokens
+        share the same endpoint; explicit invalid Authorization never falls back.
       security:
-        - bearerAuth:
-            - attendance:manage
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+      responses:
+        "201":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AttendanceRecord"
+                  meta:
+                    type: object
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Invalid path query or JSON
+        "401":
+          description: Missing or invalid credentials
+        "403":
+          description: Permission or hierarchy denied
+        "404":
+          description: Resource or reference missing
+        "409":
+          description: Duplicate attendance side-operation or concurrency conflict
+        "422":
+          description: Invalid payload or timing
+        "500":
+          description: Internal failure; writes rolled back and read audits fail closed
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                userId:
-                  type: integer
-                status:
-                  type: string
-                  enum:
-                    - present
-                    - absent
-                    - late
-                    - gone_early
-                    - partial
-                    - no_show
-                notes:
-                  type: string
-      responses:
-        "201":
-          description: Attendance set
+              $ref: "#/components/schemas/AttendanceCreate"
   /orbats/{id}/attendance/automation:
     post:
       tags:
@@ -6083,21 +6315,157 @@ paths:
   /users/{id}/attendance:
     get:
       tags:
-        - Users
         - Attendance
-      summary: Get user attendance
+      summary: Public user attendance history
+      description: Preserves existing anonymous public access, while removing private notes, logs, actor details and account
+        data. Valid sessions may use me; bots/anonymous require numeric user IDs. Anonymous/bot/other-user targeted
+        reads audited even for empty results; self reads not logged. Unknown/repeated query arguments rejected. All
+        returned timestamps UTC ISO. Active bot tokens share the same endpoint; explicit invalid Authorization never
+        falls back.
+      security:
+        - {}
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            oneOf:
+              - type: integer
+                minimum: 1
+                maximum: 2147483647
+              - type: string
+                const: me
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+          description: Capped at100.
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            pattern: ^[0-9]+$
+          description: Descending positiveInt32 record ID keyset.
+        - name: days
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 3650
+            default: 30
+          description: Rolling UTC 24-hour days counted backwards from now.
       responses:
         "200":
-          description: User attendance records
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AttendancePublicRecord"
+                  meta:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      limit:
+                        type: integer
+                        minimum: 0
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+                    required:
+                      - limit
+                      - nextCursor
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Invalid path query or JSON
+        "401":
+          description: Missing or invalid credentials
+        "403":
+          description: Permission or hierarchy denied
+        "404":
+          description: Resource or reference missing
+        "409":
+          description: Duplicate attendance side-operation or concurrency conflict
+        "422":
+          description: Invalid payload or timing
+        "500":
+          description: Internal failure; writes rolled back and read audits fail closed
   /users/{id}/attendance/stats:
     get:
       tags:
-        - Users
         - Attendance
-      summary: Get user attendance statistics
+      summary: Public user attendance statistics
+      description: Preserves existing anonymous aggregate access. UTC rolling window and existing attendance
+        percentage/count/average arithmetic; legacy records excluded as before. Targeted other-user and anonymous reads
+        audited, including empty windows. Unknown/repeated query arguments rejected. All returned timestamps UTC ISO.
+        Active bot tokens share the same endpoint; explicit invalid Authorization never falls back.
+      security:
+        - {}
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            oneOf:
+              - type: integer
+                minimum: 1
+                maximum: 2147483647
+              - type: string
+                const: me
+        - name: days
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 3650
+            default: 30
+          description: Rolling UTC 24-hour days counted backwards from now.
       responses:
         "200":
-          description: Attendance statistics
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AttendanceStatistics"
+                  meta:
+                    type: object
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Invalid path query or JSON
+        "401":
+          description: Missing or invalid credentials
+        "403":
+          description: Permission or hierarchy denied
+        "404":
+          description: Resource or reference missing
+        "409":
+          description: Duplicate attendance side-operation or concurrency conflict
+        "422":
+          description: Invalid payload or timing
+        "500":
+          description: Internal failure; writes rolled back and read audits fail closed
   /users/{id}/events:
     get:
       tags:
@@ -9300,13 +9668,20 @@ components:
           type: boolean
     AttendanceRecord:
       type: object
+      additionalProperties: false
       properties:
         id:
           type: integer
+          minimum: 1
+          maximum: 2147483647
         userId:
           type: integer
+          minimum: 1
+          maximum: 2147483647
         orbatId:
           type: integer
+          minimum: 1
+          maximum: 2147483647
         status:
           type: string
           enum:
@@ -9316,25 +9691,187 @@ components:
             - gone_early
             - partial
             - no_show
-        checkInTime:
-          type: string
-          format: date-time
-          nullable: true
-        checkOutTime:
-          type: string
-          format: date-time
-          nullable: true
-        minutesPresent:
+        minutesLate:
           type: integer
-          nullable: true
+          minimum: 0
+        minutesGoneEarly:
+          type: integer
+          minimum: 0
+        totalMinutesMissed:
+          type: integer
+          minimum: 0
+        totalMinutesPresent:
+          type: integer
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        orbat:
+          type: object
+          additionalProperties: false
+          properties:
+            id:
+              type: integer
+              minimum: 1
+              maximum: 2147483647
+            name:
+              type: string
+            startsAtUtc:
+              type:
+                - string
+                - "null"
+              format: date-time
+            eventDate:
+              type:
+                - string
+                - "null"
+              format: date-time
+          required:
+            - id
+            - name
+            - startsAtUtc
+            - eventDate
+        signupId:
+          type:
+            - integer
+            - "null"
         notes:
-          type: string
-          nullable: true
-        source:
-          type: string
-          enum:
-            - manual
-            - automated_system
+          type:
+            - string
+            - "null"
+        notedAbsent:
+          type: boolean
+        notedLateEarly:
+          type: boolean
+        notedUnsure:
+          type: boolean
+        user:
+          type: object
+          additionalProperties: false
+          properties:
+            id:
+              type: integer
+              minimum: 1
+              maximum: 2147483647
+            username:
+              type:
+                - string
+                - "null"
+          required:
+            - id
+            - username
+        signup:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              properties:
+                id:
+                  type: integer
+                  minimum: 1
+                  maximum: 2147483647
+                slotId:
+                  type: integer
+                  minimum: 1
+                  maximum: 2147483647
+                user:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    id:
+                      type: integer
+                      minimum: 1
+                      maximum: 2147483647
+                    username:
+                      type:
+                        - string
+                        - "null"
+                  required:
+                    - id
+                    - username
+                slot:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    id:
+                      type: integer
+                      minimum: 1
+                      maximum: 2147483647
+                    name:
+                      type: string
+            - type: "null"
+        sessions:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              id:
+                type: integer
+                minimum: 1
+                maximum: 2147483647
+              userId:
+                type: integer
+                minimum: 1
+                maximum: 2147483647
+              attendanceId:
+                type:
+                  - integer
+                  - "null"
+              checkedInAt:
+                type: string
+                format: date-time
+              checkedOutAt:
+                type:
+                  - string
+                  - "null"
+                format: date-time
+              durationMinutes:
+                type:
+                  - integer
+                  - "null"
+              sessionDate:
+                type: string
+                format: date-time
+              timestamp:
+                type: string
+                format: date-time
+        logs:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              id:
+                type: integer
+                minimum: 1
+                maximum: 2147483647
+              action:
+                type: string
+              source:
+                type: string
+              timestamp:
+                type: string
+                format: date-time
+              changedBy:
+                oneOf:
+                  - type: object
+                    additionalProperties: false
+                    properties:
+                      id:
+                        type: integer
+                        minimum: 1
+                        maximum: 2147483647
+                      username:
+                        type:
+                          - string
+                          - "null"
+                    required:
+                      - id
+                      - username
+                  - type: "null"
     TrainingRequest:
       type: object
       properties:
@@ -12873,3 +13410,213 @@ components:
         expectedUpdatedAt:
           type: string
           format: date-time
+    AttendancePublicRecord:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        userId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        orbatId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        status:
+          type: string
+          enum:
+            - present
+            - absent
+            - late
+            - gone_early
+            - partial
+            - no_show
+        minutesLate:
+          type: integer
+          minimum: 0
+        minutesGoneEarly:
+          type: integer
+          minimum: 0
+        totalMinutesMissed:
+          type: integer
+          minimum: 0
+        totalMinutesPresent:
+          type: integer
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        orbat:
+          type: object
+          additionalProperties: false
+          properties:
+            id:
+              type: integer
+              minimum: 1
+              maximum: 2147483647
+            name:
+              type: string
+            startsAtUtc:
+              type:
+                - string
+                - "null"
+              format: date-time
+            eventDate:
+              type:
+                - string
+                - "null"
+              format: date-time
+          required:
+            - id
+            - name
+            - startsAtUtc
+            - eventDate
+      required:
+        - id
+        - userId
+        - orbatId
+        - status
+        - minutesLate
+        - minutesGoneEarly
+        - totalMinutesMissed
+        - totalMinutesPresent
+        - createdAt
+        - updatedAt
+        - orbat
+    AttendanceCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        signupId:
+          type:
+            - integer
+            - "null"
+          minimum: 1
+          maximum: 2147483647
+        userId:
+          type:
+            - integer
+            - "null"
+          minimum: 1
+          maximum: 2147483647
+        status:
+          type: string
+          enum:
+            - present
+            - absent
+            - late
+            - gone_early
+            - partial
+            - no_show
+        notes:
+          type:
+            - string
+            - "null"
+        checkinTime:
+          type:
+            - string
+            - "null"
+          format: date-time
+        checkoutTime:
+          type:
+            - string
+            - "null"
+          format: date-time
+      minProperties: 1
+      description: signupId or userId required. When both present they must identify the same user. UTC timestamps explicit
+        offsets; checkout requires later checkin. Optional notes trimmed.
+    AttendancePatch:
+      type: object
+      additionalProperties: false
+      properties:
+        signupId:
+          type:
+            - integer
+            - "null"
+          minimum: 1
+          maximum: 2147483647
+        userId:
+          type:
+            - integer
+            - "null"
+          minimum: 1
+          maximum: 2147483647
+        status:
+          type: string
+          enum:
+            - present
+            - absent
+            - late
+            - gone_early
+            - partial
+            - no_show
+        notes:
+          type:
+            - string
+            - "null"
+      minProperties: 1
+      description: Omitted fields preserved. Signup/user must be consistent. Reassigning user updates session owners.
+    AttendanceStatistics:
+      type: object
+      additionalProperties: false
+      properties:
+        totalEvents:
+          type: integer
+          minimum: 0
+        presentCount:
+          type: integer
+          minimum: 0
+        lateCount:
+          type: integer
+          minimum: 0
+        goneEarlyCount:
+          type: integer
+          minimum: 0
+        arrivedLateCount:
+          type: integer
+          minimum: 0
+        leftEarlyCount:
+          type: integer
+          minimum: 0
+        partialCount:
+          type: integer
+          minimum: 0
+        absentCount:
+          type: integer
+          minimum: 0
+        noShowCount:
+          type: integer
+          minimum: 0
+        attendancePercentage:
+          type: integer
+          minimum: 0
+        avgMinutesMissed:
+          type: integer
+          minimum: 0
+        avgArrivedLatePerMonth:
+          type: number
+          minimum: 0
+        avgLeftEarlyPerMonth:
+          type: number
+          minimum: 0
+      required:
+        - totalEvents
+        - presentCount
+        - lateCount
+        - goneEarlyCount
+        - arrivedLateCount
+        - leftEarlyCount
+        - partialCount
+        - absentCount
+        - noShowCount
+        - attendancePercentage
+        - avgMinutesMissed
+        - avgArrivedLatePerMonth
+        - avgLeftEarlyPerMonth

@@ -1,6 +1,6 @@
 'use client';
 
-import { apiList } from '@/lib/api/client';
+import { apiList, apiRequest } from '@/lib/api/client';
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
@@ -76,9 +76,8 @@ function AttendanceForm({
       const fetchAttendance = async () => {
         setIsLoadingSignups(true);
         try {
-          const response = await fetch(`/api/attendance/${attendanceId}`);
-          if (response.ok) {
-            const data = await response.json();
+          const { data } = await apiRequest<{ signupId: number | null; userId: number; status: string; notes: string | null }>(`/api/attendance/${attendanceId}`);
+          {
             setSignupId(data.signupId || undefined);
             setUserId(data.userId);
             setStatus(data.status || 'absent');
@@ -143,24 +142,21 @@ function AttendanceForm({
         ? `/api/attendance/${attendanceId}`
         : `/api/orbats/${orbatId}/attendance`;
 
-      const method = attendanceId ? 'PUT' : 'POST';
+      const method = attendanceId ? 'PATCH' : 'POST';
 
-      const response = await fetch(url, {
+      await apiRequest(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to save attendance');
-      }
 
       showToast('Attendance saved successfully', 'success');
       onSave();
       onClose();
     } catch (error) {
       logClientError('Error saving attendance:', error);
-      showToast('Failed to save attendance', 'error');
+      showToast(error instanceof Error ? error.message : 'Failed to save attendance', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -381,9 +377,7 @@ function AttendanceDetailsModal({
 export default function AttendanceManagement({ orbatId }: { orbatId: number }) {
   const [attendances, setAttendances] = useState<AttendanceRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split('T')[0]
-  );
+  const [selectedDate, setSelectedDate] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showForm, setShowForm] = useState(false);
@@ -397,12 +391,9 @@ export default function AttendanceManagement({ orbatId }: { orbatId: number }) {
     setIsLoading(true);
     try {
       const query = new URLSearchParams();
-      query.append('date', selectedDate);
+      if (selectedDate) query.append('date', selectedDate);
 
-      const response = await fetch(`/api/orbats/${orbatId}/attendance?${query}`);
-      if (!response.ok) throw new Error('Failed to fetch attendance');
-
-      const data = await response.json();
+      const data = await apiList<AttendanceRecord>(`/api/orbats/${orbatId}/attendance?${query}`);
       setAttendances(data);
     } catch (error) {
       logClientError('Error fetching attendance:', error);
@@ -420,11 +411,10 @@ export default function AttendanceManagement({ orbatId }: { orbatId: number }) {
     if (!deleteId) return;
 
     try {
-      const response = await fetch(`/api/attendance/${deleteId}`, {
+      await apiRequest(`/api/attendance/${deleteId}`, {
         method: 'DELETE',
       });
 
-      if (!response.ok) throw new Error('Failed to delete attendance');
 
       showToast('Attendance deleted successfully', 'success');
       setConfirmDelete(false);
@@ -432,7 +422,7 @@ export default function AttendanceManagement({ orbatId }: { orbatId: number }) {
       fetchAttendances();
     } catch (error) {
       logClientError('Error deleting attendance:', error);
-      showToast('Failed to delete attendance', 'error');
+      showToast(error instanceof Error ? error.message : 'Failed to delete attendance', 'error');
     }
   };
 
@@ -558,6 +548,7 @@ export default function AttendanceManagement({ orbatId }: { orbatId: number }) {
           />
           <input
             type="date"
+            title="Recorded date (UTC); leave empty for all dates"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
             className="px-4 py-2 border rounded-md focus:outline-none focus:ring-2"

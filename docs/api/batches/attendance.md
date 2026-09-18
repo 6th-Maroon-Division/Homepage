@@ -1,0 +1,15 @@
+# Manual attendance and public history migration
+
+Protected manual endpoints keep `attendance:view` for reads and `attendance:edit` for writes, with the global grant required even for self. Targeted records and owner changes additionally check the live hierarchy. All endpoints accept validated user sessions and active database bots.
+
+- `GET/POST /orbats/{id}/attendance`: cursor-paginated descending record IDs, optional userId and UTC-created-date filter. POST accepts nullable numeric signupId/userId, status, trimmed nullable notes, and optional explicit-offset checkinTime/checkoutTime. At least one identity is required; both must agree. Signup must belong to the operation. Duplicate user/operation attendance is rejected.
+- `GET/PATCH/DELETE /attendance/{attendanceId}` replaces PUT with strict nonempty partial PATCH. Omitted signup/user/status/notes remain unchanged. Authorized owner changes also update linked session owners. DELETE returns null and preserves cascade identifiers in the durable API audit.
+- Public `GET /users/{id}/attendance` and `/stats` preserve existing anonymous access pending any future explicit policy change. The record DTO is limited to attendance display fields and operation information, excluding notes, logs, actor/private user data and account fields. Statistics retain existing arithmetic and exclude legacy records as before. Session users may use `me`; others require numeric IDs. Anonymous, bot and other-user reads are audited even for empty results, and audit failure fails closed.
+
+Private record DTOs contain display-only user/actor IDs and usernames, UTC sessions and logs; raw log snapshots are excluded. Reads audit all displayed other-user identities, excluding page lookahead. Pagination defaults to50 and caps at100. Strict days windows default30/max3650 and use rolling UTC24-hour days. Date filters use UTC midnight bounds and run before pagination. Unknown or duplicate arguments are rejected.
+
+All manual mutation changes, sessions, attendance logs and redacted API audits share one Serializable transaction. Existing duration/status arithmetic and availability-note flags are preserved. Check-out must follow check-in; ambiguous local timestamps are rejected. Side operations prohibit creation/update/list, while deletion can clean up existing stale records. Session dates normalize to UTC midnight. No new manual bot outbox event type was introduced.
+
+AttendanceManagement uses the shared client and PATCH. Its optional date filter now works; default empty preserves the previous all-records display. The unused-but-supported UserAttendanceProfile component uses the narrow public DTO and shared pagination; 365days is correctly labeled rather than Alltime.
+
+Tests:36 unit cases in `tests/api/attendance.test.ts`;7 real Prisma tests in `tests/api-integration/attendance.test.ts` cover UTC duration/session persistence, note flags, reassignments, cascades, hierarchy, bot actors, paging/privacy/public access and rollback. Automation, bot compile/backfill and import/legacy endpoints remain separate subsequent batches.

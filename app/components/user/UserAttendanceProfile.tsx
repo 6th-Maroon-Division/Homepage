@@ -1,5 +1,6 @@
 'use client';
 
+import { apiList, apiRequest } from '@/lib/api/client';
 import { useState, useEffect } from 'react';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 
@@ -28,14 +29,7 @@ interface AttendanceRecord {
   minutesGoneEarly: number;
   totalMinutesMissed: number;
   createdAt: string;
-  signup: {
-    slot: {
-      orbat: {
-        name: string;
-        eventDate: string;
-      };
-    };
-  };
+  orbat: { id: number; name: string; eventDate: string | null; startsAtUtc: string | null };
 }
 
 export default function UserAttendanceProfile({ userId }: { userId: number }) {
@@ -46,34 +40,20 @@ export default function UserAttendanceProfile({ userId }: { userId: number }) {
   // const { showToast } = { showToast: (msg: string) => console.log(msg) };
 
   useEffect(() => {
+    const controller = new AbortController();
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // Fetch stats
-        const statsResponse = await fetch(
-          `/api/users/${userId}/attendance/stats?days=${durationDays}`
-        );
-        if (statsResponse.ok) {
-          const statsData = await statsResponse.json();
-          setStats(statsData);
-        }
-
-        // Fetch records
-        const recordsResponse = await fetch(
-          `/api/users/${userId}/attendance?days=${durationDays}`
-        );
-        if (recordsResponse.ok) {
-          const recordsData = await recordsResponse.json();
-          setRecords(recordsData);
-        }
-      } catch (error) {
-        console.error('Error fetching attendance data:', error);
-      } finally {
-        setIsLoading(false);
-      }
+        const [statsResponse, rows] = await Promise.all([
+          apiRequest<UserAttendanceStats>(`/api/users/${userId}/attendance/stats?days=${durationDays}`, { signal: controller.signal }),
+          apiList<AttendanceRecord>(`/api/users/${userId}/attendance?days=${durationDays}`, { signal: controller.signal }),
+        ]);
+        if (!controller.signal.aborted) { setStats(statsResponse.data); setRecords(rows); }
+      } catch { if (!controller.signal.aborted) { setStats(null); setRecords([]); } }
+      finally { if (!controller.signal.aborted) setIsLoading(false); }
     };
-
-    fetchData();
+    void fetchData();
+    return () => controller.abort();
   }, [userId, durationDays]);
 
   if (isLoading) {
@@ -111,7 +91,7 @@ export default function UserAttendanceProfile({ userId }: { userId: number }) {
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
-            {days === 365 ? 'All time' : `${days} days`}
+            {`${days} days`}
           </button>
         ))}
       </div>
@@ -194,11 +174,11 @@ export default function UserAttendanceProfile({ userId }: { userId: number }) {
                 {records.map((record) => (
                   <tr key={record.id} className="border-t hover:bg-gray-50">
                     <td className="px-4 py-2">
-                      {record.signup.slot.orbat.name}
+                      {record.orbat.name}
                     </td>
                     <td className="px-4 py-2">
                       {new Date(
-                        record.signup.slot.orbat.eventDate
+                        record.orbat.startsAtUtc ?? record.orbat.eventDate ?? record.createdAt
                       ).toLocaleDateString()}
                     </td>
                     <td className="px-4 py-2">

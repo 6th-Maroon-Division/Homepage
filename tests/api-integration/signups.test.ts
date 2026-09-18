@@ -123,6 +123,7 @@ test('availability uses shared state, UTC DTO and redacted audit; absence blocks
 });
 test('real transactions roll back signup/note/outbox/idempotency when audit fails and read audit fails closed', async () => {
   const { slots, orbat } = await fixture();
+  const receiptCountBefore = await prisma.botIdempotencyReceipt.count();
   const transaction = prisma.$transaction.bind(prisma);
   const spy = vi.spyOn(prisma, '$transaction').mockImplementation(((callback: (tx: Prisma.TransactionClient) => unknown, options: unknown) => transaction(async tx => {
     const original = tx.apiAuditLog.create; tx.apiAuditLog.create = (() => { throw new Error('Injected audit failure'); }) as typeof original;
@@ -134,5 +135,6 @@ test('real transactions roll back signup/note/outbox/idempotency when audit fail
     expect((await notePatch(req('PATCH', { status: 'unsure' }), noteCtx(orbat.id))).status).toBe(500);
     session.id = actor; expect((await noteGet(req('GET'), noteCtx(orbat.id, member))).status).toBe(500);
   } finally { spy.mockRestore(); log.mockRestore(); }
-  expect(await prisma.signup.count({ where: { slot: { orbatId: orbat.id } } })).toBe(0); expect(await prisma.orbatAttendanceNote.count({ where: { orbatId: orbat.id } })).toBe(0); expect(await prisma.botEvent.count({ where: { aggregateId: String(orbat.id) } })).toBe(0);
+  expect(await prisma.signup.count({ where: { slot: { orbatId: orbat.id } } })).toBe(0); expect(await prisma.orbatAttendanceNote.count({ where: { orbatId: orbat.id } })).toBe(0); expect(await prisma.botEvent.count({ where: { aggregate: 'orbat', aggregateId: String(orbat.id) } })).toBe(0);
+  expect(await prisma.botIdempotencyReceipt.count()).toBe(receiptCountBefore);
 });
