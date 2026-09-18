@@ -30,7 +30,8 @@
     "test:backend": "node scripts/test-api-integration.mjs --backend",
     "audit:prune": "tsx scripts/prune-api-audits.ts",
     "api:check": "node scripts/check-api-contract.mjs",
-    "test:ui": "node scripts/test-ui.mjs"
+    "test:ui": "node scripts/test-ui.mjs",
+    "ui:check": "node scripts/check-ui-coverage.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",

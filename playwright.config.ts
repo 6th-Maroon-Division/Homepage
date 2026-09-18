@@ -15,6 +15,8 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: process.env.UI_TEST_BASE_URL,
+    actionTimeout: 15000,
+    navigationTimeout: 60000,
     timezoneId: 'Europe/Berlin',
     locale: 'en-GB',
     trace: 'retain-on-failure',

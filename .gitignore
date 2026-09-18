@@ -73,3 +73,4 @@ Thumbs.db
 /.tsconfig-ui-test-*.json
 
 /.prisma-ui-test-*/
+/.ui-test-lock/

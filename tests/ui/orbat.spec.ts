@@ -1,5 +1,7 @@
 import { test, expect } from './fixtures';
 
+export const coveredPages = ['/orbats', '/orbats/[id]', '/admin/orbats/[id]/edit'] as const;
+
 test('public ORBAT shows briefing and roles without signup controls', async ({ page, seed }) => {
   await page.goto(`/orbats/${seed.orbatId}`);
   await expect(page.getByRole('heading', { name: 'Browser Public Operation', exact: true })).toBeVisible();

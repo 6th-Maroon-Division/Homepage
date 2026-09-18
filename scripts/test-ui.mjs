@@ -2,13 +2,15 @@ import { startDBServer } from '@prisma/dev/internal/db';
 import { ServerState } from '@prisma/dev/internal/state';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { copyFile, cp, rm, writeFile } from 'node:fs/promises';
+import { copyFile, cp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const runId = randomUUID();
+const lockDir = new URL('../.ui-test-lock/', import.meta.url);
+let ownsLock = false;
 const distDir = `.next-ui-test-${runId}`;
 const tsconfigFile = `.tsconfig-ui-test-${runId}.json`;
 const clientDir = new URL(`../.prisma-ui-test-${runId}/`, import.meta.url);
@@ -92,6 +94,11 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
 }
 
 try {
+  try { await mkdir(lockDir); ownsLock = true; }
+  catch (error) {
+    if (error.code === 'EEXIST') throw new Error('Another UI test run owns .ui-test-lock. Run one suite at a time; remove the lock only if a previous run was forcibly killed.');
+    throw error;
+  }
   console.log('Starting UI tests with an isolated Prisma-managed PGlite database…');
   // Use the same pinned Prisma database service as the backend integration
   // suite, without its Streams/WAL sidecar sharing the emulated session.
@@ -155,6 +162,7 @@ try {
   await rm(new URL(`../${distDir}`, import.meta.url), { recursive: true, force: true });
   await rm(new URL(`../${tsconfigFile}`, import.meta.url), { force: true });
   await rm(clientDir, { recursive: true, force: true });
+  if (ownsLock) await rm(lockDir, { recursive: true, force: true });
 }
 // Prisma's cleanup can set exitCode; preserve the test or interruption result.
 if (interrupted) process.exitCode = interruptionCode;
