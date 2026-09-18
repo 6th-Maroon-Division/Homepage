@@ -1260,7 +1260,8 @@ paths:
         read anonymously. Only one limit and one cursor query key are accepted; unknown/duplicate keys return 400.
         Descending-ID cursor pages use real lookahead and end with meta.nextCursor:null. The website recent-operation
         selector explicitly requests limit=5; the API default is 50, capped at 100. This general catalog read creates no
-        user-data audit. POST on this URL retains its existing creation contract and is not migrated by this change."
+        user-data audit. POST on this URL is a separate protected orbat:create operation; the public GET contract is
+        unchanged."
       security:
         - {}
         - sessionCookie: []
@@ -1330,10 +1331,18 @@ paths:
     post:
       tags:
         - ORBATs
-      summary: Create new ORBAT
+      summary: Create an ORBAT
+      description: No query parameters are accepted (400 if supplied). Requires orbat:create for session users. Active
+        database bot tokens act as superadmin. User sessions record their creator ID; active superadmin bot tokens
+        create with a null creator, attributed through the audit actor. Deploy the optional-creator database migration
+        first for bot creation. Missing role/frequency references return 404; retired roles or transaction/reference
+        conflicts return 409. A serializable transaction creates operation/squads/slots/frequency links, the existing
+        orbat.created outbox event, and a metadata-only audit without briefing text. Realtime notifications are emitted
+        safely after commit. Returns only data.id; public GET behavior remains unchanged.
       security:
-        - bearerAuth:
-            - orbat:create
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
       requestBody:
         required: true
         content:
@@ -1342,11 +1351,70 @@ paths:
               $ref: "#/components/schemas/OrbatCreateInput"
       responses:
         "201":
-          description: ORBAT created
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                      - id
+                    properties:
+                      id:
+                        type: integer
+                        minimum: 1
+                        maximum: 2147483647
+                  meta:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Invalid arguments or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
         "401":
-          description: Unauthorized
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
         "403":
-          description: Forbidden
+          description: Insufficient permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Conflicting resource state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Payload validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
   /orbats/{id}:
     get:
       tags:
@@ -6721,68 +6789,70 @@ components:
           format: date-time
     OrbatCreateInput:
       type: object
+      additionalProperties: false
       required:
         - name
         - squads
       properties:
-        name:
+        name: &a23
           type: string
-        description:
-          type: string
-          nullable: true
-        eventDate:
-          type: string
-          format: date
-          nullable: true
-        startTime:
-          type: string
-          format: time
-          nullable: true
-        endTime:
-          type: string
-          format: time
-          nullable: true
+          minLength: 1
+          description: Trimmed nonempty value.
         squads:
           type: array
+          minItems: 1
           items:
             type: object
+            additionalProperties: false
             required:
               - name
+              - orderIndex
               - slots
             properties:
-              name:
-                type: string
-              orderIndex:
+              name: *a23
+              orderIndex: &a24
                 type: integer
+                minimum: 0
+                maximum: 2147483647
               slots:
                 type: array
+                minItems: 1
                 items:
                   type: object
+                  additionalProperties: false
                   required:
-                    - name
                     - orderIndex
                     - maxSignups
                   properties:
-                    name:
-                      type: string
-                    orderIndex:
-                      type: integer
-                    maxSignups:
-                      type: integer
                     squadRoleId:
-                      type: integer
-                      nullable: true
+                      anyOf:
+                        - &a25
+                          type: integer
+                          minimum: 1
+                          maximum: 2147483647
+                        - type: "null"
+                    orderIndex: *a24
+                    maxSignups: *a25
+                description: Slot orderIndex values must be unique within this squad.
+          description: Squad orderIndex values must be unique.
         frequencyIds:
           type: array
-          items:
-            type: integer
+          uniqueItems: true
+          items: *a25
+          default: []
         tempFrequencies:
           type: array
           items:
             type: object
+            additionalProperties: false
+            required:
+              - frequency
+              - type
+              - isAdditional
+              - channel
+              - callsign
             properties:
-              frequency:
-                type: string
+              frequency: *a23
               type:
                 type: string
                 enum:
@@ -6792,20 +6862,96 @@ components:
                 type: boolean
               channel:
                 type: string
+                description: Trimmed; may be empty.
               callsign:
                 type: string
+                description: Trimmed; may be empty.
+          default: []
+        startsAtUtc: &a26
+          anyOf:
+            - type: string
+              format: date-time
+              description: Explicit timezone required (Z or offset); normalized to UTC. Plain date-only strings are rejected.
+            - type: "null"
+        endsAtUtc: *a26
+        eventDateUtc: *a26
+        isSideOp:
+          type: boolean
+          default: false
+        description:
+          type:
+            - string
+            - "null"
+          description: Trimmed; empty strings become null.
+        timezone:
+          type:
+            - string
+            - "null"
+          description: Trimmed; empty strings become null.
         bluforCountry:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
+          description: Trimmed; empty strings become null.
+        bluforRelationship:
+          type:
+            - string
+            - "null"
+          description: Trimmed; empty strings become null.
         opforCountry:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
+          description: Trimmed; empty strings become null.
+        opforRelationship:
+          type:
+            - string
+            - "null"
+          description: Trimmed; empty strings become null.
         indepCountry:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
+          description: Trimmed; empty strings become null.
+        indepRelationship:
+          type:
+            - string
+            - "null"
+          description: Trimmed; empty strings become null.
+        iedThreat:
+          type:
+            - string
+            - "null"
+          description: Trimmed; empty strings become null.
+        civilianRelationship:
+          type:
+            - string
+            - "null"
+          description: Trimmed; empty strings become null.
         rulesOfEngagement:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
+          description: Trimmed; empty strings become null.
+        airspace:
+          type:
+            - string
+            - "null"
+          description: Trimmed; empty strings become null.
+        inGameTimezone:
+          type:
+            - string
+            - "null"
+          description: Trimmed; empty strings become null.
+        operationDay:
+          type:
+            - string
+            - "null"
+          description: Trimmed; empty strings become null.
+      description: Strict create-only contract. Legacy eventDate/startTime/endTime, client IDs, slot names, deleted flags, and
+        per-slot radioFrequencyId are rejected. An end requires a start and must follow it. startsAtUtc cannot be past;
+        without a start, eventDateUtc cannot be before the current UTC day. Start takes precedence over eventDateUtc for
+        stored event date.
     OrbatUpdateInput:
       type: object
       required:

@@ -220,8 +220,8 @@ model Orbat {
   startsAtUtc           DateTime?
   endsAtUtc             DateTime?
   timezone              String?
-  createdBy             User                        @relation("OrbatCreator", fields: [createdById], references: [id])
-  createdById           Int
+  createdBy             User?                       @relation("OrbatCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  createdById           Int?
   createdAt             DateTime                    @default(now())
   isMainOp              Boolean                     @default(false)
   isSideOp              Boolean                     @default(false)

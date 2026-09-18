@@ -8,6 +8,7 @@ import { useToast } from '../ui/ToastContainer';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import DualRingTimePicker from '../ui/DualRingTimePicker';
 import { copyOrbatPresetSlots } from '@/lib/orbat-template';
+import { utcOperationDate, utcOperationDateInput } from '@/lib/orbat-form-dates';
 
 const logClientError = (...args: unknown[]) => {
   if (process.env.NODE_ENV === 'development') {
@@ -134,7 +135,9 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
   const [description, setDescription] = useState(initialData?.description || '');
   const [eventDate, setEventDate] = useState(() => {
     if (initialData?.startsAtUtc) return toLocalDateInput(initialData.startsAtUtc);
-    if (initialData?.eventDateUtc) return toLocalDateInput(initialData.eventDateUtc);
+    if (initialData?.eventDateUtc) return initialData.startTime
+      ? toLocalDateInput(initialData.eventDateUtc)
+      : utcOperationDateInput(initialData.eventDateUtc);
     if (initialData?.eventDate) return initialData.eventDate;
     // Only try to get from searchParams if we're in create mode and it's the client
     if (typeof window !== 'undefined') {
@@ -744,7 +747,9 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
 
       const startDateTime = buildUtcDateTime(eventDate, startTime);
       let endDateTime = buildUtcDateTime(eventDate, endTime);
-      const eventDateUtc = buildUtcDateFromLocalDate(eventDate);
+      const eventDateUtc = !startDateTime
+        ? utcOperationDate(eventDate)
+        : buildUtcDateFromLocalDate(eventDate);
 
       if (eventDate && !eventDateUtc) {
         setError('Invalid event date');
@@ -761,16 +766,9 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         return;
       }
 
-      if (mode === 'create' && !startDateTime && eventDate) {
-        const [year, month, day] = eventDate.split('-').map(Number);
-        const selectedDate = new Date(year, month - 1, day, 0, 0, 0, 0);
-        const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-
-        if (selectedDate < today) {
-          setError('Cannot create operations with past dates');
-          return;
-        }
+      if (mode === 'create' && !startDateTime && eventDate && eventDate < new Date().toISOString().slice(0, 10)) {
+        setError('Cannot create operations with past UTC dates');
+        return;
       }
 
       const activeSlots = slots.filter((s) => !s._deleted);
@@ -810,7 +808,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         slots: (mode === 'edit' ? slot.subslots : slot.subslots.filter((subslot) => !subslot._deleted)).map((subslot) => ({
           ...(mode === 'edit' && subslot.id ? { id: subslot.id } : {}),
           squadRoleId: subslot.squadRoleId ?? null,
-          name: subslot.name,
+          ...(mode === 'edit' ? { name: subslot.name } : {}),
           orderIndex: subslot.orderIndex,
           maxSignups: subslot.maxSignups ?? 1,
           ...(mode === 'edit' && subslot._deleted ? { _deleted: true } : {}),
@@ -820,16 +818,16 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
       const payload = {
         name,
         description,
-        eventDate: eventDate || null,
+        ...(mode === 'edit' ? { eventDate: eventDate || null, startTime: startTime || null, endTime: endTime || null } : {}),
         eventDateUtc: eventDateUtc ? eventDateUtc.toISOString() : null,
-        startTime: startTime || null,
-        endTime: endTime || null,
         startsAtUtc: startDateTime ? startDateTime.toISOString() : null,
         endsAtUtc: endDateTime ? endDateTime.toISOString() : null,
         timezone: timezone || null,
         squads: cleanSquads,
         frequencyIds: selectedFrequencyIds,
-        tempFrequencies,
+        tempFrequencies: mode === 'create'
+          ? tempFrequencies.map(({ frequency, type, isAdditional, channel, callsign }) => ({ frequency, type, isAdditional, channel, callsign }))
+          : tempFrequencies,
         bluforCountry: bluforCountry || null,
         bluforRelationship: bluforRelationship || null,
         opforCountry: opforCountry || null,
@@ -848,27 +846,31 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
       const url = mode === 'create' ? '/api/orbats' : `/api/orbats/${initialData?.id}`;
       const method = mode === 'create' ? 'POST' : 'PATCH';
 
-      const response = await fetch(url, {
+      const options = {
         method,
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({ error: 'Failed to save OrbAT' }));
-        setError(data.error || 'Failed to save OrbAT');
-        return;
+      };
+      let result: { id: number };
+      if (mode === 'create') {
+        result = (await apiRequest<{ id: number }>(url, options)).data;
+      } else {
+        const response = await fetch(url, options);
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({ error: 'Failed to save OrbAT' }));
+          setError(data.error || 'Failed to save OrbAT');
+          return;
+        }
+        result = await response.json();
       }
-
-      const result = await response.json();
       showSuccess(`OrbAT ${mode === 'create' ? 'created' : 'updated'} successfully!`);
       router.push(`/orbats/${result.id}`);
       router.refresh();
     } catch (err) {
       logClientError('Error saving OrbAT:', err);
-      const errorMsg = 'Failed to save OrbAT. Please check the form and try again.';
+      const errorMsg = err instanceof Error ? err.message : 'Failed to save OrbAT. Please check the form and try again.';
       setError(errorMsg);
       showError(errorMsg);
     } finally {
@@ -1058,7 +1060,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         </div>
 
         <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-          Date and times are entered in your local timezone and stored in UTC.
+          Start and end times use your local timezone and are stored in UTC. Without a start time, the event date is a UTC calendar date.
         </p>
       </div>
 

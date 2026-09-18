@@ -64,10 +64,10 @@ export async function GET() {
       startTime: orbat.startTime || null,
       endTime: orbat.endTime || null,
       createdAt: orbat.createdAt.toISOString(),
-      createdBy: {
+      createdBy: orbat.createdBy ? {
         id: orbat.createdBy.id,
         username: orbat.createdBy.username || 'Unknown',
-      },
+      } : null,
       slotCount: orbat.squads.length,
       totalSubslots,
       totalSignups,

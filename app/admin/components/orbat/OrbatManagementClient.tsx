@@ -17,7 +17,7 @@ type Orbat = {
   createdBy: {
     id: number;
     username: string;
-  };
+  } | null;
   slotCount: number;
   totalSignups: number;
   totalSubslots: number;
@@ -146,7 +146,7 @@ export default function OrbatManagementClient({ orbats: initialOrbats, canCreate
       return (
         orbat.name.toLowerCase().includes(query) ||
         orbat.description?.toLowerCase().includes(query) ||
-        orbat.createdBy.username.toLowerCase().includes(query)
+        (orbat.createdBy?.username ?? 'Bot').toLowerCase().includes(query)
       );
     }
 
@@ -303,7 +303,7 @@ export default function OrbatManagementClient({ orbats: initialOrbats, canCreate
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: 'var(--foreground)' }}>
-                        {orbat.createdBy.username}
+                        {orbat.createdBy?.username ?? 'Bot'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: 'var(--foreground)' }}>
                         <div className="text-xs space-y-1">
