@@ -1,5 +1,6 @@
 'use client';
 
+import { apiRequest } from '@/lib/api/client';
 import { useSession, signOut } from 'next-auth/react';
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
@@ -15,11 +16,8 @@ export default function UserMenu() {
     if (session?.user?.id) {
       const fetchAvatar = async () => {
         try {
-          const response = await fetch('/api/user/current');
-          if (response.ok) {
-            const data = await response.json();
-            setAvatarUrl(data.avatarUrl || null);
-          }
+          const { data } = await apiRequest<{ avatarUrl: string | null }>('/api/users/me');
+          setAvatarUrl(data.avatarUrl || null);
         } catch (error) {
           console.error('Failed to fetch avatar:', error);
         }

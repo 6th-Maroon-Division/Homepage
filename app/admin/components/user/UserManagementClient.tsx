@@ -71,6 +71,7 @@ export default function UserManagementClient({
 }: UserManagementClientProps) {
   const router = useRouter();
   const [users, setUsers] = useState<User[]>(initialUsers);
+  useEffect(() => { setUsers(initialUsers); }, [initialUsers]);
   const [activeTab, setActiveTab] = useState<'all' | 'unranked' | 'permissionTemplates'>(initialTab);
   const [filter, setFilter] = useState<'all' | 'admin' | 'regular'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -340,15 +341,10 @@ export default function UserManagementClient({
     const { userId } = confirmDelete;
 
     try {
-      const res = await fetch(`/api/users/${userId}`, {
+      await apiRequest(`/api/users/${userId}`, {
         method: 'DELETE',
       });
 
-      if (!res.ok) {
-        const data = await res.json();
-        showError(data.error || 'Failed to delete user');
-        return;
-      }
 
       // Update local state
       setUsers(users.filter(u => u.id !== userId));
@@ -388,21 +384,7 @@ export default function UserManagementClient({
         return;
       }
 
-      // Update user trainings
-      const updatedUsers = users.map(u => {
-        if (u.id === userId) {
-          // Fetch updated training data
-          return u;
-        }
-        return u;
-      });
-      
-      // Re-fetch to get the updated trainings
-      const updatedRes = await fetch(`/api/users/${userId}`);
-      if (updatedRes.ok) {
-        const updatedUser = await updatedRes.json();
-        setUsers(users.map(u => u.id === userId ? updatedUser : u));
-      }
+      router.refresh();
 
       showSuccess('Training assigned successfully');
       setTrainingModalData(null);

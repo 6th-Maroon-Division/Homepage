@@ -1187,16 +1187,12 @@ export default function UserSelfDetailClient({
 
                   setIsSavingUsername(true);
                   try {
-                    const response = await fetch('/api/user/update', {
-                      method: 'POST',
+                    await apiRequest('/api/users/me', {
+                      method: 'PATCH',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ username: normalizedUsername }),
                     });
 
-                    if (!response.ok) {
-                      const data = await response.json().catch(() => ({}));
-                      throw new Error(data.error || 'Failed to update username');
-                    }
 
                     setEditableUsername(normalizedUsername);
                     setDisplayUsername(normalizedUsername);
@@ -1324,16 +1320,12 @@ export default function UserSelfDetailClient({
                 onClick={async () => {
                   setIsSavingAvatar(true);
                   try {
-                    const response = await fetch('/api/user/update', {
-                      method: 'POST',
+                    await apiRequest('/api/users/me', {
+                      method: 'PATCH',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ avatarUrl: null }),
                     });
 
-                    if (!response.ok) {
-                      const data = await response.json().catch(() => ({}));
-                      throw new Error(data.error || 'Failed to clear profile picture');
-                    }
 
                     setProfileImageUrl('');
                     if (avatarFileInputRef.current) {

@@ -5036,16 +5036,6 @@ paths:
       responses:
         "200":
           description: Success
-  /user/auth-providers:
-    get:
-      tags:
-        - Users
-      summary: Get user authentication providers
-      responses:
-        "200":
-          description: List of linked providers
-        "401":
-          description: Unauthorized
   /user/avatar/migrate:
     post:
       tags:
@@ -5099,16 +5089,6 @@ paths:
             text/event-stream:
               schema:
                 type: object
-  /user/update:
-    post:
-      tags:
-        - Users
-      summary: Update user profile
-      responses:
-        "200":
-          description: User updated
-        "401":
-          description: Unauthorized
   /users:
     get:
       tags:
@@ -5217,58 +5197,255 @@ paths:
     get:
       tags:
         - Users
-      summary: Get user by ID
+      summary: Read a user profile
+      description: No query parameters. GET/PATCH allow self or hierarchy-aware user:manage; active bot tokens are superadmin.
+        DELETE requires user:manage and cannot target the acting user. Training history and restrictive creator
+        relations prevent deletion409. Reads of other users are audited without snapshots; mutations and redacted audits
+        are atomic. me is a session-only alias. Provider names contain no external account IDs. UTC timestamps.
       security:
-        - bearerAuth:
-            - user:manage
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Positive Int32 user ID or session-only me.
       responses:
         "200":
-          description: User details
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/UserProfile"
+                  meta:
+                    type: object
+        "400":
+          description: Invalid path, query or JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
         "401":
-          description: Unauthorized
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
         "403":
-          description: Forbidden
+          description: User access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
         "404":
-          description: User not found
+          description: User missing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Linked durable records, duplicate data, or concurrent change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal or audit failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+    patch:
+      tags:
+        - Users
+      summary: Update a user profile
+      description: No query parameters. GET/PATCH allow self or hierarchy-aware user:manage; active bot tokens are superadmin.
+        DELETE requires user:manage and cannot target the acting user. Training history and restrictive creator
+        relations prevent deletion409. Reads of other users are audited without snapshots; mutations and redacted audits
+        are atomic. me is a session-only alias. Provider names contain no external account IDs. UTC timestamps.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Positive Int32 user ID or session-only me.
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: "#/components/schemas/UserProfile"
+                  meta:
+                    type: object
+        "400":
+          description: Invalid path, query or JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: User access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: User missing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Linked durable records, duplicate data, or concurrent change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal or audit failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              minProperties: 1
+              properties:
+                username:
+                  type: string
+                  minLength: 1
+                  maxLength: 50
+                  description: Trimmed nonempty username.
+                email:
+                  type:
+                    - string
+                    - "null"
+                  format: email
+                avatarUrl:
+                  type:
+                    - string
+                    - "null"
+                  description: HTTP(S) URL or same-origin path; empty string clears. Data, protocol-relative and backslash paths rejected.
     delete:
       tags:
         - Users
-      summary: Delete user
+      summary: Delete an unreferenced user
+      description: No query parameters. GET/PATCH allow self or hierarchy-aware user:manage; active bot tokens are superadmin.
+        DELETE requires user:manage and cannot target the acting user. Training history and restrictive creator
+        relations prevent deletion409. Reads of other users are audited without snapshots; mutations and redacted audits
+        are atomic. me is a session-only alias. Provider names contain no external account IDs. UTC timestamps.
       security:
-        - bearerAuth:
-            - user:manage
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Positive Int32 user ID or session-only me.
       responses:
         "200":
-          description: User deleted
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: "null"
+                  meta:
+                    type: object
+        "400":
+          description: Invalid path, query or JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
         "401":
-          description: Unauthorized
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
         "403":
-          description: Forbidden
-    patch:
-      tags:
-        - TODO
-      summary: TODO document PATCH /users/{id}
-      responses:
-        "200":
-          description: Success
-  /users/{id}/admin:
-    get:
-      tags:
-        - Users
-      summary: Get user admin information
-      security:
-        - bearerAuth:
-            - user:manage
-      responses:
-        "200":
-          description: User admin details
-    patch:
-      tags:
-        - TODO
-      summary: TODO document PATCH /users/{id}/admin
-      responses:
-        "200":
-          description: Success
+          description: User access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: User missing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Linked durable records, duplicate data, or concurrent change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Internal or audit failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
   /users/{id}/attendance:
     get:
       tags:
@@ -10547,3 +10724,38 @@ components:
                             type: integer
                             minimum: 1
                             maximum: 2147483647
+    UserProfile:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - username
+        - email
+        - avatarUrl
+        - createdAt
+        - providers
+      properties:
+        id:
+          type: integer
+        username:
+          type:
+            - string
+            - "null"
+        email:
+          type:
+            - string
+            - "null"
+        avatarUrl:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+          format: date-time
+        providers:
+          type: array
+          items:
+            type: string
+            enum:
+              - steam
+              - discord

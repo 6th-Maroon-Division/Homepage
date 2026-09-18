@@ -320,11 +320,7 @@ export default function UserDetailClient({
 
     setIsDeleting(true);
     try {
-      const res = await fetch(`/api/users/${user.id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to delete user');
-      }
+      await apiRequest(`/api/users/${user.id}`, { method: 'DELETE' });
       showSuccess('User deleted successfully');
       router.push('/admin/users');
       router.refresh();
@@ -341,15 +337,11 @@ export default function UserDetailClient({
 
     setIsClearingAvatar(true);
     try {
-      const res = await fetch(`/api/users/${user.id}`, {
+      await apiRequest(`/api/users/${user.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ avatarUrl: null }),
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to clear avatar');
-      }
       showSuccess('Avatar cleared successfully');
       router.refresh();
     } catch (error) {
@@ -1110,16 +1102,12 @@ export default function UserDetailClient({
 
                     setIsSavingUsername(true);
                     try {
-                      const response = await fetch(`/api/users/${user.id}`, {
+                      await apiRequest(`/api/users/${user.id}`, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ username: normalizedUsername }),
                       });
 
-                      if (!response.ok) {
-                        const data = await response.json().catch(() => ({}));
-                        throw new Error(data.error || 'Failed to update username');
-                      }
 
                       setEditableUsername(normalizedUsername);
                       setDisplayUsername(normalizedUsername);

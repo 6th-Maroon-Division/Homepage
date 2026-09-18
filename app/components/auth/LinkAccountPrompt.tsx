@@ -1,5 +1,6 @@
 'use client';
 
+import { apiRequest } from '@/lib/api/client';
 import { signIn } from 'next-auth/react';
 import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
@@ -19,12 +20,7 @@ export default function LinkAccountPrompt() {
 
     const refreshProviders = async () => {
       try {
-        const res = await fetch('/api/user/auth-providers', { cache: 'no-store' });
-        if (!res.ok) {
-          throw new Error('Failed to fetch auth providers');
-        }
-
-        const data: { providers?: string[] } = await res.json();
+        const { data } = await apiRequest<{ providers: string[] }>('/api/users/me', { cache: 'no-store' });
         const providers = Array.isArray(data.providers) ? data.providers : [];
 
         if (!cancelled) {
