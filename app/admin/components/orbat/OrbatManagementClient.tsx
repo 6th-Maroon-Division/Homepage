@@ -33,6 +33,7 @@ type OrbatManagementClientProps = {
 
 export default function OrbatManagementClient({ orbats: initialOrbats, canCreate, canEdit, canDelete }: OrbatManagementClientProps) {
   const [orbats, setOrbats] = useState<Orbat[]>(initialOrbats);
+  useEffect(() => { setOrbats(initialOrbats); }, [initialOrbats]);
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
