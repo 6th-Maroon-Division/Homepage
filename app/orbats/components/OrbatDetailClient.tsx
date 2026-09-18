@@ -598,7 +598,7 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
                 const isFull = slot.signups.length >= slot.maxSignups;
                 const userSignedUp = currentUserId !== null && slot.signups.some(s => s.user?.id === currentUserId);
 
-                const showSignupButton = !isPast && !userSignedUp && !isFull;
+                const showSignupButton = currentUserId !== null && !isPast && !userSignedUp && !isFull;
                 const showUnsignButton = !isPast && userSignedUp;
 
                 const trainingNames = (slot.requiredTrainings || [])
