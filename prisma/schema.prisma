@@ -1049,3 +1049,13 @@ model ApiAuditLog {
   @@index([actorTokenId, occurredAt])
   @@index([resource, resourceId])
 }
+
+// Browser-bound Steam OpenID attempts are consumed atomically on successful authentication.
+model SteamLoginAttempt {
+  stateHash String   @id
+  userId    Int?
+  expiresAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([expiresAt])
+}
