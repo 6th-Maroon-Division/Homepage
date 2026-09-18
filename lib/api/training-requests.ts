@@ -54,6 +54,7 @@ export async function auditTrainingRequestRead(audit: ApiAuditContext, rows: Ret
 export async function canManageTrainingRequest(principal: ApiPrincipal, userId: number, database: Pick<Prisma.TransactionClient, 'userPermission'> = prisma) {
   if (principal.kind === 'user' && principal.userId === userId) return true;
   const rows = await database.userPermission.findMany({ where: { userId }, select: { value: true, permission: { select: { key: true } } } });
-  const grants = parsePermissionGrants(Object.fromEntries(rows.map(row => [row.permission.key, row.value]))) ?? {};
+  const grants = parsePermissionGrants(Object.fromEntries(rows.map(row => [row.permission.key, row.value])));
+  if (grants === null) return (principal.permissions['system:super_admin'] ?? 0) > 0;
   return ['training:approve_request', 'training:mark'].some(key => hasApiHierarchyPermission(principal.permissions, grants, key as 'training:approve_request'));
 }

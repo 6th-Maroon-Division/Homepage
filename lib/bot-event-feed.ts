@@ -1,8 +1,8 @@
 import type { BotEvent } from '@/generated/prisma/client';
 import { prisma } from '@/lib/prisma';
 import { handleApiRequest } from '@/lib/api/handler';
-import { authenticateApi } from '@/lib/api/auth';
-import { hasApiPermission, parsePermissionGrants } from '@/lib/api/permissions';
+import { createApiPrincipalRevalidator } from '@/lib/api/auth';
+import { hasApiPermission } from '@/lib/api/permissions';
 import type { ApiPrincipal } from '@/lib/api/principal';
 import { writeApiAudit, type ApiAuditContext } from '@/lib/api/audit';
 import { apiError, apiSuccess } from '@/lib/api/response';
@@ -41,16 +41,6 @@ async function auditEvents(events: ReturnType<typeof eventDto>[], principal: Api
   const ids = [...new Set(events.map(event => event.payload.userId).filter((id): id is number => typeof id === 'number' && (principal.kind === 'bot' || id !== principal.userId)))];
   if (ids.length) await writeApiAudit(prisma, context, { action: 'user_data.read', resource: 'event', targetUserIds: ids, outcome: 'success' });
 }
-async function stillAuthorized(request: Request, principal: ApiPrincipal) {
-  if (principal.kind === 'bot') {
-    const current = await authenticateApi(request);
-    return current?.kind === 'bot' && current.tokenId === principal.tokenId;
-  }
-  const user = await prisma.user.findUnique({ where: { id: principal.userId }, select: { userPermissions: { select: { value: true, permission: { select: { key: true } } } } } });
-  const grants = user && parsePermissionGrants(Object.fromEntries(user.userPermissions.map(grant => [grant.permission.key, grant.value])));
-  return !!grants && hasApiPermission(grants, 'system:super_admin');
-}
-
 export async function getEventFeed(request: Request) {
   return handleApiRequest(request, 'system:super_admin', async (principal, context) => {
     const params = new URL(request.url).searchParams;
@@ -73,6 +63,7 @@ export async function getEventFeed(request: Request) {
     // Fetch and audit before committing HTTP headers, so handshake failures remain JSON errors.
     const initial = await fetchPage();
     if (!request.headers.get('accept')?.split(',').some(value => value.trim().split(';')[0] === 'text/event-stream')) return apiSuccess(initial.data, { meta: initial.meta });
+    const revalidate = await createApiPrincipalRevalidator(principal);
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let close: (() => void) | undefined;
@@ -80,18 +71,30 @@ export async function getEventFeed(request: Request) {
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
         close = () => { try { controller.close(); } catch { /* Already cancelled. */ } };
+        const enqueue = (text: string) => {
+          if (stopped) return false;
+          const chunk = encoder.encode(text);
+          if ((controller.desiredSize ?? 0) < chunk.byteLength) { stop(); return false; }
+          controller.enqueue(chunk);
+          return true;
+        };
         const send = (page: typeof initial) => {
           if (stopped) return;
           for (const event of page.data) {
+            if (!enqueue(`id: ${event.id}\nevent: ${event.type}\ndata: ${JSON.stringify({ data: event, meta: {} })}\n\n`)) return;
             after = BigInt(event.id);
-            controller.enqueue(encoder.encode(`id: ${event.id}\nevent: ${event.type}\ndata: ${JSON.stringify({ data: event, meta: {} })}\n\n`));
           }
-          if (!page.data.length) controller.enqueue(encoder.encode(': keepalive\n\n'));
+          if (!page.data.length) enqueue(': keepalive\n\n');
         };
         const poll = async () => {
           try {
             if (stopped) return;
-            if (!await stillAuthorized(request, principal)) { stop(); return; }
+            const current = await revalidate();
+            context.principal = current;
+            if (!current || !hasApiPermission(current.permissions, 'system:super_admin')) {
+              await writeApiAudit(prisma, context, { action: 'access.denied', resource: 'event_stream', outcome: 'denied' });
+              stop(); return;
+            }
             const page = await fetchPage();
             send(page);
             if (!stopped) timer = setTimeout(() => { void poll(); }, 5000);
@@ -100,10 +103,10 @@ export async function getEventFeed(request: Request) {
         request.signal.addEventListener('abort', stop, { once: true });
         if (request.signal.aborted) { stop(); return; }
         send(initial);
-        timer = setTimeout(() => { void poll(); }, 5000);
+        if (!stopped) timer = setTimeout(() => { void poll(); }, 5000);
       },
       cancel() { stopped = true; if (timer) clearTimeout(timer); request.signal.removeEventListener('abort', stop); },
-    });
+    }, { highWaterMark: 1024 * 1024, size: chunk => chunk.byteLength });
     return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive' } });
   });
 }

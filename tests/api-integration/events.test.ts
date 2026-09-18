@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest';
 const session = vi.hoisted(() => ({ userId: null as number | null }));
-vi.mock('next-auth', () => ({ getServerSession: async () => session.userId === null ? null : { user: { id: session.userId } } }));
+vi.mock('next-auth', () => ({ getServerSession: async () => session.userId === null ? null : { user: { id: session.userId }, expires: '2099-01-01T00:00:00Z' } }));
 vi.mock('@/app/api/auth/[...nextauth]/route', () => ({ authOptions: {} }));
 import { prisma } from '@/lib/prisma';
 import { GET } from '@/app/api/events/route';

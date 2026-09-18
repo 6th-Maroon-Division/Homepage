@@ -41,4 +41,3 @@ export async function processPendingEventsForUser(
     return { processedCount };
   }, { isolationLevel: 'Serializable', timeout: 60000 });
 }
-

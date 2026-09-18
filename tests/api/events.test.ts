@@ -8,7 +8,7 @@ const req = (query = '?aggregate=rank', headers: Record<string, string> = {}, si
 const row = (id = 1, userId = 5) => ({ id: BigInt(id), aggregate: 'rank', type: 'user.rank_changed', occurredAt: new Date('2026-09-18T10:00:00Z'), payload: { userId, rankHistoryId: 8, oldRankId: null, newRankId: 9, discordUserId: '123456789012345678', source: 'automatic', reason: 'Private reason', token: 'secret' } });
 beforeEach(() => {
   vi.resetAllMocks();
-  mocks.session.mockResolvedValue({ user: { id: 4 } });
+  mocks.session.mockResolvedValue({ user: { id: 4 }, expires: '2099-01-01T00:00:00Z' });
   mocks.db.user.findUnique.mockResolvedValue({ userPermissions: [{ permission: { key: 'system:super_admin' }, value: 1 }] });
   mocks.db.botToken.findFirst.mockResolvedValue({ id: 9 });
   mocks.db.botEvent.findMany.mockResolvedValue([]);
@@ -105,4 +105,25 @@ test('SSE polls serially, audit failures close without delivering the failed bat
 });
 test('conflicting resume sources fail before reads', async () => {
   expect((await GET(req('?aggregate=rank&cursor=8', { 'last-event-id': '7' }))).status).toBe(400);
+});
+test('SSE captures subscriber identity and expiry instead of authenticating publisher context', async () => {
+  vi.useFakeTimers();
+  mocks.session.mockResolvedValue({ user: { id: 4 }, expires: new Date(Date.now() + 9000).toISOString() });
+  const response = await GET(req(undefined, { accept: 'text/event-stream' }));
+  const reader = response.body!.getReader(); await reader.read();
+  mocks.session.mockResolvedValue({ user: { id: 999 }, expires: '2099-01-01T00:00:00Z' });
+  await vi.advanceTimersByTimeAsync(5000); await reader.read();
+  expect(mocks.db.user.findUnique).toHaveBeenLastCalledWith(expect.objectContaining({ where: { id: 4 } }));
+  await vi.advanceTimersByTimeAsync(5000);
+  expect((await reader.read()).done).toBe(true);
+  expect(mocks.db.apiAuditLog.create).toHaveBeenCalledWith({ data: expect.objectContaining({ action: 'access.denied', resource: 'event_stream' }) });
+});
+test('SSE closes rather than buffering oversized unread frames indefinitely', async () => {
+  vi.useFakeTimers();
+  mocks.db.botEvent.findMany.mockResolvedValue([{ ...row(), aggregate: 'orbat', payload: { name: 'x'.repeat(1024 * 1024), orbatId: 1 } }]);
+  const response = await GET(req('?aggregate=orbat', { accept: 'text/event-stream' }));
+  const reader = response.body!.getReader();
+  expect((await reader.read()).done).toBe(true);
+  await vi.advanceTimersByTimeAsync(15000);
+  expect(mocks.db.botEvent.findMany).toHaveBeenCalledTimes(1);
 });
