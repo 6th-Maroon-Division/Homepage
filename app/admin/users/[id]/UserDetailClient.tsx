@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import TrainingStatusBadge from '@/app/components/trainings/TrainingStatusBadge';
-import { apiRequest } from '@/lib/api/client';
+import { apiList, apiRequest } from '@/lib/api/client';
 
 type UserPermission = {
   id: number;
@@ -251,14 +251,7 @@ export default function UserDetailClient({
     const loadTemplates = async () => {
       setIsLoadingTemplates(true);
       try {
-        const res = await fetch('/api/permissions/templates', { cache: 'no-store' });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || 'Failed to load permission templates');
-        }
-
-        const data = (await res.json()) as { templates?: PermissionTemplate[] };
-        const templates = Array.isArray(data.templates) ? data.templates : [];
+        const templates = (await apiList<PermissionTemplate>('/api/permissions/templates')).sort((a, b) => a.name.localeCompare(b.name));
 
         if (cancelled) {
           return;

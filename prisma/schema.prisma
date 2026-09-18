@@ -520,8 +520,8 @@ model OrbatTemplate {
   endTime              String? // Default HH:MM format
 
   // Admin metadata
-  createdBy   User     @relation(fields: [createdById], references: [id])
-  createdById Int
+  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdById Int?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

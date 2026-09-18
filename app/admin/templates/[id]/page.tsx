@@ -1,6 +1,6 @@
 'use client';
 
-import { apiList } from '@/lib/api/client';
+import { apiList, apiRequest } from '@/lib/api/client';
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
@@ -125,12 +125,7 @@ export default function TemplateEditor() {
   useEffect(() => {
     const fetchAccess = async () => {
       try {
-        const response = await fetch('/api/templates/access');
-        if (!response.ok) {
-          router.push('/admin');
-          return;
-        }
-        const capabilities = await response.json();
+        const { data: capabilities } = await apiRequest<typeof access>('/api/templates/access');
         setAccess(capabilities);
         if (!capabilities.canRead || (isNewTemplate && !capabilities.canCreate)) {
           showError(isNewTemplate ? 'You do not have permission to create templates' : 'You do not have permission to view templates');
@@ -151,13 +146,7 @@ export default function TemplateEditor() {
     if (!isNewTemplate && !isAccessLoading && access.canRead) {
       const fetchTemplate = async () => {
         try {
-          const response = await fetch(`/api/templates/${params.id}`);
-          if (!response.ok) throw new Error('Failed to fetch template');
-          const data = await response.json();
-          // Parse slotsJson if it's a string
-          if (typeof data.slotsJson === 'string') {
-            data.slotsJson = JSON.parse(data.slotsJson);
-          }
+          const { data } = await apiRequest<OrbatTemplate>(`/api/templates/${params.id}`);
           setTemplate((current) => ({
             ...current,
             ...data,
@@ -229,18 +218,14 @@ export default function TemplateEditor() {
 
     try {
       const url = isNewTemplate ? '/api/templates' : `/api/templates/${template.id}`;
-      const method = isNewTemplate ? 'POST' : 'PUT';
-
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(template),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to save template');
-      }
+      const fields = ['name', 'description', 'category', 'tagsJson', 'isSideOp', 'timezone', 'bluforCountry', 'bluforRelationship', 'opforCountry', 'opforRelationship', 'indepCountry', 'indepRelationship', 'iedThreat', 'civilianRelationship', 'rulesOfEngagement', 'airspace', 'inGameTimezone', 'operationDay', 'startTime', 'endTime'] as const;
+      const payload = {
+        ...Object.fromEntries(fields.map(key => [key, template[key]])),
+        slotsJson: template.slotsJson.map((squad, orderIndex) => ({ name: squad.name, orderIndex, slots: squad.slots.map((slot, slotIndex) => ({ name: slot.name, orderIndex: slotIndex, maxSignups: slot.maxSignups, squadRoleId: slot.squadRoleId ?? null })) })),
+        frequencyIds: template.frequencyIds,
+        tempFrequencies: template.tempFrequencies.map(({ frequency, type, isAdditional, channel, callsign }) => ({ frequency, type, isAdditional, channel: channel ?? '', callsign: callsign ?? '' })),
+      };
+      await apiRequest(url, { method: isNewTemplate ? 'POST' : 'PATCH', body: JSON.stringify(payload) });
 
       showSuccess(
         isNewTemplate ? 'Template created successfully' : 'Template updated successfully'

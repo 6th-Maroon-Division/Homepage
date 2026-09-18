@@ -1,5 +1,6 @@
 'use client';
 
+import { apiList, apiRequest } from '@/lib/api/client';
 import { useMemo, useState } from 'react';
 import { useToast } from '@/app/components/ui/ToastContainer';
 
@@ -61,7 +62,7 @@ export default function PermissionTemplateManagementClient({ permissions, templa
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [permissions]);
 
-  const loadTemplateIntoEditor = (templateId: number | null) => {
+  const loadTemplateIntoEditor = (templateId: number | null, rows = templateRows) => {
     if (templateId === null) {
       setSelectedTemplateId(null);
       setName(DEFAULT_TEMPLATE_NAME);
@@ -70,7 +71,7 @@ export default function PermissionTemplateManagementClient({ permissions, templa
       return;
     }
 
-    const selected = templateRows.find((template) => template.id === templateId);
+    const selected = rows.find((template) => template.id === templateId);
     if (!selected) {
       return;
     }
@@ -87,12 +88,7 @@ export default function PermissionTemplateManagementClient({ permissions, templa
   }));
 
   const refreshTemplates = async () => {
-    const response = await fetch('/api/permissions/templates', { cache: 'no-store' });
-    if (!response.ok) {
-      throw new Error('Failed to refresh templates');
-    }
-    const data = (await response.json()) as { templates?: PermissionTemplate[] };
-    const nextTemplates = Array.isArray(data.templates) ? data.templates : [];
+    const nextTemplates = (await apiList<PermissionTemplate>('/api/permissions/templates')).sort((a, b) => a.name.localeCompare(b.name));
     setTemplateRows(nextTemplates);
     return nextTemplates;
   };
@@ -106,60 +102,15 @@ export default function PermissionTemplateManagementClient({ permissions, templa
 
     setIsSaving(true);
     try {
-      if (selectedTemplateId === null) {
-        const create = async (overwrite: boolean) => {
-          const response = await fetch('/api/permissions/templates', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: trimmedName,
-              description: description.trim() || null,
-              permissions: templatePayload,
-              overwrite,
-            }),
-          });
-
-          if (!response.ok) {
-            const data = await response.json().catch(() => ({}));
-            const err = new Error(data.error || 'Failed to create template') as Error & { code?: string };
-            err.code = data.code;
-            throw err;
-          }
-        };
-
-        try {
-          await create(false);
-        } catch (error) {
-          const typed = error as Error & { code?: string };
-          if (typed.code === 'TEMPLATE_EXISTS') {
-            const confirmed = window.confirm('Template name already exists. Overwrite existing template?');
-            if (!confirmed) return;
-            await create(true);
-          } else {
-            throw error;
-          }
-        }
-      } else {
-        const response = await fetch(`/api/permissions/templates/${selectedTemplateId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: trimmedName,
-            description: description.trim() || null,
-            permissions: templatePayload,
-          }),
-        });
-
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
-          throw new Error(data.error || 'Failed to update template');
-        }
-      }
+      await apiRequest<PermissionTemplate>(selectedTemplateId === null ? '/api/permissions/templates' : `/api/permissions/templates/${selectedTemplateId}`, {
+        method: selectedTemplateId === null ? 'POST' : 'PATCH',
+        body: JSON.stringify({ name: trimmedName, description: description.trim() || null, permissions: templatePayload }),
+      });
 
       const nextTemplates = await refreshTemplates();
       const matching = nextTemplates.find((template) => template.name === trimmedName);
       if (matching) {
-        loadTemplateIntoEditor(matching.id);
+        loadTemplateIntoEditor(matching.id, nextTemplates);
       }
       showSuccess('Permission template saved');
     } catch (error) {
@@ -186,18 +137,11 @@ export default function PermissionTemplateManagementClient({ permissions, templa
 
     setIsDeleting(true);
     try {
-      const response = await fetch(`/api/permissions/templates/${selectedTemplateId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to delete template');
-      }
+      await apiRequest(`/api/permissions/templates/${selectedTemplateId}`, { method: 'DELETE' });
 
       const nextTemplates = await refreshTemplates();
       if (nextTemplates.length > 0) {
-        loadTemplateIntoEditor(nextTemplates[0].id);
+        loadTemplateIntoEditor(nextTemplates[0].id, nextTemplates);
       } else {
         loadTemplateIntoEditor(null);
       }

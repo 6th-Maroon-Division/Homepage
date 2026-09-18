@@ -240,11 +240,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     // Fetch templates
     const fetchTemplates = async () => {
       try {
-        const response = await fetch('/api/templates');
-        if (response.ok) {
-          const data = await response.json();
-          setTemplates(data);
-        }
+        setTemplates(await apiList<typeof templates[number]>('/api/templates'));
       } catch (error) {
         logClientError('Error fetching templates:', error);
       }
@@ -291,10 +287,8 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
       : `/api/orbats/${templateId}`;
     
     try {
-      const response = await fetch(endpoint);
-      if (!response.ok) throw new Error('Failed to load preset');
-      if (response.ok) {
-        const data = await response.json();
+      const { data } = await apiRequest<OrbatData & { frequencyIds?: number[]; tempFrequencies?: TempFrequency[] }>(endpoint);
+      {
         
         // Pre-fill form with template data
         if (data.name) setName(`${data.name} - Copy`);
@@ -348,10 +342,8 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         
         if (templateId && mode === 'create') {
           try {
-            const response = await fetch(`/api/templates/${templateId}`);
-            if (!response.ok) throw new Error('Failed to load template');
-            if (response.ok) {
-              const template = await response.json();
+            const { data: template } = await apiRequest<OrbatData & { frequencyIds?: number[]; tempFrequencies?: TempFrequency[] }>(`/api/templates/${templateId}`);
+            {
               
               // Pre-fill form with template data
               if (template.name) setName(`${template.name} - Copy`);
@@ -800,34 +792,28 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         }
       }
 
-      const cleanSquads = (mode === 'edit' ? slots : slots.filter((slot) => !slot._deleted)).map((slot) => ({
+      const cleanSquads = slots.filter((slot) => !slot._deleted).map((slot) => ({
         ...(mode === 'edit' && slot.id ? { id: slot.id } : {}),
         name: slot.name,
         orderIndex: slot.orderIndex,
-        ...(mode === 'edit' && slot._deleted ? { _deleted: true } : {}),
-        slots: (mode === 'edit' ? slot.subslots : slot.subslots.filter((subslot) => !subslot._deleted)).map((subslot) => ({
+        slots: slot.subslots.filter((subslot) => !subslot._deleted).map((subslot) => ({
           ...(mode === 'edit' && subslot.id ? { id: subslot.id } : {}),
           squadRoleId: subslot.squadRoleId ?? null,
-          ...(mode === 'edit' ? { name: subslot.name } : {}),
           orderIndex: subslot.orderIndex,
           maxSignups: subslot.maxSignups ?? 1,
-          ...(mode === 'edit' && subslot._deleted ? { _deleted: true } : {}),
         })),
       }));
 
       const payload = {
         name,
         description,
-        ...(mode === 'edit' ? { eventDate: eventDate || null, startTime: startTime || null, endTime: endTime || null } : {}),
         eventDateUtc: eventDateUtc ? eventDateUtc.toISOString() : null,
         startsAtUtc: startDateTime ? startDateTime.toISOString() : null,
         endsAtUtc: endDateTime ? endDateTime.toISOString() : null,
         timezone: timezone || null,
         squads: cleanSquads,
         frequencyIds: selectedFrequencyIds,
-        tempFrequencies: mode === 'create'
-          ? tempFrequencies.map(({ frequency, type, isAdditional, channel, callsign }) => ({ frequency, type, isAdditional, channel, callsign }))
-          : tempFrequencies,
+        tempFrequencies: tempFrequencies.map(({ frequency, type, isAdditional, channel, callsign }) => ({ frequency, type, isAdditional, channel, callsign })),
         bluforCountry: bluforCountry || null,
         bluforRelationship: bluforRelationship || null,
         opforCountry: opforCountry || null,
@@ -853,18 +839,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         },
         body: JSON.stringify(payload),
       };
-      let result: { id: number };
-      if (mode === 'create') {
-        result = (await apiRequest<{ id: number }>(url, options)).data;
-      } else {
-        const response = await fetch(url, options);
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({ error: 'Failed to save OrbAT' }));
-          setError(data.error || 'Failed to save OrbAT');
-          return;
-        }
-        result = await response.json();
-      }
+      const { data: result } = await apiRequest<{ id: number }>(url, options);
       showSuccess(`OrbAT ${mode === 'create' ? 'created' : 'updated'} successfully!`);
       router.push(`/orbats/${result.id}`);
       router.refresh();

@@ -1,0 +1,765 @@
+{
+  "paths": {
+    "/api/orbats/{id}": {
+      "get": {
+        "summary": "Get ORBAT editor resource",
+        "description": "orbat:edit required. No query arguments. PATCH preserves omitted fields; squads replaces the full structure retaining supplied owned IDs. Past UTC dates allowed; end must follow merged start. Writes and metadata-only audits/outbox are atomic.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/OrbatEditor"
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path query or JSON"
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Permission denied"
+          },
+          "404": {
+            "description": "Operation or reference not found"
+          },
+          "409": {
+            "description": "Concurrent change or constraint conflict"
+          },
+          "422": {
+            "description": "Invalid payload or timing"
+          },
+          "500": {
+            "description": "Internal failure"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Patch ORBAT editor resource",
+        "description": "orbat:edit required. No query arguments. PATCH preserves omitted fields; squads replaces the full structure retaining supplied owned IDs. Past UTC dates allowed; end must follow merged start. Writes and metadata-only audits/outbox are atomic.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 2147483647
+                        }
+                      },
+                      "required": [
+                        "id"
+                      ]
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path query or JSON"
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Permission denied"
+          },
+          "404": {
+            "description": "Operation or reference not found"
+          },
+          "409": {
+            "description": "Concurrent change or constraint conflict"
+          },
+          "422": {
+            "description": "Invalid payload or timing"
+          },
+          "500": {
+            "description": "Internal failure"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrbatEditorPatch"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete ORBAT editor resource",
+        "description": "orbat:delete required. No query arguments. PATCH preserves omitted fields; squads replaces the full structure retaining supplied owned IDs. Past UTC dates allowed; end must follow merged start. Writes and metadata-only audits/outbox are atomic.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "null"
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path query or JSON"
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Permission denied"
+          },
+          "404": {
+            "description": "Operation or reference not found"
+          },
+          "409": {
+            "description": "Concurrent change or constraint conflict"
+          },
+          "422": {
+            "description": "Invalid payload or timing"
+          },
+          "500": {
+            "description": "Internal failure"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "OrbatEditorSlotInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "squadRoleId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "orderIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "maxSignups": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          }
+        },
+        "required": [
+          "orderIndex",
+          "maxSignups"
+        ]
+      },
+      "OrbatEditorSquadInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "orderIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "slots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrbatEditorSlotInput"
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "name",
+          "orderIndex",
+          "slots"
+        ]
+      },
+      "OrbatEditorPatch": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "timezone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bluforCountry": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bluforRelationship": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "opforCountry": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "opforRelationship": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "indepCountry": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "indepRelationship": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "iedThreat": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "civilianRelationship": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rulesOfEngagement": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "airspace": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "inGameTimezone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "operationDay": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "eventDateUtc": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "startsAtUtc": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "endsAtUtc": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "isSideOp": {
+            "type": "boolean"
+          },
+          "frequencyIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "uniqueItems": true
+          },
+          "tempFrequencies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "frequency": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "SR",
+                    "LR"
+                  ]
+                },
+                "isAdditional": {
+                  "type": "boolean"
+                },
+                "channel": {
+                  "type": "string"
+                },
+                "callsign": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "frequency",
+                "type",
+                "isAdditional",
+                "channel",
+                "callsign"
+              ]
+            }
+          },
+          "squads": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrbatEditorSquadInput"
+            },
+            "minItems": 1
+          }
+        },
+        "minProperties": 1
+      },
+      "OrbatEditor": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "timezone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bluforCountry": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bluforRelationship": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "opforCountry": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "opforRelationship": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "indepCountry": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "indepRelationship": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "iedThreat": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "civilianRelationship": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rulesOfEngagement": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "airspace": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "inGameTimezone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "operationDay": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "startsAtUtc": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "endsAtUtc": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "isSideOp": {
+            "type": "boolean"
+          },
+          "frequencyIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "uniqueItems": true
+          },
+          "tempFrequencies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "frequency": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "SR",
+                    "LR"
+                  ]
+                },
+                "isAdditional": {
+                  "type": "boolean"
+                },
+                "channel": {
+                  "type": "string"
+                },
+                "callsign": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "frequency",
+                "type",
+                "isAdditional",
+                "channel",
+                "callsign"
+              ]
+            }
+          },
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "eventDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "startTime": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "endTime": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "isMainOp": {
+            "type": "boolean"
+          },
+          "squads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2147483647
+                },
+                "orbatId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2147483647
+                },
+                "name": {
+                  "type": "string"
+                },
+                "orderIndex": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 2147483647
+                },
+                "slots": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 2147483647
+                      },
+                      "orbatId": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 2147483647
+                      },
+                      "squadId": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 2147483647
+                      },
+                      "squadRoleId": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      },
+                      "orderIndex": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "maxSignups": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      },
+                      "squadRole": {
+                        "type": [
+                          "object",
+                          "null"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 2147483647
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "isRetired": {
+                            "type": "boolean"
+                          },
+                          "requiredTrainingIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 2147483647
+                            }
+                          },
+                          "requiredRankIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 2147483647
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "removePaths": []
+}

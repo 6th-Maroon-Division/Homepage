@@ -18,7 +18,7 @@ const record = (value: unknown): value is Record<string, unknown> => !!value && 
 const int = (value: unknown, minimum = 1): value is number => typeof value === 'number' && Number.isInteger(value) && value >= minimum && value <= 2147483647;
 const exact = (value: Record<string, unknown>, fields: readonly string[]) => Object.keys(value).every(key => fields.includes(key));
 const nonempty = (value: unknown): value is string => typeof value === 'string' && !!value.trim();
-export function parseOrbatCreate(body: unknown): Parsed<CreateInput> {
+export function parseOrbatCreate(body: unknown, options: { allowPast?: boolean; allowIncompleteTiming?: boolean } = {}): Parsed<CreateInput> {
   const invalid = () => ({ error: apiError(422, 'validation_failed', 'Invalid operation creation payload. Use canonical fields, valid UTC timestamps and unique numeric references and positions.') });
   if (!record(body) || !exact(body, ['name', 'squads', 'frequencyIds', 'tempFrequencies', 'startsAtUtc', 'endsAtUtc', 'eventDateUtc', 'isSideOp', ...textFields]) || !nonempty(body.name)) return invalid();
   const text = {} as Record<TextField, string | null>;
@@ -32,9 +32,9 @@ export function parseOrbatCreate(body: unknown): Parsed<CreateInput> {
     if (body[key] !== undefined && body[key] !== null && !dates[key]) return invalid();
   }
   const now = new Date();
-  if (dates.endsAtUtc && (!dates.startsAtUtc || dates.endsAtUtc <= dates.startsAtUtc)) return invalid();
-  if (dates.startsAtUtc && dates.startsAtUtc < now) return invalid();
-  if (!dates.startsAtUtc && dates.eventDateUtc && dates.eventDateUtc < new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))) return invalid();
+  if (!options.allowIncompleteTiming && dates.endsAtUtc && (!dates.startsAtUtc || dates.endsAtUtc <= dates.startsAtUtc)) return invalid();
+  if (!options.allowPast && dates.startsAtUtc && dates.startsAtUtc < now) return invalid();
+  if (!options.allowPast && !dates.startsAtUtc && dates.eventDateUtc && dates.eventDateUtc < new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))) return invalid();
   if (body.isSideOp !== undefined && typeof body.isSideOp !== 'boolean') return invalid();
   if (!Array.isArray(body.squads) || !body.squads.length) return invalid();
   const squads: SquadInput[] = [];

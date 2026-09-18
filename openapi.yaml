@@ -1654,33 +1654,337 @@ paths:
   /permissions/templates:
     get:
       tags:
-        - TODO
-      summary: TODO document GET /permissions/templates
+        - Templates
+      summary: List permission templates
+      description: Requires user:manage_permissions. General configuration reads are not audited. Active database bots act as
+        superadmin. UTC timestamps use ISO Z. Unknown and repeated query parameters are rejected.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
       responses:
         "200":
           description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PermissionTemplate"
+                  meta:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      limit:
+                        type: integer
+                        minimum: 1
+                        maximum: 2147483647
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+                    required:
+                      - limit
+                      - nextCursor
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Malformed JSON, ID or query
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient rights
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Missing template or reference
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Duplicate name, retired role or concurrent change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Request or audit failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+          description: Maximum returned count; values above 100 are capped.
+        - in: query
+          name: cursor
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+          description: Exclusive ascending ID cursor.
     post:
       tags:
-        - TODO
-      summary: TODO document POST /permissions/templates
+        - Templates
+      summary: Create a permission template
+      description: Requires user:manage_permissions. Duplicate names conflict; overwrite is not accepted. Audit contains
+        permission IDs and values. Active database bots act as superadmin. UTC timestamps use ISO Z. Unknown and
+        repeated query parameters are rejected.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
       responses:
-        "200":
+        "201":
           description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PermissionTemplate"
+                  meta:
+                    type: object
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Malformed JSON, ID or query
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient rights
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Missing template or reference
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Duplicate name, retired role or concurrent change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Request or audit failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PermissionTemplateCreate"
   /permissions/templates/{id}:
-    put:
+    patch:
       tags:
-        - TODO
-      summary: TODO document PUT /permissions/templates/{id}
+        - Templates
+      summary: Update a permission template
+      description: Requires user:manage_permissions. Partial update; supplied permissions replace the full set atomically.
+        Audit contains permission IDs and values. Active database bots act as superadmin. UTC timestamps use ISO Z.
+        Unknown and repeated query parameters are rejected.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
       responses:
         "200":
           description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PermissionTemplate"
+                  meta:
+                    type: object
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Malformed JSON, ID or query
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient rights
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Missing template or reference
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Duplicate name, retired role or concurrent change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Request or audit failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PermissionTemplatePatch"
     delete:
       tags:
-        - TODO
-      summary: TODO document DELETE /permissions/templates/{id}
+        - Templates
+      summary: Delete a permission template
+      description: Requires user:manage_permissions. Deletes stored items in the same transaction with its audit. Active
+        database bots act as superadmin. UTC timestamps use ISO Z. Unknown and repeated query parameters are rejected.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
       responses:
         "200":
           description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    type: "null"
+                  meta:
+                    type: object
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Malformed JSON, ID or query
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient rights
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Missing template or reference
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Duplicate name, retired role or concurrent change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Request or audit failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
   /radio-frequencies:
     get:
       tags:
@@ -3113,61 +3417,414 @@ paths:
     get:
       tags:
         - Templates
-      summary: List ORBAT templates
+      summary: List active ORBAT templates
+      description: Requires any template:create, template:edit, template:delete, orbat:create or orbat:edit permission.
+        Minimal creator data for other users is audited without snapshots. Active database bots act as superadmin. UTC
+        timestamps use ISO Z. Unknown and repeated query parameters are rejected.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
       responses:
         "200":
-          description: List of templates
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OrbatTemplate"
+                  meta:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      limit:
+                        type: integer
+                        minimum: 1
+                        maximum: 2147483647
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+                    required:
+                      - limit
+                      - nextCursor
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Malformed JSON, ID or query
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient rights
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Missing template or reference
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Duplicate name, retired role or concurrent change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Request or audit failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+          description: Maximum returned count; values above 100 are capped.
+        - in: query
+          name: cursor
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+          description: Exclusive ascending ID cursor.
     post:
       tags:
         - Templates
-      summary: Create ORBAT template
+      summary: Create an ORBAT template
+      description: Requires template:create. Strict fields; new numeric references and unique positions. Bot creator is null.
+        Transactional audit. Active database bots act as superadmin. UTC timestamps use ISO Z. Unknown and repeated
+        query parameters are rejected.
       security:
-        - bearerAuth:
-            - templates:create
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      responses:
+        "201":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/OrbatTemplate"
+                  meta:
+                    type: object
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Malformed JSON, ID or query
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient rights
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Missing template or reference
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Duplicate name, retired role or concurrent change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Request or audit failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/TemplateCreateInput"
-      responses:
-        "201":
-          description: Template created
+              $ref: "#/components/schemas/OrbatTemplateCreate"
   /templates/{id}:
     get:
       tags:
         - Templates
-      summary: Get template by ID
-      responses:
-        "200":
-          description: Template details
-    patch:
-      tags:
-        - Templates
-      summary: Update template
+      summary: Read an ORBAT template
+      description: Requires any template:create, template:edit, template:delete, orbat:create or orbat:edit permission.
+        Minimal creator data for other users is audited without snapshots. Archived templates remain readable. Derived
+        role names and prerequisite arrays use current definitions. Active database bots act as superadmin. UTC
+        timestamps use ISO Z. Unknown and repeated query parameters are rejected.
       security:
-        - bearerAuth:
-            - templates:edit
-      responses:
-        "200":
-          description: Template updated
-    delete:
-      tags:
-        - Templates
-      summary: Delete template
-      security:
-        - bearerAuth:
-            - templates:delete
-      responses:
-        "200":
-          description: Template deleted
-    put:
-      tags:
-        - TODO
-      summary: TODO document PUT /templates/{id}
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
       responses:
         "200":
           description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/OrbatTemplate"
+                  meta:
+                    type: object
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Malformed JSON, ID or query
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient rights
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Missing template or reference
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Duplicate name, retired role or concurrent change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Request or audit failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+    patch:
+      tags:
+        - Templates
+      summary: Update an ORBAT template
+      description: Requires template:edit. Nonempty partial update; omitted values are preserved. Transactional audit. Active
+        database bots act as superadmin. UTC timestamps use ISO Z. Unknown and repeated query parameters are rejected.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/OrbatTemplate"
+                  meta:
+                    type: object
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Malformed JSON, ID or query
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient rights
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Missing template or reference
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Duplicate name, retired role or concurrent change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Request or audit failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrbatTemplatePatch"
+    delete:
+      tags:
+        - Templates
+      summary: Archive an ORBAT template
+      description: Requires template:delete. Soft deletion sets isActive false and writes a transactional audit. Active
+        database bots act as superadmin. UTC timestamps use ISO Z. Unknown and repeated query parameters are rejected.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    type: "null"
+                  meta:
+                    type: object
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Malformed JSON, ID or query
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient rights
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Missing template or reference
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Duplicate name, retired role or concurrent change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Request or audit failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
   /training-categories:
     get:
       tags:
@@ -5398,29 +6055,71 @@ paths:
     get:
       tags:
         - Templates
-      summary: Get current user template capabilities
-      description: Legacy session-only endpoint; not yet migrated to the unified API contract.
+      summary: Read template capabilities
+      description: Any authenticated principal. Computes capabilities from live grants. No general read audit. Active database
+        bots act as superadmin. UTC timestamps use ISO Z. Unknown and repeated query parameters are rejected.
       security:
         - sessionCookie: []
         - secureSessionCookie: []
+        - apiKey: []
       responses:
         "200":
-          description: Template capabilities
+          description: Success
           content:
             application/json:
               schema:
                 type: object
+                additionalProperties: false
                 properties:
-                  canCreate:
-                    type: boolean
-                  canEdit:
-                    type: boolean
-                  canDelete:
-                    type: boolean
-                  canRead:
-                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/TemplateCapabilities"
+                  meta:
+                    type: object
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Malformed JSON, ID or query
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
         "401":
-          description: Unauthorized
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "403":
+          description: Insufficient rights
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Missing template or reference
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "409":
+          description: Duplicate name, retired role or concurrent change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "422":
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "500":
+          description: Request or audit failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
   /audit-logs:
     get:
       tags:
@@ -6468,6 +7167,159 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiFailure"
+  /api/orbats/{id}:
+    get:
+      summary: Get ORBAT editor resource
+      description: orbat:edit required. No query arguments. PATCH preserves omitted fields; squads replaces the full structure
+        retaining supplied owned IDs. Past UTC dates allowed; end must follow merged start. Writes and metadata-only
+        audits/outbox are atomic.
+      security:
+        - sessionCookie: []
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/OrbatEditor"
+                  meta:
+                    type: object
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Invalid path query or JSON
+        "401":
+          description: Missing or invalid credentials
+        "403":
+          description: Permission denied
+        "404":
+          description: Operation or reference not found
+        "409":
+          description: Concurrent change or constraint conflict
+        "422":
+          description: Invalid payload or timing
+        "500":
+          description: Internal failure
+    patch:
+      summary: Patch ORBAT editor resource
+      description: orbat:edit required. No query arguments. PATCH preserves omitted fields; squads replaces the full structure
+        retaining supplied owned IDs. Past UTC dates allowed; end must follow merged start. Writes and metadata-only
+        audits/outbox are atomic.
+      security:
+        - sessionCookie: []
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      id:
+                        type: integer
+                        minimum: 1
+                        maximum: 2147483647
+                    required:
+                      - id
+                  meta:
+                    type: object
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Invalid path query or JSON
+        "401":
+          description: Missing or invalid credentials
+        "403":
+          description: Permission denied
+        "404":
+          description: Operation or reference not found
+        "409":
+          description: Concurrent change or constraint conflict
+        "422":
+          description: Invalid payload or timing
+        "500":
+          description: Internal failure
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrbatEditorPatch"
+    delete:
+      summary: Delete ORBAT editor resource
+      description: orbat:delete required. No query arguments. PATCH preserves omitted fields; squads replaces the full
+        structure retaining supplied owned IDs. Past UTC dates allowed; end must follow merged start. Writes and
+        metadata-only audits/outbox are atomic.
+      security:
+        - sessionCookie: []
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    type: "null"
+                  meta:
+                    type: object
+                required:
+                  - data
+                  - meta
+        "400":
+          description: Invalid path query or JSON
+        "401":
+          description: Missing or invalid credentials
+        "403":
+          description: Permission denied
+        "404":
+          description: Operation or reference not found
+        "409":
+          description: Concurrent change or constraint conflict
+        "422":
+          description: Invalid payload or timing
+        "500":
+          description: Internal failure
 components:
   securitySchemes:
     bearerAuth:
@@ -8582,3 +9434,1003 @@ components:
             - type: "null"
         discordId: *a53
         steamId: *a53
+    OrbatTemplateSlotInput:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+        squadRoleId:
+          type:
+            - integer
+            - "null"
+          minimum: 1
+          maximum: 2147483647
+        orderIndex:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+        maxSignups:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+      required:
+        - name
+        - orderIndex
+        - maxSignups
+    OrbatTemplateSquadInput:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+        orderIndex:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+        slots:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrbatTemplateSlotInput"
+          minItems: 1
+      required:
+        - name
+        - orderIndex
+        - slots
+    OrbatTemplateFrequency:
+      type: object
+      additionalProperties: false
+      properties:
+        frequency:
+          type: string
+          minLength: 1
+        type:
+          enum:
+            - SR
+            - LR
+        isAdditional:
+          type: boolean
+        channel:
+          type: string
+        callsign:
+          type: string
+      required:
+        - frequency
+        - type
+        - isAdditional
+        - channel
+        - callsign
+    OrbatTemplateCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        description:
+          type:
+            - string
+            - "null"
+        category:
+          type:
+            - string
+            - "null"
+        tagsJson:
+          type:
+            - string
+            - "null"
+        timezone:
+          type:
+            - string
+            - "null"
+        bluforCountry:
+          type:
+            - string
+            - "null"
+        bluforRelationship:
+          type:
+            - string
+            - "null"
+        opforCountry:
+          type:
+            - string
+            - "null"
+        opforRelationship:
+          type:
+            - string
+            - "null"
+        indepCountry:
+          type:
+            - string
+            - "null"
+        indepRelationship:
+          type:
+            - string
+            - "null"
+        iedThreat:
+          type:
+            - string
+            - "null"
+        civilianRelationship:
+          type:
+            - string
+            - "null"
+        rulesOfEngagement:
+          type:
+            - string
+            - "null"
+        airspace:
+          type:
+            - string
+            - "null"
+        inGameTimezone:
+          type:
+            - string
+            - "null"
+        operationDay:
+          type:
+            - string
+            - "null"
+        name:
+          type: string
+          minLength: 1
+        slotsJson:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrbatTemplateSquadInput"
+          minItems: 1
+        frequencyIds:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+          uniqueItems: true
+        tempFrequencies:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrbatTemplateFrequency"
+        isSideOp:
+          type: boolean
+        startTime:
+          type:
+            - string
+            - "null"
+          pattern: ^([01]\d|2[0-3]):[0-5]\d$
+          description: Preset wall-clock HH:MM default, not an instant.
+        endTime:
+          type:
+            - string
+            - "null"
+          pattern: ^([01]\d|2[0-3]):[0-5]\d$
+          description: Preset wall-clock HH:MM default, not an instant.
+      required:
+        - name
+        - slotsJson
+    OrbatTemplatePatch:
+      type: object
+      additionalProperties: false
+      properties:
+        description:
+          type:
+            - string
+            - "null"
+        category:
+          type:
+            - string
+            - "null"
+        tagsJson:
+          type:
+            - string
+            - "null"
+        timezone:
+          type:
+            - string
+            - "null"
+        bluforCountry:
+          type:
+            - string
+            - "null"
+        bluforRelationship:
+          type:
+            - string
+            - "null"
+        opforCountry:
+          type:
+            - string
+            - "null"
+        opforRelationship:
+          type:
+            - string
+            - "null"
+        indepCountry:
+          type:
+            - string
+            - "null"
+        indepRelationship:
+          type:
+            - string
+            - "null"
+        iedThreat:
+          type:
+            - string
+            - "null"
+        civilianRelationship:
+          type:
+            - string
+            - "null"
+        rulesOfEngagement:
+          type:
+            - string
+            - "null"
+        airspace:
+          type:
+            - string
+            - "null"
+        inGameTimezone:
+          type:
+            - string
+            - "null"
+        operationDay:
+          type:
+            - string
+            - "null"
+        name:
+          type: string
+          minLength: 1
+        slotsJson:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrbatTemplateSquadInput"
+          minItems: 1
+        frequencyIds:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+          uniqueItems: true
+        tempFrequencies:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrbatTemplateFrequency"
+        isSideOp:
+          type: boolean
+        startTime:
+          type:
+            - string
+            - "null"
+          pattern: ^([01]\d|2[0-3]):[0-5]\d$
+          description: Preset wall-clock HH:MM default, not an instant.
+        endTime:
+          type:
+            - string
+            - "null"
+          pattern: ^([01]\d|2[0-3]):[0-5]\d$
+          description: Preset wall-clock HH:MM default, not an instant.
+        isActive:
+          type: boolean
+      minProperties: 1
+    OrbatTemplateSlot:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+        squadRoleId:
+          type:
+            - integer
+            - "null"
+          minimum: 1
+          maximum: 2147483647
+        orderIndex:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+        maxSignups:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        requiredTrainingIds:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+        requiredRankIds:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+      required:
+        - name
+        - squadRoleId
+        - orderIndex
+        - maxSignups
+        - requiredTrainingIds
+        - requiredRankIds
+    OrbatTemplateSquad:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+        orderIndex:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+        slots:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrbatTemplateSlot"
+      required:
+        - name
+        - orderIndex
+        - slots
+    OrbatTemplate:
+      type: object
+      additionalProperties: false
+      properties:
+        description:
+          type:
+            - string
+            - "null"
+        category:
+          type:
+            - string
+            - "null"
+        tagsJson:
+          type:
+            - string
+            - "null"
+        timezone:
+          type:
+            - string
+            - "null"
+        bluforCountry:
+          type:
+            - string
+            - "null"
+        bluforRelationship:
+          type:
+            - string
+            - "null"
+        opforCountry:
+          type:
+            - string
+            - "null"
+        opforRelationship:
+          type:
+            - string
+            - "null"
+        indepCountry:
+          type:
+            - string
+            - "null"
+        indepRelationship:
+          type:
+            - string
+            - "null"
+        iedThreat:
+          type:
+            - string
+            - "null"
+        civilianRelationship:
+          type:
+            - string
+            - "null"
+        rulesOfEngagement:
+          type:
+            - string
+            - "null"
+        airspace:
+          type:
+            - string
+            - "null"
+        inGameTimezone:
+          type:
+            - string
+            - "null"
+        operationDay:
+          type:
+            - string
+            - "null"
+        name:
+          type: string
+          minLength: 1
+        slotsJson:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrbatTemplateSquad"
+        frequencyIds:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+          uniqueItems: true
+        tempFrequencies:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrbatTemplateFrequency"
+        isSideOp:
+          type: boolean
+        startTime:
+          type:
+            - string
+            - "null"
+          pattern: ^([01]\d|2[0-3]):[0-5]\d$
+          description: Preset wall-clock HH:MM default, not an instant.
+        endTime:
+          type:
+            - string
+            - "null"
+          pattern: ^([01]\d|2[0-3]):[0-5]\d$
+          description: Preset wall-clock HH:MM default, not an instant.
+        id:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        createdById:
+          type:
+            - integer
+            - "null"
+        createdBy:
+          anyOf:
+            - type: object
+              additionalProperties: false
+              properties:
+                id:
+                  type: integer
+                  minimum: 1
+                  maximum: 2147483647
+                username:
+                  type:
+                    - string
+                    - "null"
+                avatarUrl:
+                  type:
+                    - string
+                    - "null"
+              required:
+                - id
+                - username
+                - avatarUrl
+            - type: "null"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        usageCount:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+        isActive:
+          type: boolean
+      required:
+        - description
+        - category
+        - tagsJson
+        - timezone
+        - bluforCountry
+        - bluforRelationship
+        - opforCountry
+        - opforRelationship
+        - indepCountry
+        - indepRelationship
+        - iedThreat
+        - civilianRelationship
+        - rulesOfEngagement
+        - airspace
+        - inGameTimezone
+        - operationDay
+        - name
+        - slotsJson
+        - frequencyIds
+        - tempFrequencies
+        - isSideOp
+        - startTime
+        - endTime
+        - id
+        - createdById
+        - createdBy
+        - createdAt
+        - updatedAt
+        - usageCount
+        - isActive
+    TemplateCapabilities:
+      type: object
+      additionalProperties: false
+      properties:
+        canRead:
+          type: boolean
+        canCreate:
+          type: boolean
+        canEdit:
+          type: boolean
+        canDelete:
+          type: boolean
+      required:
+        - canRead
+        - canCreate
+        - canEdit
+        - canDelete
+    PermissionTemplateEntryInput:
+      type: object
+      additionalProperties: false
+      properties:
+        permissionId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        value:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+          description: Must not exceed this permission’s configured maxValue (normally 255).
+      required:
+        - permissionId
+        - value
+    PermissionTemplateCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type:
+            - string
+            - "null"
+        permissions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PermissionTemplateEntryInput"
+          minItems: 1
+          description: Unique permissionId values. At least one value must be positive. Zero entries are excluded after validating
+            references.
+      required:
+        - name
+        - permissions
+    PermissionTemplatePatch:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type:
+            - string
+            - "null"
+        permissions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PermissionTemplateEntryInput"
+          minItems: 1
+          description: Unique permissionId values. At least one value must be positive. Zero entries are excluded after validating
+            references.
+      minProperties: 1
+    PermissionTemplate:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type:
+            - string
+            - "null"
+        permissions:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              permissionId:
+                type: integer
+                minimum: 1
+                maximum: 2147483647
+              key:
+                type: string
+              value:
+                type: integer
+                minimum: 1
+                maximum: 2147483647
+            required:
+              - permissionId
+              - key
+              - value
+        id:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - description
+        - createdAt
+        - updatedAt
+        - permissions
+    OrbatEditorSlotInput:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        squadRoleId:
+          type:
+            - integer
+            - "null"
+          minimum: 1
+          maximum: 2147483647
+        orderIndex:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+        maxSignups:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+      required:
+        - orderIndex
+        - maxSignups
+    OrbatEditorSquadInput:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        name:
+          type: string
+          minLength: 1
+        orderIndex:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+        slots:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrbatEditorSlotInput"
+          minItems: 1
+      required:
+        - name
+        - orderIndex
+        - slots
+    OrbatEditorPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        description:
+          type:
+            - string
+            - "null"
+        timezone:
+          type:
+            - string
+            - "null"
+        bluforCountry:
+          type:
+            - string
+            - "null"
+        bluforRelationship:
+          type:
+            - string
+            - "null"
+        opforCountry:
+          type:
+            - string
+            - "null"
+        opforRelationship:
+          type:
+            - string
+            - "null"
+        indepCountry:
+          type:
+            - string
+            - "null"
+        indepRelationship:
+          type:
+            - string
+            - "null"
+        iedThreat:
+          type:
+            - string
+            - "null"
+        civilianRelationship:
+          type:
+            - string
+            - "null"
+        rulesOfEngagement:
+          type:
+            - string
+            - "null"
+        airspace:
+          type:
+            - string
+            - "null"
+        inGameTimezone:
+          type:
+            - string
+            - "null"
+        operationDay:
+          type:
+            - string
+            - "null"
+        eventDateUtc:
+          type:
+            - string
+            - "null"
+          format: date-time
+        startsAtUtc:
+          type:
+            - string
+            - "null"
+          format: date-time
+        endsAtUtc:
+          type:
+            - string
+            - "null"
+          format: date-time
+        name:
+          type: string
+          minLength: 1
+        isSideOp:
+          type: boolean
+        frequencyIds:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+          uniqueItems: true
+        tempFrequencies:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              frequency:
+                type: string
+                minLength: 1
+              type:
+                type: string
+                enum:
+                  - SR
+                  - LR
+              isAdditional:
+                type: boolean
+              channel:
+                type: string
+              callsign:
+                type: string
+            required:
+              - frequency
+              - type
+              - isAdditional
+              - channel
+              - callsign
+        squads:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrbatEditorSquadInput"
+          minItems: 1
+      minProperties: 1
+    OrbatEditor:
+      type: object
+      additionalProperties: false
+      properties:
+        description:
+          type:
+            - string
+            - "null"
+        timezone:
+          type:
+            - string
+            - "null"
+        bluforCountry:
+          type:
+            - string
+            - "null"
+        bluforRelationship:
+          type:
+            - string
+            - "null"
+        opforCountry:
+          type:
+            - string
+            - "null"
+        opforRelationship:
+          type:
+            - string
+            - "null"
+        indepCountry:
+          type:
+            - string
+            - "null"
+        indepRelationship:
+          type:
+            - string
+            - "null"
+        iedThreat:
+          type:
+            - string
+            - "null"
+        civilianRelationship:
+          type:
+            - string
+            - "null"
+        rulesOfEngagement:
+          type:
+            - string
+            - "null"
+        airspace:
+          type:
+            - string
+            - "null"
+        inGameTimezone:
+          type:
+            - string
+            - "null"
+        operationDay:
+          type:
+            - string
+            - "null"
+        startsAtUtc:
+          type:
+            - string
+            - "null"
+          format: date-time
+        endsAtUtc:
+          type:
+            - string
+            - "null"
+          format: date-time
+        name:
+          type: string
+          minLength: 1
+        isSideOp:
+          type: boolean
+        frequencyIds:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+          uniqueItems: true
+        tempFrequencies:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              frequency:
+                type: string
+                minLength: 1
+              type:
+                type: string
+                enum:
+                  - SR
+                  - LR
+              isAdditional:
+                type: boolean
+              channel:
+                type: string
+              callsign:
+                type: string
+            required:
+              - frequency
+              - type
+              - isAdditional
+              - channel
+              - callsign
+        id:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        eventDate:
+          type:
+            - string
+            - "null"
+          format: date-time
+        startTime:
+          type:
+            - string
+            - "null"
+        endTime:
+          type:
+            - string
+            - "null"
+        isMainOp:
+          type: boolean
+        squads:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              id:
+                type: integer
+                minimum: 1
+                maximum: 2147483647
+              orbatId:
+                type: integer
+                minimum: 1
+                maximum: 2147483647
+              name:
+                type: string
+              orderIndex:
+                type: integer
+                minimum: 0
+                maximum: 2147483647
+              slots:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    id:
+                      type: integer
+                      minimum: 1
+                      maximum: 2147483647
+                    orbatId:
+                      type: integer
+                      minimum: 1
+                      maximum: 2147483647
+                    squadId:
+                      type: integer
+                      minimum: 1
+                      maximum: 2147483647
+                    squadRoleId:
+                      type:
+                        - integer
+                        - "null"
+                    orderIndex:
+                      type: integer
+                      minimum: 0
+                      maximum: 2147483647
+                    maxSignups:
+                      type:
+                        - integer
+                        - "null"
+                    squadRole:
+                      type:
+                        - object
+                        - "null"
+                      additionalProperties: false
+                      properties:
+                        id:
+                          type: integer
+                          minimum: 1
+                          maximum: 2147483647
+                        name:
+                          type: string
+                        isRetired:
+                          type: boolean
+                        requiredTrainingIds:
+                          type: array
+                          items:
+                            type: integer
+                            minimum: 1
+                            maximum: 2147483647
+                        requiredRankIds:
+                          type: array
+                          items:
+                            type: integer
+                            minimum: 1
+                            maximum: 2147483647
