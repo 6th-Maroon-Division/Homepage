@@ -47,49 +47,6 @@ tags:
 security:
   - bearerAuth: []
 paths:
-  /admin/import/legacy-user-data:
-    get:
-      tags:
-        - Admin
-        - Import
-      summary: Get legacy user data
-      security:
-        - bearerAuth:
-            - user:import
-      responses:
-        "200":
-          description: Legacy user data
-    post:
-      tags:
-        - TODO
-      summary: TODO document POST /admin/import/legacy-user-data
-      responses:
-        "200":
-          description: Success
-  /admin/import/legacy-user-data/apply:
-    post:
-      tags:
-        - Admin
-        - Import
-      summary: Apply legacy user data import
-      security:
-        - bearerAuth:
-            - user:import
-      responses:
-        "200":
-          description: Import applied
-  /admin/import/legacy-user-data/map:
-    post:
-      tags:
-        - Admin
-        - Import
-      summary: Map legacy user data
-      security:
-        - bearerAuth:
-            - user:import
-      responses:
-        "200":
-          description: Mappings saved
   /attendance:
     get:
       tags:
@@ -258,29 +215,6 @@ paths:
           description: Invalid payload or timing
         "500":
           description: Internal failure; writes rolled back and read audits fail closed
-  /attendance/legacy-import/user-data:
-    post:
-      tags:
-        - TODO
-      summary: TODO document POST /attendance/legacy-import/user-data
-      responses:
-        "200":
-          description: Success
-    get:
-      tags:
-        - TODO
-      summary: TODO document GET /attendance/legacy-import/user-data
-      responses:
-        "200":
-          description: Success
-  /attendance/legacy-import/user-data/map:
-    put:
-      tags:
-        - TODO
-      summary: TODO document PUT /attendance/legacy-import/user-data/map
-      responses:
-        "200":
-          description: Success
   /auth/{...nextauth}:
     get:
       tags:
@@ -11959,6 +11893,175 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/LegacyAttendanceImportInput"
+  /attendance/legacy-users:
+    get:
+      summary: List legacy user import records
+      description: Requires attendance:view. Strict filters, ascending ID cursor with actual lookahead. No embedded directory.
+        Read audits exclude self/lookahead.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters:
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            pattern: ^[1-9][0-9]*$
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+            description: Capped at 100
+        - name: search
+          in: query
+          schema:
+            type: string
+            maxLength: 200
+        - name: isMapped
+          in: query
+          schema:
+            type: boolean
+        - name: isApplied
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LegacyUserListResponse"
+        "400":
+          description: Invalid query or JSON
+        "401":
+          description: Invalid identity
+        "403":
+          description: Required permission missing
+        "404":
+          description: Reference not found
+        "409":
+          description: Concurrent change, applied-data protection or ambiguous target
+        "422":
+          description: Invalid payload or CSV
+        "500":
+          description: Request/audit failed; transaction rolled back
+    patch:
+      summary: Map legacy user records
+      description: Requires system:super_admin. Up to 100 unique IDs, input-order response; all references preflight before
+        atomic update/audit. Applied records cannot change target. No query arguments.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters: []
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LegacyUserMappingResponse"
+        "400":
+          description: Invalid query or JSON
+        "401":
+          description: Invalid identity
+        "403":
+          description: Required permission missing
+        "404":
+          description: Reference not found
+        "409":
+          description: Concurrent change, applied-data protection or ambiguous target
+        "422":
+          description: Invalid payload or CSV
+        "500":
+          description: Request/audit failed; transaction rolled back
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LegacyUserMappingInput"
+  /attendance/legacy-users/import:
+    post:
+      summary: Preview or import legacy user CSV
+      description: Requires attendance:edit; autoMap additionally requires system:super_admin. Maximum 1000 rows; quoted CSV,
+        exact seven headers in any order. Strict nonnegative counts; valid DD/MM/YYYY or YYYY-MM-DD becomes calendar
+        date. Existing legacy IDs skipped; unknown ranks retained with notes. Only unambiguous username matches
+        auto-map. Preview does not insert, commit audits IDs/counts. No query arguments.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters: []
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LegacyUserImportResponse"
+        "400":
+          description: Invalid query or JSON
+        "401":
+          description: Invalid identity
+        "403":
+          description: Required permission missing
+        "404":
+          description: Reference not found
+        "409":
+          description: Concurrent change, applied-data protection or ambiguous target
+        "422":
+          description: Invalid payload or CSV
+        "500":
+          description: Request/audit failed; transaction rolled back
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LegacyUserImportInput"
+  /attendance/legacy-users/apply:
+    post:
+      summary: Apply bounded legacy user records
+      description: Requires system:super_admin. Unique explicit IDs; already applied IDs skipped. Missing/unmapped/ambiguous
+        targets and invalid ranks/dates reject before writes. Rank baseline, history, outbox, applied flags and per-user
+        audits commit atomically. Preserves status flags; timestamps are UTC. No query arguments.
+      security:
+        - sessionCookie: []
+        - secureSessionCookie: []
+        - apiKey: []
+      parameters: []
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LegacyUserApplyResponse"
+        "400":
+          description: Invalid query or JSON
+        "401":
+          description: Invalid identity
+        "403":
+          description: Required permission missing
+        "404":
+          description: Reference not found
+        "409":
+          description: Concurrent change, applied-data protection or ambiguous target
+        "422":
+          description: Invalid payload or CSV
+        "500":
+          description: Request/audit failed; transaction rolled back
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LegacyUserApplyInput"
 components:
   securitySchemes:
     bearerAuth:
@@ -17725,3 +17828,281 @@ components:
         - groups
         - total
         - orbatId
+    LegacyUserRecord:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        legacyId:
+          type: string
+        discordUsername:
+          type: string
+        rankName:
+          type: string
+        dateJoined:
+          type: string
+          format: date
+          nullable: true
+        tigSinceLastPromo:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+        totalTig:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+        oldData:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+        mappedUserId:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+          nullable: true
+        isMapped:
+          type: boolean
+        notes:
+          type: string
+          nullable: true
+        isApplied:
+          type: boolean
+        importedAt:
+          type: string
+          format: date-time
+        mappedUser:
+          type: object
+          additionalProperties: false
+          properties:
+            id:
+              type: integer
+              minimum: 1
+              maximum: 2147483647
+            username:
+              type: string
+          required:
+            - id
+            - username
+          nullable: true
+      required:
+        - id
+        - legacyId
+        - discordUsername
+        - rankName
+        - dateJoined
+        - tigSinceLastPromo
+        - totalTig
+        - oldData
+        - mappedUserId
+        - isMapped
+        - notes
+        - isApplied
+        - importedAt
+        - mappedUser
+    LegacyUserListResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/LegacyUserRecord"
+        meta:
+          type: object
+          additionalProperties: false
+          properties:
+            limit:
+              type: integer
+              minimum: 1
+              maximum: 100
+            nextCursor:
+              type: string
+              nullable: true
+          required:
+            - limit
+            - nextCursor
+      required:
+        - data
+        - meta
+    LegacyUserImportInput:
+      type: object
+      additionalProperties: false
+      properties:
+        csvData:
+          type: string
+          minLength: 1
+          maxLength: 1000000
+        previewOnly:
+          type: boolean
+          default: false
+        autoMap:
+          type: boolean
+          default: false
+      required:
+        - csvData
+    LegacyUserImportResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          properties:
+            imported:
+              type: integer
+              minimum: 0
+              maximum: 2147483647
+            autoMapped:
+              type: integer
+              minimum: 0
+              maximum: 2147483647
+            skipped:
+              type: integer
+              minimum: 0
+              maximum: 2147483647
+            preview:
+              type: array
+              items:
+                type: object
+                additionalProperties: false
+                properties:
+                  legacyId:
+                    type: string
+                  discordUsername:
+                    type: string
+                  rankName:
+                    type: string
+                  dateJoined:
+                    type: string
+                    format: date
+                    nullable: true
+                  tigSinceLastPromo:
+                    type: integer
+                    minimum: 0
+                    maximum: 2147483647
+                  totalTig:
+                    type: integer
+                    minimum: 0
+                    maximum: 2147483647
+                  oldData:
+                    type: integer
+                    minimum: 0
+                    maximum: 2147483647
+                  mappedUserId:
+                    type: integer
+                    minimum: 1
+                    maximum: 2147483647
+                    nullable: true
+                  isMapped:
+                    type: boolean
+                  notes:
+                    type: string
+                    nullable: true
+                required:
+                  - legacyId
+                  - discordUsername
+                  - rankName
+                  - dateJoined
+                  - tigSinceLastPromo
+                  - totalTig
+                  - oldData
+                  - mappedUserId
+                  - isMapped
+                  - notes
+          required:
+            - imported
+            - autoMapped
+            - skipped
+            - preview
+        meta:
+          type: object
+          additionalProperties: false
+          properties: {}
+      required:
+        - data
+        - meta
+    LegacyUserMappingInput:
+      type: object
+      additionalProperties: false
+      properties:
+        updates:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              id:
+                type: integer
+                minimum: 1
+                maximum: 2147483647
+              mappedUserId:
+                type: integer
+                minimum: 1
+                maximum: 2147483647
+                nullable: true
+            required:
+              - id
+              - mappedUserId
+      required:
+        - updates
+    LegacyUserMappingResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/LegacyUserRecord"
+        meta:
+          type: object
+          additionalProperties: false
+          properties: {}
+      required:
+        - data
+        - meta
+    LegacyUserApplyInput:
+      type: object
+      additionalProperties: false
+      properties:
+        ids:
+          type: array
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+          items:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+      required:
+        - ids
+    LegacyUserApplyResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          properties:
+            applied:
+              type: integer
+              minimum: 0
+              maximum: 2147483647
+            skipped:
+              type: integer
+              minimum: 0
+              maximum: 2147483647
+          required:
+            - applied
+            - skipped
+        meta:
+          type: object
+          additionalProperties: false
+          properties: {}
+      required:
+        - data
+        - meta

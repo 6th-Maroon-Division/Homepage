@@ -85,7 +85,7 @@ export function LegacyDataMappingClient({
     try {
       const endpoint = importType === 'attendance' 
         ? '/api/attendance/legacy-records/import'
-        : '/api/attendance/legacy-import/user-data';
+        : '/api/attendance/legacy-users/import';
       
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -94,7 +94,7 @@ export function LegacyDataMappingClient({
       });
 
       const envelope = await response.json();
-      const result = importType === 'attendance' ? (response.ok ? envelope.data : { error: envelope.error?.message }) : envelope;
+      const result = response.ok ? envelope.data : { error: envelope.error?.message };
       if (response.ok) {
         const recordType = importType === 'attendance' ? 'attendance' : 'user data';
         showToast(`Imported ${result.imported} ${recordType} records - switch to tabs to map users`, 'success');
@@ -127,7 +127,7 @@ export function LegacyDataMappingClient({
     try {
       const endpoint = importType === 'attendance' 
         ? '/api/attendance/legacy-records/import'
-        : '/api/attendance/legacy-import/user-data';
+        : '/api/attendance/legacy-users/import';
       
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -136,7 +136,7 @@ export function LegacyDataMappingClient({
       });
 
       const envelope = await response.json();
-      const result = importType === 'attendance' ? (response.ok ? envelope.data : { error: envelope.error?.message }) : envelope;
+      const result = response.ok ? envelope.data : { error: envelope.error?.message };
       if (response.ok) {
         setPreviewRecords(result.preview || []);
         setConflicts(result.conflicts || []);
@@ -169,15 +169,14 @@ export function LegacyDataMappingClient({
       });
 
       // Fetch both attendance and user data, then combine
-      const [attendanceResult, userDataResponse] = await Promise.all([
+      const [attendanceResult, userDataResult] = await Promise.all([
         apiList<LegacyAttendanceRecord>(`/api/attendance/legacy-records?${params}`),
-        fetch(`/api/attendance/legacy-import/user-data?${params}`)
+        apiList<LegacyUserDataRecord>(`/api/attendance/legacy-users?${params}`)
       ]);
 
-      const userDataResult = await userDataResponse.json();
 
       // Combine both datasets - normalize user data records to have legacyName for consistency
-      const normalizedUserData = (userDataResult.records || []).map((record: LegacyUserDataRecord) => ({
+      const normalizedUserData = userDataResult.map((record: LegacyUserDataRecord) => ({
         ...record,
         legacyName: record.discordUsername, // Add legacyName for compatibility
       }));
@@ -223,23 +222,13 @@ export function LegacyDataMappingClient({
         isUserData ? ('discordUsername' in r && r.discordUsername === identifier) : (!('discordUsername' in r) && r.legacyName === identifier)
       );
 
-      const updatePromises = recordsToUpdate.map(record => {
-        const endpoint = isUserData ? '/api/attendance/legacy-import/user-data/map' : `/api/attendance/legacy-records/${record.id}`;
-        const isUserDataRecord = 'discordUsername' in record;
-        const body = isUserDataRecord 
-          ? JSON.stringify({ legacyUserDataId: record.id, mappedUserId })
-          : JSON.stringify({ mappedUserId });
-        
-        if (!isUserDataRecord) return apiRequest(endpoint, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body }).then(() => ({ ok: true }));
-        return fetch(endpoint, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body,
-        });
-      });
-
-      const responses = await Promise.all(updatePromises);
-      const allSuccessful = responses.every(r => r.ok);
+      if (isUserData) {
+        if (recordsToUpdate.length > 100) throw new Error('Map at most 100 records at a time.');
+        await apiRequest('/api/attendance/legacy-users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ updates: recordsToUpdate.map(record => ({ id: record.id, mappedUserId })) }) });
+      } else {
+        for (const record of recordsToUpdate) await apiRequest(`/api/attendance/legacy-records/${record.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mappedUserId }) });
+      }
+      const allSuccessful = true;
 
       if (allSuccessful) {
         showToast(`User mapping saved for all ${recordsToUpdate.length} records`, 'success');
@@ -250,8 +239,8 @@ export function LegacyDataMappingClient({
       } else {
         showToast('Some mappings failed to save', 'error');
       }
-    } catch {
-      showToast('Save failed', 'error');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Save failed', 'error');
     } finally {
       setIsSavingMapping(false);
     }
