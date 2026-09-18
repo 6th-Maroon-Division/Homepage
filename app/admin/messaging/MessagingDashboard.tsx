@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useToast } from '@/app/components/ui/ToastContainer';
+import { apiRequest } from '@/lib/api/client';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 
 type MessageType = 'orbat' | 'training' | 'rankup' | 'general' | 'alert';
@@ -27,24 +28,18 @@ export default function MessagingDashboard() {
     setIsSending(true);
 
     try {
-      const response = await fetch('/api/messaging/send', {
+      const { data } = await apiRequest<{ recipientCount: number }>('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title,
-          message,
+          body: message,
           type,
           actionUrl: actionUrl || null,
-          audience,
+          audience: { type: audience },
         }),
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to send message');
-      }
-
-      const data = await response.json();
       showToast(`Message sent to ${data.recipientCount} users!`, 'success');
       
       // Reset form

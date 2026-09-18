@@ -1,5 +1,7 @@
 'use client';
 
+import { apiRequest } from '@/lib/api/client';
+
 import { useMemo, useState } from 'react';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 import { useToast } from '@/app/components/ui/ToastContainer';
@@ -95,8 +97,8 @@ export default function TrainingStatusActionPanel({
 
     setSavingStatus(action.status);
     try {
-      const response = await fetch(`/api/training-requests/${requestId}`, {
-        method: 'PUT',
+      await apiRequest(`/api/training-requests/${requestId}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status: action.status,
@@ -104,10 +106,7 @@ export default function TrainingStatusActionPanel({
         }),
       });
 
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new Error(error.error || 'Failed to update training status');
-      }
+
 
       setNotes('');
       showSuccess(`Training status updated to ${action.status.replaceAll('_', ' ')}`);

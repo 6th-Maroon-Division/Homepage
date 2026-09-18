@@ -9,6 +9,7 @@ import TrainingScheduleSummary from '@/app/components/trainings/TrainingSchedule
 import TrainingStatusBadge from '@/app/components/trainings/TrainingStatusBadge';
 import type { TrainingRequestSession } from '@/app/components/trainings/training-request-types';
 import NotificationPreferencesPanel from '@/app/settings/NotificationPreferencesPanel';
+import { apiRequest } from '@/lib/api/client';
 
 type UserTraining = {
   id: number;
@@ -128,10 +129,7 @@ type RankHistoryEntry = {
 };
 
 type RankHistoryPagination = {
-  page: number;
-  pageSize: number;
-  total: number;
-  totalPages: number;
+  nextCursor: string | null;
 };
 
 type TabKey = 'overview' | 'attendance' | 'trainings' | 'loa' | 'rank-history' | 'notifications' | 'actions';
@@ -178,6 +176,8 @@ export default function UserSelfDetailClient({
   const [tabsRestored, setTabsRestored] = useState(false);
   const [rankHistoryRows, setRankHistoryRows] = useState<RankHistoryEntry[]>([]);
   const [rankHistoryPage, setRankHistoryPage] = useState(1);
+  const [rankHistoryCursors, setRankHistoryCursors] = useState<Array<string | null>>([null]);
+  const rankHistoryCursor = rankHistoryCursors[rankHistoryPage - 1] ?? null;
   const [rankHistoryPagination, setRankHistoryPagination] = useState<RankHistoryPagination | null>(null);
   const [isLoadingRankHistory, setIsLoadingRankHistory] = useState(false);
   const [rankHistoryError, setRankHistoryError] = useState('');
@@ -207,31 +207,37 @@ export default function UserSelfDetailClient({
   }, [activeTab, tabsRestored, trainingsViewTab]);
 
 
-  const fetchRankHistory = useCallback(async (pageNum: number) => {
+  const fetchRankHistory = useCallback(async (cursor: string | null, signal: AbortSignal) => {
     setIsLoadingRankHistory(true);
+    setRankHistoryRows([]);
+    setRankHistoryPagination(null);
+    setRankHistoryError('');
     try {
-      const response = await fetch(`/api/users/${user.id}/rank-history?page=${pageNum}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch rank history');
-      }
-
-      const data = await response.json();
-      setRankHistoryRows(data.data ?? []);
-      setRankHistoryPagination(data.pagination ?? null);
-      setRankHistoryError('');
+      const params = new URLSearchParams({ limit: '20' });
+      if (cursor) params.set('cursor', cursor);
+      const { data, meta } = await apiRequest<RankHistoryEntry[]>(`/api/users/${user.id}/rank-history?${params}`, { signal });
+      if (signal.aborted) return;
+      setRankHistoryRows(data);
+      setRankHistoryPagination({ nextCursor: meta.nextCursor ?? null });
     } catch (error) {
-      console.error('Error fetching rank history:', error);
-      setRankHistoryError('Failed to load rank history');
+      if (signal.aborted) return;
+      setRankHistoryError(error instanceof Error ? error.message : 'Failed to load rank history');
     } finally {
-      setIsLoadingRankHistory(false);
+      if (!signal.aborted) setIsLoadingRankHistory(false);
     }
   }, [user.id]);
 
   useEffect(() => {
-    if (activeTab === 'rank-history') {
-      fetchRankHistory(rankHistoryPage);
-    }
-  }, [activeTab, rankHistoryPage, fetchRankHistory]);
+    setRankHistoryPage(1);
+    setRankHistoryCursors([null]);
+  }, [user.id]);
+
+  useEffect(() => {
+    if (activeTab !== 'rank-history') return;
+    const controller = new AbortController();
+    void fetchRankHistory(rankHistoryCursor, controller.signal);
+    return () => controller.abort();
+  }, [activeTab, rankHistoryPage, rankHistoryCursor, fetchRankHistory]);
 
   useEffect(() => {
     setEditableUsername(user.username ?? '');
@@ -239,7 +245,7 @@ export default function UserSelfDetailClient({
   }, [user.username]);
 
   useEffect(() => {
-    const source = new EventSource('/api/user/events');
+    const source = new EventSource('/api/users/me/events');
 
     source.onmessage = () => {
       if (refreshTimerRef.current) {
@@ -634,14 +640,7 @@ export default function UserSelfDetailClient({
                               onClick={async () => {
                                 setIsCancellingRequestId(request.id);
                                 try {
-                                  const response = await fetch(`/api/training-requests/${request.id}`, {
-                                    method: 'DELETE',
-                                  });
-
-                                  if (!response.ok) {
-                                    const data = await response.json().catch(() => ({}));
-                                    throw new Error(data.error || 'Failed to cancel request');
-                                  }
+                                  await apiRequest(`/api/training-requests/${request.id}`, { method: 'DELETE' });
 
                                   setRequestRows((prev) => prev.filter((item) => item.id !== request.id));
                                   showSuccess('Training request cancelled');
@@ -794,21 +793,9 @@ export default function UserSelfDetailClient({
 
                                   setIsSubmittingRequest(true);
                                   try {
-                                    const response = await fetch('/api/training-requests', {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({
-                                        trainingId: selectedTrainingId,
-                                        requestMessage: requestMessage.trim() || null,
-                                      }),
+                                    const { data: created } = await apiRequest<{ id: number; trainingId: number; training: { name: string }; status: string; requestMessage: string | null; adminResponse: string | null; requestedAt: string; updatedAt: string }>('/api/training-requests', {
+                                      method: 'POST', body: JSON.stringify({ userId: user.id, trainingId: selectedTrainingId, requestMessage: requestMessage.trim() || null }),
                                     });
-
-                                    if (!response.ok) {
-                                      const data = await response.json().catch(() => ({}));
-                                      throw new Error(data.error || 'Failed to submit request');
-                                    }
-
-                                    const created = await response.json();
                                     setRequestRows((prev) => [
                                       {
                                         id: created.id,
@@ -884,6 +871,9 @@ export default function UserSelfDetailClient({
             <h3 className="font-semibold mb-3" style={{ color: 'var(--foreground)' }}>
               Submit Leave Of Absence
             </h3>
+            <p className="mb-3 text-sm" style={{ color: 'var(--muted-foreground)' }}>
+              Dates are shown in UTC. Selected dates begin at 00:00 UTC.
+            </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
@@ -948,22 +938,16 @@ export default function UserSelfDetailClient({
 
                   setIsSubmittingLoa(true);
                   try {
-                    const response = await fetch('/api/loa', {
+                    const { data: created } = await apiRequest<LoaEntry>('/api/users/me/leave-of-absences', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({
-                        startDate: loaStartDate,
-                        returnDate: loaReturnDate || null,
+                        startDate: `${loaStartDate}T00:00:00.000Z`,
+                        returnDate: loaReturnDate ? `${loaReturnDate}T00:00:00.000Z` : null,
                         reason: loaReason.trim() || null,
                       }),
                     });
 
-                    if (!response.ok) {
-                      const data = await response.json().catch(() => ({}));
-                      throw new Error(data.error || 'Failed to submit LOA');
-                    }
-
-                    const created = await response.json();
                     setLoaRows((prev) => [created, ...prev]);
                     setLoaStartDate('');
                     setLoaReturnDate('');
@@ -1016,11 +1000,11 @@ export default function UserSelfDetailClient({
                       <div className="flex flex-col gap-2">
                         <p className="text-sm" style={{ color: 'var(--foreground)' }}>
                           <span className="font-semibold">Start:</span>{' '}
-                          {new Date(entry.startDate).toLocaleDateString('en-GB')}
+                          {new Date(entry.startDate).toLocaleDateString('en-GB', { timeZone: 'UTC' })}
                         </p>
                         <p className="text-sm" style={{ color: 'var(--foreground)' }}>
                           <span className="font-semibold">Return:</span>{' '}
-                          {entry.returnDate ? new Date(entry.returnDate).toLocaleDateString('en-GB') : 'Not set yet'}
+                          {entry.returnDate ? new Date(entry.returnDate).toLocaleDateString('en-GB', { timeZone: 'UTC' }) : 'Not set yet'}
                         </p>
                         {isCancelled && (
                           <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
@@ -1061,18 +1045,12 @@ export default function UserSelfDetailClient({
                             onClick={async () => {
                               setIsSavingLoaId(entry.id);
                               try {
-                                const response = await fetch(`/api/loa/${entry.id}`, {
+                                const { data: updated } = await apiRequest<LoaEntry>(`/api/leave-of-absences/${entry.id}`, {
                                   method: 'PATCH',
                                   headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ returnDate: draftReturnDate || null }),
+                                  body: JSON.stringify({ returnDate: draftReturnDate ? `${draftReturnDate}T00:00:00.000Z` : null }),
                                 });
 
-                                if (!response.ok) {
-                                  const data = await response.json().catch(() => ({}));
-                                  throw new Error(data.error || 'Failed to update LOA return date');
-                                }
-
-                                const updated = await response.json();
                                 setLoaRows((prev) => prev.map((row) => (row.id === entry.id ? updated : row)));
                                 showSuccess('LOA return date updated');
                                 router.refresh();
@@ -1093,18 +1071,12 @@ export default function UserSelfDetailClient({
                               if (isFuture) {
                                 setIsCancellingLoaId(entry.id);
                                 try {
-                                  const response = await fetch(`/api/loa/${entry.id}`, {
+                                  const { data: updated } = await apiRequest<LoaEntry>(`/api/leave-of-absences/${entry.id}`, {
                                     method: 'PATCH',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ cancel: true }),
                                   });
 
-                                  if (!response.ok) {
-                                    const data = await response.json().catch(() => ({}));
-                                    throw new Error(data.error || 'Failed to cancel LOA');
-                                  }
-
-                                  const updated = await response.json();
                                   setLoaRows((prev) => prev.map((row) => (row.id === entry.id ? updated : row)));
                                   showSuccess('Future LOA cancelled');
                                   router.refresh();
@@ -1118,25 +1090,17 @@ export default function UserSelfDetailClient({
 
                               setIsMarkingBackLoaId(entry.id);
                               try {
-                                const today = new Date().toISOString().slice(0, 10);
-                                const startDate = entry.startDate.slice(0, 10);
-                                const returnDateToSet = today >= startDate ? today : startDate;
-                                const response = await fetch(`/api/loa/${entry.id}`, {
+                                const returnDateToSet = new Date(Math.max(Date.now(), new Date(entry.startDate).getTime())).toISOString();
+                                const { data: updated } = await apiRequest<LoaEntry>(`/api/leave-of-absences/${entry.id}`, {
                                   method: 'PATCH',
                                   headers: { 'Content-Type': 'application/json' },
                                   body: JSON.stringify({ returnDate: returnDateToSet }),
                                 });
 
-                                if (!response.ok) {
-                                  const data = await response.json().catch(() => ({}));
-                                  throw new Error(data.error || 'Failed to mark LOA as returned');
-                                }
-
-                                const updated = await response.json();
                                 setLoaRows((prev) => prev.map((row) => (row.id === entry.id ? updated : row)));
                                 setLoaReturnDateDrafts((prev) => ({
                                   ...prev,
-                                  [entry.id]: returnDateToSet,
+                                  [entry.id]: returnDateToSet.slice(0, 10),
                                 }));
                                 showSuccess('Marked as back now');
                                 router.refresh();
@@ -1204,16 +1168,12 @@ export default function UserSelfDetailClient({
 
                   setIsSavingUsername(true);
                   try {
-                    const response = await fetch('/api/user/update', {
-                      method: 'POST',
+                    await apiRequest('/api/users/me', {
+                      method: 'PATCH',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ username: normalizedUsername }),
                     });
 
-                    if (!response.ok) {
-                      const data = await response.json().catch(() => ({}));
-                      throw new Error(data.error || 'Failed to update username');
-                    }
 
                     setEditableUsername(normalizedUsername);
                     setDisplayUsername(normalizedUsername);
@@ -1305,17 +1265,7 @@ export default function UserSelfDetailClient({
                     const formData = new FormData();
                     formData.append('file', file);
 
-                    const response = await fetch('/api/user/avatar/upload', {
-                      method: 'POST',
-                      body: formData,
-                    });
-
-                    if (!response.ok) {
-                      const data = await response.json().catch(() => ({}));
-                      throw new Error(data.error || 'Failed to upload profile picture');
-                    }
-
-                    const result = await response.json();
+                    const { data: result } = await apiRequest<{ avatarUrl: string | null; changed: boolean }>('/api/users/me/avatar', { method: 'POST', body: formData, });
                     
                     showSuccess('Profile picture updated');
                     await updateSession();
@@ -1341,16 +1291,12 @@ export default function UserSelfDetailClient({
                 onClick={async () => {
                   setIsSavingAvatar(true);
                   try {
-                    const response = await fetch('/api/user/update', {
-                      method: 'POST',
+                    await apiRequest('/api/users/me', {
+                      method: 'PATCH',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ avatarUrl: null }),
                     });
 
-                    if (!response.ok) {
-                      const data = await response.json().catch(() => ({}));
-                      throw new Error(data.error || 'Failed to clear profile picture');
-                    }
 
                     setProfileImageUrl('');
                     if (avatarFileInputRef.current) {
@@ -1391,18 +1337,7 @@ export default function UserSelfDetailClient({
                 onClick={async () => {
                   setIsRefreshingSteamAvatar(true);
                   try {
-                    const response = await fetch('/api/user/avatar/refresh', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ provider: 'steam' }),
-                    });
-
-                    if (!response.ok) {
-                      const data = await response.json().catch(() => ({}));
-                      throw new Error(data.error || 'Failed to refresh from Steam');
-                    }
-
-                    const data = await response.json();
+                    const { data: data } = await apiRequest<{ avatarUrl: string | null; changed: boolean }>('/api/users/me/avatar/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: 'steam' }), });
                     if (data.avatarUrl) {
                       setProfileImageUrl(data.avatarUrl);
                     }
@@ -1433,23 +1368,14 @@ export default function UserSelfDetailClient({
                   onClick={async () => {
                     setIsSavingAvatar(true);
                     try {
-                      const response = await fetch('/api/user/avatar/migrate', {
-                        method: 'POST',
-                      });
-
-                      if (!response.ok) {
-                        const data = await response.json().catch(() => ({}));
-                        throw new Error(data.error || 'Failed to migrate avatar');
-                      }
-
-                      const result = await response.json();
-                      if (result.migrated) {
+                      const { data: result } = await apiRequest<{ avatarUrl: string | null; changed: boolean }>('/api/users/me/avatar/migrate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}), });
+                      if (result.changed) {
                         showSuccess('Avatar migrated to file storage');
-                        setProfileImageUrl(result.newAvatarUrl || '');
+                        setProfileImageUrl(result.avatarUrl || '');
                         await updateSession();
                         router.refresh();
                       } else {
-                        showSuccess(result.message || 'Avatar is already using file storage');
+                        showSuccess('Avatar is already using file storage');
                       }
                     } catch (error) {
                       showError(error instanceof Error ? error.message : 'Failed to migrate avatar');
@@ -1556,7 +1482,7 @@ export default function UserSelfDetailClient({
             </div>
           )}
 
-          {rankHistoryPagination && rankHistoryPagination.totalPages > 1 && (
+          {(rankHistoryPage > 1 || rankHistoryPagination?.nextCursor) && (
             <div className="mt-4 flex justify-center gap-2">
               <button
                 onClick={() => setRankHistoryPage(Math.max(1, rankHistoryPage - 1))}
@@ -1567,11 +1493,16 @@ export default function UserSelfDetailClient({
                 Previous
               </button>
               <div style={{ color: 'var(--muted-foreground)' }} className="px-3 py-2 text-sm">
-                Page {rankHistoryPage} of {rankHistoryPagination.totalPages}
+                Page {rankHistoryPage}
               </div>
               <button
-                onClick={() => setRankHistoryPage(Math.min(rankHistoryPagination.totalPages, rankHistoryPage + 1))}
-                disabled={rankHistoryPage === rankHistoryPagination.totalPages || isLoadingRankHistory}
+                onClick={() => {
+                  const nextCursor = rankHistoryPagination?.nextCursor;
+                  if (!nextCursor) return;
+                  setRankHistoryCursors((current) => [...current.slice(0, rankHistoryPage), nextCursor]);
+                  setRankHistoryPage((page) => page + 1);
+                }}
+                disabled={!rankHistoryPagination?.nextCursor || isLoadingRankHistory}
                 className="px-3 py-2 rounded-md border disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ borderColor: 'var(--border)', color: 'var(--foreground)' }}
               >

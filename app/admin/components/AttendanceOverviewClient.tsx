@@ -1,5 +1,7 @@
 'use client';
 
+import LocalDateTime from '@/app/components/ui/LocalDateTime';
+
 import { useState } from 'react';
 import Link from 'next/link';
 
@@ -158,7 +160,7 @@ export default function AttendanceOverviewClient({ orbats: initialOrbats }: Atte
                       style={{ color: 'var(--muted-foreground)' }}
                     >
                       {(orbat.startsAtUtc ?? orbat.eventDate)
-                        ? new Date((orbat.startsAtUtc ?? orbat.eventDate)!).toLocaleDateString()
+                        ? <LocalDateTime value={new Date((orbat.startsAtUtc ?? orbat.eventDate)!).toISOString()} kind="date" dateOnly={!orbat.startsAtUtc} />
                         : 'No date set'}
                     </p>
                     <div className="flex gap-4 text-sm">

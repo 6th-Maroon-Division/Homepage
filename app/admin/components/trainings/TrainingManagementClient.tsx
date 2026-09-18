@@ -1,5 +1,7 @@
 'use client';
 
+import { apiList, apiRequest } from '@/lib/api/client';
+
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useToast } from '@/app/components/ui/ToastContainer';
@@ -46,6 +48,15 @@ type Training = {
     userTrainings: number;
     trainingRequests: number;
   };
+  minimumRank: Rank | null;
+  requiredTrainings: { id: number; name: string }[];
+};
+
+type TrainingCatalog = Omit<Training, '_count' | 'minimumRank' | 'requiredTrainings'> & { counts: Training['_count'] };
+
+type TrainingRequirements = {
+  minimumRankId: number | null;
+  requiredTrainingIds: number[];
   minimumRank: Rank | null;
   requiredTrainings: { id: number; name: string }[];
 };
@@ -185,11 +196,8 @@ export default function TrainingManagementClient({
   // Fetch categories
   const fetchCategories = async () => {
     try {
-      const response = await fetch('/api/training-categories');
-      if (response.ok) {
-        const data = await response.json();
-        setCategories(data.sort((a: Category, b: Category) => a.orderIndex - b.orderIndex));
-      }
+      const data = await apiList<Category>('/api/training-categories');
+      setCategories(data.sort((a, b) => a.orderIndex - b.orderIndex || a.name.localeCompare(b.name)));
     } catch (error) {
       logClientError('Error fetching categories:', error);
     }
@@ -199,20 +207,18 @@ export default function TrainingManagementClient({
   // Fetch updated data
   const refreshTrainings = async () => {
     try {
-      const response = await fetch('/api/trainings');
-      if (response.ok) {
-        const data = await response.json();
-        if (Array.isArray(data)) {
-          setTrainings((current) => data.map((row) => {
-            const previous = current.find((training) => training.id === row.id);
-            return {
-              ...row,
-              minimumRank: previous?.minimumRank ?? null,
-              requiredTrainings: previous?.requiredTrainings ?? [],
-            };
-          }));
-        }
-      }
+      const data = await apiList<TrainingCatalog>('/api/trainings');
+      setTrainings((current) => data
+        .sort((a, b) => a.name.localeCompare(b.name) || a.id - b.id)
+        .map(({ counts, ...row }) => {
+          const previous = current.find((training) => training.id === row.id);
+          return {
+            ...row,
+            _count: counts,
+            minimumRank: previous?.minimumRank ?? null,
+            requiredTrainings: previous?.requiredTrainings ?? [],
+          };
+        }));
     } catch (error) {
       logClientError('Error refreshing trainings:', error);
     }
@@ -220,17 +226,8 @@ export default function TrainingManagementClient({
 
   const refreshAllRequests = async (_status?: string) => {
     try {
-      const response = await fetch('/api/training-requests', { cache: 'no-store' });
-      if (response.ok) {
-        const data = await response.json();
-        if (Array.isArray(data)) {
-          setAllRequests(data.map((row) => ({
-            ...row,
-            lastMessage: normalizeTrainingMessage(row.lastMessage),
-            session: normalizeTrainingSession(row.session),
-          })));
-        }
-      }
+      const data = await apiList<(typeof allRequests)[number]>('/api/training-requests', { cache: 'no-store' });
+      setAllRequests(data.map(row => ({ ...row, lastMessage: normalizeTrainingMessage(row.lastMessage), session: normalizeTrainingSession(row.session) })));
     } catch (error) {
       logClientError('Error refreshing requests:', error);
     }
@@ -274,46 +271,21 @@ export default function TrainingManagementClient({
 
     setIsSaving(true);
     try {
-      if (editingId) {
-        // Update existing training
-        const response = await fetch(`/api/trainings/${editingId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...formData,
-            categoryId: formData.categoryId ? parseInt(formData.categoryId) : null,
-          }),
-        });
-
-        if (response.ok) {
-          showSuccess('Training updated successfully');
-          await refreshTrainings();
-          resetForm();
-        } else {
-          showError('Failed to update training');
-        }
-      } else {
-        // Create new training
-        const response = await fetch('/api/trainings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...formData,
-            categoryId: formData.categoryId ? parseInt(formData.categoryId) : null,
-          }),
-        });
-
-        if (response.ok) {
-          showSuccess('Training created successfully');
-          await refreshTrainings();
-          resetForm();
-        } else {
-          showError('Failed to create training');
-        }
-      }
+      await apiRequest<TrainingCatalog>(editingId ? `/api/trainings/${editingId}` : '/api/trainings', {
+        method: editingId ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          categoryId: formData.categoryId ? Number(formData.categoryId) : null,
+          duration: formData.duration ? Number(formData.duration) : null,
+        }),
+      });
+      showSuccess(editingId ? 'Training updated successfully' : 'Training created successfully');
+      await refreshTrainings();
+      resetForm();
     } catch (error) {
       logClientError('Error saving training:', error);
-      showError('Error saving training');
+      showError(error instanceof Error ? error.message : 'Error saving training');
     } finally {
       setIsSaving(false);
     }
@@ -340,21 +312,13 @@ export default function TrainingManagementClient({
 
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/trainings/${deleteId}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        showSuccess('Training deleted successfully');
-        await refreshTrainings();
-        setDeleteId(null);
-      } else {
-        const payload = await response.json().catch(() => ({}));
-        showError(payload.error || 'Failed to delete training');
-      }
+      await apiRequest(`/api/trainings/${deleteId}`, { method: 'DELETE' });
+      showSuccess('Training deleted successfully');
+      await refreshTrainings();
+      setDeleteId(null);
     } catch (error) {
       logClientError('Error deleting training:', error);
-      showError('Error deleting training');
+      showError(error instanceof Error ? error.message : 'Error deleting training');
     } finally {
       setIsSaving(false);
     }
@@ -375,30 +339,28 @@ export default function TrainingManagementClient({
     setTrainingModalOpen(false);
   };
 
-  // Requirements management functions
+  // Apply the returned requirements so the controls immediately show saved changes.
+  const saveRequirements = async (trainingId: number, patch: { minimumRankId?: number | null; requiredTrainingIds?: number[] }) => {
+    const { data } = await apiRequest<TrainingRequirements>(`/api/trainings/${trainingId}/requirements`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    setTrainings((current) => current.map((training) => training.id === trainingId
+      ? { ...training, minimumRank: data.minimumRank, requiredTrainings: data.requiredTrainings }
+      : training));
+  };
+
   const handleSetRankRequirement = async (trainingId: number) => {
     const rankId = selectedRankForTraining[trainingId];
     if (!rankId) return;
-
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/trainings/${trainingId}/requirements`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ minimumRankId: rankId }),
-      });
-
-      if (response.ok) {
-        showSuccess('Rank requirement set successfully');
-        await refreshTrainings();
-        setSelectedRankForTraining((prev) => ({ ...prev, [trainingId]: null }));
-      } else {
-        const data = await response.json();
-        showError(data.error || 'Failed to set rank requirement');
-      }
+      await saveRequirements(trainingId, { minimumRankId: rankId });
+      setSelectedRankForTraining((prev) => ({ ...prev, [trainingId]: null }));
+      showSuccess('Rank requirement set successfully');
     } catch (error) {
-      logClientError('Error setting rank requirement:', error);
-      showError('Error setting rank requirement');
+      showError(error instanceof Error ? error.message : 'Failed to set rank requirement');
     } finally {
       setIsSaving(false);
     }
@@ -407,19 +369,10 @@ export default function TrainingManagementClient({
   const handleRemoveRankRequirement = async (trainingId: number) => {
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/trainings/${trainingId}/requirements`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        showSuccess('Rank requirement removed successfully');
-        await refreshTrainings();
-      } else {
-        showError('Failed to remove rank requirement');
-      }
+      await saveRequirements(trainingId, { minimumRankId: null });
+      showSuccess('Rank requirement removed successfully');
     } catch (error) {
-      logClientError('Error removing rank requirement:', error);
-      showError('Error removing rank requirement');
+      showError(error instanceof Error ? error.message : 'Failed to remove rank requirement');
     } finally {
       setIsSaving(false);
     }
@@ -431,26 +384,14 @@ export default function TrainingManagementClient({
       showError('Invalid prerequisite selection');
       return;
     }
-
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/trainings/${trainingId}/prerequisites`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requiredTrainingId: prerequisiteId }),
-      });
-
-      if (response.ok) {
-        showSuccess('Prerequisite added successfully');
-        await refreshTrainings();
-        setSelectedPrerequisite((prev) => ({ ...prev, [trainingId]: null }));
-      } else {
-        const data = await response.json();
-        showError(data.error || 'Failed to add prerequisite');
-      }
+      const { data } = await apiRequest<TrainingRequirements>(`/api/trainings/${trainingId}/requirements`, { cache: 'no-store' });
+      await saveRequirements(trainingId, { requiredTrainingIds: [...new Set([...data.requiredTrainingIds, prerequisiteId])] });
+      setSelectedPrerequisite((prev) => ({ ...prev, [trainingId]: null }));
+      showSuccess('Prerequisite added successfully');
     } catch (error) {
-      logClientError('Error adding prerequisite:', error);
-      showError('Error adding prerequisite');
+      showError(error instanceof Error ? error.message : 'Failed to add prerequisite');
     } finally {
       setIsSaving(false);
     }
@@ -459,19 +400,11 @@ export default function TrainingManagementClient({
   const handleRemovePrerequisite = async (trainingId: number, prerequisiteId: number) => {
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/trainings/${trainingId}/prerequisites/${prerequisiteId}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        showSuccess('Prerequisite removed successfully');
-        await refreshTrainings();
-      } else {
-        showError('Failed to remove prerequisite');
-      }
+      const { data } = await apiRequest<TrainingRequirements>(`/api/trainings/${trainingId}/requirements`, { cache: 'no-store' });
+      await saveRequirements(trainingId, { requiredTrainingIds: data.requiredTrainingIds.filter(id => id !== prerequisiteId) });
+      showSuccess('Prerequisite removed successfully');
     } catch (error) {
-      logClientError('Error removing prerequisite:', error);
-      showError('Error removing prerequisite');
+      showError(error instanceof Error ? error.message : 'Failed to remove prerequisite');
     } finally {
       setIsSaving(false);
     }
@@ -481,21 +414,9 @@ export default function TrainingManagementClient({
   const handleRequestAction = async (requestId: number, status: 'approved' | 'rejected', adminResponse?: string) => {
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/training-requests/${requestId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, adminResponse: adminResponse || null }),
-      });
-
-      if (response.ok) {
-        showSuccess(`Request ${status} successfully`);
-        setRequestActionModal(null);
-        setAdminMessage('');
-        await refreshAllRequests();
-        await refreshTrainings();
-      } else {
-        showError(`Failed to ${status} request`);
-      }
+      await apiRequest(`/api/training-requests/${requestId}`, { method: 'PATCH', body: JSON.stringify({ status, adminResponse: adminResponse || null }) });
+      showSuccess(`Request ${status} successfully`); setRequestActionModal(null); setAdminMessage('');
+      await refreshAllRequests(); await refreshTrainings();
     } catch (error) {
       logClientError('Error updating request:', error);
       showError('Error updating request');
@@ -525,7 +446,7 @@ export default function TrainingManagementClient({
         await fetchCategories();
       } else {
         const error = await response.json();
-        showError(error.error || 'Failed to add category');
+        showError(error.error?.message || 'Failed to add category');
       }
     } catch (error) {
       logClientError('Error adding category:', error);
@@ -569,7 +490,7 @@ export default function TrainingManagementClient({
     setIsSaving(true);
     try {
       const response = await fetch(`/api/training-categories/${categoryId}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
       });
@@ -580,7 +501,7 @@ export default function TrainingManagementClient({
         await fetchCategories();
       } else {
         const error = await response.json();
-        showError(error.error || 'Failed to update category');
+        showError(error.error?.message || 'Failed to update category');
       }
     } catch (error) {
       logClientError('Error updating category:', error);
@@ -610,7 +531,7 @@ export default function TrainingManagementClient({
       
       // Use a single API call with swap operation for atomicity
       const response = await fetch(`/api/training-categories/${categoryId}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ swapWithCategoryId: otherCategory.id }),
       });

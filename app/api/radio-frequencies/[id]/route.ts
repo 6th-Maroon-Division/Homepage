@@ -1,103 +1,49 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { validateQueryParameters, parsePositiveId } from '@/lib/api/validation';
 import { prisma } from '@/lib/prisma';
-import { checkPermission } from '@/lib/auth-middleware';
+import { handleApiRequest } from '@/lib/api/handler';
+import { apiError, apiSuccess } from '@/lib/api/response';
+import { readJsonBody } from '@/lib/api/request';
+import { parseRadioFrequencyBody, radioFrequencySnapshot, radioMutationError } from '@/lib/api/radio-frequencies';
+import { writeApiAudit } from '@/lib/api/audit';
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions);
+type Context = { params: Promise<{ id: string }> };
 
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export async function PATCH(request: Request, context: Context) {
+  return handleApiRequest(request, 'orbat:edit', async (_principal, audit) => {
+    const queryError = validateQueryParameters(request, []);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
+    const id = parsePositiveId((await context.params).id);
+    if (!id || id > 2147483647) return apiError(400, 'invalid_request', 'Invalid frequency id.');
+    const parsed = parseRadioFrequencyBody(await readJsonBody(request), false);
+    if (parsed.error) return parsed.error;
+    try {
+      return await prisma.$transaction(async tx => {
+        const before = await tx.radioFrequency.findUnique({ where: { id } });
+        if (!before) return apiError(404, 'not_found', 'Frequency not found.');
+        const after = await tx.radioFrequency.update({ where: { id }, data: parsed.data });
+        await writeApiAudit(tx, audit, { action: 'radio_frequency.updated', resource: 'radio_frequency', resourceId: String(id), outcome: 'success', before: radioFrequencySnapshot(before), after: radioFrequencySnapshot(after) });
+        return apiSuccess(after);
+      });
+    } catch (error) {
+      return radioMutationError(error);
     }
-    
-    const hasPermission = await checkPermission(session.user.id, 'orbat:edit');
-    if (!hasPermission) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    const { id } = await params;
-    const freqId = parseInt(id);
-
-    if (isNaN(freqId)) {
-      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
-    }
-
-    const body = await request.json();
-    const { frequency, type, isAdditional, channel, callsign } = body;
-
-    // Check if frequency exists
-    const existingFreq = await prisma.radioFrequency.findUnique({
-      where: { id: freqId },
-    });
-
-    if (!existingFreq) {
-      return NextResponse.json({ error: 'Frequency not found' }, { status: 404 });
-    }
-
-    // Update the frequency
-    const updatedFreq = await prisma.radioFrequency.update({
-      where: { id: freqId },
-      data: {
-        ...(frequency && { frequency }),
-        ...(type && { type }),
-        ...(isAdditional !== undefined && { isAdditional }),
-        ...(channel !== undefined && { channel: channel || null }),
-        ...(callsign !== undefined && { callsign: callsign || null }),
-      },
-    });
-
-    return NextResponse.json(updatedFreq);
-  } catch (error) {
-    console.error('Error updating radio frequency:', error);
-    return NextResponse.json({ error: 'Failed to update frequency' }, { status: 500 });
-  }
+  });
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    
-    const hasPermission = await checkPermission(session.user.id, 'orbat:delete');
-    if (!hasPermission) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    const { id } = await params;
-    const freqId = parseInt(id);
-
-    if (isNaN(freqId)) {
-      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
-    }
-
-    // Check if frequency exists
-    const freq = await prisma.radioFrequency.findUnique({
-      where: { id: freqId },
-    });
-
-    if (!freq) {
-      return NextResponse.json({ error: 'Frequency not found' }, { status: 404 });
-    }
-
-    // Delete the frequency (will set radioFrequencyId to NULL on subslots due to SetNull)
-    await prisma.radioFrequency.delete({
-      where: { id: freqId },
-    });
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error deleting radio frequency:', error);
-    return NextResponse.json({ error: 'Failed to delete frequency' }, { status: 500 });
-  }
+export async function DELETE(request: Request, context: Context) {
+  return handleApiRequest(request, 'orbat:delete', async (_principal, audit) => {
+    const queryError = validateQueryParameters(request, []);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
+    const id = parsePositiveId((await context.params).id);
+    if (!id || id > 2147483647) return apiError(400, 'invalid_request', 'Invalid frequency id.');
+    try {
+      return await prisma.$transaction(async tx => {
+        const before = await tx.radioFrequency.findUnique({ where: { id } });
+        if (!before) return apiError(404, 'not_found', 'Frequency not found.');
+        await tx.radioFrequency.delete({ where: { id } });
+        await writeApiAudit(tx, audit, { action: 'radio_frequency.deleted', resource: 'radio_frequency', resourceId: String(id), outcome: 'success', before: radioFrequencySnapshot(before) });
+        return apiSuccess(null);
+      });
+    } catch (error) { return radioMutationError(error); }
+  });
 }

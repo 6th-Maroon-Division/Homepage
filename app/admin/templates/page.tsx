@@ -53,11 +53,11 @@ export default async function AdminTemplatesPage() {
     tagsJson: template.tagsJson,
     usageCount: template.usageCount,
     isActive: template.isActive,
-    createdBy: {
+    createdBy: template.createdBy ? {
       id: template.createdBy.id,
       username: template.createdBy.username,
       avatarUrl: template.createdBy.avatarUrl,
-    },
+    } : null,
     createdAt: template.createdAt.toISOString(),
   }));
 

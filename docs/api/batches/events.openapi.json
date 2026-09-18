@@ -1,0 +1,210 @@
+{
+  "paths": {
+    "/events": {
+      "get": {
+        "summary": "Read or stream durable integration events",
+        "description": "Requires positive system:super_admin or active bot token. Audits only delivered other-user payload IDs without snapshots. Final nextCursor is null; resumeCursor remains the polling checkpoint.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "aggregate",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "rank",
+                "orbat",
+                "training"
+              ]
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)$",
+              "default": "0"
+            },
+            "description": "Nonnegative signed-64-bit decimal ID, maximum 9223372036854775807"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 50
+            },
+            "description": "Capped at 100"
+          },
+          {
+            "name": "Last-Event-ID",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Alternative cursor; must match query cursor when both are supplied"
+          },
+          {
+            "name": "Accept",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "application/json",
+                "text/event-stream"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ascending durable events or SSE frames. Each SSE data field is the canonical {data: Event,meta:{}} envelope. Credentials and grants are revalidated each poll.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DurableEvent"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "limit",
+                        "nextCursor",
+                        "resumeCursor"
+                      ],
+                      "properties": {
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "nextCursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "resumeCursor": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed, unknown or duplicate query or conflicting resume sources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiFailure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiFailure"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Requires system:super_admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiFailure"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database or audit failure; no personal data delivered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiFailure"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DurableEvent": {
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "occurredAt",
+          "payload"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "type": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC timestamp ending in Z"
+          },
+          "payload": {
+            "type": "object",
+            "description": "Whitelisted integration fields only; secrets, reasons and arbitrary stored JSON are excluded.",
+            "additionalProperties": {
+              "type": [
+                "string",
+                "integer",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "removePaths": [
+    "/bot/events/ranks",
+    "/bot/events/orbats",
+    "/bot/events/training"
+  ]
+}

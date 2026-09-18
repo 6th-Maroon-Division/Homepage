@@ -1,58 +1,34 @@
-// app/api/ranks/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { validateQueryParameters, parseCursorPagination } from '@/lib/api/validation';
 import { prisma } from '@/lib/prisma';
-import { checkPermission } from '@/lib/auth-middleware';
-
-export async function GET() {
-  try {
-    const ranks = await prisma.rank.findMany({
-      orderBy: { orderIndex: 'asc' },
-    });
-    return NextResponse.json({ ranks });
-  } catch (error) {
-    console.error('Error fetching ranks:', error);
-    return NextResponse.json({ error: 'Failed to fetch ranks' }, { status: 500 });
-  }
+import { handleApiRequest } from '@/lib/api/handler';
+import { apiError, apiSuccess } from '@/lib/api/response';
+import { readJsonBody } from '@/lib/api/request';
+import { writeApiAudit } from '@/lib/api/audit';
+import { parseRankBody, rankSnapshot, rankDatabaseError } from '@/lib/api/ranks';
+export async function GET(request: Request) {
+  return handleApiRequest(request, undefined, async () => {
+    const queryError = validateQueryParameters(request, ['limit', 'cursor']);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
+    const pagination = parseCursorPagination(new URL(request.url).searchParams, { defaultLimit: 50, maxLimit: 100 });
+    if (pagination.error !== undefined) return apiError(400, 'invalid_request', pagination.error);
+    const { cursor, limit } = pagination.data;
+    const rows = await prisma.rank.findMany({ where: cursor ? { id: { gt: cursor } } : {}, orderBy: { id: 'asc' }, take: limit + 1 });
+    const data = rows.slice(0, limit);
+    return apiSuccess(data, { meta: { limit, nextCursor: rows.length > limit ? String(data.at(-1)!.id) : null } });
+  });
 }
-
-export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  
-  const hasPermission = await checkPermission(session.user.id, 'rank:create');
-  if (!hasPermission) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-  try {
-    const body = await request.json();
-    const {
-      name,
-      abbreviation,
-      orderIndex,
-      attendanceRequiredSinceLastRank,
-      autoRankupEnabled,
-    } = body;
-
-    if (!name || !abbreviation || typeof orderIndex !== 'number') {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-    }
-
-    const rank = await prisma.rank.create({
-      data: {
-        name,
-        abbreviation,
-        orderIndex,
-        attendanceRequiredSinceLastRank: attendanceRequiredSinceLastRank ?? null,
-        autoRankupEnabled: !!autoRankupEnabled,
-      },
-    });
-    return NextResponse.json({ rank }, { status: 201 });
-  } catch (error) {
-    console.error('Error creating rank:', error);
-    return NextResponse.json({ error: 'Failed to create rank' }, { status: 500 });
-  }
+export async function POST(request: Request) {
+  return handleApiRequest(request, 'rank:create', async (_principal, audit) => {
+    const queryError = validateQueryParameters(request, []);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
+    const parsed = parseRankBody(await readJsonBody(request), true);
+    if (parsed.error) return parsed.error;
+    try {
+      return await prisma.$transaction(async tx => {
+        const rank = await tx.rank.create({ data: { ...parsed.data, name: parsed.data.name!, abbreviation: parsed.data.abbreviation!, orderIndex: parsed.data.orderIndex! } });
+        await writeApiAudit(tx, audit, { action: 'rank.created', resource: 'rank', resourceId: String(rank.id), outcome: 'success', after: rankSnapshot(rank) });
+        return apiSuccess(rank, { status: 201 });
+      });
+    } catch (error) { return rankDatabaseError(error); }
+  });
 }

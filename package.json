@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": "^20.19 || ^22.12 || >=24.0"
+    "node": "^24.11.0"
   },
   "scripts": {
     "dev": "next dev",
@@ -22,38 +22,63 @@
     "db:push": "prisma db push",
     "swagger": "node scripts/swagger.mjs",
     "swagger:serve": "node scripts/swagger.mjs",
-    "openapi:refresh": "node scripts/openapi-refresh.mjs"
+    "api:inventory": "node scripts/api-inventory.mjs",
+    "openapi:refresh": "node scripts/openapi-refresh.mjs",
+    "test:api": "vitest run",
+    "test:api:coverage": "vitest run --coverage",
+    "test:api:integration": "node scripts/test-api-integration.mjs",
+    "test:backend": "node scripts/test-api-integration.mjs --backend",
+    "audit:prune": "tsx scripts/prune-api-audits.ts",
+    "api:check": "node scripts/check-api-contract.mjs",
+    "test:ui": "node scripts/test-ui.mjs",
+    "ui:check": "node scripts/check-ui-coverage.mjs",
+    "typecheck": "tsc --noEmit --incremental false",
+    "test:workflows": "node --test tests/workflows/*.test.mjs"
   },
   "dependencies": {
-    "@prisma/adapter-pg": "^7.8.0",
-    "@prisma/client": "^7.8.0",
-    "lightningcss": "^1.32.0",
-    "next": "^16.2.9",
-    "next-auth": "^4.24.14",
-    "pg": "^8.22.0",
-    "react": "19.2.7",
-    "react-dom": "19.2.7",
-    "uuid": "^14.0.1"
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
+    "lightningcss": "^1.33.0",
+    "next": "^16.3.5",
+    "next-auth": "^4.24.15",
+    "pg": "^8.23.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "uuid": "^14.0.2"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
+    "@playwright/test": "^1.63.0",
+    "@prisma/dev": "0.25.2",
+    "@tailwindcss/postcss": "^4.3.3",
     "@types/estree": "^1.0.9",
     "@types/json-schema": "^7.0.15",
-    "@types/node": "^26.0.1",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
+    "@types/node": "^24.13.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@types/trusted-types": "^2.0.7",
+    "@vitest/coverage-v8": "^5.0.1",
     "babel-plugin-react-compiler": "1.0.0",
-    "dotenv": "^17.4.2",
-    "eslint": "^10",
-    "eslint-config-next": "^16.2.9",
+    "dotenv": "^18.0.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.5",
     "express": "^5.2.1",
-    "prisma": "^7.8.0",
-    "swagger-ui-dist": "^5.32.8",
+    "prisma": "^7.10.0",
+    "swagger-ui-dist": "^5.33.0",
     "swagger-ui-express": "^5.0.1",
-    "tailwindcss": "^4",
-    "tsx": "^4.22.4",
-    "typescript": "^6.0.3",
-    "yaml": "^2.9.0"
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.13",
+    "typescript": "npm:@typescript/typescript6@6.0.2",
+    "vitest": "^5.0.1",
+    "yaml": "^2.9.1",
+    "@typescript/native": "npm:typescript@^7.0.2"
+  },
+  "overrides": {
+    "@prisma/config": {
+      "deepmerge-ts": "8.0.2"
+    },
+    "prisma": {
+      "mysql2": "3.24.4",
+      "@prisma/dev": "$@prisma/dev"
+    }
   }
 }

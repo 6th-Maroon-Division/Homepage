@@ -1,5 +1,7 @@
 'use client';
 
+import { apiList, apiRequest } from '@/lib/api/client';
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 import { useToast } from '@/app/components/ui/ToastContainer';
@@ -63,20 +65,14 @@ export default function TrainingRequestChat({
   }, [onMessagesChange]);
 
   const refreshMessages = useCallback(async () => {
-    const response = await fetch(`/api/training-requests/${requestId}/messages`, {
-      cache: 'no-store',
-    });
-    if (!response.ok) return;
-
-    const payload = await response.json();
-    const rawMessages = Array.isArray(payload) ? payload : payload.messages;
-    if (!Array.isArray(rawMessages)) return;
-
-    updateMessages(
-      rawMessages
-        .map(normalizeTrainingMessage)
-        .filter((message: TrainingRequestMessage | null): message is TrainingRequestMessage => message !== null),
-    );
+    try {
+      const rows = await apiList<{ id: number }>(`/api/training-requests/${requestId}/messages`, { cache: 'no-store' });
+      updateMessages(rows.map(normalizeTrainingMessage).filter((message): message is TrainingRequestMessage => message !== null));
+      const latest = rows.at(-1);
+      if (latest) await apiRequest(`/api/training-requests/${requestId}/read-states/me`, { method: 'PATCH', body: JSON.stringify({ lastReadMessageId: latest.id }) });
+    } catch {
+      // Preserve loaded messages through transient polling failures.
+    }
   }, [requestId, updateMessages]);
 
   useEffect(() => {
@@ -111,19 +107,13 @@ export default function TrainingRequestChat({
 
     setIsSending(true);
     try {
-      const response = await fetch(`/api/training-requests/${requestId}/messages`, {
+      const { data: payload } = await apiRequest(`/api/training-requests/${requestId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ body: content }),
       });
 
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new Error(error.error || 'Failed to send message');
-      }
-
-      const payload = await response.json();
-      const message = normalizeTrainingMessage(payload.message ?? payload);
+      const message = normalizeTrainingMessage(payload);
       if (message) updateMessages([message]);
       setDraft('');
     } catch (error) {

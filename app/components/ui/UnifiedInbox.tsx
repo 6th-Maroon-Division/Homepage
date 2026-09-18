@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useToast } from '@/app/components/ui/ToastContainer';
+import { apiRequest, apiList } from '@/lib/api/client';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 
 type MessageType = 'orbat' | 'training' | 'rankup' | 'general' | 'alert';
@@ -24,13 +25,6 @@ interface Message {
   } | null;
 }
 
-interface InboxData {
-  messages: Message[];
-  unreadCount: number;
-  total: number;
-  hasMore: boolean;
-}
-
 export default function UnifiedInbox() {
   const { data: session } = useSession();
   const { showToast } = useToast();
@@ -45,6 +39,7 @@ export default function UnifiedInbox() {
   const isOpenRef = useRef(false);
   const fetchMessagesRef = useRef<() => Promise<void>>(async () => undefined);
   const fetchUnreadCountRef = useRef<() => Promise<void>>(async () => undefined);
+  const messageRequest = useRef(0);
 
   useEffect(() => {
     isOpenRef.current = isOpen;
@@ -56,13 +51,8 @@ export default function UnifiedInbox() {
     }
 
     try {
-      const response = await fetch('/api/messaging/inbox?unread=true&limit=1');
-      if (!response.ok) {
-        return;
-      }
-
-      const data: InboxData = await response.json();
-      setUnreadCount(data.unreadCount);
+      const { meta } = await apiRequest<Message[]>('/api/users/me/messages?unread=true&limit=1');
+      setUnreadCount(Number(meta.unreadCount));
     } catch (error) {
       console.error('Error fetching unread count:', error);
     }
@@ -71,6 +61,7 @@ export default function UnifiedInbox() {
   const fetchMessages = useCallback(async () => {
     if (!session?.user) return;
 
+    const request = ++messageRequest.current;
     setIsLoading(true);
     try {
       const queryParams = new URLSearchParams();
@@ -79,19 +70,19 @@ export default function UnifiedInbox() {
       }
       queryParams.append('limit', '20');
 
-      const response = await fetch(`/api/messaging/inbox?${queryParams}`);
-      if (!response.ok) throw new Error('Failed to fetch messages');
-
-      const data: InboxData = await response.json();
-      setMessages(data.messages);
-      setUnreadCount(data.unreadCount);
+      const data = await apiList<Message>(`/api/users/me/messages?${queryParams}`);
+      // A slower request for the previous filter must not replace this view.
+      if (request !== messageRequest.current) return;
+      setMessages(data);
+      await fetchUnreadCount();
     } catch (error) {
+      if (request !== messageRequest.current) return;
       console.error('Error fetching messages:', error);
       showToast('Failed to load messages', 'error');
     } finally {
-      setIsLoading(false);
+      if (request === messageRequest.current) setIsLoading(false);
     }
-  }, [session, filter, showToast]);
+  }, [session, filter, showToast, fetchUnreadCount]);
 
   useEffect(() => {
     fetchMessagesRef.current = fetchMessages;
@@ -105,13 +96,14 @@ export default function UnifiedInbox() {
     if (isOpen) {
       fetchMessages();
     }
+    return () => { messageRequest.current += 1; };
   }, [isOpen, fetchMessages]);
 
   // Stream-first inbox updates with polling fallback
   useEffect(() => {
     if (!session?.user?.id) return;
 
-    const source = new EventSource('/api/messaging/events');
+    const source = new EventSource('/api/users/me/messages/events');
     streamRef.current = source;
 
     source.onopen = () => {
@@ -121,7 +113,7 @@ export default function UnifiedInbox() {
 
     source.onmessage = (event) => {
       try {
-        const payload = JSON.parse(event.data) as { type?: string };
+        const payload = JSON.parse(event.data).data as { type?: string };
         if (payload.type === 'stream.connected') {
           return;
         }
@@ -167,11 +159,7 @@ export default function UnifiedInbox() {
 
   const markAsRead = async (messageId: number) => {
     try {
-      const response = await fetch(`/api/messaging/${messageId}/read`, {
-        method: 'PUT',
-      });
-
-      if (!response.ok) throw new Error('Failed to mark as read');
+      await apiRequest(`/api/users/me/messages/${messageId}`, { method: 'PATCH', body: JSON.stringify({ isRead: true }) });
 
       // Update local state
       setMessages(prev =>
@@ -187,11 +175,7 @@ export default function UnifiedInbox() {
 
   const markAllAsRead = async () => {
     try {
-      const response = await fetch('/api/messaging/read-all', {
-        method: 'PUT',
-      });
-
-      if (!response.ok) throw new Error('Failed to mark all as read');
+      await apiRequest('/api/users/me/messages', { method: 'PATCH', body: JSON.stringify({ isRead: true }) });
 
       // Update local state
       setMessages(prev =>

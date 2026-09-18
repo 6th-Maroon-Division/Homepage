@@ -1,5 +1,6 @@
 'use client';
 
+import { apiList, apiRequest } from '@/lib/api/client';
 import React, { useState } from 'react';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
@@ -11,7 +12,7 @@ interface LegacyAttendanceRecord {
   legacyNotes?: string;
   legacyEventDate?: string;
   isMapped: boolean;
-  mappedUser?: { id: number; username: string; email: string } | null;
+  mappedUser?: { id: number; username: string; avatarUrl?: string | null } | null;
 }
 
 interface LegacyUserDataRecord {
@@ -51,11 +52,10 @@ export function LegacyDataMappingClient({
   const [previewRecords, setPreviewRecords] = useState<LegacyRecord[]>([]);
   const [previewMeta, setPreviewMeta] = useState<{ skippedCells?: number; processedCells?: number } | null>(null);
   const [conflicts, setConflicts] = useState<Array<{ legacyUserId: string; legacyEventDate: string; existing: string; new: string }>>([]);
-  const [conflictResolutions, setConflictResolutions] = useState<Record<string, string>>({}); // key: "userId_date", value: status choice
   const [legacyData, setLegacyData] = useState<LegacyRecord[]>(initialData);
   const [isFetching, setIsFetching] = useState(false);
   const [searchText, setSearchText] = useState('');
-  const [selectedMappingId, setSelectedMappingId] = useState<number | null>(null);
+  const [selectedMapping, setSelectedMapping] = useState<LegacyRecord | null>(null);
   const [isSavingMapping, setIsSavingMapping] = useState(false);
   const [isFetchingUsers, setIsFetchingUsers] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
@@ -84,8 +84,8 @@ export function LegacyDataMappingClient({
     setIsImporting(true);
     try {
       const endpoint = importType === 'attendance' 
-        ? '/api/attendance/legacy-import' 
-        : '/api/attendance/legacy-import/user-data';
+        ? '/api/attendance/legacy-records/import'
+        : '/api/attendance/legacy-users/import';
       
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -93,7 +93,8 @@ export function LegacyDataMappingClient({
         body: JSON.stringify({ csvData }),
       });
 
-      const result = await response.json();
+      const envelope = await response.json();
+      const result = response.ok ? envelope.data : { error: envelope.error?.message };
       if (response.ok) {
         const recordType = importType === 'attendance' ? 'attendance' : 'user data';
         showToast(`Imported ${result.imported} ${recordType} records - switch to tabs to map users`, 'success');
@@ -125,8 +126,8 @@ export function LegacyDataMappingClient({
     setIsPreviewing(true);
     try {
       const endpoint = importType === 'attendance' 
-        ? '/api/attendance/legacy-import' 
-        : '/api/attendance/legacy-import/user-data';
+        ? '/api/attendance/legacy-records/import'
+        : '/api/attendance/legacy-users/import';
       
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -134,11 +135,11 @@ export function LegacyDataMappingClient({
         body: JSON.stringify({ csvData, previewOnly: true }),
       });
 
-      const result = await response.json();
+      const envelope = await response.json();
+      const result = response.ok ? envelope.data : { error: envelope.error?.message };
       if (response.ok) {
         setPreviewRecords(result.preview || []);
         setConflicts(result.conflicts || []);
-        setConflictResolutions({}); // Reset conflict choices
         setPreviewMeta({
           skippedCells: result.skippedCells,
           processedCells: result.processedCells
@@ -168,22 +169,20 @@ export function LegacyDataMappingClient({
       });
 
       // Fetch both attendance and user data, then combine
-      const [attendanceResponse, userDataResponse] = await Promise.all([
-        fetch(`/api/attendance/legacy-data?${params}`),
-        fetch(`/api/attendance/legacy-import/user-data?${params}`)
+      const [attendanceResult, userDataResult] = await Promise.all([
+        apiList<LegacyAttendanceRecord>(`/api/attendance/legacy-records?${params}`),
+        apiList<LegacyUserDataRecord>(`/api/attendance/legacy-users?${params}`)
       ]);
 
-      const attendanceResult = await attendanceResponse.json();
-      const userDataResult = await userDataResponse.json();
 
       // Combine both datasets - normalize user data records to have legacyName for consistency
-      const normalizedUserData = (userDataResult.records || []).map((record: LegacyUserDataRecord) => ({
+      const normalizedUserData = userDataResult.map((record: LegacyUserDataRecord) => ({
         ...record,
         legacyName: record.discordUsername, // Add legacyName for compatibility
       }));
 
       const combinedData: LegacyRecord[] = [
-        ...(attendanceResult.data || []),
+        ...attendanceResult,
         ...normalizedUserData
       ];
       
@@ -195,16 +194,15 @@ export function LegacyDataMappingClient({
     }
   };
 
-  const handleOpenMapping = async (legacyId: number) => {
-    setSelectedMappingId(legacyId);
+  const handleOpenMapping = async (record: LegacyRecord) => {
+    setSelectedMapping(record);
     await fetchUsers();
   };
 
   const fetchUsers = async () => {
     setIsFetchingUsers(true);
     try {
-      const usersRes = await fetch('/api/users');
-      const usersData = await usersRes.json();
+      const usersData = await apiList<User>('/api/users');
       setUsers(usersData);
     } catch {
       showToast('Failed to fetch users', 'error');
@@ -213,51 +211,36 @@ export function LegacyDataMappingClient({
     }
   };
 
-  const handleSaveMapping = async (legacyId: number, mappedUserId: number) => {
+  const handleSaveMapping = async (targetRecord: LegacyRecord, mappedUserId: number) => {
     setIsSavingMapping(true);
     try {
-      const targetRecord = legacyData.find(r => r.id === legacyId);
-      if (!targetRecord) {
-        showToast('Record not found', 'error');
-        return;
-      }
-
       // Determine record type and find all records with same identifier
       const isUserData = 'discordUsername' in targetRecord;
       const identifier = isUserData ? (targetRecord as LegacyUserDataRecord).discordUsername : (targetRecord as LegacyAttendanceRecord).legacyName;
       
       const recordsToUpdate = legacyData.filter(r => 
-        isUserData ? (r as LegacyUserDataRecord).discordUsername === identifier : (r as LegacyAttendanceRecord).legacyName === identifier
+        isUserData ? ('discordUsername' in r && r.discordUsername === identifier) : (!('discordUsername' in r) && r.legacyName === identifier)
       );
 
-      const updatePromises = recordsToUpdate.map(record => {
-        const endpoint = isUserData ? '/api/attendance/legacy-import/user-data/map' : '/api/attendance/legacy-data';
-        const isUserDataRecord = 'discordUsername' in record;
-        const body = isUserDataRecord 
-          ? JSON.stringify({ legacyUserDataId: record.id, mappedUserId })
-          : JSON.stringify({ legacyDataId: record.id, mappedUserId });
-        
-        return fetch(endpoint, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body,
-        });
-      });
-
-      const responses = await Promise.all(updatePromises);
-      const allSuccessful = responses.every(r => r.ok);
+      if (isUserData) {
+        if (recordsToUpdate.length > 100) throw new Error('Map at most 100 records at a time.');
+        await apiRequest('/api/attendance/legacy-users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ updates: recordsToUpdate.map(record => ({ id: record.id, mappedUserId })) }) });
+      } else {
+        for (const record of recordsToUpdate) await apiRequest(`/api/attendance/legacy-records/${record.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mappedUserId }) });
+      }
+      const allSuccessful = true;
 
       if (allSuccessful) {
         showToast(`User mapping saved for all ${recordsToUpdate.length} records`, 'success');
-        setSelectedMappingId(null);
+        setSelectedMapping(null);
         setSearchText('');
         setActiveSubTab('all');
         await fetchLegacyData();
       } else {
         showToast('Some mappings failed to save', 'error');
       }
-    } catch {
-      showToast('Save failed', 'error');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Save failed', 'error');
     } finally {
       setIsSavingMapping(false);
     }
@@ -278,7 +261,7 @@ export function LegacyDataMappingClient({
     // Get the display name based on record type
     const displayName = 'discordUsername' in record ? (record as LegacyUserDataRecord).discordUsername : (record as LegacyAttendanceRecord).legacyName;
     
-    const existing = acc.find(g => g.displayName === displayName);
+    const existing = acc.find(g => g.displayName === displayName && ('discordUsername' in g.records[0]) === ('discordUsername' in record));
     if (existing) {
       existing.records.push(record);
       // Update group status based on all records
@@ -462,13 +445,13 @@ export function LegacyDataMappingClient({
               </button>
               <button
                 onClick={handleImportCSV}
-                disabled={isImporting || previewRecords.length === 0 || (importType === 'attendance' && conflicts.length > 0 && Object.keys(conflictResolutions).length < conflicts.length)}
+                disabled={isImporting || previewRecords.length === 0 || (importType === 'attendance' && conflicts.length > 0)}
                 style={{
                   backgroundColor: isImporting ? 'var(--muted-foreground)' : '#10b981',
                   color: 'white',
                 }}
                 className="px-4 py-2 rounded text-sm font-semibold disabled:opacity-50"
-                title={importType === 'attendance' && conflicts.length > 0 && Object.keys(conflictResolutions).length < conflicts.length ? 'Resolve all conflicts first' : ''}
+                title={importType === 'attendance' && conflicts.length > 0 ? 'Correct conflicting CSV rows and preview again' : ''}
               >
                 {isImporting ? <LoadingSpinner /> : 'Save to Database'}
               </button>
@@ -533,8 +516,6 @@ export function LegacyDataMappingClient({
                 </p>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {conflicts.map((conflict, idx) => {
-                    const key = `${conflict.legacyUserId}_${conflict.legacyEventDate}`;
-                    const chosen = conflictResolutions[key];
                     return (
                       <div
                         key={idx}
@@ -546,38 +527,13 @@ export function LegacyDataMappingClient({
                         </div>
                         <div style={{ color: 'rgba(255,255,255,0.9)' }} className="text-xs space-y-1">
                           <div>Existing: <strong>{conflict.existing}</strong> | New: <strong>{conflict.new}</strong></div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => setConflictResolutions({ ...conflictResolutions, [key]: conflict.existing })}
-                              style={{
-                                backgroundColor: chosen === conflict.existing ? 'white' : 'rgba(255,255,255,0.2)',
-                                color: chosen === conflict.existing ? '#f97316' : 'white',
-                              }}
-                              className="px-2 py-1 rounded text-xs font-semibold"
-                            >
-                              Keep {conflict.existing}
-                            </button>
-                            <button
-                              onClick={() => setConflictResolutions({ ...conflictResolutions, [key]: conflict.new })}
-                              style={{
-                                backgroundColor: chosen === conflict.new ? 'white' : 'rgba(255,255,255,0.2)',
-                                color: chosen === conflict.new ? '#f97316' : 'white',
-                              }}
-                              className="px-2 py-1 rounded text-xs font-semibold"
-                            >
-                              Use {conflict.new}
-                            </button>
-                          </div>
+
                         </div>
                       </div>
                     );
                   })}
                 </div>
-                {Object.keys(conflictResolutions).length === conflicts.length && (
-                  <p style={{ color: 'rgba(255,255,255,0.8)' }} className="text-xs">
-                    ✓ All conflicts resolved
-                  </p>
-                )}
+                <p className="text-xs text-white">Correct the conflicting CSV rows and preview again before importing.</p>
               </div>
             )}
           </div>
@@ -650,7 +606,7 @@ export function LegacyDataMappingClient({
                     
                     return (
                       <div
-                        key={`group-${displayName}-${group.records[0].id}`}
+                        key={`group-${"discordUsername" in group.records[0] ? "user" : "attendance"}-${displayName}-${group.records[0].id}`}
                         style={{ padding: '12px', borderColor: 'var(--border)' }}
                         className="flex justify-between items-center"
                       >
@@ -683,7 +639,7 @@ export function LegacyDataMappingClient({
                           )}
                         </div>
                         <button
-                          onClick={() => handleOpenMapping(group.records[0].id)}
+                          onClick={() => handleOpenMapping(group.records[0])}
                           style={{
                             backgroundColor: group.isMapped ? '#10b981' : 'var(--muted-foreground)',
                             color: 'white',
@@ -702,14 +658,14 @@ export function LegacyDataMappingClient({
         )}
       </div>
 
-      {selectedMappingId !== null && (
+      {selectedMapping !== null && (
         <MappingModal
-          legacyRecord={legacyData.find((r) => r.id === selectedMappingId)!}
+          legacyRecord={selectedMapping}
           users={users}
           isFetchingUsers={isFetchingUsers}
           isSavingMapping={isSavingMapping}
-          onSave={(userId) => handleSaveMapping(selectedMappingId, userId)}
-          onClose={() => setSelectedMappingId(null)}
+          onSave={(userId) => handleSaveMapping(selectedMapping, userId)}
+          onClose={() => setSelectedMapping(null)}
         />
       )}
     </div>

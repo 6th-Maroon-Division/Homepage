@@ -1,5 +1,10 @@
 'use client';
 
+import LocalDateTime from '@/app/components/ui/LocalDateTime';
+
+import { useSession } from 'next-auth/react';
+import { apiList, apiRequest } from '@/lib/api/client';
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useToast } from '@/app/components/ui/ToastContainer';
@@ -63,7 +68,7 @@ type ClientFrequency = {
     isAdditional: boolean;
     channel?: string | null;
     callsign?: string | null;
-    createdAt: Date;
+    createdAt: string | Date;
   };
 };
 
@@ -270,7 +275,8 @@ function getRelationshipColor(relationship: string): string {
 export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailClientProps) {
   const [orbat, setOrbat] = useState<ClientOrbat>(initialOrbat);
   const [loadingSubslotId, setLoadingSubslotId] = useState<number | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const { data: session } = useSession();
+  const currentUserId = session?.user?.id ? Number(session.user.id) : null;
   const [slotEligibility, setSlotEligibility] = useState<Record<number, ClientSlotEligibility>>({});
   const [isStreamConnected, setIsStreamConnected] = useState(false);
   const [noteStatus, setNoteStatus] = useState<'absent' | 'unsure' | 'late_unsure'>('absent');
@@ -332,28 +338,14 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
       ? null
       : attendanceNotes.find((note) => note.userId === currentUserId) || null;
 
-  // Fetch current user ID on mount
   useEffect(() => {
-    fetch('/api/user/current')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.id) setCurrentUserId(data.id);
-      })
-      .catch(() => {
-        // Ignore error - user might not be logged in
-      });
-  }, []);
-
-  useEffect(() => {
-    fetch(`/api/orbats/${initialOrbat.id}/eligibility`, { cache: 'no-store' })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((payload: { eligibility?: Record<number, ClientSlotEligibility> } | null) => {
-        if (payload?.eligibility) setSlotEligibility(payload.eligibility);
-      })
-      .catch(() => {
-        // Anonymous visitors and transient failures simply get the normal slot UI.
-      });
-  }, [initialOrbat.id]);
+    if (currentUserId === null) { setSlotEligibility({}); return; }
+    const controller = new AbortController();
+    apiList<ClientSlotEligibility & { slotId: number }>(`/api/orbats/${initialOrbat.id}/eligibility`, { signal: controller.signal })
+      .then(rows => { if (!controller.signal.aborted) setSlotEligibility(Object.fromEntries(rows.map(row => [row.slotId, row]))); })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [initialOrbat.id, currentUserId, orbat]);
 
   useEffect(() => {
     if (!myAttendanceNote) {
@@ -376,13 +368,8 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
 
   const refreshOrbat = useCallback(async () => {
     try {
-      const res = await fetch(`/api/orbats/${initialOrbat.id}/full`);
-      if (!res.ok) {
-        return;
-      }
-
-      const updated = await res.json();
-      setOrbat(updated);
+      const { data } = await apiRequest<ClientOrbat>(`/api/orbats/${initialOrbat.id}/full`);
+      setOrbat(data);
     } catch {
       // fallback interval may recover
     }
@@ -439,129 +426,24 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
 
   async function handleSignup(slotId: number) {
     setLoadingSubslotId(slotId);
-
     try {
-      const res = await fetch(`/api/subslots/${slotId}/signup`, {
-        method: 'POST',
-      });
-
-      if (!res.ok) {
-        let message = 'Failed to sign up.';
-        try {
-          const body: { error?: string } = await res.json();
-          if (body.error) message = body.error;
-        } catch {
-          // ignore JSON parse error
-        }
-        showError(message);
-        return;
-      }
-
-      const updated: ApiSlot = await res.json();
-
-      const mappedSlot: ClientSlot = {
-        id: updated.id,
-        name: updated.name,
-        orderIndex: updated.orderIndex,
-        maxSignups: updated.maxSignups,
-        squadRoleId: updated.squadRoleId,
-        requiredTrainings: updated.requiredTrainings || [],
-        requiredRanks: updated.requiredRanks || [],
-        requiredTraining: updated.requiredTraining || null,
-        requiredRank: updated.requiredRank || null,
-        signups: updated.signups.map((s) => ({
-          id: s.id,
-          user: s.user
-            ? {
-                id: s.user.id,
-                username: s.user.username,
-                rankAbbreviation: s.user.rankAbbreviation ?? null,
-                rankName: s.user.rankName ?? null,
-              }
-            : null,
-        })),
-      };
-
-      setOrbat((prev) => ({
-        ...prev,
-        squads: prev.squads.map((squad) => ({
-          ...squad,
-          slots: squad.slots.map((slot) =>
-            slot.id === mappedSlot.id ? mappedSlot : slot,
-          ),
-        })),
-      }));
-      
+      await apiRequest('/api/signups', { method: 'POST', body: JSON.stringify({ slotId, userId: 'me' }) });
+      await refreshOrbat();
       showSuccess('Successfully signed up!');
-    } catch {
-      showError('Network error while signing up.');
-    } finally {
-      setLoadingSubslotId(null);
-    }
+    } catch (error) { showError(error instanceof Error ? error.message : 'Failed to sign up.'); }
+    finally { setLoadingSubslotId(null); }
   }
   async function handleUnsign(slotId: number) {
+    const signup = orbat.squads.flatMap(squad => squad.slots).find(slot => slot.id === slotId)?.signups.find(row => row.user?.id === currentUserId);
+    if (!signup) return;
     setLoadingSubslotId(slotId);
-
     try {
-      const res = await fetch(`/api/subslots/${slotId}/signup`, {
-        method: 'DELETE',
-      });
-
-      if (!res.ok) {
-        let message = 'Failed to remove signup.';
-        try {
-          const body: { error?: string } = await res.json();
-          if (body.error) message = body.error;
-        } catch {
-          // ignore JSON parse error
-        }
-        showError(message);
-        return;
-      }
-
-      const updated: ApiSlot = await res.json();
-
-      const mappedSlot: ClientSlot = {
-        id: updated.id,
-        name: updated.name,
-        orderIndex: updated.orderIndex,
-        maxSignups: updated.maxSignups,
-        squadRoleId: updated.squadRoleId,
-        requiredTrainings: updated.requiredTrainings || [],
-        requiredRanks: updated.requiredRanks || [],
-        requiredTraining: updated.requiredTraining || null,
-        requiredRank: updated.requiredRank || null,
-        signups: updated.signups.map((s) => ({
-          id: s.id,
-          user: s.user
-            ? {
-                id: s.user.id,
-                username: s.user.username,
-                rankAbbreviation: s.user.rankAbbreviation ?? null,
-                rankName: s.user.rankName ?? null,
-              }
-            : null,
-        })),
-      };
-
-      setOrbat((prev) => ({
-        ...prev,
-        squads: prev.squads.map((squad) => ({
-          ...squad,
-          slots: squad.slots.map((slot) =>
-            slot.id === mappedSlot.id ? mappedSlot : slot,
-          ),
-        })),
-      }));
-      
-      showSuccess('Signup removed successfully');
-    } catch {
-      showError('Network error while removing signup.');
-    } finally {
-      setLoadingSubslotId(null);
-    }
+      await apiRequest(`/api/signups/${signup.id}`, { method: 'DELETE' });
+      await refreshOrbat();
+      showSuccess('Signup removed.');
+    } catch (error) { showError(error instanceof Error ? error.message : 'Failed to remove signup.'); }
+    finally { setLoadingSubslotId(null); }
   }
-
   const formatNoteUser = (note: OrbatAttendanceNote) => {
     const username = note.user?.username || 'Unknown';
     const rank = note.user?.userRank?.currentRank?.abbreviation;
@@ -593,8 +475,8 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
 
     setIsSavingAttendanceNote(true);
     try {
-      const res = await fetch(`/api/orbats/${orbat.id}/attendance-notes`, {
-        method: 'POST',
+      await apiRequest(`/api/orbats/${orbat.id}/availability/me`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -606,10 +488,6 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
         }),
       });
 
-      if (!res.ok) {
-        const body: { error?: string } = await res.json().catch(() => ({}));
-        throw new Error(body.error || 'Failed to save attendance note');
-      }
 
       await refreshOrbat();
       showSuccess('Attendance note saved.');
@@ -627,14 +505,10 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
 
     setIsDeletingAttendanceNote(true);
     try {
-      const res = await fetch(`/api/orbats/${orbat.id}/attendance-notes/${myAttendanceNote.id}`, {
+      await apiRequest(`/api/orbats/${orbat.id}/availability/me`, {
         method: 'DELETE',
       });
 
-      if (!res.ok) {
-        const body: { error?: string } = await res.json().catch(() => ({}));
-        throw new Error(body.error || 'Failed to delete attendance note');
-      }
 
       await refreshOrbat();
       showSuccess('Attendance note removed.');
@@ -673,13 +547,13 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
         {eventDate && (
           <div className="text-xs mt-2" style={{ color: 'var(--muted-foreground)' }}>
             <p>
-              Event date: {eventDate.toLocaleDateString(undefined, { dateStyle: 'medium' })}
+              Event date: {<LocalDateTime value={eventDate.toISOString()} kind="date" dateOnly={!startDateTime} />}
             </p>
             {(startDateTime || endDateTime || orbat.startTime || orbat.endTime) && (
               <p>
-                Time: {startDateTime ? startDateTime.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : (orbat.startTime || '??:??')}
+                Time: {startDateTime ? <LocalDateTime value={startDateTime.toISOString()} kind="time" /> : (orbat.startTime || '??:??')}
                 {(endDateTime || orbat.endTime)
-                  ? ` - ${endDateTime ? endDateTime.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : orbat.endTime}`
+                  ? <> - {endDateTime ? <LocalDateTime value={endDateTime.toISOString()} kind="time" /> : orbat.endTime}</>
                   : ''}
               </p>
             )}
@@ -726,7 +600,7 @@ export default function OrbatDetailClient({ orbat: initialOrbat }: OrbatDetailCl
                 const isFull = slot.signups.length >= slot.maxSignups;
                 const userSignedUp = currentUserId !== null && slot.signups.some(s => s.user?.id === currentUserId);
 
-                const showSignupButton = !isPast && !userSignedUp && !isFull;
+                const showSignupButton = currentUserId !== null && !isPast && !userSignedUp && !isFull;
                 const showUnsignButton = !isPast && userSignedUp;
 
                 const trainingNames = (slot.requiredTrainings || [])

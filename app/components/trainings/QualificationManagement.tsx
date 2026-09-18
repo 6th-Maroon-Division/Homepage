@@ -1,5 +1,7 @@
 'use client';
 
+import { apiList, apiRequest } from '@/lib/api/client';
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
@@ -106,21 +108,7 @@ export default function QualificationManagement() {
     setIsLoading(true);
     setFetchError(null);
     try {
-      const response = await fetch('/api/user-trainings?all=true&includeHidden=true', {
-        cache: 'no-store',
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) {
-        const message = payload && typeof payload === 'object' && 'error' in payload
-          ? String(payload.error)
-          : 'Failed to load qualification records';
-        throw new Error(message);
-      }
-      if (!Array.isArray(payload)) {
-        throw new Error('Qualification records returned an invalid response');
-      }
-
-      const nextRecords = payload as QualificationRecord[];
+      const nextRecords = await apiList<QualificationRecord>('/api/user-trainings', { cache: 'no-store' });
       setRecords(nextRecords);
       setSelectedRecordIds((current) => {
         const availableIds = new Set(nextRecords.map((record) => record.id));
@@ -180,20 +168,7 @@ export default function QualificationManagement() {
     setRecordErrors((current) => ({ ...current, [record.id]: '' }));
     try {
       const noteOverride = notesByRecordId[record.id];
-      const response = await fetch(`/api/user-trainings/${record.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status,
-          ...(noteOverride === undefined ? {} : { notes: noteOverride }),
-        }),
-      });
-      const payload = await readResponsePayload(response);
-      if (!response.ok) {
-        throw new Error(typeof payload.error === 'string' ? payload.error : 'Failed to update qualification');
-      }
-
-      const updated = payload as unknown as QualificationRecord;
+      const { data: updated } = await apiRequest<QualificationRecord>(`/api/user-trainings/${record.id}`, { method: 'PATCH', body: JSON.stringify({ status, ...(noteOverride === undefined ? {} : { notes: noteOverride }) }) });
       setRecords((current) => current.map((item) => item.id === record.id
         ? { ...updated, relatedRequestId: updated.relatedRequestId ?? item.relatedRequestId }
         : item));
@@ -249,22 +224,9 @@ export default function QualificationManagement() {
     setIsBulkSaving(true);
     setBulkError(null);
     try {
-      const response = await fetch('/api/user-trainings/bulk-status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          trainingId: selectedBulkTrainingId,
-          userIds: selectedForTraining.map((record) => record.userId),
-          status: 'needs_qualify',
-          notes: bulkNotes,
-        }),
-      });
-      const payload = await readResponsePayload(response);
-      if (!response.ok) {
-        throw new Error(typeof payload.error === 'string' ? payload.error : 'Bulk qualification update failed');
-      }
-
-      const updatedCount = typeof payload.updated === 'number' ? payload.updated : selectedForTraining.length;
+      if (selectedForTraining.length > 100) throw new Error('Select at most 100 records per update.');
+      const { data: updated } = await apiRequest<QualificationRecord[]>('/api/user-trainings', { method: 'PATCH', body: JSON.stringify({ updates: selectedForTraining.map(record => ({ userId: record.userId, trainingId: selectedBulkTrainingId, status: 'needs_qualify', notes: bulkNotes })) }) });
+      const updatedCount = updated.length;
       showSuccess(`${updatedCount} ${updatedCount === 1 ? 'user' : 'users'} set to Needs Qualification`);
       setSelectedRecordIds(new Set());
       setBulkNotes('');

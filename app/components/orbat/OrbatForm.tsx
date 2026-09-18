@@ -1,10 +1,14 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { apiList, apiRequest } from '@/lib/api/client';
+
+import { useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '../ui/ToastContainer';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import DualRingTimePicker from '../ui/DualRingTimePicker';
+import { copyOrbatPresetSlots } from '@/lib/orbat-template';
+import { utcOperationDate, utcOperationDateInput } from '@/lib/orbat-form-dates';
 
 const logClientError = (...args: unknown[]) => {
   if (process.env.NODE_ENV === 'development') {
@@ -120,7 +124,29 @@ const buildUtcDateFromLocalDate = (dateValue: string): Date | null => {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
-export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
+const subscribeToHydration = () => () => {};
+const browserSnapshot = () => true;
+const serverSnapshot = () => false;
+
+export default function OrbatForm(props: OrbatFormProps) {
+  const isHydrated = useSyncExternalStore(subscribeToHydration, browserSnapshot, serverSnapshot);
+
+  // Date/time defaults depend on the browser timezone and calendar URL. Mount
+  // the stateful form once those are available, before any fields can be edited.
+  // Server rendering and the first browser render share this loading state.
+  if (!isHydrated) {
+    return (
+      <div role="status" className="flex items-center gap-3 py-6">
+        <LoadingSpinner size="sm" />
+        <span>Loading operation editor…</span>
+      </div>
+    );
+  }
+
+  return <HydratedOrbatForm {...props} />;
+}
+
+function HydratedOrbatForm({ mode, initialData }: OrbatFormProps) {
   const router = useRouter();
   const { showSuccess, showError } = useToast();
   const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
@@ -131,7 +157,9 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
   const [description, setDescription] = useState(initialData?.description || '');
   const [eventDate, setEventDate] = useState(() => {
     if (initialData?.startsAtUtc) return toLocalDateInput(initialData.startsAtUtc);
-    if (initialData?.eventDateUtc) return toLocalDateInput(initialData.eventDateUtc);
+    if (initialData?.eventDateUtc) return initialData.startTime
+      ? toLocalDateInput(initialData.eventDateUtc)
+      : utcOperationDateInput(initialData.eventDateUtc);
     if (initialData?.eventDate) return initialData.eventDate;
     // Only try to get from searchParams if we're in create mode and it's the client
     if (typeof window !== 'undefined') {
@@ -217,8 +245,6 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     requiredRankIds?: number[];
     requiredTrainings?: Array<{ id: number; name: string }>;
     requiredRanks?: Array<{ id: number; name: string; abbreviation: string }>;
-    requiredTraining: { id: number; name: string } | null;
-    requiredRank: { id: number; name: string; abbreviation: string } | null;
     isRetired?: boolean;
   }>>([]);
   const [subslotSearchBySlot, setSubslotSearchBySlot] = useState<Record<number, string>>({});
@@ -236,11 +262,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     // Fetch templates
     const fetchTemplates = async () => {
       try {
-        const response = await fetch('/api/templates');
-        if (response.ok) {
-          const data = await response.json();
-          setTemplates(data);
-        }
+        setTemplates(await apiList<typeof templates[number]>('/api/templates'));
       } catch (error) {
         logClientError('Error fetching templates:', error);
       }
@@ -249,11 +271,8 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     // Fetch recent orbats
     const fetchRecentOrbats = async () => {
       try {
-        const response = await fetch('/api/orbats?limit=5');
-        if (response.ok) {
-          const data = await response.json();
-          setRecentOrbats(data);
-        }
+        const { data } = await apiRequest<typeof recentOrbats>('/api/orbats?limit=5');
+        setRecentOrbats(data);
       } catch (error) {
         logClientError('Error fetching recent orbats:', error);
       }
@@ -261,11 +280,8 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
 
     const fetchSubslotDefinitions = async () => {
       try {
-        const response = await fetch('/api/subslot-definitions');
-        if (response.ok) {
-          const data = await response.json();
-          setSubslotDefinitions(data);
-        }
+        const data = await apiList<(typeof subslotDefinitions)[number]>('/api/subslot-definitions');
+        setSubslotDefinitions(data.sort((a, b) => a.name.localeCompare(b.name)));
       } catch (error) {
         logClientError('Error fetching role definitions:', error);
       }
@@ -293,69 +309,15 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
       : `/api/orbats/${templateId}`;
     
     try {
-      const response = await fetch(endpoint);
-      if (response.ok) {
-        const data = await response.json();
+      const { data } = await apiRequest<OrbatData & { frequencyIds?: number[]; tempFrequencies?: TempFrequency[] }>(endpoint);
+      {
         
         // Pre-fill form with template data
         if (data.name) setName(`${data.name} - Copy`);
         if (data.description) setDescription(data.description);
         setIsSideOp(Boolean(data.isSideOp));
         
-        // Handle slots - templates use slotsJson as squads with nested slots, orbats use squads
-        let slots = null;
-        interface TemplateSquad {
-          id?: number;
-          name: string;
-          orderIndex: number;
-          slots: TemplateSlot[];
-        }
-        interface TemplateSlot {
-          id?: number;
-          name: string;
-          orderIndex: number;
-          maxSignups?: number;
-          squadRoleId?: number | null;
-        }
-        interface Squad {
-          id?: number;
-          name: string;
-          orderIndex: number;
-          slots: TemplateSlot[];
-        }
-        if (data.slotsJson) {
-          const parsedSlotsJson: unknown = typeof data.slotsJson === 'string' ? JSON.parse(data.slotsJson) : data.slotsJson;
-          const templateSquads = parsedSlotsJson as TemplateSquad[];
-          slots = templateSquads.map((squad) => ({
-            id: squad.id,
-            name: squad.name,
-            orderIndex: squad.orderIndex,
-            subslots: (squad.slots || []).map((slot) => ({
-              id: slot.id,
-              squadRoleId: slot.squadRoleId ?? null,
-              name: slot.name,
-              orderIndex: slot.orderIndex,
-              maxSignups: slot.maxSignups ?? 1,
-            })),
-          }));
-        } else if (data.squads) {
-          const squads = data.squads as unknown as Squad[];
-          slots = squads.map((squad) => ({
-            id: squad.id,
-            name: squad.name,
-            orderIndex: squad.orderIndex,
-            subslots: (squad.slots || []).map((slot) => ({
-              id: slot.id,
-              squadRoleId: slot.squadRoleId ?? null,
-              name: slot.name,
-              orderIndex: slot.orderIndex,
-              maxSignups: slot.maxSignups ?? 1,
-            })),
-          }));
-        } else if (data.slots) {
-          slots = data.slots;
-        }
-        if (slots) setSlots(slots);
+        setSlots(copyOrbatPresetSlots(data));
         
         if (data.bluforCountry) setBluforCountry(data.bluforCountry);
         if (data.bluforRelationship) setBluforRelationship(data.bluforRelationship);
@@ -402,46 +364,14 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         
         if (templateId && mode === 'create') {
           try {
-            const response = await fetch(`/api/templates/${templateId}`);
-            if (response.ok) {
-              const template = await response.json();
+            const { data: template } = await apiRequest<OrbatData & { frequencyIds?: number[]; tempFrequencies?: TempFrequency[] }>(`/api/templates/${templateId}`);
+            {
               
               // Pre-fill form with template data
               if (template.name) setName(`${template.name} - Copy`);
               if (template.description) setDescription(template.description);
               setIsSideOp(Boolean(template.isSideOp));
-              if (template.slotsJson) {
-                const parsedSlotsJson: unknown = typeof template.slotsJson === 'string'
-                  ? JSON.parse(template.slotsJson)
-                  : template.slotsJson;
-                interface TemplateSquad {
-                  id?: number;
-                  name: string;
-                  orderIndex: number;
-                  slots: TemplateSlot[];
-                }
-                interface TemplateSlot {
-                  id?: number;
-                  name: string;
-                  orderIndex: number;
-                  maxSignups?: number;
-                  squadRoleId?: number | null;
-                }
-                const templateSquads = parsedSlotsJson as TemplateSquad[];
-                const mappedSlots = templateSquads.map((squad) => ({
-                  id: squad.id,
-                  name: squad.name,
-                  orderIndex: squad.orderIndex,
-                  subslots: (squad.slots || []).map((slot) => ({
-                    id: slot.id,
-                    squadRoleId: slot.squadRoleId ?? null,
-                    name: slot.name,
-                    orderIndex: slot.orderIndex,
-                    maxSignups: slot.maxSignups ?? 1,
-                  })),
-                }));
-                setSlots(mappedSlots);
-              }
+              setSlots(copyOrbatPresetSlots(template));
               if (template.bluforCountry) setBluforCountry(template.bluforCountry);
               if (template.bluforRelationship) setBluforRelationship(template.bluforRelationship);
               if (template.opforCountry) setOpforCountry(template.opforCountry);
@@ -483,11 +413,8 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
   useEffect(() => {
     const fetchFrequencies = async () => {
       try {
-        const response = await fetch('/api/radio-frequencies');
-        if (response.ok) {
-          const data = await response.json();
-          setRadioFrequencies(data);
-        }
+        const data = await apiList<(typeof radioFrequencies)[number]>('/api/radio-frequencies');
+        setRadioFrequencies(data.sort((a, b) => a.type.localeCompare(b.type) || a.frequency.localeCompare(b.frequency, undefined, { numeric: true })));
       } catch (error) {
         logClientError('Error fetching radio frequencies:', error);
       }
@@ -497,25 +424,25 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     if (mode === 'edit' && initialData?.id) {
       const fetchOrbatFrequencies = async () => {
         try {
-          const response = await fetch(`/api/orbats/${initialData.id}/full`);
-          if (response.ok) {
-            const orbat = await response.json();
-            if (orbat.frequencies) {
-              const freqIds = orbat.frequencies.map((f: { radioFrequencyId: number }) => f.radioFrequencyId);
-              setSelectedFrequencyIds(freqIds);
-            }
-            if (orbat.tempFrequencies && Array.isArray(orbat.tempFrequencies) && orbat.tempFrequencies.length > 0) {
-              // Load temporary frequencies from the orbat
-              const loadedTempFreqs = orbat.tempFrequencies.map((f: { _id?: string; frequency: string; type: 'SR' | 'LR'; isAdditional: boolean; channel?: string; callsign?: string }) => ({
-                _id: f._id || createClientId(),
-                frequency: f.frequency,
-                type: f.type,
-                isAdditional: f.isAdditional,
-                channel: f.channel || '',
-                callsign: f.callsign || '',
-              }));
-              setTempFrequencies(loadedTempFreqs);
-            }
+          const { data: orbat } = await apiRequest<{
+            frequencies: Array<{ radioFrequencyId: number }>;
+            tempFrequencies: unknown;
+          }>(`/api/orbats/${initialData.id}/full`);
+          if (orbat.frequencies) {
+            const freqIds = orbat.frequencies.map((f: { radioFrequencyId: number }) => f.radioFrequencyId);
+            setSelectedFrequencyIds(freqIds);
+          }
+          if (orbat.tempFrequencies && Array.isArray(orbat.tempFrequencies) && orbat.tempFrequencies.length > 0) {
+            // Load temporary frequencies from the orbat
+            const loadedTempFreqs = orbat.tempFrequencies.map((f: { _id?: string; frequency: string; type: 'SR' | 'LR'; isAdditional: boolean; channel?: string; callsign?: string }) => ({
+              _id: f._id || createClientId(),
+              frequency: f.frequency,
+              type: f.type,
+              isAdditional: f.isAdditional,
+              channel: f.channel || '',
+              callsign: f.callsign || '',
+            }));
+            setTempFrequencies(loadedTempFreqs);
           }
         } catch (error) {
           logClientError('Error fetching orbat frequencies:', error);
@@ -795,17 +722,13 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
       requiredTrainingIds:
         definition.requiredTrainingIds && definition.requiredTrainingIds.length > 0
           ? definition.requiredTrainingIds
-          : definition.requiredTraining
-            ? [definition.requiredTraining.id]
-            : [],
+          : [],
       requiredRankIds:
         definition.requiredRankIds && definition.requiredRankIds.length > 0
           ? definition.requiredRankIds
-          : definition.requiredRank
-            ? [definition.requiredRank.id]
-            : [],
-      requiredTrainingId: definition.requiredTraining?.id ?? null,
-      requiredRankId: definition.requiredRank?.id ?? null,
+          : [],
+      requiredTrainingId: definition.requiredTrainingIds?.[0] ?? null,
+      requiredRankId: definition.requiredRankIds?.[0] ?? null,
     });
     setSlots(normalizeOrderIndexes(newSlots));
 
@@ -829,110 +752,90 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
     setIsSaving(true);
     setError(null);
 
-    // Validate
-    if (!name.trim()) {
-      setError('OrbAT name is required');
-      setIsSaving(false);
-      return;
-    }
-
-    const startDateTime = buildUtcDateTime(eventDate, startTime);
-    let endDateTime = buildUtcDateTime(eventDate, endTime);
-    const eventDateUtc = buildUtcDateFromLocalDate(eventDate);
-
-    if (eventDate && !eventDateUtc) {
-      setError('Invalid event date');
-      setIsSaving(false);
-      return;
-    }
-
-    if (startDateTime && endDateTime && endDateTime <= startDateTime) {
-      endDateTime.setDate(endDateTime.getDate() + 1);
-    }
-
-    // Prevent creating operations in the past
-    if (mode === 'create' && startDateTime && startDateTime < new Date()) {
-      setError('Cannot create operations in the past');
-      setIsSaving(false);
-      return;
-    }
-
-    if (mode === 'create' && !startDateTime && eventDate) {
-      const [year, month, day] = eventDate.split('-').map(Number);
-      const selectedDate = new Date(year, month - 1, day, 0, 0, 0, 0);
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-
-      if (selectedDate < today) {
-        setError('Cannot create operations with past dates');
-        setIsSaving(false);
-        return;
-      }
-    }
-
-    const activeSlots = slots.filter((s) => !s._deleted);
-    if (activeSlots.length === 0) {
-      setError('At least one slot is required');
-      setIsSaving(false);
-      return;
-    }
-
-    for (const slot of activeSlots) {
-      if (!slot.name.trim()) {
-        setError('All slots must have a name');
-        setIsSaving(false);
-        return;
-      }
-      const activeSubslots = slot.subslots.filter((s) => !s._deleted);
-      if (activeSubslots.length === 0) {
-        setError(`Slot "${slot.name}" must have at least one role`);
-        setIsSaving(false);
-        return;
-      }
-      for (const subslot of activeSubslots) {
-        if (!subslot.name.trim()) {
-          setError('All roles must have a name');
-          setIsSaving(false);
-          return;
-        }
-
-        if (!Number.isInteger(subslot.maxSignups) || subslot.maxSignups < 1) {
-          setError('Max signups must be at least 1 for each role');
-          setIsSaving(false);
-          return;
-        }
-      }
-    }
-
     try {
-      const cleanSquads = (mode === 'edit' ? slots : slots.filter((slot) => !slot._deleted)).map((slot) => ({
+      // Validate
+      if (!name.trim()) {
+        setError('OrbAT name is required');
+        return;
+      }
+
+      const startDateTime = buildUtcDateTime(eventDate, startTime);
+      const endDateTime = buildUtcDateTime(eventDate, endTime);
+      const eventDateUtc = !startDateTime
+        ? utcOperationDate(eventDate)
+        : buildUtcDateFromLocalDate(eventDate);
+
+      if (eventDate && !eventDateUtc) {
+        setError('Invalid event date');
+        return;
+      }
+
+      if (startDateTime && endDateTime && endDateTime <= startDateTime) {
+        endDateTime.setDate(endDateTime.getDate() + 1);
+      }
+
+      // Prevent creating operations in the past
+      if (mode === 'create' && startDateTime && startDateTime < new Date()) {
+        setError('Cannot create operations in the past');
+        return;
+      }
+
+      if (mode === 'create' && !startDateTime && eventDate && eventDate < new Date().toISOString().slice(0, 10)) {
+        setError('Cannot create operations with past UTC dates');
+        return;
+      }
+
+      const activeSlots = slots.filter((s) => !s._deleted);
+      if (activeSlots.length === 0) {
+        setError('At least one slot is required');
+        return;
+      }
+
+      for (const slot of activeSlots) {
+        if (!slot.name.trim()) {
+          setError('All slots must have a name');
+          return;
+        }
+        const activeSubslots = slot.subslots.filter((s) => !s._deleted);
+        if (activeSubslots.length === 0) {
+          setError(`Slot "${slot.name}" must have at least one role`);
+          return;
+        }
+        for (const subslot of activeSubslots) {
+          if (!subslot.name.trim()) {
+            setError('All roles must have a name');
+            return;
+          }
+
+          if (!Number.isInteger(subslot.maxSignups) || subslot.maxSignups < 1) {
+            setError('Max signups must be at least 1 for each role');
+            return;
+          }
+        }
+      }
+
+      const cleanSquads = slots.filter((slot) => !slot._deleted).map((slot) => ({
         ...(mode === 'edit' && slot.id ? { id: slot.id } : {}),
         name: slot.name,
         orderIndex: slot.orderIndex,
-        ...(mode === 'edit' && slot._deleted ? { _deleted: true } : {}),
-        slots: (mode === 'edit' ? slot.subslots : slot.subslots.filter((subslot) => !subslot._deleted)).map((subslot) => ({
+        slots: slot.subslots.filter((subslot) => !subslot._deleted).map((subslot) => ({
           ...(mode === 'edit' && subslot.id ? { id: subslot.id } : {}),
           squadRoleId: subslot.squadRoleId ?? null,
-          name: subslot.name,
           orderIndex: subslot.orderIndex,
           maxSignups: subslot.maxSignups ?? 1,
-          ...(mode === 'edit' && subslot._deleted ? { _deleted: true } : {}),
         })),
       }));
 
       const payload = {
         name,
         description,
-        eventDate: eventDate || null,
         eventDateUtc: eventDateUtc ? eventDateUtc.toISOString() : null,
-        startTime: startTime || null,
-        endTime: endTime || null,
         startsAtUtc: startDateTime ? startDateTime.toISOString() : null,
         endsAtUtc: endDateTime ? endDateTime.toISOString() : null,
         timezone: timezone || null,
         squads: cleanSquads,
         frequencyIds: selectedFrequencyIds,
-        tempFrequencies,
+        tempFrequencies: tempFrequencies.map(({ frequency, type, isAdditional, channel, callsign }) => ({ frequency, type, isAdditional, channel, callsign })),
         bluforCountry: bluforCountry || null,
         bluforRelationship: bluforRelationship || null,
         opforCountry: opforCountry || null,
@@ -951,30 +854,23 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
       const url = mode === 'create' ? '/api/orbats' : `/api/orbats/${initialData?.id}`;
       const method = mode === 'create' ? 'POST' : 'PATCH';
 
-      const response = await fetch(url, {
+      const options = {
         method,
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({ error: 'Failed to save OrbAT' }));
-        setError(data.error || 'Failed to save OrbAT');
-        setIsSaving(false);
-        return;
-      }
-
-      const result = await response.json();
+      };
+      const { data: result } = await apiRequest<{ id: number }>(url, options);
       showSuccess(`OrbAT ${mode === 'create' ? 'created' : 'updated'} successfully!`);
       router.push(`/orbats/${result.id}`);
       router.refresh();
     } catch (err) {
       logClientError('Error saving OrbAT:', err);
-      const errorMsg = 'Network error occurred';
+      const errorMsg = err instanceof Error ? err.message : 'Failed to save OrbAT. Please check the form and try again.';
       setError(errorMsg);
       showError(errorMsg);
+    } finally {
       setIsSaving(false);
     }
   };
@@ -1006,7 +902,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
             <select
               value={selectedTemplate}
               onChange={(e) => setSelectedTemplate(e.target.value)}
-              disabled={isLoadingTemplates || templates.length === 0}
+              disabled={isLoadingTemplates || (templates.length === 0 && recentOrbats.length === 0)}
               className="border rounded-lg px-3 py-2 text-sm"
               style={{
                 backgroundColor: 'var(--background)',
@@ -1161,7 +1057,7 @@ export default function OrbatForm({ mode, initialData }: OrbatFormProps) {
         </div>
 
         <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-          Date and times are entered in your local timezone and stored in UTC.
+          Start and end times use your local timezone and are stored in UTC. Without a start time, the event date is a UTC calendar date.
         </p>
       </div>
 

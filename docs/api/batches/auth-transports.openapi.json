@@ -1,0 +1,165 @@
+{
+  "paths": {
+    "/auth/steam-login": {
+      "get": {
+        "summary": "Begin browser Steam OpenID login",
+        "description": "Browser protocol exception: no bearer token or session required; no query arguments. Creates ten-minute browser-bound one-use state and redirects to pinned Steam. Existing session identity binds account linking.",
+        "security": [],
+        "responses": {
+          "307": {
+            "description": "Browser redirect to the provider, application destination, or same-origin protocol error page; sets or clears HttpOnly cookies as appropriate."
+          },
+          "503": {
+            "description": "Authentication configuration unavailable; no session is issued."
+          }
+        }
+      }
+    },
+    "/auth/steam-callback": {
+      "get": {
+        "summary": "Verify Steam OpenID assertion and establish or link browser session",
+        "description": "Browser protocol exception, not a JSON business API. Requires state cookie and the matching provider callback state, strict OpenID assertion with signed exact return URL, fresh UTC nonce, pinned HTTPS signature verification, and same initiating session. Consumes one-use attempt with account mutation and audit atomically. Never accepts arbitrary userId.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "state",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          {
+            "name": "openid.ns",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "openid.mode",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "openid.op_endpoint",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "openid.claimed_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "openid.identity",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "openid.return_to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "openid.response_nonce",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "openid.assoc_handle",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "openid.signed",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "openid.sig",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "307": {
+            "description": "Browser redirect to the provider, application destination, or same-origin protocol error page; sets or clears HttpOnly cookies as appropriate."
+          },
+          "503": {
+            "description": "Authentication configuration unavailable; no session is issued."
+          }
+        }
+      }
+    },
+    "/auth/{...nextauth}": {
+      "parameters": [
+        {
+          "name": "nextauth",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "NextAuth catch-all protocol path such as signin/discord, callback/discord, session, csrf or signout."
+        }
+      ],
+      "get": {
+        "summary": "NextAuth browser authentication protocol",
+        "description": "Protocol exception retaining NextAuth-native redirects, cookies, CSRF/state validation and response formats. Discord provider identity and account linking are checked by callbacks; mutation audits contain only internal IDs. No preexisting bot token is required.",
+        "security": [],
+        "responses": {
+          "default": {
+            "description": "Native NextAuth protocol response, redirect or error; not wrapped in the business API envelope."
+          }
+        }
+      },
+      "post": {
+        "summary": "NextAuth browser authentication protocol",
+        "description": "Protocol exception retaining NextAuth-native redirects, cookies, CSRF/state validation and response formats. Discord provider identity and account linking are checked by callbacks; mutation audits contain only internal IDs. No preexisting bot token is required.",
+        "security": [],
+        "responses": {
+          "default": {
+            "description": "Native NextAuth protocol response, redirect or error; not wrapped in the business API envelope."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {}
+  },
+  "removePaths": [
+    "/auth/steam-signin",
+    "/auth/{nextauth}"
+  ]
+}

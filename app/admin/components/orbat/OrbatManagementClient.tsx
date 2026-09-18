@@ -1,5 +1,6 @@
 'use client';
 
+import { apiList } from '@/lib/api/client';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import DeleteOrbatButton from '../../../components/orbat/DeleteOrbatButton';
@@ -17,7 +18,7 @@ type Orbat = {
   createdBy: {
     id: number;
     username: string;
-  };
+  } | null;
   slotCount: number;
   totalSignups: number;
   totalSubslots: number;
@@ -32,6 +33,7 @@ type OrbatManagementClientProps = {
 
 export default function OrbatManagementClient({ orbats: initialOrbats, canCreate, canEdit, canDelete }: OrbatManagementClientProps) {
   const [orbats, setOrbats] = useState<Orbat[]>(initialOrbats);
+  useEffect(() => { setOrbats(initialOrbats); }, [initialOrbats]);
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -70,12 +72,7 @@ export default function OrbatManagementClient({ orbats: initialOrbats, canCreate
   useEffect(() => {
     const fetchOrbats = async () => {
       try {
-        const response = await fetch('/api/admin/orbats/list');
-        if (!response.ok) {
-          return;
-        }
-
-        const data = (await response.json()) as Orbat[];
+        const data = await apiList<Orbat>('/api/orbats/management');
         setOrbats(data);
       } catch {
         // keep current local state if sync fails
@@ -93,10 +90,10 @@ export default function OrbatManagementClient({ orbats: initialOrbats, canCreate
       }, 250);
     };
 
-    const source = new EventSource('/api/admin/catalog/events');
+    const source = new EventSource('/api/catalog/events');
     source.onmessage = (event) => {
       try {
-        const payload = JSON.parse(event.data) as { type?: string };
+        const payload = JSON.parse(event.data).data as { type?: string };
         if (payload.type === 'orbat.changed') {
           queueSync();
         }
@@ -146,7 +143,7 @@ export default function OrbatManagementClient({ orbats: initialOrbats, canCreate
       return (
         orbat.name.toLowerCase().includes(query) ||
         orbat.description?.toLowerCase().includes(query) ||
-        orbat.createdBy.username.toLowerCase().includes(query)
+        (orbat.createdBy?.username ?? 'Bot').toLowerCase().includes(query)
       );
     }
 
@@ -303,7 +300,7 @@ export default function OrbatManagementClient({ orbats: initialOrbats, canCreate
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: 'var(--foreground)' }}>
-                        {orbat.createdBy.username}
+                        {orbat.createdBy?.username ?? 'Bot'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: 'var(--foreground)' }}>
                         <div className="text-xs space-y-1">

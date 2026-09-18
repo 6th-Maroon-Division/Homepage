@@ -166,8 +166,8 @@ enum PermissionAction {
 
 model PermissionAuditLog {
   id           Int              @id @default(autoincrement())
-  actor        User             @relation("PermissionActor", fields: [actorId], references: [id], onDelete: Cascade)
-  actorId      Int // Who made the change
+  actor        User?            @relation("PermissionActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorId      Int? // Human actor; null for bot or deleted actor (API audit retains token identity)
   targetUser   User             @relation("PermissionTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
   targetUserId Int // Whose permissions changed
   permission   Permission       @relation(fields: [permissionId], references: [id], onDelete: Cascade)
@@ -220,8 +220,8 @@ model Orbat {
   startsAtUtc           DateTime?
   endsAtUtc             DateTime?
   timezone              String?
-  createdBy             User                        @relation("OrbatCreator", fields: [createdById], references: [id])
-  createdById           Int
+  createdBy             User?                       @relation("OrbatCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  createdById           Int?
   createdAt             DateTime                    @default(now())
   isMainOp              Boolean                     @default(false)
   isSideOp              Boolean                     @default(false)
@@ -520,8 +520,8 @@ model OrbatTemplate {
   endTime              String? // Default HH:MM format
 
   // Admin metadata
-  createdBy   User     @relation(fields: [createdById], references: [id])
-  createdById Int
+  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdById Int?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -1024,4 +1024,38 @@ model BotEvent {
   @@index([aggregate, id])
   @@index([type, id])
   @@index([occurredAt])
+}
+
+// Append-only via application APIs; scalar actor IDs survive account/token deletion.
+model ApiAuditLog {
+  id             Int      @id @default(autoincrement())
+  occurredAt     DateTime @default(now()) @db.Timestamptz(3)
+  correlationId  String
+  actorType      String
+  actorUserId    Int?
+  actorTokenId   Int?
+  action         String
+  resource       String
+  resourceId     String?
+  targetUserIds  Int[]    @default([])
+  method         String
+  path           String
+  outcome        String
+  before         Json?
+  after          Json?
+
+  @@index([occurredAt, id])
+  @@index([actorUserId, occurredAt])
+  @@index([actorTokenId, occurredAt])
+  @@index([resource, resourceId])
+}
+
+// Browser-bound Steam OpenID attempts are consumed atomically on successful authentication.
+model SteamLoginAttempt {
+  stateHash String   @id
+  userId    Int?
+  expiresAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([expiresAt])
 }

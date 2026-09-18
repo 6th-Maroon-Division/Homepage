@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { apiList, apiRequest } from '@/lib/api/client';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 
@@ -45,12 +46,9 @@ export default function LegacyImportClient() {
       if (filterMapped === 'mapped') params.set('isMapped', 'true');
       if (filterMapped === 'unmapped') params.set('isMapped', 'false');
 
-      const res = await fetch(`/api/admin/import/legacy-user-data?${params.toString()}`);
-      if (!res.ok) throw new Error('Failed to fetch records');
-
-      const data = await res.json();
-      setRecords(data.records);
-      setUsers(data.users);
+      const [data, directory] = await Promise.all([apiList<LegacyRecord>(`/api/attendance/legacy-users?${params}`), apiList<User>('/api/users')]);
+      setRecords(data);
+      setUsers(directory);
     } catch (error) {
       console.error(error);
       showError('Failed to fetch legacy records');
@@ -60,7 +58,7 @@ export default function LegacyImportClient() {
   }, [filterMapped, showError]);
 
   useEffect(() => {
-    if (step === 'preview' || step === 'map') {
+    if (step === 'preview' || step === 'map' || step === 'apply') {
       fetchRecords();
     }
   }, [step, fetchRecords]);
@@ -80,23 +78,8 @@ export default function LegacyImportClient() {
 
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const res = await fetch('/api/admin/import/legacy-user-data', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || 'Upload failed');
-      }
-
-      const data = await res.json();
-      showSuccess(
-        `Imported ${data.imported} records. Auto-mapped ${data.autoMapped} users by Discord username.`
-      );
+      const { data } = await apiRequest<{ imported: number; autoMapped: number; skipped: number }>('/api/attendance/legacy-users/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ csvData: await file.text(), autoMap: true }) });
+      showSuccess(`Imported ${data.imported} records; auto-mapped ${data.autoMapped}; skipped ${data.skipped} existing records.`);
       setStep('preview');
     } catch (error) {
       console.error(error);
@@ -122,26 +105,15 @@ export default function LegacyImportClient() {
 
     setLoading(true);
     try {
-      const mappings = Array.from(selectedMappings.entries()).map(([legacyId, userId]) => ({
-        legacyId,
-        userId,
-      }));
-
-      const res = await fetch('/api/admin/import/legacy-user-data/map', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mappings }),
-      });
-
-      if (!res.ok) throw new Error('Failed to save mappings');
-
-      const data = await res.json();
-      showSuccess(`Mapped ${data.mapped} records successfully`);
+      const updates = Array.from(selectedMappings.entries()).map(([id, mappedUserId]) => ({ id, mappedUserId }));
+      if (updates.length > 100) throw new Error('Save at most 100 mappings at a time.');
+      const { data } = await apiRequest<LegacyRecord[]>('/api/attendance/legacy-users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ updates }) });
+      showSuccess(`Mapped ${data.length} records successfully`);
       setSelectedMappings(new Map());
       fetchRecords();
     } catch (error) {
       console.error(error);
-      showError('Failed to save mappings');
+      showError(error instanceof Error ? error.message : 'Failed to save mappings');
     } finally {
       setLoading(false);
     }
@@ -153,27 +125,18 @@ export default function LegacyImportClient() {
     }
 
     setLoading(true);
+    let applied = 0;
     try {
-      const res = await fetch('/api/admin/import/legacy-user-data/apply', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      if (!res.ok) throw new Error('Failed to apply data');
-
-      const data = await res.json();
-      showSuccess(
-        `Applied ${data.applied} records successfully. Skipped: ${data.skipped}${data.errors ? '. Check console for errors.' : ''}`
-      );
-
-      if (data.errors) {
-        console.warn('Apply errors:', data.errors);
+      const pending = await apiList<LegacyRecord>('/api/attendance/legacy-users?isMapped=true&isApplied=false');
+      for (let offset = 0; offset < pending.length; offset += 100) {
+        const { data } = await apiRequest<{ applied: number; skipped: number }>('/api/attendance/legacy-users/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: pending.slice(offset, offset + 100).map(row => row.id) }) });
+        applied += data.applied;
       }
-
-      fetchRecords();
+      showSuccess(`Applied ${applied} records successfully.`);
+      await fetchRecords();
     } catch (error) {
-      console.error(error);
-      showError('Failed to apply legacy data');
+      showError(`${applied} records applied in completed batches. ${error instanceof Error ? error.message : 'Failed to apply legacy data'}`);
+      await fetchRecords();
     } finally {
       setLoading(false);
     }

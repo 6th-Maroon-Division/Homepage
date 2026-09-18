@@ -1,188 +1,58 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { handleApiRequest } from '@/lib/api/handler';
+import { apiError, apiSuccess } from '@/lib/api/response';
+import { readJsonBody } from '@/lib/api/request';
+import { writeApiAudit } from '@/lib/api/audit';
+import { parseTrainingRequestBody } from '@/lib/api/training-request-contract';
+import { requestId as parseRequestId, requestActor, isRequestStaff, getTrainingRequest, canManageTrainingRequest, auditTrainingRequestRead, requestDatabaseError, publishRequestEvent } from '@/lib/api/training-requests';
+import { sessionJson as requestJson } from '@/lib/api/training-session-contract';
+
+
+
 import { prisma } from '@/lib/prisma';
-import { isTrainingStaff } from '@/lib/training-staff';
+
 import {
-  isTrainingRequestStatus,
+  type TrainingRequestWorkflowStatus,
   requestStatusToUserTrainingStatus,
   validateTrainingTransition,
 } from '@/lib/training-workflow';
-import { createTrainingNotification } from '@/lib/training-notifications';
+import { createSessionNotification, publishSessionNotifications, type SessionNotifications } from '@/lib/api/training-session-notifications';
 import { publishTrainingChatEvent } from '@/lib/realtime/training-chat-events';
 import { publishUserProfileEvent } from '@/lib/realtime/user-events';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-const publicUserSelect = {
-  id: true,
-  username: true,
-  avatarUrl: true,
-} as const;
-
-function parseRequestId(value: string) {
-  const id = Number(value);
-  return Number.isInteger(id) && id > 0 ? id : null;
-}
-
-async function getDetailedRequest(requestId: number) {
-  return prisma.trainingRequest.findUnique({
-    where: { id: requestId },
-    include: {
-      training: true,
-      user: { select: publicUserSelect },
-      handledByAdmin: { select: publicUserSelect },
-      assignedTrainer: { select: publicUserSelect },
-      messages: {
-        include: { sender: { select: publicUserSelect } },
-        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-      },
-      sessionAttendee: {
-        include: {
-          session: {
-            include: { trainer: { select: publicUserSelect } },
-          },
-        },
-      },
-    },
+export async function GET(request: Request, context: RouteContext) {
+  return handleApiRequest(request, undefined, async (principal, audit) => {
+    const id = parseRequestId((await context.params).id);
+    if (!id || new URL(request.url).searchParams.size) return apiError(400, 'invalid_request', 'Invalid request ID or query.');
+    const data = await getTrainingRequest(id, principal);
+    if (!data) return apiError(404, 'not_found', 'Training request not found.');
+    if (!(principal.kind === 'user' && principal.userId === data.userId) && !isRequestStaff(principal)) return apiError(403, 'forbidden', 'Training request access required.');
+    await auditTrainingRequestRead(audit, [data], String(id));
+    return apiSuccess(data, { meta: { isStaff: isRequestStaff(principal) } });
   });
 }
 
-function serializeDetailedRequest(
-  record: NonNullable<Awaited<ReturnType<typeof getDetailedRequest>>>,
-  viewerId: number,
-  staffViewer: boolean,
-) {
-  const attendee = record.sessionAttendee;
-  const session = attendee?.session ?? null;
-  const isConfirmed = Boolean(
-    session
-    && ['scheduled', 'in_progress', 'completed'].includes(session.status)
-    && session.startsAt,
-  );
-  const visibleSession = staffViewer || isConfirmed ? session : null;
+export async function PATCH(request: Request, context: RouteContext) {
+  return handleApiRequest(request, undefined, async (principal, audit) => {
+  try {
 
-  return {
-    request: {
-      id: record.id,
-      userId: record.userId,
-      trainingId: record.trainingId,
-      status: record.status,
-      requestMessage: record.requestMessage,
-      adminResponse: record.adminResponse,
-      requestedAt: record.requestedAt,
-      updatedAt: record.updatedAt,
-      training: record.training,
-      user: record.user,
-      handledByAdmin: staffViewer ? record.handledByAdmin : null,
-      assignedTrainer: staffViewer || isConfirmed ? record.assignedTrainer : null,
-    },
-    messages: record.messages.map((message) => {
-      const sender = message.senderRole === 'STAFF' && !staffViewer
-        ? { id: null, username: 'Staff', avatarUrl: null }
-        : message.sender;
-
-      return {
-        id: message.id,
-        requestId: message.requestId,
-        senderRole: message.senderRole,
-        body: message.body,
-        createdAt: message.createdAt,
-        editedAt: message.editedAt,
-        sender,
-        isMine: message.senderId === viewerId,
-      };
-    }),
-    session: visibleSession
-      ? {
-          id: visibleSession.id,
-          trainingId: visibleSession.trainingId,
-          trainer: visibleSession.trainer,
-          startsAt: visibleSession.startsAt,
-          durationMinutes: visibleSession.durationMinutes,
-          status: visibleSession.status,
-          specialInstructions: visibleSession.specialInstructions,
-          attendeeStatus: attendee?.status ?? null,
-          server: 'Arma3 Training Server',
-          confirmed: isConfirmed,
-        }
-      : null,
-    isStaff: staffViewer,
-  };
-}
-
-export async function GET(_request: NextRequest, context: RouteContext) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const actorId = requestActor(principal);
+  if (!(isRequestStaff(principal))) {
+    return requestJson({ error: 'Forbidden' }, { status: 403 });
   }
 
   const { id } = await context.params;
   const requestId = parseRequestId(id);
   if (!requestId) {
-    return NextResponse.json({ error: 'Invalid training request id' }, { status: 400 });
+    return apiError(400, 'invalid_request', 'Invalid training request ID.');
   }
 
-  const record = await getDetailedRequest(requestId);
-  if (!record) {
-    return NextResponse.json({ error: 'Training request not found' }, { status: 404 });
-  }
-
-  const viewerId = Number(session.user.id);
-  const staffViewer = await isTrainingStaff(viewerId);
-  if (record.userId !== viewerId && !staffViewer) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  const latestMessage = record.messages.at(-1);
-  if (latestMessage) {
-    await prisma.trainingRequestReadState.upsert({
-      where: { requestId_userId: { requestId, userId: viewerId } },
-      create: {
-        requestId,
-        userId: viewerId,
-        lastReadMessageId: latestMessage.id,
-        lastReadAt: new Date(),
-      },
-      update: {
-        lastReadMessageId: latestMessage.id,
-        lastReadAt: new Date(),
-      },
-    });
-  }
-
-  const subscription = await prisma.trainingRequestSubscription.findUnique({
-    where: { requestId_userId: { requestId, userId: viewerId } },
-  });
-
-  return NextResponse.json({
-    ...serializeDetailedRequest(record, viewerId, staffViewer),
-    subscription,
-  });
-}
-
-export async function PUT(request: NextRequest, context: RouteContext) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const actorId = Number(session.user.id);
-  if (!(await isTrainingStaff(actorId))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  const { id } = await context.params;
-  const requestId = parseRequestId(id);
-  if (!requestId) {
-    return NextResponse.json({ error: 'Invalid training request id' }, { status: 400 });
-  }
-
-  const body = await request.json();
-  if (!isTrainingRequestStatus(body.status) || body.status === 'completed') {
-    return NextResponse.json({ error: 'Valid status is required' }, { status: 400 });
-  }
-
+  if (new URL(request.url).searchParams.size) return apiError(400, 'invalid_request', 'Query parameters are not accepted.');
+  const parsed = parseTrainingRequestBody(await readJsonBody(request), 'update');
+  if (parsed.error) return parsed.error;
+  // Update payloads require a valid status in the canonical parser.
+  const body = parsed.data as typeof parsed.data & { status: TrainingRequestWorkflowStatus };
   const existing = await prisma.trainingRequest.findUnique({
     where: { id: requestId },
     include: {
@@ -191,7 +61,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     },
   });
   if (!existing) {
-    return NextResponse.json({ error: 'Training request not found' }, { status: 404 });
+    return requestJson({ error: 'Training request not found' }, { status: 404 });
   }
 
   const transition = validateTrainingTransition(existing.status, body.status, {
@@ -199,20 +69,21 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     requiresOrbatQualification: existing.training.requiresOrbatQualification,
   });
   if (!transition.valid) {
-    return NextResponse.json({ error: transition.reason }, { status: 409 });
+    return requestJson({ error: transition.reason }, { status: 409 });
   }
 
-  const adminResponse = typeof body.adminResponse === 'string'
-    ? body.adminResponse.trim().slice(0, 4000) || null
-    : existing.adminResponse;
-  const nextUserTrainingStatus = requestStatusToUserTrainingStatus(body.status);
+  const adminResponse = body.adminResponse === undefined ? existing.adminResponse : body.adminResponse;
+  const nextStatus = body.status;
+  const nextUserTrainingStatus = requestStatusToUserTrainingStatus(nextStatus);
   const now = new Date();
 
+  const notifications: SessionNotifications = [];
   const transitionApplied = await prisma.$transaction(async (tx) => {
+    if (!await canManageTrainingRequest(principal, existing.userId, tx)) return 'denied' as const;
     const requestUpdate = await tx.trainingRequest.updateMany({
       where: { id: requestId, status: existing.status, updatedAt: existing.updatedAt },
       data: {
-        status: body.status,
+        status: nextStatus,
         adminResponse,
         handledByAdminId: actorId,
       },
@@ -319,16 +190,6 @@ export async function PUT(request: NextRequest, context: RouteContext) {
         });
       }
     }
-    return true;
-  });
-
-  if (!transitionApplied) {
-    return NextResponse.json(
-      { error: 'This request changed while you were updating it. Refresh and try again.' },
-      { status: 409 },
-    );
-  }
-
   const statusMessages: Record<string, string> = {
     approved: `Your ${existing.training.name} request was approved. Staff will coordinate your training session.`,
     rejected: `Your ${existing.training.name} request was declined.`,
@@ -339,42 +200,49 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     failed: `Your ${existing.training.name} qualification was marked as failed. Contact a trainer for next steps.`,
   };
 
-  if (statusMessages[body.status]) {
-    await createTrainingNotification({
+  if (statusMessages[nextStatus]) {
+    await createSessionNotification({
       recipientUserIds: [existing.userId],
       title: `${existing.training.name}: ${String(body.status).replaceAll('_', ' ')}`,
-      body: statusMessages[body.status],
+      body: statusMessages[nextStatus],
       actionUrl: `/trainings/requests/${requestId}`,
       createdById: actorId,
-    });
+    }, tx, notifications);
   }
 
-  publishTrainingChatEvent(requestId, { source: 'status', status: body.status });
-  publishUserProfileEvent(existing.userId, {
+    await writeApiAudit(tx, audit, { action: 'training_request.updated', resource: 'training_request', resourceId: String(requestId), targetUserIds: [existing.userId], outcome: 'success', before: { status: existing.status }, after: { status: nextStatus } });
+    return await getTrainingRequest(requestId, principal, tx);
+  }, { isolationLevel: 'Serializable' });
+
+  if (transitionApplied === 'denied') return apiError(403, 'forbidden', 'Insufficient training authority over this user.');
+  if (!transitionApplied) {
+    return requestJson(
+      { error: 'This request changed while you were updating it. Refresh and try again.' },
+      { status: 409 },
+    );
+  }
+
+  publishRequestEvent(() => publishTrainingChatEvent(requestId, { source: 'status', status: body.status }));
+  publishRequestEvent(() => publishUserProfileEvent(existing.userId, {
     source: 'training-request.updated',
-    status: body.status,
+    status: nextStatus,
     trainingId: existing.trainingId,
+  }));
+
+  publishSessionNotifications(notifications);
+  return apiSuccess(transitionApplied);
+  } catch (error) { return requestDatabaseError(error); }
   });
-
-  const updated = await getDetailedRequest(requestId);
-  if (!updated) {
-    return NextResponse.json({ error: 'Training request not found' }, { status: 404 });
-  }
-
-  const serialized = serializeDetailedRequest(updated, actorId, true);
-  return NextResponse.json({ ...serialized.request, ...serialized, request: serialized.request });
 }
 
-export async function DELETE(_request: NextRequest, context: RouteContext) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export async function DELETE(_request: Request, context: RouteContext) {
+  return handleApiRequest(_request, undefined, async (principal, audit) => {
+  try {
 
   const { id } = await context.params;
   const requestId = parseRequestId(id);
   if (!requestId) {
-    return NextResponse.json({ error: 'Invalid training request id' }, { status: 400 });
+    return apiError(400, 'invalid_request', 'Invalid training request ID.');
   }
 
   const existing = await prisma.trainingRequest.findUnique({
@@ -389,20 +257,23 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     },
   });
   if (!existing) {
-    return NextResponse.json({ error: 'Training request not found' }, { status: 404 });
+    return requestJson({ error: 'Training request not found' }, { status: 404 });
   }
 
-  const actorId = Number(session.user.id);
-  const staffViewer = await isTrainingStaff(actorId);
+  const actorId = requestActor(principal);
+  const staffViewer = isRequestStaff(principal);
   if (existing.userId !== actorId && !staffViewer) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return requestJson({ error: 'Forbidden' }, { status: 403 });
   }
 
   if (!['pending', 'approved'].includes(existing.status)) {
-    return NextResponse.json({ error: 'Only pending or approved requests can be cancelled' }, { status: 409 });
+    return requestJson({ error: 'Only pending or approved requests can be cancelled' }, { status: 409 });
   }
 
+  if (new URL(_request.url).searchParams.size) return apiError(400, 'invalid_request', 'Query parameters are not accepted.');
+  if ((await _request.text()).trim()) return apiError(400, 'invalid_request', 'Cancellation does not accept a request body.');
   const cancelled = await prisma.$transaction(async (tx) => {
+    if (!await canManageTrainingRequest(principal, existing.userId, tx)) return 'denied' as const;
     const requestUpdate = await tx.trainingRequest.updateMany({
       where: { id: requestId, status: existing.status, updatedAt: existing.updatedAt },
       data: {
@@ -458,17 +329,21 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
         body: staffViewer ? 'The request was cancelled by staff.' : 'The request was cancelled by the requester.',
       },
     });
+    await writeApiAudit(tx, audit, { action: 'training_request.cancelled', resource: 'training_request', resourceId: String(requestId), targetUserIds: [existing.userId], outcome: 'success', before: { status: existing.status }, after: { status: 'cancelled', detachedAttendeeId: existing.sessionAttendee?.id ?? null } });
     return true;
-  });
+  }, { isolationLevel: 'Serializable' });
 
+  if (cancelled === 'denied') return apiError(403, 'forbidden', 'Insufficient training authority over this user.');
   if (!cancelled) {
-    return NextResponse.json(
+    return requestJson(
       { error: 'This request changed while you were cancelling it. Refresh and try again.' },
       { status: 409 },
     );
   }
 
-  publishTrainingChatEvent(requestId, { source: 'status', status: 'cancelled' });
-  publishUserProfileEvent(existing.userId, { source: 'training-request.cancelled' });
-  return NextResponse.json({ message: 'Training request cancelled successfully', status: 'cancelled' });
+  publishRequestEvent(() => publishTrainingChatEvent(requestId, { source: 'status', status: 'cancelled' }));
+  publishRequestEvent(() => publishUserProfileEvent(existing.userId, { source: 'training-request.cancelled' }));
+  return apiSuccess(null);
+  } catch (error) { return requestDatabaseError(error); }
+  });
 }

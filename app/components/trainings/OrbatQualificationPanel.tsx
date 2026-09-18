@@ -1,5 +1,7 @@
 'use client';
 
+import { apiRequest } from '@/lib/api/client';
+
 import { useCallback, useEffect, useState } from 'react';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 import { useToast } from '@/app/components/ui/ToastContainer';
@@ -19,6 +21,7 @@ type AssignedSlot = {
 
 type QualificationCandidate = {
   userTrainingId: number;
+  existingSignupId: number | null;
   user: QualificationUser;
   status: 'needs_qualify';
   notes: string | null;
@@ -60,20 +63,19 @@ export default function OrbatQualificationPanel({ orbatId }: { orbatId: number }
 
   const loadQualifications = useCallback(async () => {
     try {
-      const response = await fetch(`/api/orbats/${orbatId}/qualifications`, {
-        cache: 'no-store',
-      });
-
-      if (response.status === 401 || response.status === 403) {
-        setVisibility('hidden');
-        return;
-      }
-      if (!response.ok) {
-        throw new Error('Unable to load ORBAT qualifications');
-      }
-
-      const payload = (await response.json()) as QualificationPayload;
-      const nextGroups = Array.isArray(payload.groups) ? payload.groups : [];
+      const nextGroups: QualificationGroup[] = [];
+      let cursor: string | null = null;
+      const seen = new Set<string>();
+      do {
+        const page: { data: QualificationPayload; meta: { nextCursor?: string | null } } = await apiRequest<QualificationPayload>(`/api/orbats/${orbatId}/qualifications?limit=100${cursor ? `&cursor=${cursor}` : ''}`, { cache: 'no-store' });
+        for (const group of page.data.groups) {
+          const existing = nextGroups.find(row => row.training.id === group.training.id);
+          if (existing) existing.users.push(...group.users); else nextGroups.push(group);
+        }
+        cursor = page.meta.nextCursor ?? null;
+        if (cursor && seen.has(cursor)) throw new Error('Repeated pagination cursor.');
+        if (cursor) seen.add(cursor);
+      } while (cursor);
       setGroups(nextGroups);
       setNotesById((current) => {
         const next = { ...current };
@@ -111,20 +113,7 @@ export default function OrbatQualificationPanel({ orbatId }: { orbatId: number }
   ) => {
     setUpdating({ id: candidate.userTrainingId, status });
     try {
-      const response = await fetch(`/api/orbats/${orbatId}/qualifications`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userTrainingId: candidate.userTrainingId,
-          status,
-          notes: notesById[candidate.userTrainingId] ?? '',
-        }),
-      });
-
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || `Unable to mark qualification as ${status}`);
-      }
+      await apiRequest(`/api/user-trainings/${candidate.userTrainingId}`, { method: 'PATCH', body: JSON.stringify({ orbatId, status, notes: notesById[candidate.userTrainingId] ?? '' }) });
 
       showSuccess(
         status === 'qualified'
@@ -149,18 +138,9 @@ export default function OrbatQualificationPanel({ orbatId }: { orbatId: number }
 
     setAssigningId(candidate.userTrainingId);
     try {
-      const response = await fetch(`/api/orbats/${orbatId}/qualifications/assign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userTrainingId: candidate.userTrainingId,
-          targetSlotId,
-        }),
-      });
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || 'Unable to assign qualification slot');
-      }
+      const group = groups.find(row => row.users.some(user => user.userTrainingId === candidate.userTrainingId));
+      if (!group) throw new Error('Qualification no longer available.');
+      await apiRequest(candidate.existingSignupId ? `/api/signups/${candidate.existingSignupId}` : '/api/signups', { method: candidate.existingSignupId ? 'PATCH' : 'POST', body: JSON.stringify({ slotId: targetSlotId, qualificationTrainingId: group.training.id, ...(candidate.existingSignupId ? {} : { userId: candidate.user.id }) }) });
 
       showSuccess(`${candidate.user.username || 'User'} assigned for qualification`);
       await loadQualifications();

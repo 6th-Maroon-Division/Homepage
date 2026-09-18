@@ -1,0 +1,534 @@
+{
+  "paths": {
+    "/attendance/legacy-records": {
+      "get": {
+        "summary": "List legacy attendance records",
+        "description": "Requires attendance:edit. Strict query arguments, ascending ID cursor, audits returned other-user/unknown legacy identities. No email.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "isMapped",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegacyAttendanceListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path, query or JSON"
+          },
+          "401": {
+            "description": "Invalid identity"
+          },
+          "403": {
+            "description": "Permission denied"
+          },
+          "404": {
+            "description": "Missing reference"
+          },
+          "409": {
+            "description": "Concurrent change or conflicting legacy status"
+          },
+          "422": {
+            "description": "Payload or CSV validation failed"
+          },
+          "500": {
+            "description": "Request or audit failed; no partial mutation"
+          }
+        }
+      }
+    },
+    "/attendance/legacy-records/{id}": {
+      "patch": {
+        "summary": "Map a legacy attendance record",
+        "description": "Requires system:super_admin. Explicit null clears mapping. Atomic mapping and old/new target audit. No query arguments.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegacyAttendanceRecordResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path, query or JSON"
+          },
+          "401": {
+            "description": "Invalid identity"
+          },
+          "403": {
+            "description": "Permission denied"
+          },
+          "404": {
+            "description": "Missing reference"
+          },
+          "409": {
+            "description": "Concurrent change or conflicting legacy status"
+          },
+          "422": {
+            "description": "Payload or CSV validation failed"
+          },
+          "500": {
+            "description": "Request or audit failed; no partial mutation"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LegacyAttendanceMappingInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/attendance/legacy-records/import": {
+      "post": {
+        "summary": "Preview or import legacy attendance matrix CSV",
+        "description": "Requires attendance:edit. Explicit YEAR header; UTC midnight dates, chronological rollover, maximum 5000 valid cells. P/A/NA imported; LOA/NO/EO/empty skipped. Unique identity/date dedup includes within-file records; conflicting statuses block the entire commit. Preview writes no records. Duplicate-only import succeeds. No query arguments.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegacyAttendanceImportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path, query or JSON"
+          },
+          "401": {
+            "description": "Invalid identity"
+          },
+          "403": {
+            "description": "Permission denied"
+          },
+          "404": {
+            "description": "Missing reference"
+          },
+          "409": {
+            "description": "Concurrent change or conflicting legacy status"
+          },
+          "422": {
+            "description": "Payload or CSV validation failed"
+          },
+          "500": {
+            "description": "Request or audit failed; no partial mutation"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LegacyAttendanceImportInput"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "LegacyAttendanceRecord": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "legacyName": {
+            "type": "string"
+          },
+          "legacyUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "legacyStatus": {
+            "type": "string"
+          },
+          "legacyNotes": {
+            "type": "string",
+            "nullable": true
+          },
+          "legacyEventDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "mappedUserId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647,
+            "nullable": true
+          },
+          "isMapped": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "mappedUser": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2147483647
+              },
+              "username": {
+                "type": "string"
+              },
+              "avatarUrl": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "username",
+              "avatarUrl"
+            ],
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "legacyName",
+          "legacyUserId",
+          "legacyStatus",
+          "legacyNotes",
+          "legacyEventDate",
+          "mappedUserId",
+          "isMapped",
+          "createdAt",
+          "updatedAt",
+          "mappedUser"
+        ]
+      },
+      "LegacyAttendanceImportInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "csvData": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000000
+          },
+          "previewOnly": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "csvData"
+        ]
+      },
+      "LegacyAttendanceImportResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "imported": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "year": {
+                "type": "integer",
+                "minimum": 1900,
+                "maximum": 9999
+              },
+              "dateColumns": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "skippedCells": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "processedCells": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "duplicates": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "same": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "different": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "same",
+                  "different"
+                ]
+              },
+              "conflicts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "legacyUserId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "legacyEventDate": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "existing": {
+                      "type": "string"
+                    },
+                    "new": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "legacyUserId",
+                    "legacyEventDate",
+                    "existing",
+                    "new"
+                  ]
+                }
+              },
+              "preview": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "legacyName": {
+                      "type": "string"
+                    },
+                    "legacyUserId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "legacyStatus": {
+                      "type": "string"
+                    },
+                    "legacyNotes": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "legacyEventDate": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "legacyName",
+                    "legacyUserId",
+                    "legacyStatus",
+                    "legacyNotes",
+                    "legacyEventDate"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "imported",
+              "year",
+              "dateColumns",
+              "skippedCells",
+              "processedCells",
+              "duplicates",
+              "conflicts",
+              "preview"
+            ]
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {}
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "LegacyAttendanceMappingInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mappedUserId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647,
+            "nullable": true
+          }
+        },
+        "required": [
+          "mappedUserId"
+        ]
+      },
+      "LegacyAttendanceRecordResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/LegacyAttendanceRecord"
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {}
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "LegacyAttendanceListResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LegacyAttendanceRecord"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "nextCursor": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "limit",
+              "nextCursor"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      }
+    }
+  },
+  "removePaths": [
+    "/attendance/legacy-data",
+    "/attendance/legacy-import"
+  ]
+}

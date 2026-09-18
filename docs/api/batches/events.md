@@ -1,0 +1,13 @@
+# Durable event feeds
+
+`GET /api/events?aggregate=rank|orbat|training` replaces the three `/api/bot/events/{ranks,orbats,training}` feeds. Session users require positive `system:super_admin`; active database bot tokens retain superadmin access. Explicit invalid credentials never fall back to a session. These integration feeds intentionally have broader access than per-user rank views, so ordinary promotion managers cannot use them to bypass user hierarchy.
+
+Only `aggregate`, `cursor`, and `limit` query parameters are accepted once each. Aggregate is required. Cursor defaults to zero and is a canonical nonnegative decimal signed-64-bit ID string; limit defaults to 50, caps at 100. Results are ascending event ID. `Last-Event-ID` also supplies the resume cursor; if both sources exist they must match. JSON returns `{data: Event[], meta:{limit,nextCursor,resumeCursor}}`, with actual lookahead and null final `nextCursor`. Persist `resumeCursor` to poll after reaching the current end.
+
+Each event is `{id:string,type:string,occurredAt:UTC-Z,payload}`. Payloads are explicit integration-field projections, never arbitrary stored JSON: rank IDs/user ID/Discord ID/change type/source; ORBAT IDs/signup/slot IDs/user ID/name/status; training IDs/title/website URL. Known timestamp fields normalize to UTC. Reasons, credentials, notes, arbitrary nested objects, and unrelated fields are discarded. Unsafe event-type strings become `unknown`.
+
+`Accept: text/event-stream` retains durable SSE delivery. Frames have event ID/type and `data: {data: Event,meta:{}}`. The initial database read and audit complete before HTTP headers, allowing canonical JSON errors on handshake failure. Serial five-second polls revalidate the captured subscriber identity, session expiry, live user existence/superadmin grants or bot validity; revoked access, query failure, or audit failure closes the stream without releasing that batch. Cancellation and request abortion stop polling. Reconnect with Last-Event-ID; duplicates across reconnects remain possible and clients should deduplicate event IDs. No SSE session-cookie renewal occurs.
+
+Read audits (`user_data.read`, resource `event`) include only returned other-user IDs present in projected payloads, excluding self/lookahead; bots include all returned user IDs. No snapshots, raw payloads, Discord IDs, or operation-only read audits are stored. Unauthorized attempts retain shared access-denied auditing.
+
+Tests: `tests/api/events.test.ts` (19 cases including SSE revocation/rollback/BigInt bounds); `tests/api-integration/events.test.ts` (4 real Prisma cases covering pagination, projection, audit privacy, live revocation and SSE handshake).

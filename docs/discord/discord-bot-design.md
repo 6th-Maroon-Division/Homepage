@@ -151,7 +151,9 @@ Bot endpoints use:
 Authorization: Bearer <BOT_API_TOKEN>
 ```
 
-Bot tokens are created and revoked in the web application by a user with `system:super_admin`. The bot must not log the token or include it in user-facing error messages.
+Bot tokens are created and revoked through canonical `/api/bot-tokens` routes by a superadmin user or an active bot token. Active database bot tokens have superadmin rights; environment-token authentication is rejected. The bot must not log the token or include it in user-facing error messages.
+
+Follow the [shared API migration contract](../api/migration-contract.md): JSON data/meta responses, structured errors, numeric platform IDs, string Discord IDs, and UTC timestamps ending in `Z`. Shared notification preferences use `/api/users/{id}/notification-preferences` after resolving the numeric user ID. Legacy bot routes remain pending resource-by-resource consolidation; do not assume every API already has the shared contract. User-data reads by bots are audited with the token identity. An initiating Discord user is optional separate audit context.
 
 On `401`, the bot must stop retrying the individual request, mark platform authentication unhealthy, and alert operators. On `403`, it must log the endpoint and missing permission context without exposing secrets.
 

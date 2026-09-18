@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Fragment } from 'react';
 import Link from 'next/link';
+import { apiList, apiRequest } from '@/lib/api/client';
 import { useRouter } from 'next/navigation';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
 import { useToast } from '@/app/components/ui/ToastContainer';
@@ -70,6 +71,7 @@ export default function UserManagementClient({
 }: UserManagementClientProps) {
   const router = useRouter();
   const [users, setUsers] = useState<User[]>(initialUsers);
+  useEffect(() => { setUsers(initialUsers); }, [initialUsers]);
   const [activeTab, setActiveTab] = useState<'all' | 'unranked' | 'permissionTemplates'>(initialTab);
   const [filter, setFilter] = useState<'all' | 'admin' | 'regular'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -94,6 +96,9 @@ export default function UserManagementClient({
   const [unrankedLoading, setUnrankedLoading] = useState(false);
   const [unrankedFilter, setUnrankedFilter] = useState<'all' | 'needsInterview' | 'needsBCT' | 'retired'>('all');
   const [selectedUnranked, setSelectedUnranked] = useState<Set<number>>(new Set());
+  const [updatingUserStatus, setUpdatingUserStatus] = useState(false);
+  const [assigningRanks, setAssigningRanks] = useState(false);
+  const updatingUnrankedUsers = updatingUserStatus || assigningRanks;
   const [ranks, setRanks] = useState<Array<{ id: number; name: string; abbreviation: string }>>([]);
   
   const { showSuccess, showError } = useToast();
@@ -102,7 +107,7 @@ export default function UserManagementClient({
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
     let fallbackTimer: ReturnType<typeof setInterval> | null = null;
 
-    const source = new EventSource('/api/admin/users/events');
+    const source = new EventSource('/api/users/events');
 
     const scheduleRefresh = () => {
       if (refreshTimer) {
@@ -124,7 +129,7 @@ export default function UserManagementClient({
 
     source.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data) as { type?: string };
+        const data = JSON.parse(event.data).data as { type?: string };
         if (data.type === 'stream.connected') {
           return;
         }
@@ -163,12 +168,7 @@ export default function UserManagementClient({
   const fetchUserPermissions = async (userId: number) => {
     setLoadingPermissions(true);
     try {
-      const res = await fetch(`/api/users/${userId}/permissions`);
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Failed to fetch permissions');
-      }
-      const data = await res.json();
+      const { data } = await apiRequest<{ permissions: typeof userPermissions }>(`/api/users/${userId}/permissions`);
       setUserPermissions(data.permissions || []);
     } catch (e) {
       showError(e instanceof Error ? e.message : 'Failed to load permissions');
@@ -189,15 +189,11 @@ export default function UserManagementClient({
         value: p.currentValue,
       }));
       
-      const res = await fetch(`/api/users/${permissionsModalData.userId}/permissions`, {
-        method: 'PUT',
+      await apiRequest<null>(`/api/users/${permissionsModalData.userId}/permissions`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ permissions }),
       });
-      
-      if (!res.ok) {
-        throw new Error('Failed to save permissions');
-      }
       
       showSuccess(`Permissions updated for ${permissionsModalData.username}`);
       setPermissionsModalData(null);
@@ -218,23 +214,12 @@ export default function UserManagementClient({
   const fetchUnrankedUsers = async () => {
     setUnrankedLoading(true);
     try {
-      let interview = 'all';
-      let bct = 'all';
-      let retired = 'all';
-      
-      if (unrankedFilter === 'needsInterview') {
-        interview = 'notDone';
-      } else if (unrankedFilter === 'needsBCT') {
-        bct = 'notDone';
-      } else if (unrankedFilter === 'retired') {
-        retired = 'retired';
-      }
-      
-      const res = await fetch(
-        `/api/admin/users/unranked?interview=${interview}&bct=${bct}&retired=${retired}`
-      );
-      const data = await res.json();
-      setUnrankedUsers(data.users || []);
+      const params = new URLSearchParams();
+      if (unrankedFilter === 'needsInterview') params.set('interviewDone', 'false');
+      else if (unrankedFilter === 'needsBCT') params.set('requiredTrainingsCompleted', 'false');
+      else if (unrankedFilter === 'retired') params.set('retired', 'true');
+      const data = await apiList<{ id: number; username: string | null; userRank: { interviewDone: boolean; retired: boolean } | null; attendanceTotal: number; requiredTrainingsCompleted: boolean }>(`/api/users/onboarding?${params}`);
+      setUnrankedUsers(data.sort((a, b) => (a.username ?? '').localeCompare(b.username ?? '')));
     } catch (e) {
       showError('Failed to load unranked users');
     } finally {
@@ -245,9 +230,8 @@ export default function UserManagementClient({
   // Fetch ranks for bulk assignment
   const fetchRanks = async () => {
     try {
-      const res = await fetch('/api/ranks');
-      const data = await res.json();
-      setRanks(data.ranks || []);
+      const data = await apiList<{ id: number; name: string; abbreviation: string; orderIndex: number }>('/api/ranks');
+      setRanks(data.sort((a, b) => a.orderIndex - b.orderIndex || a.id - b.id));
     } catch (e) {
       logClientError(e);
     }
@@ -274,50 +258,50 @@ export default function UserManagementClient({
 
   // Bulk actions for unranked users
   const bulkAssignRank = async (rankId: number) => {
+    const userIds = Array.from(selectedUnranked);
+    if (updatingUnrankedUsers || userIds.length === 0) return;
+    if (userIds.length > 100) {
+      showError('Select up to 100 users for a rank assignment.');
+      return;
+    }
+    setAssigningRanks(true);
     try {
-      const res = await fetch('/api/admin/users/bulk-rank-assign', {
-        method: 'POST',
+      await apiRequest('/api/users/ranks', {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userIds: Array.from(selectedUnranked), rankId }),
+        body: JSON.stringify({ updates: userIds.map(userId => ({ userId, rankId })) }),
       });
-      if (!res.ok) throw new Error('Failed');
-      showSuccess(`Assigned rank to ${selectedUnranked.size} users`);
+      showSuccess(`Assigned rank to ${userIds.length} users`);
       setSelectedUnranked(new Set());
-      fetchUnrankedUsers();
-    } catch (e) {
-      showError('Failed to assign ranks');
+      await fetchUnrankedUsers();
+    } catch (error) {
+      showError(error instanceof Error ? error.message : 'Failed to assign ranks');
+    } finally {
+      setAssigningRanks(false);
     }
   };
 
-  const bulkToggleInterview = async () => {
-    try {
-      const res = await fetch('/api/admin/users/bulk-interview-toggle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userIds: Array.from(selectedUnranked) }),
-      });
-      if (!res.ok) throw new Error('Failed');
-      showSuccess(`Toggled interview for ${selectedUnranked.size} users`);
-      setSelectedUnranked(new Set());
-      fetchUnrankedUsers();
-    } catch (e) {
-      showError('Failed to toggle interview');
+  const bulkSetStatus = async (field: 'interviewDone' | 'retired', value: boolean) => {
+    const userIds = Array.from(selectedUnranked);
+    if (updatingUnrankedUsers || userIds.length === 0) return;
+    if (userIds.length > 100) {
+      showError('Select up to 100 users for a status update.');
+      return;
     }
-  };
-
-  const bulkToggleRetired = async () => {
+    setUpdatingUserStatus(true);
     try {
-      const res = await fetch('/api/admin/users/bulk-retire-toggle', {
-        method: 'POST',
+      await apiRequest('/api/users/status', {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userIds: Array.from(selectedUnranked) }),
+        body: JSON.stringify({ updates: userIds.map(userId => ({ userId, [field]: value })) }),
       });
-      if (!res.ok) throw new Error('Failed');
-      showSuccess(`Toggled retired for ${selectedUnranked.size} users`);
+      showSuccess(`Updated status for ${userIds.length} users`);
       setSelectedUnranked(new Set());
-      fetchUnrankedUsers();
-    } catch (e) {
-      showError('Failed to toggle retired');
+      await fetchUnrankedUsers();
+    } catch (error) {
+      showError(error instanceof Error ? error.message : 'Failed to update user status');
+    } finally {
+      setUpdatingUserStatus(false);
     }
   };
 
@@ -337,15 +321,10 @@ export default function UserManagementClient({
     const { userId } = confirmDelete;
 
     try {
-      const res = await fetch(`/api/users/${userId}`, {
+      await apiRequest(`/api/users/${userId}`, {
         method: 'DELETE',
       });
 
-      if (!res.ok) {
-        const data = await res.json();
-        showError(data.error || 'Failed to delete user');
-        return;
-      }
 
       // Update local state
       setUsers(users.filter(u => u.id !== userId));
@@ -374,32 +353,18 @@ export default function UserManagementClient({
           userId,
           trainingId: parseInt(trainingId),
           notes: notes || null,
-          needsRetraining,
+          status: needsRetraining ? 'failed' : 'qualified',
           isHidden,
         }),
       });
 
       if (!res.ok) {
         const data = await res.json();
-        showError(data.error || 'Failed to assign training');
+        showError(data.error?.message || 'Failed to assign training');
         return;
       }
 
-      // Update user trainings
-      const updatedUsers = users.map(u => {
-        if (u.id === userId) {
-          // Fetch updated training data
-          return u;
-        }
-        return u;
-      });
-      
-      // Re-fetch to get the updated trainings
-      const updatedRes = await fetch(`/api/users/${userId}`);
-      if (updatedRes.ok) {
-        const updatedUser = await updatedRes.json();
-        setUsers(users.map(u => u.id === userId ? updatedUser : u));
-      }
+      router.refresh();
 
       showSuccess('Training assigned successfully');
       setTrainingModalData(null);
@@ -415,11 +380,8 @@ export default function UserManagementClient({
     if (availableTrainings.length > 0) return; // Already fetched
     setLoadingTrainings(true);
     try {
-      const res = await fetch('/api/trainings/available');
-      if (res.ok) {
-        const data = await res.json();
-        setAvailableTrainings(data);
-      }
+      const data = await apiList<{ id: number; name: string; duration: number | null }>('/api/trainings?activeOnly=true');
+      setAvailableTrainings(data.sort((a, b) => a.name.localeCompare(b.name) || a.id - b.id).map(training => ({ ...training, category: null })));
     } catch (error) {
       logClientError('Error fetching trainings:', error);
     } finally {
@@ -875,7 +837,7 @@ export default function UserManagementClient({
                                       userId: user.id,
                                       trainingId: parseInt(trainingId as string),
                                       notes: notes || null,
-                                      needsRetraining,
+                                      status: needsRetraining ? 'failed' : 'qualified',
                                       isHidden,
                                     }),
                                   });
@@ -887,7 +849,7 @@ export default function UserManagementClient({
                                     window.location.reload();
                                   } else {
                                     const data = await res.json();
-                                    showError(data.error || 'Failed to assign training');
+                                    showError(data.error?.message || 'Failed to assign training');
                                   }
                                 } catch (error) {
                                   logClientError('Error assigning training:', error);
@@ -1088,20 +1050,20 @@ export default function UserManagementClient({
                             ?.trainings.find((t) => t.trainingId === parseInt(trainingModalData.trainingId))?.id
                         }`,
                         {
-                          method: 'PUT',
+                          method: 'PATCH',
                           headers: {
                             'Content-Type': 'application/json',
                           },
                           body: JSON.stringify({
                             notes: trainingModalData.notes || null,
-                            needsRetraining: trainingModalData.needsRetraining,
+                            ...(trainingModalData.needsRetraining !== users.find(u => u.id === trainingModalData.userId)?.trainings.find(t => t.trainingId === parseInt(trainingModalData.trainingId))?.needsRetraining ? { status: trainingModalData.needsRetraining ? 'failed' : 'qualified' } : {}),
                             isHidden: trainingModalData.isHidden,
                           }),
                         }
                       );
 
                       if (res.ok) {
-                        const updatedTraining = await res.json();
+                        const { data: updatedTraining } = await res.json();
                         setUsers(
                           users.map((u) =>
                             u.id === trainingModalData.userId
@@ -1431,27 +1393,35 @@ export default function UserManagementClient({
               {ranks.map((rank) => (
                 <button
                   key={rank.id}
-                  className="px-3 py-1 rounded-md text-sm font-medium"
+                  className="px-3 py-1 rounded-md text-sm font-medium disabled:opacity-50"
                   style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                  disabled={updatingUnrankedUsers || selectedUnranked.size > 100}
                   onClick={() => bulkAssignRank(rank.id)}
                 >
                   → {rank.abbreviation}
                 </button>
               ))}
-              <button
-                className="px-3 py-1 rounded-md text-sm font-medium"
-                style={{ backgroundColor: 'var(--accent)', color: 'white' }}
-                onClick={bulkToggleInterview}
-              >
-                Toggle Interview
-              </button>
-              <button
-                className="px-3 py-1 rounded-md text-sm font-medium"
-                style={{ backgroundColor: 'var(--accent)', color: 'white' }}
-                onClick={bulkToggleRetired}
-              >
-                Toggle Retired
-              </button>
+              {([
+                { field: 'interviewDone', value: true, label: 'Mark Interview Complete' },
+                { field: 'interviewDone', value: false, label: 'Mark Interview Pending' },
+                { field: 'retired', value: true, label: 'Mark Retired' },
+                { field: 'retired', value: false, label: 'Mark Active' },
+              ] as const).map(({ field, value, label }) => (
+                <button
+                  key={`${field}-${value}`}
+                  className="px-3 py-1 rounded-md text-sm font-medium disabled:opacity-50"
+                  style={{ backgroundColor: 'var(--accent)', color: 'white' }}
+                  disabled={updatingUnrankedUsers || selectedUnranked.size > 100}
+                  onClick={() => bulkSetStatus(field, value)}
+                >
+                  {label}
+                </button>
+              ))}
+              {updatingUserStatus && <span role="status">Updating status…</span>}
+              {assigningRanks && <span role="status">Assigning ranks…</span>}
+              {selectedUnranked.size > 100 && (
+                <span className="text-sm py-2">Select up to 100 users for a bulk update.</span>
+              )}
             </div>
           )}
 
@@ -1472,6 +1442,7 @@ export default function UserManagementClient({
                     <th className="px-6 py-3 text-left">
                       <input
                         type="checkbox"
+                        disabled={updatingUnrankedUsers}
                         checked={selectedUnranked.size === unrankedUsers.length && unrankedUsers.length > 0}
                         onChange={() => {
                           if (selectedUnranked.size === unrankedUsers.length) {
@@ -1508,6 +1479,7 @@ export default function UserManagementClient({
                       <td className="px-6 py-4">
                         <input
                           type="checkbox"
+                          disabled={updatingUnrankedUsers}
                           checked={selectedUnranked.has(user.id)}
                           onChange={() => {
                             const newSelected = new Set(selectedUnranked);
@@ -1535,8 +1507,8 @@ export default function UserManagementClient({
                         </span>
                       </td>
                       <td className="px-6 py-4" style={{ color: 'var(--foreground)' }}>
-                        <span className={user.bctCompleted ? 'text-green-500' : 'text-red-500'}>
-                          {user.bctCompleted ? '✓' : '✗'}
+                        <span className={user.requiredTrainingsCompleted ? 'text-green-500' : 'text-red-500'}>
+                          {user.requiredTrainingsCompleted ? '✓' : '✗'}
                         </span>
                       </td>
                       <td className="px-6 py-4" style={{ color: 'var(--foreground)' }}>

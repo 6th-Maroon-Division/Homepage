@@ -1,14 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import { apiRequest } from '@/lib/api/client';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
 
 interface ImportResult {
-  success: boolean;
   imported: number;
   skipped: number;
-  errors: string[];
   total: number;
 }
 
@@ -26,15 +25,17 @@ export default function AttendanceImportClient({ orbatId }: { orbatId: number })
 
     setIsImporting(true);
     try {
-      // Parse CSV data
+      // Calendar dates in this import are UTC dates.
       const lines = csvData.trim().split('\n');
       const records = [];
 
       for (const line of lines) {
-        const [username, date, status] = line.split(',').map(s => s.trim());
-        if (username && date && status) {
-          records.push({ username, date, status });
-        }
+        if (!line.trim()) continue;
+        const cells = line.split(',').map(s => s.trim());
+        if (cells.join(',').toLowerCase() === 'username,date,status') continue;
+        const [username, date, status] = cells;
+        if (cells.length !== 3 || !username || !date || !status) throw new Error('Each row must contain username,date,status.');
+        records.push({ username, date, status: status.toUpperCase() });
       }
 
       if (records.length === 0) {
@@ -43,17 +44,12 @@ export default function AttendanceImportClient({ orbatId }: { orbatId: number })
         return;
       }
 
-      const response = await fetch('/api/attendance/import', {
+      if (records.length > 100) throw new Error('Import at most 100 rows at a time.');
+      const { data } = await apiRequest<ImportResult>(`/api/orbats/${orbatId}/attendance/import`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ records, orbatId }),
+        body: JSON.stringify({ records }),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to import records');
-      }
-
-      const data = await response.json();
       setResult(data);
       showToast(
         `Imported ${data.imported} records, skipped ${data.skipped}`,
@@ -62,7 +58,7 @@ export default function AttendanceImportClient({ orbatId }: { orbatId: number })
       setCsvData('');
     } catch (error) {
       console.error('Error importing:', error);
-      showToast('Failed to import attendance records', 'error');
+      showToast(error instanceof Error ? error.message : 'Failed to import attendance records', 'error');
     } finally {
       setIsImporting(false);
     }
@@ -75,7 +71,7 @@ export default function AttendanceImportClient({ orbatId }: { orbatId: number })
           Import Legacy Attendance Data
         </h2>
         <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
-          Import attendance records from the old system using CSV format
+          Import up to 100 rows for this operation. Dates use UTC. A failed import saves no rows.
         </p>
       </div>
 
@@ -166,16 +162,7 @@ export default function AttendanceImportClient({ orbatId }: { orbatId: number })
               <div className="text-yellow-600">
                 <span className="font-medium">Skipped:</span> {result.skipped}
               </div>
-              {result.errors.length > 0 && (
-                <div className="mt-2">
-                  <p className="font-medium text-red-600 mb-1">Errors:</p>
-                  <ul className="list-disc list-inside space-y-1 text-red-600">
-                    {result.errors.map((error, i) => (
-                      <li key={i}>{error}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+
             </div>
           </div>
         )}

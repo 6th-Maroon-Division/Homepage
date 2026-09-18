@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
+import { apiList, apiRequest } from '@/lib/api/client';
 import TrainingSessionAttendeeManager from './TrainingSessionAttendeeManager';
 import DualRingTimePicker from '@/app/components/ui/DualRingTimePicker';
 
@@ -285,8 +286,8 @@ function SessionEditor({
     setIsSaving(true);
     setError('');
     try {
-      const response = await fetch(`/api/training-sessions/${session.id}`, {
-        method: 'PUT',
+      await apiRequest(`/api/training-sessions/${session.id}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status: draft.status,
@@ -296,10 +297,6 @@ function SessionEditor({
           specialInstructions: draft.specialInstructions.trim() || null,
         }),
       });
-      const payload = await readJson(response);
-      if (!response.ok) {
-        throw new Error(errorMessage(payload, 'Unable to update the training session.'));
-      }
       await onSaved(
         draft.status === 'cancelled' ? 'Training session cancelled.' : 'Training session updated.',
       );
@@ -490,25 +487,15 @@ export default function TrainingSessionManagement({
       if (nextFilters.trainerId) searchParams.set('trainerId', nextFilters.trainerId);
       if (nextFilters.status) searchParams.set('status', nextFilters.status);
       if (nextFilters.from) {
-        searchParams.set('from', new Date(`${nextFilters.from}T00:00:00`).toISOString());
+        searchParams.set('from', new Date(`${nextFilters.from}T00:00:00.000Z`).toISOString());
       }
       if (nextFilters.to) {
-        searchParams.set('to', new Date(`${nextFilters.to}T23:59:59.999`).toISOString());
+        searchParams.set('to', new Date(Date.parse(`${nextFilters.to}T00:00:00.000Z`) + 86400000).toISOString());
       }
 
       const query = searchParams.toString();
-      const response = await fetch(`/api/training-sessions${query ? `?${query}` : ''}`, {
-        cache: 'no-store',
-        signal,
-      });
-      const payload = await readJson(response);
-      if (!response.ok) {
-        throw new Error(errorMessage(payload, 'Unable to load training sessions.'));
-      }
-      if (!payload || typeof payload !== 'object' || !('sessions' in payload) || !Array.isArray(payload.sessions)) {
-        throw new Error('The training session response was invalid.');
-      }
-      setSessions(payload.sessions as TrainingSession[]);
+      const rows = await apiList<TrainingSession>(`/api/training-sessions${query ? `?${query}` : ''}`, { cache: 'no-store', signal });
+      if (!signal?.aborted) setSessions(rows.sort((a, b) => (b.startsAt ? Date.parse(b.startsAt) : -Infinity) - (a.startsAt ? Date.parse(a.startsAt) : -Infinity) || b.id - a.id));
     } catch (loadError) {
       if (loadError instanceof DOMException && loadError.name === 'AbortError') return;
       setListError(loadError instanceof Error ? loadError.message : 'Unable to load training sessions.');
@@ -521,15 +508,8 @@ export default function TrainingSessionManagement({
     setIsLoadingStaff(true);
     setStaffError('');
     try {
-      const response = await fetch('/api/training-staff', { cache: 'no-store', signal });
-      const payload = await readJson(response);
-      if (!response.ok) {
-        throw new Error(errorMessage(payload, 'Unable to load eligible trainers.'));
-      }
-      if (!payload || typeof payload !== 'object' || !('staff' in payload) || !Array.isArray(payload.staff)) {
-        throw new Error('The training staff response was invalid.');
-      }
-      setStaff((payload.staff as StaffUser[]).sort((left, right) => staffLabel(left).localeCompare(staffLabel(right))));
+      const rows = await apiList<StaffUser>('/api/training-users?staffOnly=true', { cache: 'no-store', signal });
+      if (!signal?.aborted) setStaff(rows.sort((left, right) => staffLabel(left).localeCompare(staffLabel(right)) || left.id - right.id));
     } catch (loadError) {
       if (loadError instanceof DOMException && loadError.name === 'AbortError') return;
       setStaffError(loadError instanceof Error ? loadError.message : 'Unable to load eligible trainers.');
@@ -657,7 +637,7 @@ export default function TrainingSessionManagement({
     setCreateError('');
     setNotice('');
     try {
-      const response = await fetch('/api/training-sessions', {
+      const { data: payload } = await apiRequest<{ id: number }>('/api/training-sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -670,10 +650,6 @@ export default function TrainingSessionManagement({
           attendeeUserIds: selectedAttendeeUserIds,
         }),
       });
-      const payload = await readJson(response);
-      if (!response.ok) {
-        throw new Error(errorMessage(payload, 'Unable to create the training session.'));
-      }
 
       const createdId = payload && typeof payload === 'object' && 'id' in payload
         ? Number(payload.id)
@@ -996,7 +972,7 @@ export default function TrainingSessionManagement({
         </label>
 
         <label className="space-y-1 text-xs font-medium" style={{ color: 'var(--foreground)' }}>
-          <span>From</span>
+          <span>From (UTC date)</span>
           <input
             type="date"
             value={filters.from}
@@ -1007,7 +983,7 @@ export default function TrainingSessionManagement({
         </label>
 
         <label className="space-y-1 text-xs font-medium" style={{ color: 'var(--foreground)' }}>
-          <span>To</span>
+          <span>To (UTC date)</span>
           <input
             type="date"
             value={filters.to}

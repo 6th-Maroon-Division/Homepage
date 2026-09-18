@@ -23,9 +23,11 @@ Current `/bot/*` routes authenticate with:
 Authorization: Bearer <BOT_API_TOKEN>
 ```
 
-The implementation accepts a legacy environment token and database-backed bot tokens. New bot endpoints must use the shared bot-token validator. Documentation and clients must not use the previously proposed `X-BOT-API-TOKEN` header.
+Only active database-backed bot tokens are accepted; legacy environment tokens and `X-BOT-API-TOKEN` are rejected. Migrated business routes accept either a user session or the same bearer token. See the [migration contract](../api/migration-contract.md) for batch status and the shared response, UTC, audit, and test requirements.
 
-Bot tokens may only be administered by users with `system:super_admin`. New endpoints must define whether they require only a valid bot token or a future token scope.
+Active bot tokens have superadmin rights by product decision. Canonical `/bot-tokens` management routes require either a superadmin user session or an active bot token. Per-token scopes are not part of this migration.
+
+The inventory below includes legacy routes awaiting consolidation. “Available” does not mean a route already implements the unified contract; consult the [route inventory](../api/inventory.md) and migration contract. Resolve the numeric platform user ID before calling shared preference routes; `me` is a session-only alias.
 
 ## 3. Current endpoint inventory
 
@@ -43,7 +45,7 @@ Bot tokens may only be administered by users with `system:super_admin`. New endp
 | `POST /bot/attendance/compile` | Available | Compile an ORBAT | Contract must guarantee idempotency |
 | `POST /bot/attendance/backfill` | Available | Administrative recovery | Define whether the Discord bot should call it |
 | `POST /bot/events` | Available | Attendance event ingestion | Not a replacement for availability notes |
-| `GET /bot/promotions/pending` | Available | Manual approval queue | Polling only; define pagination/cursor |
+| `GET /ranks/promotions/pending` | Available | Shared manual approval queue | Descending-ID cursor pagination; only cursor/limit accepted |
 | `POST /bot/promotions/{id}/approve` | Available | Approve proposal | Needs concurrency/error contract and actor audit data |
 | `POST /bot/promotions/{id}/decline` | Available | Decline proposal | Platform already resets attendance baseline |
 | `GET /bot/promotions/auto` | Partial | Recent automatic rank history | Does not cover all manual changes or provide a durable cursor |
@@ -55,12 +57,14 @@ The routes referenced in older bot documentation are now available:
 
 - `GET /bot/orbats/{id}/signups`
 - `GET /bot/users/discord/{discordId}/signups`
-- `GET /bot/ranks/discord-roles`
-- bot notification-preference routes
+- `GET /ranks/discord-roles`
+- shared user/bot notification-preference routes (`/users/{id}/notification-preferences`)
 - bot availability-note routes
 - a bot-authenticated applied-rank event stream
 
 Embedded signup data remains available from `GET /bot/orbats/{id}`, while the dedicated routes provide pagination and user-specific lookup.
+
+Pending queue reads are consolidated at `GET /ranks/promotions/pending` with active bot bearer authentication or an authorized session. Fetch all cursor pages for the complete visible queue. The reduced proposal DTO includes stored rank IDs, attendance totals/delta, status, UTC creation time, `user: { id, username, discordId }`, and nullable `currentRank`/`nextRank` summaries. It excludes email, avatar, Steam/account fields, and `updatedAt`. Bot reads audit returned target IDs without response snapshots. The old bot queue GET routes are removed; legacy approval/decline POST routes remain unchanged.
 
 ## 4. Priority summary
 
@@ -237,11 +241,11 @@ model UserNotificationPreference {
 
 Do not duplicate `discordUserId` in this model; Discord identity is already represented by linked authentication accounts. Resolve it through the user relation.
 
-### Proposed endpoints
+### Available canonical endpoints
 
 ```http
-GET /bot/users/discord/{discordId}/notification-preferences
-PATCH /bot/users/discord/{discordId}/notification-preferences
+GET /users/{id}/notification-preferences
+PATCH /users/{id}/notification-preferences
 ```
 
 `PATCH` accepts only the fields being changed and returns the complete resulting preferences. Website settings must read and write the same row.
@@ -270,38 +274,43 @@ model RankDiscordRole {
 
 Snowflakes remain strings.
 
-### Proposed administration endpoints
+### Canonical shared endpoints
 
 ```http
-GET    /admin/ranks/discord-roles?guildId={guildId}
-PUT    /admin/ranks/{rankId}/discord-role
-DELETE /admin/ranks/{rankId}/discord-role?guildId={guildId}
+GET    /ranks/discord-roles?guildId={guildId}
+PATCH  /ranks/{id}/discord-role?guildId={guildId}
+DELETE /ranks/{id}/discord-role?guildId={guildId}
 ```
 
-Administration requires an appropriate rank-configuration permission. The UI should validate snowflake format but cannot prove Discord role existence without Discord access.
+All methods require `rank:edit` for session users; active database bot tokens are superadmin. PATCH accepts `discordRoleId` and/or `isActive`, with `discordRoleId` required when creating a mapping. The UI validates snowflake format but cannot prove Discord role existence without Discord access. Mutations are audited in their database transaction.
 
-### Proposed bot endpoint
+Bot synchronization uses the same paginated collection, filtering active mappings:
 
 ```http
-GET /bot/ranks/discord-roles?guildId={guildId}
+GET /ranks/discord-roles?guildId={guildId}&activeOnly=true&limit=100
 ```
 
-Example response:
+Follow `meta.nextCursor` until null before reconciling the complete guild mapping set. `activeOnly` defaults to false for administration. Responses use the shared envelope, with string Discord IDs and numeric platform IDs:
 
 ```json
 {
-  "guildId": "111111111111111111",
-  "version": "2026-07-29T10:00:00.000Z",
-  "mappings": [
+  "data": [
     {
+      "id": 10,
       "rankId": 2,
-      "rankName": "Private",
-      "rankAbbreviation": "Pvt",
-      "discordRoleId": "222222222222222222"
+      "guildId": "111111111111111111",
+      "discordRoleId": "222222222222222222",
+      "isActive": true,
+      "createdAt": "2026-07-29T10:00:00.000Z",
+      "updatedAt": "2026-07-29T10:00:00.000Z",
+      "rank": { "id": 2, "name": "Private", "abbreviation": "Pvt", "orderIndex": 2 }
     }
-  ]
+  ],
+  "meta": { "limit": 100, "nextCursor": null }
 }
 ```
+
+The former admin/bot URLs and the proposed version/mappings envelope are superseded by this contract.
 
 The bot caches successful results. An empty result and an API failure must be distinguishable so an outage cannot cause destructive role removal.
 
@@ -438,15 +447,28 @@ The bot should use ORBAT date filtering to identify candidates. The platform may
 
 ## 15. P2 and deferred contracts
 
-### Bot rank-history access
+### Shared user rank reads
 
-Add only if operator diagnostics or user-visible history requires it:
+Bots and the website use the same canonical endpoints:
 
 ```http
-GET /bot/users/{userId}/rank-history?limit=50&cursor={cursor}
+GET /users/{id}/rank
+GET /users/{id}/rank-history?limit=50&cursor={cursor}
 ```
 
-The applied-rank event and current-user endpoints are sufficient for routine synchronization.
+Bots supply numeric platform user IDs and an active database bearer token. Session users can use `me`; access to others requires live hierarchy-aware `user:manage` or superadmin. Rank-summary reads now require authentication. The legacy `/bot/users/{userId}/rank-history` route is removed.
+
+History uses descending-ID cursor pagination with default 50/cap 100 and `{ data, meta: { limit, nextCursor } }`. The old `page` query returns 400. Each entry contains only `id`, nullable `previousRankName`, `newRankName`, `attendanceTotalAtChange`, `attendanceDeltaSinceLastRank`, `triggeredBy`, nullable `outcome`, nullable `declineReason`, and UTC `createdAt`. The legacy bot note/userId/actor-ID extras are omitted. Empty history does not require a user-rank record; missing rank-summary state returns 404.
+
+Other-user reads, including all bot reads and empty target histories, are audited using target/request metadata without response records or decline reasons. The applied-rank event and current-user endpoints remain sufficient for routine synchronization; history is available for diagnostics and user-visible history.
+
+### Shared rank assignment
+
+Bots and authorized website users assign or demote through `PATCH /users/{id}/rank` with `{ rankId, reason? }`; the former separate assign/demote URLs are removed. Users require global `rank:manage_promotions` plus target hierarchy authorization, even for self changes. Active bot tokens qualify as superadmin. GET’s `user:manage` permission is independent of mutation authorization.
+
+A lower rank order is recorded as demotion; other changes are assignment. Same-rank assignment still resets the attendance baseline and creates history. The rank update, UTC rank date, history, `user.rank_changed` outbox event, and redacted audit are atomic. The optional reason remains in history notes and is excluded from the outbox event. PATCH returns the shared updated rank summary.
+
+For bulk assignment, use `PATCH /users/ranks` with `{ updates: [{ userId, rankId, reason? }] }`, limited to 100 unique users. It shares the single-user permission and attendance rules, checks all targets before writes, and returns rank summaries in input order. All changes, history, audits, and rank-change outbox records (`source: bulk_assignment`) commit atomically. The former admin bulk-rank-assign URL is removed.
 
 ### Training announcement metadata
 

@@ -1,0 +1,177 @@
+{
+  "paths": {
+    "/users/onboarding": {
+      "get": {
+        "summary": "List user onboarding queue",
+        "description": "Requires user:manage with live target hierarchy; bots superadmin. Users without currentrank OR missingrequired training. SQL filters beforepagination. Completion qualified or finished only when noORBATqualification; empty requiredset complete. Attendance counts presentmainops+legacy. MinimalDTO without email; returnedotheruserread audit only, no snapshots.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647,
+              "default": 50
+            },
+            "description": "Clamped100"
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "description": "Exclusive ascending userID"
+          },
+          {
+            "in": "query",
+            "name": "interviewDone",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Exacttrue|false; omittedmeansall"
+          },
+          {
+            "in": "query",
+            "name": "retired",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Exacttrue|false; omittedmeansall"
+          },
+          {
+            "in": "query",
+            "name": "requiredTrainingsCompleted",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Exacttrue|false; omittedmeansall"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Onboardingpage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "username",
+                          "userRank",
+                          "attendanceTotal",
+                          "requiredTrainingsCompleted"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 2147483647
+                          },
+                          "username": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "userRank": {
+                            "oneOf": [
+                              {
+                                "type": "null"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "interviewDone",
+                                  "retired"
+                                ],
+                                "properties": {
+                                  "interviewDone": {
+                                    "type": "boolean"
+                                  },
+                                  "retired": {
+                                    "type": "boolean"
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          "attendanceTotal": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "requiredTrainingsCompleted": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "limit",
+                        "nextCursor"
+                      ],
+                      "properties": {
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "nextCursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown/duplicate/invalid query"
+          },
+          "401": {
+            "description": "Invalid credentials; invalid Bearer nofallback"
+          },
+          "403": {
+            "description": "Requiresuser:manage"
+          },
+          "500": {
+            "description": "Database or requiredread auditfailure; personaldata withheld"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {}
+  },
+  "removePaths": [
+    "/admin/users/unranked"
+  ]
+}

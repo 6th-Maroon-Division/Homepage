@@ -1,5 +1,6 @@
 'use client';
 
+import { apiList, apiRequest } from '@/lib/api/client';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useToast } from '@/app/components/ui/ToastContainer';
@@ -17,7 +18,7 @@ interface OrbatTemplate {
     id: number;
     username: string | null;
     avatarUrl: string | null;
-  };
+  } | null;
   createdAt: string;
 }
 
@@ -42,12 +43,7 @@ export default function TemplateManagementClient({ templates: initialTemplates, 
   useEffect(() => {
     const fetchTemplates = async () => {
       try {
-        const response = await fetch('/api/templates');
-        if (!response.ok) {
-          return;
-        }
-
-        const data = (await response.json()) as OrbatTemplate[];
+        const data = (await apiList<OrbatTemplate>('/api/templates')).sort((a, b) => (a.category ?? '').localeCompare(b.category ?? '') || a.name.localeCompare(b.name));
         setTemplates(data);
       } catch {
         // keep current state on sync errors
@@ -65,10 +61,10 @@ export default function TemplateManagementClient({ templates: initialTemplates, 
       }, 250);
     };
 
-    const source = new EventSource('/api/admin/catalog/events');
+    const source = new EventSource('/api/catalog/events');
     source.onmessage = (event) => {
       try {
-        const payload = JSON.parse(event.data) as { type?: string };
+        const payload = JSON.parse(event.data).data as { type?: string };
         if (payload.type === 'template.changed') {
           queueSync();
         }
@@ -102,7 +98,7 @@ export default function TemplateManagementClient({ templates: initialTemplates, 
       return (
         template.name.toLowerCase().includes(query) ||
         template.description?.toLowerCase().includes(query) ||
-        template.createdBy.username?.toLowerCase().includes(query) ||
+        template.createdBy?.username?.toLowerCase().includes(query) ||
         template.category?.toLowerCase().includes(query)
       );
     }
@@ -115,11 +111,7 @@ export default function TemplateManagementClient({ templates: initialTemplates, 
 
     setIsDeleting(true);
     try {
-      const response = await fetch(`/api/templates/${templateToDelete.id}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) throw new Error('Failed to delete template');
+      await apiRequest(`/api/templates/${templateToDelete.id}`, { method: 'DELETE' });
 
       setTemplates(templates.filter((t) => t.id !== templateToDelete.id));
       showSuccess('Template deleted successfully');
@@ -269,7 +261,7 @@ export default function TemplateManagementClient({ templates: initialTemplates, 
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      <p style={{ color: 'var(--foreground)' }}>{template.createdBy.username || 'Unknown'}</p>
+                      <p style={{ color: 'var(--foreground)' }}>{template.createdBy?.username || 'Unknown'}</p>
                     </td>
                     <td className="px-6 py-4">
                       <p style={{ color: 'var(--foreground)' }}>{template.usageCount}</p>

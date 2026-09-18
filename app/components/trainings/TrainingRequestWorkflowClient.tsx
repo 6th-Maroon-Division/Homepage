@@ -1,5 +1,7 @@
 'use client';
 
+import { apiRequest } from '@/lib/api/client';
+
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
@@ -33,16 +35,10 @@ export default function TrainingRequestWorkflowClient({
   const loadRequest = useCallback(async (showLoader = false) => {
     if (showLoader) setIsLoading(true);
     try {
-      const response = await fetch(`/api/training-requests/${requestId}`, { cache: 'no-store' });
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || (response.status === 404 ? 'Training request not found' : 'Unable to load training request'));
-      }
-
-      const payload = await response.json();
-      const normalized = normalizeTrainingRequestDetail(payload);
-      setRequest(normalized);
-      setIsStaff(Boolean(payload.isStaff ?? payload.canManage ?? initialIsStaff));
+      const { data, meta } = await apiRequest(`/api/training-requests/${requestId}`, { cache: 'no-store' });
+      const normalized = normalizeTrainingRequestDetail(data);
+      setRequest(current => ({ ...normalized, messages: current?.messages ?? [] }));
+      setIsStaff(Boolean(meta.isStaff ?? initialIsStaff));
       setError('');
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Unable to load training request');

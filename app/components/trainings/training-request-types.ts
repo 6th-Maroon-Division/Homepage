@@ -60,7 +60,7 @@ function asRecord(value: unknown): UnknownRecord {
 }
 
 function asNumber(value: unknown, fallback = 0): number {
-  const parsed = typeof value === 'number' ? value : Number(value);
+  const parsed = typeof value === 'number' ? value : Number.NaN;
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
@@ -75,29 +75,29 @@ function normalizeUser(value: unknown): TrainingRequestUser | null {
 
   return {
     id,
-    username: asNullableString(record.username ?? record.name),
-    avatarUrl: asNullableString(record.avatarUrl ?? record.avatar),
+    username: asNullableString(record.username),
+    avatarUrl: asNullableString(record.avatarUrl),
   };
 }
 
 export function normalizeTrainingMessage(value: unknown): TrainingRequestMessage | null {
   const record = asRecord(value);
   const id = asNumber(record.id);
-  const content = asNullableString(record.content ?? record.body ?? record.message);
+  const content = asNullableString(record.body);
   if (!id || !content) return null;
 
-  const sender = normalizeUser(record.sender ?? record.user ?? record.author);
-  const rawRole = String(record.senderRole ?? record.senderType ?? record.kind ?? record.role ?? '').toLowerCase();
+  const sender = normalizeUser(record.sender);
+  const rawRole = String(record.senderRole ?? '').toLowerCase();
   const senderRole = rawRole === 'system'
     ? 'system'
-    : rawRole === 'staff' || rawRole === 'trainer' || rawRole === 'admin'
+    : rawRole === 'staff'
       ? 'staff'
       : 'user';
 
   return {
     id,
     content,
-    createdAt: asNullableString(record.createdAt ?? record.sentAt) ?? new Date().toISOString(),
+    createdAt: asNullableString(record.createdAt) ?? '',
     senderId: record.senderId === null ? null : asNumber(record.senderId ?? sender?.id) || null,
     senderRole,
     sender,
@@ -109,30 +109,30 @@ export function normalizeTrainingSession(value: unknown): TrainingRequestSession
   const id = asNumber(record.id);
   if (!id) return null;
 
-  const duration = record.durationMinutes ?? record.duration;
+  const duration = record.durationMinutes;
   return {
     id,
-    startsAt: asNullableString(record.startsAt ?? record.startsAtUtc ?? record.scheduledAt ?? record.startTime),
-    endsAt: asNullableString(record.endsAt ?? record.endsAtUtc ?? record.endTime),
+    startsAt: asNullableString(record.startsAt),
+    endsAt: asNullableString(record.endsAt),
     durationMinutes: duration === null || duration === undefined ? null : asNumber(duration),
     status: asNullableString(record.status) ?? 'proposed',
-    confirmedAt: asNullableString(record.confirmedAt ?? record.scheduleConfirmedAt),
-    instructions: asNullableString(record.instructions ?? record.specialInstructions),
-    trainer: normalizeUser(record.trainer ?? record.assignedTrainer),
+    confirmedAt: asNullableString(record.confirmedAt),
+    instructions: asNullableString(record.specialInstructions),
+    trainer: normalizeUser(record.trainer),
   };
 }
 
 export function normalizeSubscription(value: unknown): TrainingChatSubscription {
   const record = asRecord(value);
   return {
-    website: Boolean(record.website ?? record.websiteEnabled ?? record.web),
-    discord: Boolean(record.discord ?? record.discordEnabled),
+    website: Boolean(record.websiteEnabled),
+    discord: Boolean(record.discordEnabled),
   };
 }
 
 export function normalizeTrainingRequestDetail(value: unknown): TrainingRequestDetail {
   const outer = asRecord(value);
-  const record = asRecord(outer.request ?? outer.trainingRequest ?? value);
+  const record = outer;
   const training = asRecord(record.training);
   const rawMessages = Array.isArray(record.messages)
     ? record.messages
@@ -140,31 +140,30 @@ export function normalizeTrainingRequestDetail(value: unknown): TrainingRequestD
       ? outer.messages
       : [];
 
-  const sessionAttendee = asRecord(record.sessionAttendee ?? outer.sessionAttendee);
-  const assignedTrainer = normalizeUser(record.assignedTrainer ?? outer.assignedTrainer);
+  const assignedTrainer = normalizeUser(record.assignedTrainer);
   const normalizedSession = normalizeTrainingSession(
-    record.session ?? record.trainingSession ?? sessionAttendee.session ?? outer.session,
+    record.session,
   );
 
   return {
     id: asNumber(record.id),
     userId: asNumber(record.userId ?? asRecord(record.user).id),
     trainingId: asNumber(record.trainingId ?? training.id),
-    status: asNullableString(record.workflowStatus ?? record.status) ?? 'pending',
+    status: asNullableString(record.status) ?? 'pending',
     requestMessage: asNullableString(record.requestMessage),
     adminResponse: asNullableString(record.adminResponse),
-    requestedAt: asNullableString(record.requestedAt ?? record.createdAt) ?? new Date().toISOString(),
-    updatedAt: asNullableString(record.updatedAt) ?? new Date().toISOString(),
+    requestedAt: asNullableString(record.requestedAt) ?? '',
+    updatedAt: asNullableString(record.updatedAt) ?? '',
     training: {
       id: asNumber(training.id ?? record.trainingId),
-      name: asNullableString(training.name ?? record.trainingName) ?? 'Training',
+      name: asNullableString(training.name) ?? 'Training',
       description: asNullableString(training.description),
       duration: training.duration === null || training.duration === undefined ? null : asNumber(training.duration),
       requiresTrainingSession: training.requiresTrainingSession !== false,
       requiresOrbatQualification: Boolean(training.requiresOrbatQualification),
-      qualificationNotes: asNullableString(training.qualificationNotes ?? training.orbatQualificationNotes),
+      qualificationNotes: asNullableString(training.orbatQualificationNotes),
     },
-    user: normalizeUser(record.user ?? outer.user),
+    user: normalizeUser(record.user),
     messages: rawMessages
       .map(normalizeTrainingMessage)
       .filter((message): message is TrainingRequestMessage => message !== null)
@@ -172,6 +171,6 @@ export function normalizeTrainingRequestDetail(value: unknown): TrainingRequestD
     session: normalizedSession
       ? { ...normalizedSession, trainer: normalizedSession.trainer ?? assignedTrainer }
       : null,
-    subscription: normalizeSubscription(record.subscription ?? outer.subscription),
+    subscription: normalizeSubscription(record.subscription),
   };
 }

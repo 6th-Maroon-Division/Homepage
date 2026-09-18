@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import TrainingStatusBadge from '@/app/components/trainings/TrainingStatusBadge';
+import { apiList, apiRequest } from '@/lib/api/client';
 
 type UserPermission = {
   id: number;
@@ -250,14 +251,7 @@ export default function UserDetailClient({
     const loadTemplates = async () => {
       setIsLoadingTemplates(true);
       try {
-        const res = await fetch('/api/permissions/templates', { cache: 'no-store' });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || 'Failed to load permission templates');
-        }
-
-        const data = (await res.json()) as { templates?: PermissionTemplate[] };
-        const templates = Array.isArray(data.templates) ? data.templates : [];
+        const templates = (await apiList<PermissionTemplate>('/api/permissions/templates')).sort((a, b) => a.name.localeCompare(b.name));
 
         if (cancelled) {
           return;
@@ -326,11 +320,7 @@ export default function UserDetailClient({
 
     setIsDeleting(true);
     try {
-      const res = await fetch(`/api/users/${user.id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to delete user');
-      }
+      await apiRequest(`/api/users/${user.id}`, { method: 'DELETE' });
       showSuccess('User deleted successfully');
       router.push('/admin/users');
       router.refresh();
@@ -347,15 +337,11 @@ export default function UserDetailClient({
 
     setIsClearingAvatar(true);
     try {
-      const res = await fetch(`/api/users/${user.id}`, {
+      await apiRequest(`/api/users/${user.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ avatarUrl: null }),
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to clear avatar');
-      }
       showSuccess('Avatar cleared successfully');
       router.refresh();
     } catch (error) {
@@ -369,7 +355,7 @@ export default function UserDetailClient({
 
     source.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data) as { type?: string };
+        const data = JSON.parse(event.data).data as { type?: string };
         if (data.type === 'stream.connected') {
           return;
         }
@@ -630,10 +616,10 @@ export default function UserDetailClient({
 
                           if (!response.ok) {
                             const data = await response.json().catch(() => ({}));
-                            throw new Error(data.error || 'Failed to assign training');
+                            throw new Error(data.error?.message || 'Failed to assign training');
                           }
 
-                          const created = await response.json();
+                          const { data: created } = await response.json();
                           const createdRow: UserTraining = {
                             id: created.id,
                             trainingId: created.trainingId,
@@ -769,7 +755,7 @@ export default function UserDetailClient({
                                 setIsUpdatingTrainingById((previous) => ({ ...previous, [training.id]: true }));
                                 try {
                                   const response = await fetch(`/api/user-trainings/${training.id}`, {
-                                    method: 'PUT',
+                                    method: 'PATCH',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({
                                       status: action.status,
@@ -777,10 +763,9 @@ export default function UserDetailClient({
                                       isHidden: training.isHidden,
                                     }),
                                   });
-                                  const updated = await response.json().catch(() => ({}));
-                                  if (!response.ok) {
-                                    throw new Error(updated.error || 'Failed to update training');
-                                  }
+                                  const payload = await response.json().catch(() => ({}));
+                                  if (!response.ok) throw new Error(payload.error?.message || 'Failed to update training');
+                                  const updated = payload.data;
                                   setTrainingRows((previous) => previous.map((row) =>
                                     row.id === training.id
                                       ? {
@@ -829,7 +814,7 @@ export default function UserDetailClient({
 
                                 if (!response.ok) {
                                   const data = await response.json().catch(() => ({}));
-                                  throw new Error(data.error || 'Failed to remove training');
+                                  throw new Error(data.error?.message || 'Failed to remove training');
                                 }
 
                                 setTrainingRows((previous) => previous.filter((row) => row.id !== training.id));
@@ -886,16 +871,11 @@ export default function UserDetailClient({
                     permissionId: permission.id,
                     value: permission.currentValue,
                   }));
-                  const res = await fetch(`/api/users/${user.id}/permissions`, {
-                    method: 'PUT',
+                  await apiRequest<null>(`/api/users/${user.id}/permissions`, {
+                    method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ permissions: payload }),
                   });
-
-                  if (!res.ok) {
-                    const data = await res.json().catch(() => ({}));
-                    throw new Error(data.error || 'Failed to save permissions');
-                  }
 
                   showSuccess('Permissions updated');
                   router.refresh();
@@ -1116,16 +1096,12 @@ export default function UserDetailClient({
 
                     setIsSavingUsername(true);
                     try {
-                      const response = await fetch(`/api/users/${user.id}`, {
+                      await apiRequest(`/api/users/${user.id}`, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ username: normalizedUsername }),
                       });
 
-                      if (!response.ok) {
-                        const data = await response.json().catch(() => ({}));
-                        throw new Error(data.error || 'Failed to update username');
-                      }
 
                       setEditableUsername(normalizedUsername);
                       setDisplayUsername(normalizedUsername);
@@ -1164,16 +1140,11 @@ export default function UserDetailClient({
 
                     setIsPromoting(true);
                     try {
-                      const response = await fetch(`/api/users/${user.id}/rank/assign`, {
-                        method: 'POST',
+                      await apiRequest(`/api/users/${user.id}/rank`, {
+                        method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ rankId: promoteRank.id }),
                       });
-
-                      if (!response.ok) {
-                        const data = await response.json().catch(() => ({}));
-                        throw new Error(data.error || 'Failed to promote user');
-                      }
 
                       showSuccess(`Promoted to ${promoteRank.abbreviation} - ${promoteRank.name}`);
                       router.refresh();
@@ -1203,16 +1174,11 @@ export default function UserDetailClient({
 
                     setIsDemoting(true);
                     try {
-                      const response = await fetch(`/api/users/${user.id}/rank/demote`, {
-                        method: 'POST',
+                      await apiRequest(`/api/users/${user.id}/rank`, {
+                        method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ rankId: demoteRank.id, reason }),
                       });
-
-                      if (!response.ok) {
-                        const data = await response.json().catch(() => ({}));
-                        throw new Error(data.error || 'Failed to demote user');
-                      }
 
                       showSuccess(`Demoted to ${demoteRank.abbreviation} - ${demoteRank.name}`);
                       router.refresh();
@@ -1267,9 +1233,9 @@ export default function UserDetailClient({
                 </select>
                 <button
                   type="button"
-                  disabled={!selectedMergeSourceId || isMergingAccount}
+                  disabled={!selectedMergeSourceId || isMergingAccount || isSelfUser}
                   onClick={async () => {
-                    if (!selectedMergeSourceId) {
+                    if (!selectedMergeSourceId || isSelfUser) {
                       return;
                     }
 
@@ -1301,7 +1267,7 @@ export default function UserDetailClient({
                         throw new Error('Missing CSRF token');
                       }
 
-                      const response = await fetch('/api/admin/users/merge', {
+                      const { data } = await apiRequest<{ summary: { movedAccounts: number } }>('/api/users/merge', {
                         method: 'POST',
                         headers: {
                           'Content-Type': 'application/json',
@@ -1314,12 +1280,6 @@ export default function UserDetailClient({
                         }),
                       });
 
-                      if (!response.ok) {
-                        const data = await response.json().catch(() => ({}));
-                        throw new Error(data.error || 'Failed to merge accounts');
-                      }
-
-                      const data = await response.json();
                       const movedAccounts = Number(data?.summary?.movedAccounts ?? 0);
                       showSuccess(`Accounts merged successfully. Linked providers moved: ${movedAccounts}.`);
                       router.refresh();

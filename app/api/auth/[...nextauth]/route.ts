@@ -6,6 +6,9 @@ import DiscordProvider from 'next-auth/providers/discord';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { processPendingEventsForUser } from '@/lib/pending-events';
+import { randomUUID } from 'node:crypto';
+import { writeApiAudit } from '@/lib/api/audit';
+import { parsePositiveId } from '@/lib/api/validation';
 
 interface DiscordProfile {
   id: string;
@@ -21,6 +24,13 @@ interface ExtendedJWT extends JWT {
   email?: string | null;
   createdAt?: Date;
   permissions?: Record<string, number>;
+  provider?: string;
+}
+
+async function denyDiscordSignIn() {
+  try { await writeApiAudit(prisma, { principal: null, correlationId: randomUUID(), method: 'GET', path: '/api/auth/callback/discord' }, { action: 'access.denied', resource: 'auth_transport', outcome: 'denied' }); }
+  catch { console.error('Authentication denial audit unavailable'); }
+  return false;
 }
 
 export const authOptions: AuthOptions = {
@@ -33,170 +43,68 @@ export const authOptions: AuthOptions = {
     // We'll handle it with a custom page that redirects to Steam
   ],
   callbacks: {
-    async signIn({ account, profile, user }) {
-      if (!account || !profile) return false;
-
-      const provider = account.provider as 'discord' | 'steam';
-      let providerUserId: string;
-      let username: string;
-      let email: string | null = null;
-      let avatarUrl: string | null = null;
-
-      if (provider === 'discord') {
-        const discordProfile = profile as DiscordProfile;
-        providerUserId = discordProfile.id;
-        username = discordProfile.username || discordProfile.global_name || 'Unknown';
-        email = discordProfile.email || null;
-        avatarUrl = discordProfile.image_url || null;
-      } else {
-        return false;
-      }
-
-      // Check if this Discord account already exists
-      const authAccount = await prisma.authAccount.findUnique({
-        where: {
-          provider_providerUserId: {
-            provider,
-            providerUserId,
-          },
-        },
-        include: { user: true },
-      });
-
-      // Check if we have an existing session (for account linking)
-      let existingUserId: number | null = null;
+    async signIn({ account, profile }) {
+      if (account?.provider !== 'discord' || !profile) return denyDiscordSignIn();
+      const providerProfile = profile as DiscordProfile;
+      if (typeof providerProfile.id !== 'string' || !/^\d{17,20}$/.test(providerProfile.id)) return denyDiscordSignIn();
+      const providerUserId = providerProfile.id;
+      const username = (typeof providerProfile.username === 'string' && providerProfile.username || typeof providerProfile.global_name === 'string' && providerProfile.global_name || 'Unknown').slice(0, 255);
+      const email = typeof providerProfile.email === 'string' ? providerProfile.email : null;
+      const avatarUrl = typeof providerProfile.image_url === 'string' && /^https:\/\//.test(providerProfile.image_url) ? providerProfile.image_url : null;
       const cookieStore = await cookies();
-      const sessionToken =
-        cookieStore.get('__Secure-next-auth.session-token')?.value ||
-        cookieStore.get('next-auth.session-token')?.value;
-
+      const cookieName = process.env.NEXTAUTH_URL?.startsWith('https:') ? '__Secure-next-auth.session-token' : 'next-auth.session-token';
+      const sessionToken = cookieStore.get(cookieName)?.value || cookieStore.getAll().filter(cookie => cookie.name.startsWith(`${cookieName}.`)).sort((a, b) => Number(a.name.split('.').at(-1)) - Number(b.name.split('.').at(-1))).map(cookie => cookie.value).join('');
+      let existingUserId: number | null = null;
       if (sessionToken && process.env.NEXTAUTH_SECRET) {
-        const decodedToken = await decode({
-          token: sessionToken,
-          secret: process.env.NEXTAUTH_SECRET,
-        });
-
-        const decodedUserId = (decodedToken as ExtendedJWT | null)?.id;
-        if (typeof decodedUserId === 'number') {
-          existingUserId = decodedUserId;
-        }
+        try {
+          const decoded = await decode({ token: sessionToken, secret: process.env.NEXTAUTH_SECRET });
+          existingUserId = parsePositiveId(decoded?.id);
+          if (existingUserId !== null && existingUserId > 2147483647) return denyDiscordSignIn();
+        } catch { return denyDiscordSignIn(); }
       }
-
-      if (!authAccount) {
-        if (existingUserId) {
-          // User is already logged in - link Discord account to existing user
-          await prisma.authAccount.create({
-            data: {
-              provider,
-              providerUserId,
-              userId: existingUserId,
-            },
-          });
-
-          // Update user's avatar if they don't have one
-          const existingUser = await prisma.user.findUnique({ where: { id: existingUserId } });
-          if (!existingUser?.avatarUrl && avatarUrl) {
-            await prisma.user.update({
-              where: { id: existingUserId },
-              data: { avatarUrl },
-            });
+      const refresh = cookieStore.get('discord-avatar-refresh')?.value === '1';
+      const result = await prisma.$transaction(async tx => {
+        let authAccount = await tx.authAccount.findUnique({ where: { provider_providerUserId: { provider: 'discord', providerUserId } }, include: { user: true } });
+        if (existingUserId !== null) {
+          const existing = await tx.user.findUnique({ where: { id: existingUserId } });
+          if (!existing) return null;
+          if (authAccount && authAccount.userId !== existingUserId) return null;
+          if (!authAccount) {
+            authAccount = await tx.authAccount.create({ data: { provider: 'discord', providerUserId, userId: existingUserId }, include: { user: true } });
+            if (!existing.avatarUrl && avatarUrl) await tx.user.update({ where: { id: existingUserId }, data: { avatarUrl } });
           }
-        } else {
-          // Create new user and link the account
-          const newUser = await prisma.user.create({
-            data: {
-              username,
-              email,
-              avatarUrl,
-              accounts: {
-                create: {
-                  provider,
-                  providerUserId,
-                },
-              },
-            },
-          });
-
-          // Process any pending attendance events for this Discord user
-          await processPendingEventsForUser(undefined, providerUserId, newUser.id);
+        } else if (!authAccount) {
+          await tx.user.create({ data: { username, email, avatarUrl, accounts: { create: { provider: 'discord', providerUserId } } } });
+          authAccount = await tx.authAccount.findUniqueOrThrow({ where: { provider_providerUserId: { provider: 'discord', providerUserId } }, include: { user: true } });
         }
-      } else if (provider === 'discord') {
-        const cookieStore = await cookies();
-        const shouldRefreshDiscordProfile = cookieStore.get('discord-avatar-refresh')?.value === '1';
-
-        if (shouldRefreshDiscordProfile) {
-          await prisma.user.update({
-            where: { id: authAccount.user.id },
-            data: {
-              username,
-              email,
-              avatarUrl,
-            },
-          });
-
-          cookieStore.set('discord-avatar-refresh', '', {
-            maxAge: 0,
-            path: '/',
-          });
-        }
-      }
-
+        if (refresh) await tx.user.update({ where: { id: authAccount.userId }, data: { username, email, avatarUrl } });
+        await writeApiAudit(tx, { principal: { kind: 'user', userId: authAccount.userId, permissions: {} }, correlationId: randomUUID(), method: 'GET', path: '/api/auth/callback/discord' }, { action: existingUserId === null ? 'auth.discord.signed_in' : 'auth.discord.linked', resource: 'auth_account', resourceId: String(authAccount.id), targetUserIds: [authAccount.userId], outcome: 'success' });
+        return authAccount.userId;
+      });
+      if (result === null) return denyDiscordSignIn();
+      if (refresh) cookieStore.set('discord-avatar-refresh', '', { maxAge: 0, path: '/' });
+      try { await processPendingEventsForUser(undefined, providerUserId, result, { principal: { kind: 'user', userId: result, permissions: {} }, correlationId: randomUUID(), method: 'GET', path: '/api/auth/callback/discord' }); } catch { console.error('Discord attendance backfill failed'); }
       return true;
     },
 
-    async jwt({ token, trigger }) {
-      // Refresh user data from database on signIn, explicit update trigger,
-      // or when token is missing a valid numeric user id
-      // Permissions are cached in JWT to avoid unnecessary database queries
-      const shouldRefresh =
-        trigger === 'signIn' ||
-        trigger === 'update' ||
-        typeof (token as ExtendedJWT).id !== 'number';
-      
-      if (shouldRefresh && token.sub) {
-        // Try to find the user by checking both Discord and Steam accounts
-        const steamAccount = await prisma.authAccount.findUnique({
-          where: {
-            provider_providerUserId: {
-              provider: 'steam',
-              providerUserId: token.sub,
-            },
-          },
-          include: { user: true },
-        });
-
-        const discordAccount = await prisma.authAccount.findUnique({
-          where: {
-            provider_providerUserId: {
-              provider: 'discord',
-              providerUserId: token.sub,
-            },
-          },
-          include: { user: true },
-        });
-
-        const authAccount = steamAccount || discordAccount;
-
-        if (authAccount) {
-          const extendedToken = token as ExtendedJWT;
-          extendedToken.id = authAccount.user.id;
-          extendedToken.username = authAccount.user.username;
-          extendedToken.email = authAccount.user.email ?? null;
-          // Don't store avatarUrl in JWT - it can be very large (data URLs)
-          // The client will fetch it separately when needed
-          extendedToken.createdAt = authAccount.user.createdAt;
-          
-          // Fetch user permissions
-          const userPermissions = await prisma.userPermission.findMany({
-            where: { userId: authAccount.user.id },
-            include: { permission: true },
-          });
-          const permissions: Record<string, number> = {};
-          for (const up of userPermissions) {
-            permissions[up.permission.key] = up.value;
-          }
-          extendedToken.permissions = permissions;
-        }
+    async jwt({ token, trigger, account }) {
+      const extended = token as ExtendedJWT;
+      const shouldRefresh = trigger === 'signIn' || trigger === 'update' || typeof extended.id !== 'number';
+      if (account?.provider === 'discord') extended.provider = 'discord';
+      if (shouldRefresh) {
+        // Never resolve a Discord subject through a Steam account with the same string ID.
+        const currentId = parsePositiveId(extended.id);
+        const linked = trigger === 'signIn' && account?.provider === 'discord' && token.sub
+          ? await prisma.authAccount.findUnique({ where: { provider_providerUserId: { provider: 'discord', providerUserId: token.sub } }, include: { user: true } })
+          : null;
+        const user = linked?.user ?? (trigger !== 'signIn' && currentId !== null && currentId <= 2147483647 ? await prisma.user.findUnique({ where: { id: currentId } }) : null);
+        if (!user) { delete extended.id; extended.permissions = {}; return token; }
+        extended.id = user.id;
+        extended.username = user.username;
+        extended.email = user.email ?? null;
+        extended.createdAt = user.createdAt;
+        const grants = await prisma.userPermission.findMany({ where: { userId: user.id }, include: { permission: true } });
+        extended.permissions = Object.fromEntries(grants.map(grant => [grant.permission.key, grant.value]));
       }
       return token;
     },

@@ -1,5 +1,6 @@
 'use client';
 
+import { apiRequest } from '@/lib/api/client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '../ui/ToastContainer';
@@ -20,19 +21,12 @@ export default function DeleteOrbatButton({ orbatId, hasDeletePermission = false
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
-      const res = await fetch(`/api/orbats/${orbatId}`, {
-        method: 'DELETE',
-      });
-
-      if (res.ok) {
-        showSuccess('OrbAT deleted successfully');
-        router.refresh();
-      } else {
-        showError('Failed to delete OrbAT');
-      }
+      await apiRequest<null>(`/api/orbats/${orbatId}`, { method: 'DELETE' });
+      showSuccess('OrbAT deleted successfully');
+      router.refresh();
     } catch (error) {
       console.error('Error deleting OrbAT:', error);
-      showError('Error deleting OrbAT');
+      showError(error instanceof Error ? error.message : 'Error deleting OrbAT');
     } finally {
       setIsDeleting(false);
       setShowConfirm(false);

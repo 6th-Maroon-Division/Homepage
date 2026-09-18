@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
+import { apiList, apiRequest } from '@/lib/api/client';
 
 type AttendanceStatus = 'scheduled' | 'attended' | 'completed' | 'absent' | 'cancelled';
 
@@ -72,10 +73,7 @@ export default function TrainingSessionAttendeeManager({
   const loadSession = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/training-sessions/${sessionId}`, { cache: 'no-store' });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || 'Unable to load session attendees');
-      const nextSession = payload as SessionPayload;
+      const { data: nextSession } = await apiRequest<SessionPayload>(`/api/training-sessions/${sessionId}`, { cache: 'no-store' });
       const nextDrafts: Record<number, { status: AttendanceStatus; notes: string }> = {};
       for (const attendee of nextSession.attendees || []) {
         nextDrafts[attendee.id] = {
@@ -98,10 +96,13 @@ export default function TrainingSessionAttendeeManager({
   }, [loadSession]);
 
   useEffect(() => {
-    void fetch('/api/training-users', { cache: 'no-store' })
-      .then(async (response) => response.ok ? response.json() : { users: [] })
-      .then((payload) => setTrainingUsers(Array.isArray(payload.users) ? payload.users : []))
-      .catch(() => setTrainingUsers([]));
+    const controller = new AbortController();
+    void apiList<TrainingUser>('/api/training-users', { cache: 'no-store', signal: controller.signal })
+      .then((rows) => {
+        if (!controller.signal.aborted) setTrainingUsers(rows.sort((left, right) => (left.username || '').localeCompare(right.username || '') || left.id - right.id));
+      })
+      .catch(() => { if (!controller.signal.aborted) setTrainingUsers([]); });
+    return () => controller.abort();
   }, []);
 
   const availableRequests = useMemo(() => {
@@ -146,7 +147,7 @@ export default function TrainingSessionAttendeeManager({
     setError('');
     setNotice('');
     try {
-      const response = await fetch(`/api/training-sessions/${sessionId}/attendees`, {
+      await apiRequest(`/api/training-sessions/${sessionId}/attendees`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -155,8 +156,6 @@ export default function TrainingSessionAttendeeManager({
           advanceTraining,
         }),
       });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || 'Unable to add attendee');
       setSelectedCandidate('');
       setAdvanceTraining(false);
       setNotice('Attendee added.');
@@ -175,8 +174,8 @@ export default function TrainingSessionAttendeeManager({
     setError('');
     setNotice('');
     try {
-      const response = await fetch(`/api/training-sessions/${sessionId}/attendees/${attendee.id}`, {
-        method: 'PUT',
+      await apiRequest(`/api/training-sessions/${sessionId}/attendees/${attendee.id}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status: draft.status,
@@ -184,8 +183,6 @@ export default function TrainingSessionAttendeeManager({
           expectedUpdatedAt: attendee.updatedAt,
         }),
       });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || 'Unable to update attendee');
       setNotice('Attendance updated. Qualification status was not changed.');
       await refreshAfterChange();
     } catch (saveError) {
@@ -204,13 +201,11 @@ export default function TrainingSessionAttendeeManager({
     setError('');
     setNotice('');
     try {
-      const response = await fetch(`/api/training-sessions/${sessionId}/attendees/${attendee.id}`, {
+      await apiRequest(`/api/training-sessions/${sessionId}/attendees/${attendee.id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ expectedUpdatedAt: attendee.updatedAt }),
       });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || 'Unable to remove attendee');
       setNotice('Attendee removed and retained as cancelled for audit.');
       await refreshAfterChange();
     } catch (removeError) {

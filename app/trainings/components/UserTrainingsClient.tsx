@@ -1,5 +1,7 @@
 'use client';
 
+import { apiList, apiRequest } from '@/lib/api/client';
+
 import { useState, useEffect } from 'react';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
@@ -81,11 +83,8 @@ export default function UserTrainingsClient({
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch('/api/training-categories');
-      if (response.ok) {
-        const data = await response.json();
-        setCategories(data.sort((a: Category, b: Category) => a.orderIndex - b.orderIndex));
-      }
+      const data = await apiList<Category>('/api/training-categories');
+      setCategories(data.sort((a, b) => a.orderIndex - b.orderIndex || a.name.localeCompare(b.name)));
     } catch (error) {
       console.error('Error fetching categories:', error);
     }
@@ -95,19 +94,13 @@ export default function UserTrainingsClient({
   const refreshData = async () => {
     try {
       const [trainingsRes, requestsRes] = await Promise.all([
-        fetch('/api/user-trainings', { cache: 'no-store' }),
-        fetch('/api/training-requests', { cache: 'no-store' }),
+        apiList<UserTraining>('/api/user-trainings?userId=me', { cache: 'no-store' }),
+        apiList<TrainingRequest>('/api/training-requests', { cache: 'no-store' }),
       ]);
 
-      if (trainingsRes.ok) {
-        const data = await trainingsRes.json();
-        setUserTrainings(data);
-      }
+      setUserTrainings(trainingsRes);
 
-      if (requestsRes.ok) {
-        const data = await requestsRes.json();
-        setTrainingRequests(data);
-      }
+      setTrainingRequests(requestsRes);
     } catch (error) {
       console.error('Error refreshing data:', error);
     }
@@ -122,24 +115,9 @@ export default function UserTrainingsClient({
 
     setIsSaving(true);
     try {
-      const response = await fetch('/api/training-requests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          trainingId,
-          requestMessage: requestMessage.trim() || null,
-        }),
-      });
-
-      if (response.ok) {
-        showSuccess('Training request submitted successfully');
-        setRequestMessage('');
-        setSelectedTrainingId(null);
-        await refreshData();
-      } else {
-        const data = await response.json();
-        showError(data.error || 'Failed to submit request');
-      }
+      await apiRequest('/api/training-requests', { method: 'POST', body: JSON.stringify({ userId: currentUserId, trainingId, requestMessage: requestMessage.trim() || null }) });
+      showSuccess('Training request submitted successfully');
+      setRequestMessage(''); setSelectedTrainingId(null); await refreshData();
     } catch (error) {
       console.error('Error requesting training:', error);
       showError('Error submitting request');
@@ -152,16 +130,9 @@ export default function UserTrainingsClient({
   const handleCancelRequest = async (requestId: number) => {
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/training-requests/${requestId}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        showSuccess('Request cancelled successfully');
-        await refreshData();
-      } else {
-        showError('Failed to cancel request');
-      }
+      await apiRequest(`/api/training-requests/${requestId}`, { method: 'DELETE' });
+      showSuccess('Request cancelled successfully');
+      await refreshData();
     } catch (error) {
       console.error('Error cancelling request:', error);
       showError('Error cancelling request');

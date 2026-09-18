@@ -53,9 +53,11 @@ Notes:
 ### Rank CRUD and Ordering
 - `GET /api/ranks`
 - `POST /api/ranks`
-- `PUT /api/ranks/[id]`
+- `PATCH /api/ranks/[id]`
 - `DELETE /api/ranks/[id]`
-- `PUT /api/ranks/reorder`
+- `PATCH /api/ranks/reorder`
+
+These catalog routes use the [canonical API contract](./api/migration-contract.md): user sessions or active superadmin bot tokens, `{ data, meta }` responses, structured errors, strict payloads, and UTC timestamps. GET requires authentication and uses ascending-ID cursor pages; the website retrieves all pages and sorts by `orderIndex` then ID. POST requires `rank:create`, PATCH/reordering require `rank:edit`, and DELETE requires `rank:delete`. PATCH bodies contain editable fields only, excluding IDs and timestamps. Reordering accepts `{ ranks: [{ id, orderIndex }] }`, applies atomically, and audits each rank; DELETE and reorder return `data: null`. Other rank workflows below remain subject to their existing contracts until migrated.
 
 ### Promotions and Eligibility Flow
 - `POST /api/ranks/promotions/propose`
@@ -66,23 +68,29 @@ Notes:
 - `POST /api/ranks/promotions/[id]/decline`
 - `POST /api/ranks/auto-rankup`
 
+Pending promotion reads use the shared `/api/ranks/promotions/pending` endpoint for sessions and bots. It requires global `rank:manage_promotions`; visibility is filtered before descending-ID cursor pagination. Users see self proposals and lower-hierarchy non-superadmin targets, while superadmins/bots see all. Only single `cursor`/`limit` query keys are accepted. The queue exposes reduced user/rank summaries and audits returned other-user IDs without snapshots. Approval/decline routes below retain their existing contracts.
+
 ### Rank Migration
 - `POST /api/ranks/migrate/preview`
 - `POST /api/ranks/migrate/apply`
 
 ### Rank Transition Training Requirements
-- `GET /api/ranks/[id]/transitions`
-- `POST /api/ranks/[id]/transitions`
-- `DELETE /api/ranks/[id]/transitions/[trainingId]`
+- `GET /api/ranks/[id]/requirements`
+- `PATCH /api/ranks/[id]/requirements`
+
+Both require current `rank:edit` permission or an active superadmin bot token. GET returns the ID-sorted `{ requiredTrainingIds, requiredTrainings }` configuration in the shared envelope, without pagination. PATCH replaces the complete set using `{ requiredTrainingIds: [...] }`; an empty array clears it. Updates and ID-only audit records commit atomically with serializable isolation. Missing references return 404; conflicts return 409 for refresh/retry. Existing empty configurations are read without writes. Internal promotion eligibility continues to use the same requirement table even though no website API callers were found for the old transition routes.
 
 ### User-Facing Rank Data
 - `GET /api/users/[id]/rank`
-- `GET /api/users/[id]/rank-history?page=...`
-- `PUT /api/users/[id]/rank/assign`
-- `PUT /api/users/[id]/rank/demote`
+- `GET /api/users/[id]/rank-history?limit=20&cursor=...`
+- `PATCH /api/users/[id]/rank`
+- `PATCH /api/users/ranks`
+
+The two user-rank read endpoints use the shared API envelope and support session-only `me` or numeric user IDs. They require self access, live hierarchy-aware `user:manage`, or superadmin (including active bot tokens). History uses descending-ID cursors; the former `page` parameter is rejected. Other-user reads are audited without storing returned records or decline reasons; rank-summary reads now require authentication. Assignment and demotion share PATCH with `{ rankId, reason? }`. Mutations require global `rank:manage_promotions` even for self changes plus target hierarchy authorization under that permission; GET’s `user:manage` permission is not required for PATCH. The transaction preserves retired/interview flags, resets the baseline/time, and writes history, a rank-change outbox event, and a redacted audit. Lower rank order is recorded as demotion; other changes are assignment, including the existing same-rank baseline-reset behavior. The PATCH response is the updated rank summary.
+
+Bulk assignment uses `{ updates: [{ userId, rankId, reason? }] }`, with 1–100 unique users. It shares individual assignment authorization and attendance calculation, checks every target before writes, and commits all updates/history/outbox/audits atomically. Summaries return in input order. The former admin bulk-rank-assign endpoint is removed.
 
 ### Bot Integration Endpoints
-- `GET /api/ranks/bot/promotions`
 - `POST /api/ranks/bot/promotions` (approve by `proposalId` in body)
 - `POST /api/ranks/bot/promotions/[id]/decline`
 
@@ -100,6 +108,8 @@ Bot endpoints use Bearer token auth with `BOT_API_TOKEN`.
 - list pending proposals
 - approve/decline with notes
 - trigger auto-rankup process
+
+Pending promotion reads use the shared `/api/ranks/promotions/pending` endpoint for sessions and bots. It requires global `rank:manage_promotions`; visibility is filtered before descending-ID cursor pagination. Users see self proposals and lower-hierarchy non-superadmin targets, while superadmins/bots see all. Only single `cursor`/`limit` query keys are accepted. The queue exposes reduced user/rank summaries and audits returned other-user IDs without snapshots. Approval/decline routes below retain their existing contracts.
 
 ### Rank Migration (`/admin/ranks/migrate`)
 - strategies: `recalculate`, `grandfather`, `map`

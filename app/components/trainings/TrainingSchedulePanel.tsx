@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
+import { apiList, apiRequest } from '@/lib/api/client';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import TrainingScheduleSummary from './TrainingScheduleSummary';
 import DualRingTimePicker from '@/app/components/ui/DualRingTimePicker';
@@ -16,7 +17,7 @@ type TrainingSchedulePanelProps = {
   onSaved: () => void | Promise<void>;
 };
 
-function localDateParts(value: string | null) {
+function utcDateParts(value: string | null) {
   if (!value) return { date: '', time: '' };
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return { date: '', time: '' };
@@ -38,7 +39,7 @@ export default function TrainingSchedulePanel({
   onSaved,
 }: TrainingSchedulePanelProps) {
   const { showError, showSuccess } = useToast();
-  const initialParts = useMemo(() => localDateParts(session?.startsAt ?? null), [session?.startsAt]);
+  const initialParts = useMemo(() => utcDateParts(session?.startsAt ?? null), [session?.startsAt]);
   const [staff, setStaff] = useState<TrainingRequestUser[]>([]);
   const [trainerId, setTrainerId] = useState(session?.trainer?.id?.toString() ?? '');
   const [date, setDate] = useState(initialParts.date);
@@ -52,7 +53,7 @@ export default function TrainingSchedulePanel({
   const [existingSessionId, setExistingSessionId] = useState('');
 
   useEffect(() => {
-    const parts = localDateParts(session?.startsAt ?? null);
+    const parts = utcDateParts(session?.startsAt ?? null);
     setTrainerId(session?.trainer?.id?.toString() ?? '');
     setDate(parts.date);
     setTime(parts.time);
@@ -61,42 +62,21 @@ export default function TrainingSchedulePanel({
   }, [defaultDurationMinutes, session]);
 
   useEffect(() => {
-    let active = true;
-    void fetch('/api/training-staff', { cache: 'no-store' })
-      .then(async (response) => {
-        if (!response.ok) return [];
-        const payload = await response.json();
-        return Array.isArray(payload) ? payload : Array.isArray(payload.staff) ? payload.staff : [];
-      })
-      .then((rows: unknown[]) => {
-        if (!active) return;
-        setStaff(
-          rows
-            .map((row) => row as Partial<TrainingRequestUser>)
-            .filter((row) => typeof row.id === 'number')
-            .map((row) => ({
-              id: row.id as number,
-              username: typeof row.username === 'string' ? row.username : null,
-              avatarUrl: typeof row.avatarUrl === 'string' ? row.avatarUrl : null,
-            }))
-            .sort((left, right) => (left.username || '').localeCompare(right.username || '')),
-        );
+    const controller = new AbortController();
+    void apiList<TrainingRequestUser>('/api/training-users?staffOnly=true', { cache: 'no-store', signal: controller.signal })
+      .then((rows) => {
+        if (controller.signal.aborted) return;
+        setStaff(rows.sort((left, right) => (left.username || '').localeCompare(right.username || '') || left.id - right.id));
       })
       .catch(() => undefined);
 
-    return () => {
-      active = false;
-    };
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
     if (session) return;
-    void fetch(`/api/training-sessions?trainingId=${trainingId}`, { cache: 'no-store' })
-      .then(async (response) => response.ok ? response.json() : { sessions: [] })
-      .then((payload) => setExistingSessions(
-        (Array.isArray(payload.sessions) ? payload.sessions : [])
-          .filter((item: { status?: string }) => ['proposed', 'scheduled', 'in_progress'].includes(item.status || '')),
-      ))
+    void apiList<(typeof existingSessions)[number]>(`/api/training-sessions?trainingId=${trainingId}`, { cache: 'no-store' })
+      .then((rows) => setExistingSessions(rows.filter(item => ['proposed', 'scheduled', 'in_progress'].includes(item.status)).sort((a, b) => b.id - a.id)))
       .catch(() => setExistingSessions([]));
   }, [session, trainingId]);
 
@@ -104,13 +84,11 @@ export default function TrainingSchedulePanel({
     if (!existingSessionId) return;
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/training-sessions/${existingSessionId}/attendees`, {
+      await apiRequest(`/api/training-sessions/${existingSessionId}/attendees`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: requestUserId, trainingRequestId: requestId }),
       });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || 'Failed to assign existing session');
       showSuccess('Existing session assigned');
       await onSaved();
     } catch (error) {
@@ -144,22 +122,14 @@ export default function TrainingSchedulePanel({
 
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/training-requests/${requestId}/schedule`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      await apiRequest(session ? `/api/training-sessions/${session.id}` : '/api/training-sessions', {
+        method: session ? 'PATCH' : 'POST',
         body: JSON.stringify({
-          assignedTrainerId: Number(trainerId),
-          startsAt: startsAt.toISOString(),
-          durationMinutes,
-          specialInstructions: instructions.trim() || null,
-          confirm,
+          trainerId: Number(trainerId), startsAt: startsAt.toISOString(), durationMinutes,
+          specialInstructions: instructions.trim() || null, status: confirm ? 'scheduled' : 'proposed',
+          ...(!session ? { trainingId, attendeeUserIds: [requestUserId], requestAssignments: [{ userId: requestUserId, trainingRequestId: requestId }] } : {}),
         }),
       });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new Error(error.error || 'Failed to save training schedule');
-      }
 
       showSuccess(confirm ? 'Training schedule confirmed' : 'Schedule draft saved');
       await onSaved();
@@ -231,7 +201,7 @@ export default function TrainingSchedulePanel({
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label htmlFor="training-date" className="mb-1 block text-sm font-medium" style={{ color: 'var(--foreground)' }}>Date</label>
+          <label htmlFor="training-date" className="mb-1 block text-sm font-medium" style={{ color: 'var(--foreground)' }}>Date (UTC)</label>
           <input
             id="training-date"
             type="date"
@@ -243,7 +213,7 @@ export default function TrainingSchedulePanel({
         </div>
         <DualRingTimePicker
           id="training-time"
-          label="Time"
+          label="Time (UTC)"
           value={time}
           onChange={setTime}
         />

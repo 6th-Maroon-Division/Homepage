@@ -1,5 +1,7 @@
 'use client';
 
+import { apiList, apiRequest } from '@/lib/api/client';
+
 import { useState, useEffect } from 'react';
 import { useToast } from '@/app/components/ui/ToastContainer';
 import LoadingSpinner from '@/app/components/ui/LoadingSpinner';
@@ -41,13 +43,8 @@ export default function RadioFrequenciesManagement() {
   const fetchFrequencies = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/radio-frequencies');
-      if (response.ok) {
-        const data = await response.json();
-        setFrequencies(data);
-      } else {
-        showError('Failed to fetch radio frequencies');
-      }
+      const data = await apiList<RadioFrequency>('/api/radio-frequencies');
+      setFrequencies(data.sort((a, b) => a.type.localeCompare(b.type) || a.frequency.localeCompare(b.frequency, undefined, { numeric: true })));
     } catch (error) {
       console.error('Error fetching frequencies:', error);
       showError('Error loading frequencies');
@@ -70,58 +67,18 @@ export default function RadioFrequenciesManagement() {
 
     setIsSaving(true);
     try {
-      if (editingId) {
-        // Update existing frequency
-        const response = await fetch(`/api/radio-frequencies/${editingId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            frequency: formData.frequency.trim(),
-            type: formData.type,
-            isAdditional: formData.isAdditional,
-            channel: formData.channel.trim() || null,
-            callsign: formData.callsign.trim() || null,
-          }),
-        });
-
-        if (response.ok) {
-          const updatedFreq = await response.json();
-          setFrequencies(frequencies.map((f) => (f.id === editingId ? updatedFreq : f)));
-          setFormData({ frequency: '', type: 'SR', isAdditional: false, channel: '', callsign: '' });
-          setEditingId(null);
-          showSuccess('Radio frequency updated successfully');
-        } else {
-          showError('Failed to update frequency');
-        }
-      } else {
-        // Create new frequency
-        const response = await fetch('/api/radio-frequencies', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            frequency: formData.frequency.trim(),
-            type: formData.type,
-            isAdditional: formData.isAdditional,
-            channel: formData.channel.trim() || null,
-            callsign: formData.callsign.trim() || null,
-          }),
-        });
-
-        if (response.ok) {
-          const newFreq = await response.json();
-          setFrequencies([...frequencies, newFreq].sort((a, b) => {
-            if (a.freqType !== b.freqType) return a.freqType.localeCompare(b.freqType);
-            return parseFloat(a.frequency) - parseFloat(b.frequency);
-          }));
-          setFormData({ frequency: '', type: 'SR', isAdditional: false, channel: '', callsign: '' });
-          showSuccess('Radio frequency added successfully');
-        } else {
-          showError('Failed to add frequency');
-        }
-      }
+      const { data: saved } = await apiRequest<RadioFrequency>(editingId ? `/api/radio-frequencies/${editingId}` : '/api/radio-frequencies', {
+        method: editingId ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...formData, frequency: formData.frequency.trim(), channel: formData.channel.trim() || null, callsign: formData.callsign.trim() || null }),
+      });
+      setFrequencies(previous => [...previous.filter(row => row.id !== saved.id), saved].sort((a, b) => a.type.localeCompare(b.type) || a.frequency.localeCompare(b.frequency, undefined, { numeric: true })));
+      setFormData({ frequency: '', type: 'SR', isAdditional: false, channel: '', callsign: '' });
+      setEditingId(null);
+      showSuccess(editingId ? 'Radio frequency updated successfully' : 'Radio frequency added successfully');
     } catch (error) {
       console.error('Error saving frequency:', error);
-      showError('Error saving frequency');
+      showError(error instanceof Error ? error.message : 'Error saving frequency');
     } finally {
       setIsSaving(false);
     }
@@ -147,19 +104,12 @@ export default function RadioFrequenciesManagement() {
     if (!confirm('Are you sure you want to delete this frequency?')) return;
 
     try {
-      const response = await fetch(`/api/radio-frequencies/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        setFrequencies(frequencies.filter((f) => f.id !== id));
-        showSuccess('Frequency deleted successfully');
-      } else {
-        showError('Failed to delete frequency');
-      }
+      await apiRequest<null>(`/api/radio-frequencies/${id}`, { method: 'DELETE' });
+      setFrequencies(previous => previous.filter(row => row.id !== id));
+      showSuccess('Frequency deleted successfully');
     } catch (error) {
       console.error('Error deleting frequency:', error);
-      showError('Error deleting frequency');
+      showError(error instanceof Error ? error.message : 'Error deleting frequency');
     }
   };
 

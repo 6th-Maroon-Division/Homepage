@@ -1,0 +1,353 @@
+{
+  "paths": {
+    "/ranks/migrate/preview": {
+      "post": {
+        "summary": "Preview rank migration",
+        "description": "Requires rank:edit and live target hierarchy; active bots superadmin. Strict JSON strategy, no query. Recalculate uses actual main-operation/legacy attendance, not the stored baseline. Map references all preflight. Computes full preview; returned other user IDs audited without snapshots; no state mutation.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "strategy"
+                    ],
+                    "properties": {
+                      "strategy": {
+                        "type": "string",
+                        "enum": [
+                          "recalculate",
+                          "grandfather"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "strategy",
+                      "rankMappings"
+                    ],
+                    "properties": {
+                      "strategy": {
+                        "const": "map"
+                      },
+                      "rankMappings": {
+                        "type": "array",
+                        "minItems": 1,
+                        "description": "Unique oldRankId values",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "oldRankId",
+                            "newRankId"
+                          ],
+                          "properties": {
+                            "oldRankId": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 2147483647
+                            },
+                            "newRankId": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 2147483647
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Computed preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "totalUsers",
+                        "demoted",
+                        "promoted",
+                        "unchanged",
+                        "changes"
+                      ],
+                      "properties": {
+                        "totalUsers": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "demoted": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "promoted": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "unchanged": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "changes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "userId",
+                              "username",
+                              "currentRankName",
+                              "newRankName",
+                              "changeType",
+                              "attendanceTotal"
+                            ],
+                            "properties": {
+                              "userId": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 2147483647
+                              },
+                              "username": {
+                                "type": "string"
+                              },
+                              "currentRankName": {
+                                "type": "string"
+                              },
+                              "newRankName": {
+                                "type": "string"
+                              },
+                              "changeType": {
+                                "type": "string",
+                                "enum": [
+                                  "promotion",
+                                  "demotion",
+                                  "unchanged"
+                                ]
+                              },
+                              "attendanceTotal": {
+                                "type": "integer",
+                                "minimum": 0
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON or query"
+          },
+          "401": {
+            "description": "Invalid credentials; explicit invalid bearer never falls back"
+          },
+          "403": {
+            "description": "Requires rank:edit or hierarchy changed"
+          },
+          "404": {
+            "description": "Mapped rank reference missing"
+          },
+          "409": {
+            "description": "Concurrent state conflict; reload preview"
+          },
+          "422": {
+            "description": "Invalid strict strategy/mapping body"
+          },
+          "500": {
+            "description": "Database or required audit failure"
+          }
+        }
+      }
+    },
+    "/ranks/migrate/apply": {
+      "post": {
+        "summary": "Apply rank migration",
+        "description": "Requires rank:edit and live target hierarchy; active bots superadmin. Strict JSON strategy, no query. Recalculate uses actual main-operation/legacy attendance, not the stored baseline. Map references all preflight. Entire visible plan is Serializable and atomic with history/outbox/audit; resets changed baselines to actual attendance, preserves flags, UTC timestamps. Failure rolls back all users.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "strategy"
+                    ],
+                    "properties": {
+                      "strategy": {
+                        "type": "string",
+                        "enum": [
+                          "recalculate",
+                          "grandfather"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "strategy",
+                      "rankMappings"
+                    ],
+                    "properties": {
+                      "strategy": {
+                        "const": "map"
+                      },
+                      "rankMappings": {
+                        "type": "array",
+                        "minItems": 1,
+                        "description": "Unique oldRankId values",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "oldRankId",
+                            "newRankId"
+                          ],
+                          "properties": {
+                            "oldRankId": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 2147483647
+                            },
+                            "newRankId": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 2147483647
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed migration summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "totalProcessed",
+                        "demoted",
+                        "promoted",
+                        "unchanged"
+                      ],
+                      "properties": {
+                        "totalProcessed": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "demoted": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "promoted": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "unchanged": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON or query"
+          },
+          "401": {
+            "description": "Invalid credentials; explicit invalid bearer never falls back"
+          },
+          "403": {
+            "description": "Requires rank:edit or hierarchy changed"
+          },
+          "404": {
+            "description": "Mapped rank reference missing"
+          },
+          "409": {
+            "description": "Concurrent state conflict; reload preview"
+          },
+          "422": {
+            "description": "Invalid strict strategy/mapping body"
+          },
+          "500": {
+            "description": "Database or required audit failure"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {}
+  },
+  "removePaths": []
+}

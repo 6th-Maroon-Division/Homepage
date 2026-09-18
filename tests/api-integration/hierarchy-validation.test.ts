@@ -1,0 +1,20 @@
+import { afterAll, expect, test, vi } from 'vitest';
+vi.mock('next-auth', () => ({ getServerSession: vi.fn() }));
+vi.mock('@/app/api/auth/[...nextauth]/route', () => ({ authOptions: {} }));
+import { prisma } from '@/lib/prisma';
+import { canAccessApiUser } from '@/lib/api/auth';
+import { canManageTrainingRequest } from '@/lib/api/training-requests';
+import type { ApiPrincipal } from '@/lib/api/principal';
+afterAll(async () => { await prisma.$disconnect(); });
+test('legacy malformed database grant cannot erase a valid target superadmin barrier', async () => {
+  const superPermission = await prisma.permission.upsert({ where: { key: 'system:super_admin' }, create: { key: 'system:super_admin' }, update: {} });
+  const badPermission = await prisma.permission.upsert({ where: { key: 'user:edit' }, create: { key: 'user:edit' }, update: {} });
+  const target = await prisma.user.create({ data: { username: 'Protected malformed grants', userPermissions: { create: [{ permissionId: superPermission.id, value: 1 }, { permissionId: badPermission.id, value: 256 }] } } });
+  const actor: ApiPrincipal = { kind: 'user', userId: target.id + 1, permissions: { 'user:manage': 10, 'training:mark': 10 } };
+  const bot: ApiPrincipal = { kind: 'bot', tokenId: 1, permissions: { 'system:super_admin': 255 } };
+  expect(await canAccessApiUser(actor, target.id, 'user:manage')).toBe(false);
+  expect(await canManageTrainingRequest(actor, target.id)).toBe(false);
+  expect(await canAccessApiUser(bot, target.id, 'user:manage')).toBe(true);
+  expect(await canManageTrainingRequest(bot, target.id)).toBe(true);
+  await prisma.userPermission.delete({ where: { userId_permissionId: { userId: target.id, permissionId: badPermission.id } } });
+});

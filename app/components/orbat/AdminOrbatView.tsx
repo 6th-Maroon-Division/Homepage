@@ -1,5 +1,9 @@
 'use client';
 
+import LocalDateTime from '@/app/components/ui/LocalDateTime';
+
+import { apiRequest } from '@/lib/api/client';
+
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import MoveSignupModal from '@/app/components/orbat/MoveSignupModal';
@@ -42,7 +46,7 @@ type ClientFrequency = {
     isAdditional: boolean;
     channel?: string | null;
     callsign?: string | null;
-    createdAt: Date;
+    createdAt: string | Date;
   };
 };
 
@@ -259,13 +263,8 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
 
   const refreshOrbat = useCallback(async () => {
     try {
-      const refreshRes = await fetch(`/api/orbats/${initialOrbat.id}/full`);
-      if (!refreshRes.ok) {
-        return;
-      }
-
-      const updatedOrbat = await refreshRes.json();
-      setOrbat(updatedOrbat);
+      const { data } = await apiRequest<ClientOrbat>(`/api/orbats/${initialOrbat.id}/full`);
+      setOrbat(data);
     } catch {
       // fallback interval may recover
     }
@@ -338,20 +337,15 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
   };
 
   const handleMove = async (signupId: number, targetSubslotId: number) => {
-    const res = await fetch(`/api/signups/${signupId}/move`, {
+    const { meta } = await apiRequest(`/api/signups/${signupId}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ targetSlotId: targetSubslotId }),
+      body: JSON.stringify({ slotId: targetSubslotId, overrideRequirements: true }),
     });
 
-    if (!res.ok) {
-      const data = await res.json();
-      throw new Error(data.error || 'Failed to move signup');
-    }
-
-    const data = await res.json();
+    const data = meta;
 
     // Show warnings if any
     if (data.warnings && Array.isArray(data.warnings)) {
@@ -374,18 +368,7 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
     const { signupId, subslotId } = confirmRemove;
 
     try {
-      const res = await fetch(`/api/subslots/${subslotId}/signup`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ signupId }),
-      });
-
-      if (!res.ok) {
-        showError('Failed to remove signup');
-        return;
-      }
+      await apiRequest(`/api/signups/${signupId}`, { method: 'DELETE' });
 
       await refreshOrbat();
       showSuccess('Signup removed successfully');
@@ -482,7 +465,7 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
 
     setIsUpdatingNoteId(note.id);
     try {
-      const res = await fetch(`/api/orbats/${orbat.id}/attendance-notes/${note.id}`, {
+      await apiRequest(`/api/orbats/${orbat.id}/availability/${note.userId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -493,10 +476,6 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
         }),
       });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to update attendance note');
-      }
 
       await refreshOrbat();
       showSuccess('Attendance note updated.');
@@ -515,14 +494,10 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
 
     setIsDeletingNoteId(note.id);
     try {
-      const res = await fetch(`/api/orbats/${orbat.id}/attendance-notes/${note.id}`, {
+      await apiRequest(`/api/orbats/${orbat.id}/availability/${note.userId}`, {
         method: 'DELETE',
       });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to delete attendance note');
-      }
 
       await refreshOrbat();
       showSuccess('Attendance note deleted.');
@@ -554,12 +529,12 @@ export default function AdminOrbatView({ orbat: initialOrbat }: AdminOrbatViewPr
                 )}
                 {eventDate && (
                   <div className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
-                    <p>Event date: {eventDate.toLocaleDateString(undefined, { dateStyle: 'medium' })}</p>
+                    <p>Event date: {<LocalDateTime value={eventDate.toISOString()} kind="date" dateOnly={!startDateTime} />}</p>
                     {(startDateTime || endDateTime || orbat.startTime || orbat.endTime) && (
                       <p>
-                        Time: {startDateTime ? startDateTime.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : (orbat.startTime || '??:??')}
+                        Time: {startDateTime ? <LocalDateTime value={startDateTime.toISOString()} kind="time" /> : (orbat.startTime || '??:??')}
                         {(endDateTime || orbat.endTime)
-                          ? ` - ${endDateTime ? endDateTime.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : orbat.endTime}`
+                          ? <> - {endDateTime ? <LocalDateTime value={endDateTime.toISOString()} kind="time" /> : orbat.endTime}</>
                           : ''}
                       </p>
                     )}

@@ -1,80 +1,38 @@
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { validateQueryParameters, parseCursorPagination } from '@/lib/api/validation';
 import { prisma } from '@/lib/prisma';
-import { NextResponse, NextRequest } from 'next/server';
-import { checkPermission } from '@/lib/auth-middleware';
+import { handleApiRequest } from '@/lib/api/handler';
+import { apiError, apiSuccess } from '@/lib/api/response';
+import { readJsonBody } from '@/lib/api/request';
+import { parseTrainingCategoryBody, categoryMutationError } from '@/lib/api/training-categories';
+import { writeApiAudit } from '@/lib/api/audit';
 
-// GET /api/training-categories - List all categories
-export async function GET() {
-  try {
-    const categories = await prisma.trainingCategory.findMany({
-      orderBy: { orderIndex: 'asc' },
-    });
-
-    return NextResponse.json(categories);
-  } catch (error) {
-    console.error('Error fetching categories:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch categories' },
-      { status: 500 }
-    );
-  }
+export async function GET(request: Request) {
+  return handleApiRequest(request, undefined, async () => {
+    const queryError = validateQueryParameters(request, ['limit', 'cursor']);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
+    const pagination = parseCursorPagination(new URL(request.url).searchParams, { defaultLimit: 50, maxLimit: 100 });
+    if (pagination.error !== undefined) return apiError(400, 'invalid_request', pagination.error);
+    const { limit, cursor } = pagination.data;
+    const rows = await prisma.trainingCategory.findMany({ where: cursor ? { id: { gt: cursor } } : {}, orderBy: { id: 'asc' }, take: limit + 1 });
+    const data = rows.slice(0, limit);
+    return apiSuccess(data, { meta: { limit, nextCursor: rows.length > limit ? String(data.at(-1)!.id) : null } });
+  });
 }
 
-// POST /api/training-categories - Create a new category (admin only)
-export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-
-  if (!session?.user?.id) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    );
-  }
-  
-  const hasPermission = await checkPermission(session.user.id, 'training:create');
-  if (!hasPermission) {
-    return NextResponse.json(
-      { error: 'Forbidden' },
-      { status: 403 }
-    );
-  }
-
-  try {
-    const body = await request.json();
-    const { name } = body;
-
-    if (!name || name.trim() === '') {
-      return NextResponse.json(
-        { error: 'Category name is required' },
-        { status: 400 }
-      );
-    }
-
-    // Get the highest orderIndex to add new category at the end
-    const lastCategory = await prisma.trainingCategory.findFirst({
-      orderBy: { orderIndex: 'desc' },
-    });
-
-    const category = await prisma.trainingCategory.create({
-      data: {
-        name: name.trim(),
-        orderIndex: (lastCategory?.orderIndex ?? -1) + 1,
-      },
-    });
-
-    return NextResponse.json(category);
-  } catch (error: unknown) {
-    if ((error as { code?: string }).code === 'P2002') {
-      return NextResponse.json(
-        { error: 'Category already exists' },
-        { status: 400 }
-      );
-    }
-    console.error('Error creating category:', error);
-    return NextResponse.json(
-      { error: 'Failed to create category' },
-      { status: 500 }
-    );
-  }
+export async function POST(request: Request) {
+  return handleApiRequest(request, 'training:create', async (_principal, audit) => {
+    const queryError = validateQueryParameters(request, []);
+    if (queryError) return apiError(400, 'invalid_request', queryError);
+    const parsed = parseTrainingCategoryBody(await readJsonBody(request), true);
+    if (parsed.error) return parsed.error;
+    try {
+      return await prisma.$transaction(async tx => {
+        const last = await tx.trainingCategory.findFirst({ orderBy: { orderIndex: 'desc' } });
+        if (last?.orderIndex === 2147483647) return apiError(409, 'conflict', 'Category ordering limit reached.');
+        const category = await tx.trainingCategory.create({ data: { name: parsed.data.name!, orderIndex: (last?.orderIndex ?? -1) + 1 } });
+        await writeApiAudit(tx, audit, { action: 'training_category.created', resource: 'training_category', resourceId: String(category.id), outcome: 'success', after: { name: category.name, orderIndex: category.orderIndex } });
+        return apiSuccess(category, { status: 201 });
+      });
+    } catch (error) { return categoryMutationError(error); }
+  });
 }

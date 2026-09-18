@@ -46,15 +46,33 @@ export function normalizeTemplateSlots(value: unknown): UnknownRecord[] {
       orderIndex: toNonNegativeInteger(squad.orderIndex, squadIndex),
       slots: rawSlots.map((rawSlot, slotIndex) => {
         const slot = asRecord(rawSlot) ?? {};
+        const role = asRecord(slot.squadRole);
         return {
           ...slot,
-          name: typeof slot.name === 'string' ? slot.name : 'Unknown Role',
+          name: typeof role?.name === 'string'
+            ? role.name
+            : typeof slot.name === 'string' ? slot.name : 'Unknown Role',
           orderIndex: toNonNegativeInteger(slot.orderIndex, slotIndex),
           maxSignups: toPositiveInteger(slot.maxSignups, 1),
         };
       }),
     };
   });
+}
+
+// Copies are new form entries: keep role-definition IDs, but never source
+// squad/slot IDs, signups, or deletion flags.
+export function copyOrbatPresetSlots(source: UnknownRecord) {
+  return normalizeTemplateSlots(source.slotsJson ?? source.squads ?? source.slots).map((squad) => ({
+    name: squad.name as string,
+    orderIndex: squad.orderIndex as number,
+    subslots: (squad.slots as UnknownRecord[]).map((slot) => ({
+      squadRoleId: typeof slot.squadRoleId === 'number' ? slot.squadRoleId : null,
+      name: slot.name as string,
+      orderIndex: slot.orderIndex as number,
+      maxSignups: slot.maxSignups as number,
+    })),
+  }));
 }
 
 export function normalizeTemplateFrequencyIds(value: unknown): number[] | null {
