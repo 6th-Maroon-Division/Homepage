@@ -706,6 +706,7 @@ model TrainingSession {
   @@index([trainerId])
   @@index([createdById])
   @@index([startsAt])
+  @@index([status, startsAt, id])
   @@index([status])
 }
 
@@ -725,6 +726,8 @@ model TrainingSessionAttendee {
   createdAt         DateTime                      @default(now())
   updatedAt         DateTime                      @updatedAt
 
+  @@index([reminder24hSentAt, status, sessionId, id])
+  @@index([sessionId, id])
   @@unique([sessionId, userId])
   @@index([sessionId])
   @@index([userId])

@@ -70,7 +70,7 @@ export async function pruneCompletedJobs(now = new Date()) {
     kind: { in: ['promotions', 'promotion-user', 'reminders'] },
     completedAt: { lt: cutoff }, dueAt: { lt: cutoff },
   };
-  const jobs = await prisma.schedulerJob.findMany({ where, select: { key: true }, orderBy: [{ completedAt: 'asc' }, { key: 'asc' }], take: 500 });
+  const jobs = await prisma.schedulerJob.findMany({ where, select: { key: true }, orderBy: [{ completedAt: 'asc' }, { dueAt: 'asc' }, { key: 'asc' }], take: 500 });
   if (jobs.length) await prisma.schedulerJob.deleteMany({ where: { ...where, key: { in: jobs.map(job => job.key) } } });
 }
 
