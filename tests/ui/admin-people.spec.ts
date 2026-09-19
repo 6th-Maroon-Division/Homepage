@@ -102,3 +102,22 @@ test('attendance overview opens an operation, saves attendance and shows statist
   await expect(page.getByText('Last 4 Ops', { exact: true }).locator('..')).toContainText(`${average.toFixed(1)} avg attendees`);
   await expect(page.getByRole('main').getByRole('heading', { name: '6-Month Trend', exact: true })).toBeVisible();
 });
+
+test('Needs Interview includes ranked trained users and marking complete removes them', async ({ page, login, db }) => {
+  const rank = await db.rank.create({ data: { name: 'UI Interview Rank', abbreviation: 'UIIR', orderIndex: 95000 } });
+  const user = await db.user.create({ data: { username: 'UI Ranked Interview Pending', userRank: { create: { currentRankId: rank.id, interviewDone: false } } } });
+  const required = await db.training.findMany({ where: { requiredForNewPeople: true }, select: { id: true } });
+  if (required.length) await db.userTraining.createMany({ data: required.map(training => ({ userId: user.id, trainingId: training.id, status: 'qualified' })) });
+  await login();
+  await page.goto('/admin/users');
+  await page.getByRole('button', { name: 'Unranked Users', exact: true }).click();
+  await page.getByRole('button', { name: 'Needs Interview', exact: true }).click();
+  const row = page.getByRole('row').filter({ hasText: user.username! });
+  await expect(row).toBeVisible();
+  await row.getByRole('checkbox').check();
+  const saved = page.waitForResponse(response => response.url().endsWith('/api/users/status') && response.request().method() === 'PATCH');
+  await page.getByRole('button', { name: 'Mark Interview Complete', exact: true }).click();
+  expect((await saved).ok()).toBeTruthy();
+  await expect(row).toHaveCount(0);
+  expect((await db.userRank.findUniqueOrThrow({ where: { userId: user.id } })).interviewDone).toBe(true);
+});

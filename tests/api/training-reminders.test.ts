@@ -1,5 +1,5 @@
 import { beforeEach, expect, test, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ session: vi.fn(), publish: vi.fn(), discord: vi.fn(), db: { user: { findUnique: vi.fn() }, botToken: { findFirst: vi.fn(), update: vi.fn() }, trainingSessionAttendee: { findMany: vi.fn(), updateMany: vi.fn() }, message: { create: vi.fn() }, botEvent: { create: vi.fn(), deleteMany: vi.fn() }, apiAuditLog: { create: vi.fn() }, $transaction: vi.fn() } }));
+const mocks = vi.hoisted(() => ({ session: vi.fn(), publish: vi.fn(), discord: vi.fn(), db: { user: { findUnique: vi.fn() }, botToken: { findFirst: vi.fn(), update: vi.fn() }, trainingSessionAttendee: { findFirstOrThrow: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() }, message: { create: vi.fn() }, botEvent: { findFirst: vi.fn(), create: vi.fn(), deleteMany: vi.fn() }, apiAuditLog: { create: vi.fn() }, $transaction: vi.fn() } }));
 vi.mock('next-auth', () => ({ getServerSession: mocks.session }));
 vi.mock('@/app/api/auth/[...nextauth]/route', () => ({ authOptions: {} }));
 vi.mock('@/lib/prisma', () => ({ prisma: mocks.db }));
@@ -13,6 +13,7 @@ beforeEach(() => {
   mocks.session.mockResolvedValue({ user: { id: 4 } });
   mocks.db.user.findUnique.mockResolvedValue({ userPermissions: [{ permission: { key: 'training:mark' }, value: 1 }] });
   mocks.db.botToken.findFirst.mockResolvedValue({ id: 9 });
+  mocks.db.trainingSessionAttendee.findFirstOrThrow.mockResolvedValue({ id: 1 });
   mocks.db.trainingSessionAttendee.findMany.mockResolvedValue([attendee()]);
   mocks.db.trainingSessionAttendee.updateMany.mockResolvedValue({ count: 1 });
   mocks.db.message.create.mockResolvedValue({ id: 7 });
@@ -96,4 +97,21 @@ test('unscheduled records returned during a schedule race never generate reminde
   mocks.db.trainingSessionAttendee.findMany.mockResolvedValue([{ ...attendee(), session: { ...attendee().session, startsAt: null } }]);
   expect((await (await POST(req())).json()).data.delivered).toBe(0);
   expect(mocks.db.message.create).not.toHaveBeenCalled();
+});
+
+test('later batches of the same session version reuse its durable bot event', async () => {
+  mocks.db.botEvent.findFirst.mockResolvedValue({ payload: { version: '2026-09-18T10:00:00.000Z', sessionVersion: attendee().session.updatedAt.toISOString(), reminderRosterId: 1 } });
+  expect((await (await POST(req())).json()).data.delivered).toBe(1);
+  expect(mocks.db.message.create).toHaveBeenCalledTimes(1);
+  expect(mocks.db.botEvent.create).not.toHaveBeenCalled();
+});
+
+
+test.each([
+  { version: '2099-01-01T00:00:00.000Z', sessionVersion: attendee().session.updatedAt.toISOString(), reminderRosterId: 0 },
+  { version: '2099-01-01T00:00:00.000Z', sessionVersion: '2020-01-01T00:00:00.000Z', reminderRosterId: 1 },
+])('new roster or session generation emits a strictly newer reminder version', async previous => {
+  mocks.db.botEvent.findFirst.mockResolvedValue({ payload: previous });
+  expect((await POST(req())).status).toBe(200);
+  expect(mocks.db.botEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ payload: expect.objectContaining({ version: '2099-01-01T00:00:00.001Z', reminderRosterId: 1, sessionVersion: attendee().session.updatedAt.toISOString() }) }) });
 });

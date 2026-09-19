@@ -237,3 +237,7 @@ npm run build
 ## License
 
 Proprietary - 6th Maroon Division
+
+### Background scheduler
+
+Run `npm run scheduler` as a separate supervised process alongside the website. Apply database migrations first. It finalizes main-op attendance at end + 4 hours, checks automatic promotions every six hours and after finalization, and schedules training reminders. See [scheduler deployment and bot events](docs/SCHEDULER.md) and the [example systemd unit](deploy/orbat-scheduler.service).

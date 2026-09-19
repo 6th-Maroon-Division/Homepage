@@ -1,0 +1,1 @@
+ALTER TABLE "SchedulerJob" ADD COLUMN "candidateCursor" INTEGER NOT NULL DEFAULT 0;

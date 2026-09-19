@@ -17,7 +17,7 @@ export async function getUserOnboarding(request: Request) {
     const requirements = await prisma.training.findMany({ where: { requiredForNewPeople: true }, select: { id: true, requiresOrbatQualification: true } });
     const completedConditions: Prisma.UserWhereInput[] = requirements.map(training => ({ userTrainings: { some: { trainingId: training.id, status: { in: training.requiresOrbatQualification ? ['qualified'] : ['qualified', 'finished'] } } } }));
     const missingConditions: Prisma.UserWhereInput[] = requirements.map(training => ({ userTrainings: { none: { trainingId: training.id, status: { in: training.requiresOrbatQualification ? ['qualified'] : ['qualified', 'finished'] } } } }));
-    const filters: Prisma.UserWhereInput[] = [{ OR: [{ userRank: null }, { userRank: { currentRankId: null } }, ...missingConditions] }];
+    const filters: Prisma.UserWhereInput[] = [{ OR: [{ userRank: null }, { userRank: { currentRankId: null } }, { userRank: { interviewDone: false } }, ...missingConditions] }];
     filters.push(userVisibility(principal));
     for (const key of ['interviewDone', 'retired'] as const) {
       if (params.get(key) === 'true') filters.push({ userRank: { [key]: true } });

@@ -114,3 +114,9 @@ A separate bot process can use these APIs without coupling the Discord connectio
 ## Deployment
 
 Apply the committed Prisma migrations through your normal deployment process before enabling the new code. Tests provision their own Prisma-managed PGlite database and do not apply migrations to development or production. Run `npm run test:backend` for the complete automatic backend gate; retain UI checks for browser interactions. See [testing](api/testing.md).
+
+## Scheduled actions
+
+The standalone [scheduler](SCHEDULER.md) finalizes main-op attendance at end + 4 hours, checks automatic promotions every six hours and after finalization, and checks training reminders every five minutes. It writes existing `user.rank_changed` and `training.reminder_due` events atomically with changes. Subscribe to the `orbat` feed for the new `attendance.finalized` event with `{ orbatId, status: "finalized", startsAt, endsAt, version }`. `version` is the finalization timestamp. Attendance finalization is one-time; this event is not a request for the bot to compile attendance. Feed retention is 30 days.
+
+Reminder event `version` identifies a reminder generation, rather than the session edit timestamp. Batches for the same session and attendee roster share one event; a later attendee addition creates a new event with a strictly newer timestamp version, even if the session itself was not edited. Consumers should process each new version to pick up newly enrolled recipients.

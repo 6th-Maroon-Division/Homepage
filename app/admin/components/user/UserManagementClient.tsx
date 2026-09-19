@@ -1336,7 +1336,7 @@ export default function UserManagementClient({
           <div className="px-6 py-4" style={{ borderBottomWidth: '1px', borderColor: 'var(--border)' }}>
             <h2 className="text-xl font-semibold" style={{ color: 'var(--foreground)' }}>Unranked Users</h2>
             <p className="text-sm mt-1" style={{ color: 'var(--muted-foreground)' }}>
-              Onboard and manage unranked personnel
+              Manage missing ranks, unfinished interviews, and required training
             </p>
           </div>
 

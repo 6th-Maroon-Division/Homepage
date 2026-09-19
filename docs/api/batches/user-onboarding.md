@@ -1,6 +1,6 @@
 # User onboarding queue
 
-Canonical `GET /users/onboarding` under /api replaces GET/admin/users/unranked. Requires global user:manage and live user:manage target hierarchy; bots superadmin. Queue retains users without a current rank OR missing any required-for-new-people training, including already-ranked people needing training. SQL visibility and all filters precede pagination.
+Canonical `GET /users/onboarding` under /api replaces GET/admin/users/unranked. Requires global user:manage and live user:manage target hierarchy; bots superadmin. Queue retains users without a current rank OR with an unfinished interview OR missing any required-for-new-people training. Ranked, fully trained users remain visible until their interview is marked complete. SQL visibility and all filters precede pagination.
 
 Only querylimit/cursor and optional stricttrue|false interviewDone,retired,requiredTrainingsCompleted. Defaultlimit50cap100, ascending userID exclusivecursor, actual lookaheadnextCursor/string-or-null. Missing userRank counts interviewDonefalse/retiredfalse. Omitted boolean means all. Old page/sort/interview/bct strings reject400; duplicate/unknown/invalid queries400.
 

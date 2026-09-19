@@ -3,6 +3,7 @@ import type { ApiPrincipal } from './principal';
 
 export type ApiAuditContext = {
   principal: ApiPrincipal | null;
+  actorType?: 'scheduler';
   correlationId: string;
   method: string;
   path: string;
@@ -36,7 +37,7 @@ export async function writeApiAudit(
   const { principal } = context;
   return database.apiAuditLog.create({ data: {
     correlationId: context.correlationId,
-    actorType: principal?.kind ?? 'anonymous',
+    actorType: context.actorType ?? principal?.kind ?? 'anonymous',
     actorUserId: principal?.kind === 'user' ? principal.userId : null,
     actorTokenId: principal?.kind === 'bot' ? principal.tokenId : null,
     action: event.action, resource: event.resource, resourceId: event.resourceId,
