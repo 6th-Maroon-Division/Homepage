@@ -1,5 +1,5 @@
 import { beforeEach, expect, test, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ session: vi.fn(), publish: vi.fn(), discord: vi.fn(), db: { user: { findUnique: vi.fn() }, botToken: { findFirst: vi.fn(), update: vi.fn() }, trainingSessionAttendee: { findMany: vi.fn(), updateMany: vi.fn() }, message: { create: vi.fn() }, botEvent: { create: vi.fn(), deleteMany: vi.fn() }, apiAuditLog: { create: vi.fn() }, $transaction: vi.fn() } }));
+const mocks = vi.hoisted(() => ({ session: vi.fn(), publish: vi.fn(), discord: vi.fn(), db: { user: { findUnique: vi.fn() }, botToken: { findFirst: vi.fn(), update: vi.fn() }, trainingSessionAttendee: { findMany: vi.fn(), updateMany: vi.fn() }, message: { create: vi.fn() }, botEvent: { findFirst: vi.fn(), create: vi.fn(), deleteMany: vi.fn() }, apiAuditLog: { create: vi.fn() }, $transaction: vi.fn() } }));
 vi.mock('next-auth', () => ({ getServerSession: mocks.session }));
 vi.mock('@/app/api/auth/[...nextauth]/route', () => ({ authOptions: {} }));
 vi.mock('@/lib/prisma', () => ({ prisma: mocks.db }));
@@ -96,4 +96,11 @@ test('unscheduled records returned during a schedule race never generate reminde
   mocks.db.trainingSessionAttendee.findMany.mockResolvedValue([{ ...attendee(), session: { ...attendee().session, startsAt: null } }]);
   expect((await (await POST(req())).json()).data.delivered).toBe(0);
   expect(mocks.db.message.create).not.toHaveBeenCalled();
+});
+
+test('later batches of the same session version reuse its durable bot event', async () => {
+  mocks.db.botEvent.findFirst.mockResolvedValue({ id: BigInt(1) });
+  expect((await (await POST(req())).json()).data.delivered).toBe(1);
+  expect(mocks.db.message.create).toHaveBeenCalledTimes(1);
+  expect(mocks.db.botEvent.create).not.toHaveBeenCalled();
 });

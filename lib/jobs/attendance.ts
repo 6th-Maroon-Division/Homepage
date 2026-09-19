@@ -30,12 +30,19 @@ export async function compileAttendanceInTransaction(tx: Prisma.TransactionClien
   const { startsAtUtc: start, endsAtUtc: end } = resolveOrbatScheduleWindow(orbat); if (!start || !end) compilationError(422, 'Operation start and end are required for compilation.');
   const signups = await tx.signup.findMany({ where: { slot: { orbatId } }, select: { id: true, userId: true }, orderBy: { id: 'asc' } });
   for (const signup of signups) await authorize(signup.userId);
-  const events = await tx.attendanceEvent.findMany({ where: { eventTime: { gte: new Date(start.getTime() - 21600000), lte: new Date(end.getTime() + 21600000) } }, orderBy: [{ eventTime: 'asc' }, { id: 'asc' }] });
+  const events = await tx.attendanceEvent.findMany({ where: { userId: { in: signups.map(signup => signup.userId) }, eventTime: { gte: new Date(start.getTime() - 21600000), lte: new Date(end.getTime() + 21600000) } }, select: { userId: true, isJoin: true, eventTime: true }, orderBy: [{ eventTime: 'asc' }, { id: 'asc' }] });
   const notes = await tx.orbatAttendanceNote.findMany({ where: { orbatId }, select: { userId: true, status: true, lateMinutes: true, leaveEarlyMinutes: true } });
+  const eventsByUser = new Map<number | null, typeof events>();
+  for (const event of events) {
+    const group = eventsByUser.get(event.userId) ?? [];
+    group.push(event);
+    eventsByUser.set(event.userId, group);
+  }
+  const notesByUser = new Map(notes.map(note => [note.userId, note]));
   const attendance = [];
   for (const signup of signups) {
-    const { joinCount, leaveCount, ...computed } = compileEventMetrics(events.filter(event => event.userId === signup.userId), start, end);
-    const flags = buildAttendanceNoteFlags(notes.find(note => note.userId === signup.userId) ?? null);
+    const { joinCount, leaveCount, ...computed } = compileEventMetrics(eventsByUser.get(signup.userId) ?? [], start, end);
+    const flags = buildAttendanceNoteFlags(notesByUser.get(signup.userId) ?? null);
     const existing = await tx.attendance.findFirst({ where: { orbatId, userId: signup.userId }, orderBy: { id: 'asc' } });
     const saved = existing ? await tx.attendance.update({ where: { id: existing.id }, data: { ...computed, ...flags, signupId: signup.id } }) : await tx.attendance.create({ data: { orbatId, userId: signup.userId, signupId: signup.id, ...computed, ...flags } });
     await tx.attendanceLog.create({ data: { attendanceId: saved.id, action: 'compiled', source: 'automation', changedById: audit.principal?.kind === 'user' ? audit.principal.userId : null } });

@@ -480,6 +480,7 @@ model AttendanceEvent {
   processed Boolean  @default(false) // true = event was matched to user, false = pending
 
   @@index([userId])
+  @@index([userId, eventTime, id])
   @@index([steamId])
   @@index([discordId])
   @@index([eventTime])
@@ -1023,6 +1024,7 @@ model BotEvent {
 
   @@index([aggregate, id])
   @@index([type, id])
+  @@index([type, aggregateId])
   @@index([occurredAt])
 }
 
@@ -1082,4 +1084,5 @@ model SchedulerJob {
   updatedAt     DateTime  @updatedAt
 
   @@index([completedAt, nextAttemptAt])
+  @@index([completedAt, dueAt, key])
 }

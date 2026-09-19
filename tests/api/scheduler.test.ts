@@ -27,6 +27,7 @@ beforeEach(() => {
   m.db.orbat.findUnique.mockResolvedValue(op);
   m.db.orbat.findMany.mockResolvedValue([]);
   m.db.userRank.findMany.mockResolvedValue([]);
+  m.remind.mockResolvedValue({ scanned: 0, delivered: [] });
   m.compile.mockResolvedValue({ compiledCount: 1 });
 });
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
@@ -99,7 +100,7 @@ test('failure before a claim never alters another job', async () => {
 test('reminders use the job transaction and execution clock', async () => {
   m.db.schedulerJob.findFirst.mockResolvedValue({ ...job, kind: 'reminders' });
   await runNextJob();
-  expect(m.remind).toHaveBeenCalledWith(m.db, expect.objectContaining({ actorType: 'scheduler' }), now);
+  expect(m.remind).toHaveBeenCalledWith(m.db, expect.objectContaining({ actorType: 'scheduler' }), now, 100);
 });
 
 test('discovery batches inserts and does not write unchanged or completed attendance jobs', async () => {
@@ -159,4 +160,12 @@ test('a full promotion page saves progress without completing the parent or hold
   expect(m.db.userRank.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ userId: { gt: 20 } }), take: 100, orderBy: { userId: 'asc' } }));
   expect(m.db.schedulerJob.createMany.mock.calls[0][0].data).toHaveLength(100);
   expect(m.db.schedulerJob.update).toHaveBeenCalledExactlyOnceWith({ where: { key: job.key }, data: { candidateCursor: 120, dueAt: now, attempts: 0, lastError: null, nextAttemptAt: new Date(0) } });
+});
+
+test('full reminder batches commit without completing the scheduler job', async () => {
+  m.db.schedulerJob.findFirst.mockResolvedValue({ ...job, kind: 'reminders' });
+  m.remind.mockResolvedValue({ scanned: 100, delivered: [] });
+  await runNextJob();
+  expect(m.remind).toHaveBeenCalledExactlyOnceWith(m.db, expect.anything(), now, 100);
+  expect(m.db.schedulerJob.update).toHaveBeenCalledExactlyOnceWith({ where: { key: job.key }, data: { dueAt: now, attempts: 0, lastError: null, nextAttemptAt: new Date(0) } });
 });

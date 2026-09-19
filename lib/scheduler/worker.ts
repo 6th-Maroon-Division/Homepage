@@ -12,6 +12,7 @@ const FOUR_HOURS = 4 * 60 * 60 * 1000;
 const SIX_HOURS = 6 * 60 * 60 * 1000;
 const STATE_ID = 'scheduler';
 const PROMOTION_PAGE_SIZE = 100;
+const REMINDER_PAGE_SIZE = 100;
 export const attendanceJobKey = (id: number) => `attendance:${id}`;
 export function promotionSlot(now: Date) { return new Date(Math.floor(now.getTime() / SIX_HOURS) * SIX_HOURS); }
 export function attendanceDueAt(orbat: Parameters<typeof resolveOrbatScheduleWindow>[0]) {
@@ -125,7 +126,12 @@ export async function runNextJob(now = new Date()): Promise<boolean> {
       } else if (job.kind === 'promotion-user' && job.userId !== null && job.expectedRankId !== null) {
         await executeAutomaticPromotions(audit, { tx, userFilter: { id: job.userId }, expectedRankId: job.expectedRankId, authorize: async () => true });
       } else if (job.kind === 'reminders') {
-        await executeTrainingReminders(tx, audit, now);
+        const result = await executeTrainingReminders(tx, audit, now, REMINDER_PAGE_SIZE);
+        if (result.scanned === REMINDER_PAGE_SIZE) {
+          // Sent markers are the durable cursor; commit this page before continuing.
+          await tx.schedulerJob.update({ where: { key: job.key }, data: { dueAt: now, attempts: 0, lastError: null, nextAttemptAt: new Date(0) } });
+          return true;
+        }
       } else {
         throw new Error('Unknown scheduler job kind');
       }

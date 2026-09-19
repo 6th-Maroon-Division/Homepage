@@ -249,3 +249,56 @@ test('promotion pages resume durably, yield to older work, and roll back cursor 
     await prisma.rank.delete({ where: { id: rank.id } });
   }
 });
+
+test('reminders span committed batches with one inbox message per attendee and one session event', async () => {
+  const training = await prisma.training.create({ data: { name: 'Batched scheduler reminders' } });
+  const session = await prisma.trainingSession.create({ data: { trainingId: training.id, startsAt: new Date(start.getTime() + 7200000), status: 'scheduled' } });
+  const users = await prisma.user.createManyAndReturn({ data: Array.from({ length: 101 }, (_, i) => ({ username: `Batched reminder ${i}` })), select: { id: true } });
+  const ids = users.map(user => user.id);
+  const key = 'batched-reminders';
+  try {
+    await prisma.trainingSessionAttendee.createMany({ data: ids.map(userId => ({ userId, sessionId: session.id })) });
+    await prisma.schedulerState.create({ data: { id: 'scheduler', activatedAt: start } });
+    await prisma.schedulerJob.create({ data: { key, kind: 'reminders', dueAt: start, nextAttemptAt: start } });
+    await runNextJob(start);
+    expect(await prisma.trainingSessionAttendee.count({ where: { sessionId: session.id, reminder24hSentAt: { not: null } } })).toBe(100);
+    expect(await prisma.schedulerJob.findUniqueOrThrow({ where: { key } })).toMatchObject({ completedAt: null });
+    const original = prisma.$transaction.bind(prisma);
+    const spy = vi.spyOn(prisma, '$transaction');
+    spy.mockImplementationOnce(((callback: (tx: never) => Promise<unknown>, options: never) => original(async tx => {
+      const create = tx.apiAuditLog.create;
+      tx.apiAuditLog.create = (() => { throw new Error('Reminder audit failed'); }) as typeof create;
+      try { return await callback(tx as never); } finally { tx.apiAuditLog.create = create; }
+    }, options)) as unknown as typeof prisma.$transaction);
+    try { await expect(runNextJob(start)).rejects.toThrow('Scheduler job failed'); } finally { spy.mockRestore(); }
+    expect(await prisma.trainingSessionAttendee.count({ where: { sessionId: session.id, reminder24hSentAt: { not: null } } })).toBe(100);
+    expect(await prisma.messageRecipient.count({ where: { userId: { in: ids } } })).toBe(100);
+    const retry = new Date(start.getTime() + 30000);
+    await runNextJob(retry);
+    expect(await prisma.schedulerJob.findUniqueOrThrow({ where: { key } })).toMatchObject({ completedAt: retry });
+    expect(await prisma.trainingSessionAttendee.count({ where: { sessionId: session.id, reminder24hSentAt: { not: null } } })).toBe(101);
+    expect(await prisma.messageRecipient.count({ where: { userId: { in: ids } } })).toBe(101);
+    expect(await prisma.botEvent.count({ where: { type: 'training.reminder_due', aggregateId: String(session.id) } })).toBe(1);
+    expect(await runNextJob(retry)).toBe(false);
+  } finally {
+    await prisma.trainingSession.delete({ where: { id: session.id } });
+    await prisma.user.deleteMany({ where: { id: { in: ids } } });
+    await prisma.training.delete({ where: { id: training.id } });
+  }
+});
+
+test('attendance compilation only loads events for signed-up members and groups repeated events', async () => {
+  const main = await operation();
+  const outsider = await prisma.user.create({ data: { username: 'Unrelated attendance events' } });
+  await prisma.attendanceEvent.createMany({ data: [
+    { userId, isJoin: false, eventTime: end },
+    { userId: outsider.id, isJoin: true, eventTime: start },
+    { userId: null, isJoin: true, eventTime: start },
+  ] });
+  const { compileAttendanceInTransaction } = await import('@/lib/jobs/attendance');
+  const result = await prisma.$transaction(tx => compileAttendanceInTransaction(tx, { principal: null, actorType: 'scheduler', correlationId: 'grouped-attendance-test', method: 'JOB', path: '/scheduler/test' }, main.id, async () => {}));
+  expect(result.totalEventsProcessed).toBe(2);
+  expect(result.attendance).toEqual([expect.objectContaining({ userId, status: 'present', totalMinutesPresent: 120, joinCount: 1, leaveCount: 1 })]);
+  await prisma.attendanceEvent.deleteMany({ where: { userId: outsider.id } });
+  await prisma.user.delete({ where: { id: outsider.id } });
+});
