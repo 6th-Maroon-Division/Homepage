@@ -206,3 +206,46 @@ test('discovery leaves unchanged and finalized operations unwritten and permanen
     expect(await prisma.attendanceLog.count({ where: { attendance: { orbatId: main.id } } })).toBe(1);
   } finally { update.mockRestore(); insert.mockRestore(); }
 });
+
+test('promotion pages resume durably, yield to older work, and roll back cursor and children together on failure', async () => {
+  const rank = await prisma.rank.create({ data: { name: 'Paged scheduler rank', abbreviation: 'PAGE', orderIndex: 9900000 } });
+  const users = await prisma.user.createManyAndReturn({ data: Array.from({ length: 205 }, (_, i) => ({ username: `Paged scheduler ${i}` })), select: { id: true } });
+  const ids = users.map(user => user.id).sort((a, b) => a - b);
+  const key = 'a-paged-promotions';
+  try {
+    await prisma.userRank.createMany({ data: ids.map(userId => ({ userId, currentRankId: rank.id, interviewDone: true })) });
+    await prisma.schedulerState.create({ data: { id: 'scheduler', activatedAt: start } });
+    await prisma.schedulerJob.create({ data: { key, kind: 'promotions', candidateCursor: ids[0] - 1, dueAt: start, nextAttemptAt: start } });
+    await runNextJob(start);
+    expect(await prisma.schedulerJob.count({ where: { kind: 'promotion-user' } })).toBe(100);
+    expect(await prisma.schedulerJob.findUniqueOrThrow({ where: { key } })).toMatchObject({ candidateCursor: ids[99], completedAt: null });
+    await prisma.schedulerJob.create({ data: { key: 'older-reminder', kind: 'reminders', dueAt: new Date(start.getTime() - 1), nextAttemptAt: start } });
+    await runNextJob(start);
+    expect(await prisma.schedulerJob.findUniqueOrThrow({ where: { key: 'older-reminder' } })).toMatchObject({ completedAt: start });
+
+    const original = prisma.$transaction.bind(prisma);
+    const transaction = vi.spyOn(prisma, '$transaction');
+    transaction.mockImplementationOnce(((callback: (tx: never) => Promise<unknown>, options: never) => original(async tx => {
+      // Fail after the page has inserted children, before its cursor commits.
+      const update = tx.schedulerJob.update;
+      tx.schedulerJob.update = (() => { throw new Error('Page cursor write failed'); }) as typeof update;
+      try { return await callback(tx as never); } finally { tx.schedulerJob.update = update; }
+    }, options)) as unknown as typeof prisma.$transaction);
+    try { await expect(runNextJob(start)).rejects.toThrow('Scheduler job failed'); } finally { transaction.mockRestore(); }
+    expect(await prisma.schedulerJob.count({ where: { kind: 'promotion-user' } })).toBe(100);
+    expect(await prisma.schedulerJob.findUniqueOrThrow({ where: { key } })).toMatchObject({ candidateCursor: ids[99], completedAt: null, attempts: 1 });
+    // Isolate parent resumption from execution of the already-enqueued children.
+    await prisma.schedulerJob.updateMany({ where: { kind: 'promotion-user' }, data: { nextAttemptAt: due } });
+    const retry = new Date(start.getTime() + 30000);
+    await runNextJob(retry);
+    expect(await prisma.schedulerJob.findUniqueOrThrow({ where: { key } })).toMatchObject({ candidateCursor: ids[199], completedAt: null, attempts: 0 });
+    await runNextJob(retry);
+    expect(await prisma.schedulerJob.findUniqueOrThrow({ where: { key } })).toMatchObject({ completedAt: retry });
+    const children = await prisma.schedulerJob.findMany({ where: { kind: 'promotion-user' }, orderBy: { userId: 'asc' } });
+    expect(children.map(child => child.userId)).toEqual(ids);
+    expect(children.every(child => child.expectedRankId === rank.id)).toBe(true);
+  } finally {
+    await prisma.user.deleteMany({ where: { id: { in: ids } } });
+    await prisma.rank.delete({ where: { id: rank.id } });
+  }
+});

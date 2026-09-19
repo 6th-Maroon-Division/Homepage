@@ -1071,6 +1071,7 @@ model SchedulerJob {
   kind          String
   userId        Int?
   expectedRankId Int?
+  candidateCursor Int       @default(0)
   orbatId       Int?
   dueAt         DateTime
   nextAttemptAt DateTime

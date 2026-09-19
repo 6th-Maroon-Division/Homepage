@@ -212,7 +212,7 @@ export default function PendingPromotionsClient() {
       
       const failed = data.errorsCount > 0;
       const summary = failed ? `Auto rankup finished with errors: ${message}. Retry failed promotions.`
-        : data.promotedCount === 0 ? `No eligible automatic promotions found. ${data.ineligibleCount} users need more attendance. Other requirements include interview completion, required training, and automatic promotion enabled on the next rank.`
+        : data.promotedCount === 0 ? `No eligible automatic promotions found. Check attendance, interview completion, required training, active status, and automatic promotion enabled on the next rank.`
         : `Auto rankup complete: ${message}`;
       setAutoRankupResult({ message: summary, failed });
       if (failed) showError(summary); else showSuccess(summary);

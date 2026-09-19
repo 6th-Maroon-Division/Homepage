@@ -11,6 +11,7 @@ import { writeApiAudit, type ApiAuditContext } from '@/lib/api/audit';
 const FOUR_HOURS = 4 * 60 * 60 * 1000;
 const SIX_HOURS = 6 * 60 * 60 * 1000;
 const STATE_ID = 'scheduler';
+const PROMOTION_PAGE_SIZE = 100;
 export const attendanceJobKey = (id: number) => `attendance:${id}`;
 export function promotionSlot(now: Date) { return new Date(Math.floor(now.getTime() / SIX_HOURS) * SIX_HOURS); }
 export function attendanceDueAt(orbat: Parameters<typeof resolveOrbatScheduleWindow>[0]) {
@@ -107,11 +108,20 @@ export async function runNextJob(now = new Date()): Promise<boolean> {
       } else if (job.kind === 'promotions') {
         // Freeze the candidate rank for this pass. If another trigger/manual action
         // changes it first, the user job skips rather than climbing another rank.
-        const candidates = await tx.userRank.findMany({ where: { currentRankId: { not: null }, interviewDone: true, retired: false }, select: { userId: true, currentRankId: true } });
+        const candidates = await tx.userRank.findMany({ where: { userId: { gt: job.candidateCursor }, currentRankId: { not: null }, interviewDone: true, retired: false }, select: { userId: true, currentRankId: true }, orderBy: { userId: 'asc' }, take: PROMOTION_PAGE_SIZE });
         if (candidates.length) await tx.schedulerJob.createMany({ data: candidates.map(candidate => ({
           key: `${job.key}:user:${candidate.userId}`, kind: 'promotion-user', userId: candidate.userId,
           expectedRankId: candidate.currentRankId!, dueAt: now, nextAttemptAt: new Date(0),
         })), skipDuplicates: true });
+        if (candidates.length === PROMOTION_PAGE_SIZE) {
+          // Commit each page and its cursor together, releasing the global lock.
+          // Move resumed work behind older due jobs without losing retry progress.
+          await tx.schedulerJob.update({ where: { key: job.key }, data: {
+            candidateCursor: candidates[candidates.length - 1].userId, dueAt: now,
+            attempts: 0, lastError: null, nextAttemptAt: new Date(0),
+          } });
+          return true;
+        }
       } else if (job.kind === 'promotion-user' && job.userId !== null && job.expectedRankId !== null) {
         await executeAutomaticPromotions(audit, { tx, userFilter: { id: job.userId }, expectedRankId: job.expectedRankId, authorize: async () => true });
       } else if (job.kind === 'reminders') {

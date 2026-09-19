@@ -12,7 +12,7 @@ vi.mock('@/lib/api/audit', () => ({ writeApiAudit: m.audit }));
 import { discoverJobs, runNextJob, attendanceDueAt, pruneCompletedJobs } from '@/lib/scheduler/worker';
 const now = new Date('2091-01-01T16:00:00Z');
 const op = { id: 4, isMainOp: true, isSideOp: false, startsAtUtc: new Date('2091-01-01T10:00:00Z'), endsAtUtc: new Date('2091-01-01T12:00:00Z') };
-const job = { key: 'attendance:4', kind: 'attendance', orbatId: 4, userId: null, expectedRankId: null, completedAt: null, attempts: 0 };
+const job = { key: 'attendance:4', kind: 'attendance', orbatId: 4, userId: null, expectedRankId: null, candidateCursor: 0, completedAt: null, attempts: 0 };
 beforeEach(() => {
   vi.resetAllMocks();
   vi.useFakeTimers(); vi.setSystemTime(now);
@@ -149,4 +149,14 @@ test('retention deletes a bounded page of old completed repeatable jobs only', a
   expect(query.take).toBe(500);
   expect(query.where.kind.in).not.toContain('attendance');
   expect(m.db.schedulerJob.deleteMany).toHaveBeenCalledWith({ where: { ...query.where, key: { in: ['old-periodic'] } } });
+});
+
+test('a full promotion page saves progress without completing the parent or holding the lock for another page', async () => {
+  m.db.schedulerJob.findFirst.mockResolvedValue({ ...job, kind: 'promotions', candidateCursor: 20 });
+  m.db.userRank.findMany.mockResolvedValue(Array.from({ length: 100 }, (_, i) => ({ userId: i + 21, currentRankId: 3 })));
+  await runNextJob();
+  expect(m.db.userRank.findMany).toHaveBeenCalledTimes(1);
+  expect(m.db.userRank.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ userId: { gt: 20 } }), take: 100, orderBy: { userId: 'asc' } }));
+  expect(m.db.schedulerJob.createMany.mock.calls[0][0].data).toHaveLength(100);
+  expect(m.db.schedulerJob.update).toHaveBeenCalledExactlyOnceWith({ where: { key: job.key }, data: { candidateCursor: 120, dueAt: now, attempts: 0, lastError: null, nextAttemptAt: new Date(0) } });
 });

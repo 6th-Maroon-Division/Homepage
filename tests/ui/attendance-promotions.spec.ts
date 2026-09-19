@@ -117,12 +117,17 @@ test('rank migration mapping previews, confirms and applies a real rank change',
 test('automatic promotion button applies a real promotion and reports API failures', async ({ page, login, db }) => {
   const low = await db.rank.create({ data: { name: 'UI Auto Low', abbreviation: 'UAL', orderIndex: 80000 } });
   const high = await db.rank.create({ data: { name: 'UI Auto High', abbreviation: 'UAH', orderIndex: 80001, autoRankupEnabled: true, attendanceRequiredSinceLastRank: 1 } });
-  const user = await db.user.create({ data: { username: 'UI Auto Member', userRank: { create: { currentRankId: low.id, interviewDone: true } } } });
+  const user = await db.user.create({ data: { username: 'UI Auto Member', userRank: { create: { currentRankId: low.id, interviewDone: false } } } });
   const op = await db.orbat.create({ data: { name: 'UI Auto Main Op', isMainOp: true } });
   await db.attendance.create({ data: { userId: user.id, orbatId: op.id, status: 'present' } });
   await login();
   await page.goto('/admin/promotions');
   page.on('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Auto Rankup', exact: true }).click();
+  await expect(page.locator('p[role="status"]')).toContainText('No eligible automatic promotions found. Check attendance, interview completion');
+  await expect(page.locator('p[role="status"]')).not.toContainText('users need more attendance');
+  expect((await db.userRank.findUniqueOrThrow({ where: { userId: user.id } })).currentRankId).toBe(low.id);
+  await db.userRank.update({ where: { userId: user.id }, data: { interviewDone: true } });
   await page.getByRole('button', { name: 'Auto Rankup', exact: true }).click();
   await expect(page.locator('p[role="status"]')).toContainText('Auto rankup complete:');
   expect((await db.userRank.findUniqueOrThrow({ where: { userId: user.id } })).currentRankId).toBe(high.id);
