@@ -15381,7 +15381,7 @@ paths:
   /users/onboarding:
     get:
       summary: List user onboarding queue
-      description: Requires user:manage with live target hierarchy; bots superadmin. Users without currentrank OR
+      description: Requires user:manage with live target hierarchy; bots superadmin. Users without currentrank OR unfinished interview OR
         missingrequired training. SQL filters beforepagination. Completion qualified or finished only when
         noORBATqualification; empty requiredset complete. Attendance counts presentmainops+legacy. MinimalDTO without
         email; returnedotheruserread audit only, no snapshots.
@@ -18272,6 +18272,9 @@ paths:
       summary: Read or stream durable integration events
       description: Requires positive system:super_admin or active bot token. Audits only delivered other-user payload IDs
         without snapshots. Final nextCursor is null; resumeCursor remains the polling checkpoint.
+        Scheduled promotions emit user.rank_changed on rank; attendance.finalized on orbat carries
+        orbatId, status (finalized), startsAt, endsAt and version (UTC finalization timestamp).
+        Training reminders emit training.reminder_due on training. Events are retained for 30 days.
       security:
         - sessionCookie: []
         - secureSessionCookie: []

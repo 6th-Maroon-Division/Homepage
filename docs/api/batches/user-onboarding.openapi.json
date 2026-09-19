@@ -3,7 +3,7 @@
     "/users/onboarding": {
       "get": {
         "summary": "List user onboarding queue",
-        "description": "Requires user:manage with live target hierarchy; bots superadmin. Users without currentrank OR missingrequired training. SQL filters beforepagination. Completion qualified or finished only when noORBATqualification; empty requiredset complete. Attendance counts presentmainops+legacy. MinimalDTO without email; returnedotheruserread audit only, no snapshots.",
+        "description": "Requires user:manage with live target hierarchy; bots superadmin. Users without currentrank OR unfinished interview OR missingrequired training. SQL filters beforepagination. Completion qualified or finished only when noORBATqualification; empty requiredset complete. Attendance counts presentmainops+legacy. MinimalDTO without email; returnedotheruserread audit only, no snapshots.",
         "security": [
           {
             "sessionCookie": []

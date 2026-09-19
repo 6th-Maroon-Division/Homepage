@@ -100,3 +100,22 @@ test('read audit failure withholds personal results and live permission or revok
   finally { await prisma.botToken.update({ where: { id: tokenId }, data: { isActive: true } }); }
   for (const query of ['?page=1', '?interviewDone=done', '?requiredTrainingsCompleted=1', '?limit=2&limit=3']) expect((await GET(req(query))).status).toBe(400);
 });
+
+test('ranked fully trained members with pending interviews remain visible until marked complete', async () => {
+  await prisma.userRank.update({ where: { userId: rankedCompleteId }, data: { interviewDone: false } });
+  try {
+    for (const query of ['', '&interviewDone=false', '&interviewDone=false&requiredTrainingsCompleted=true']) {
+      const response = await GET(req(`?cursor=${rankedCompleteId - 1}&limit=1${query}`));
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.data).toEqual([expect.objectContaining({ id: rankedCompleteId, requiredTrainingsCompleted: true, userRank: { interviewDone: false, retired: false } })]);
+      expect((await audits(response))[0].targetUserIds).toEqual([rankedCompleteId]);
+    }
+    const completed = await (await GET(req(`?cursor=${rankedCompleteId - 1}&interviewDone=true`))).json();
+    expect(completed.data.map((row: { id: number }) => row.id)).not.toContain(rankedCompleteId);
+  } finally {
+    await prisma.userRank.update({ where: { userId: rankedCompleteId }, data: { interviewDone: true } });
+  }
+  const response = await GET(req(`?cursor=${rankedCompleteId - 1}&interviewDone=false`));
+  expect((await response.json()).data.map((row: { id: number }) => row.id)).not.toContain(rankedCompleteId);
+});

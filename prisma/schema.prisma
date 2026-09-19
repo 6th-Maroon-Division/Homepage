@@ -1059,3 +1059,26 @@ model SteamLoginAttempt {
 
   @@index([expiresAt])
 }
+
+// Durable worker activation boundary: old operations are not compiled on rollout.
+model SchedulerState {
+  id          String   @id
+  activatedAt DateTime @default(now())
+}
+
+model SchedulerJob {
+  key           String    @id
+  kind          String
+  userId        Int?
+  expectedRankId Int?
+  orbatId       Int?
+  dueAt         DateTime
+  nextAttemptAt DateTime
+  completedAt   DateTime?
+  attempts      Int       @default(0)
+  lastError     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([completedAt, nextAttemptAt])
+}

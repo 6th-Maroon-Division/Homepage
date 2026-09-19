@@ -36,6 +36,7 @@ export default function PendingPromotionsClient() {
   const [isStreamConnected, setIsStreamConnected] = useState(false);
   const [isActing, setIsActing] = useState(false);
   const [isRunningAutoRankup, setIsRunningAutoRankup] = useState(false);
+  const [autoRankupResult, setAutoRankupResult] = useState<{ message: string; failed: boolean } | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const proposalRequest = useRef<AbortController | null>(null);
 
@@ -60,8 +61,9 @@ export default function PendingPromotionsClient() {
   }, [showError]);
 
   useEffect(() => {
-    void fetchProposals();
-    return () => proposalRequest.current?.abort();
+    let cancelled = false;
+    queueMicrotask(() => { if (!cancelled) void fetchProposals(); });
+    return () => { cancelled = true; proposalRequest.current?.abort(); };
   }, [fetchProposals]);
 
   useEffect(() => {
@@ -195,6 +197,7 @@ export default function PendingPromotionsClient() {
     if (!confirm('Run auto rankup process? This will promote all eligible users.')) return;
 
     setIsRunningAutoRankup(true);
+    setAutoRankupResult(null);
     try {
       const { data } = await apiRequest<{ promotedCount: number; errorsCount: number; ineligibleCount: number }>('/api/ranks/promotions/automatic', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
 
@@ -207,12 +210,19 @@ export default function PendingPromotionsClient() {
         message += `, ${data.ineligibleCount} not eligible`;
       }
       
-      showSuccess(`Auto rankup complete: ${message}`);
+      const failed = data.errorsCount > 0;
+      const summary = failed ? `Auto rankup finished with errors: ${message}. Retry failed promotions.`
+        : data.promotedCount === 0 ? `No eligible automatic promotions found. ${data.ineligibleCount} users need more attendance. Other requirements include interview completion, required training, and automatic promotion enabled on the next rank.`
+        : `Auto rankup complete: ${message}`;
+      setAutoRankupResult({ message: summary, failed });
+      if (failed) showError(summary); else showSuccess(summary);
 
       await fetchProposals();
     } catch (error) {
       console.error('Error running auto rankup:', error);
-      showError('Failed to run auto rankup');
+      const message = error instanceof Error ? error.message : 'Failed to run auto rankup';
+      setAutoRankupResult({ message, failed: true });
+      showError(message);
     } finally {
       setIsRunningAutoRankup(false);
     }
@@ -220,6 +230,11 @@ export default function PendingPromotionsClient() {
 
   return (
     <div className="space-y-4">
+      {autoRankupResult && (
+        <p role={autoRankupResult.failed ? 'alert' : 'status'} className="rounded-md border p-3 text-sm" style={{ borderColor: 'var(--border)' }}>
+          {autoRankupResult.message}
+        </p>
+      )}
       <div className="border rounded-lg overflow-hidden" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
         <div className="px-6 py-4 flex flex-wrap items-center justify-end gap-2" style={{ borderBottomWidth: '1px', borderColor: 'var(--border)' }}>
           <button

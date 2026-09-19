@@ -1,0 +1,19 @@
+[Unit]
+Description=ORBAT background scheduler
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Adjust these paths and user for your deployment. Node must be on this PATH.
+User=orbat
+WorkingDirectory=/srv/orbat-web
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/npm run scheduler
+Restart=always
+RestartSec=10
+TimeoutStopSec=75
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

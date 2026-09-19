@@ -164,3 +164,11 @@ test('an active bot can receive a polled event then revoke on its next revalidat
  mocks.db.botToken.findFirst.mockResolvedValue(null);await vi.advanceTimersByTimeAsync(5000);
  expect((await reader.read()).done).toBe(true);
 });
+
+test('attendance finalization events expose the finalized operation window on the orbat feed', async () => {
+  const payload = { orbatId: 12, status: 'finalized', startsAt: '2026-09-19T18:00:00.000Z', endsAt: '2026-09-19T20:00:00.000Z', version: '2026-09-20T00:00:00.000Z' };
+  mocks.db.botEvent.findMany.mockResolvedValue([{ id: BigInt(44), aggregate: 'orbat', type: 'attendance.finalized', occurredAt: new Date(payload.version), payload }]);
+  const response = await GET(req('?aggregate=orbat', { authorization: 'Bearer valid' }));
+  expect(response.status).toBe(200);
+  expect((await response.json()).data).toEqual([{ id: '44', type: 'attendance.finalized', occurredAt: payload.version, payload }]);
+});

@@ -115,3 +115,13 @@ test('stale automatic proposals are counted as failures without changing rank', 
     expect(mocks.db.userRank.update).not.toHaveBeenCalled();
   } finally { log.mockRestore(); }
 });
+
+test('scheduled user failures propagate to roll back the encompassing job transaction', async () => {
+  const { executeAutomaticPromotions } = await import('@/lib/jobs/promotions');
+  mocks.db.apiAuditLog.create.mockRejectedValue(new Error('Audit unavailable'));
+  await expect(executeAutomaticPromotions({ principal: null, actorType: 'scheduler', correlationId: 'scheduled-failure', method: 'JOB', path: '/scheduler/test' }, {
+    tx: mocks.db as unknown as import('@/generated/prisma/client').Prisma.TransactionClient,
+    authorize: async () => true,
+  })).rejects.toThrow('Audit unavailable');
+  expect(mocks.publish).not.toHaveBeenCalled();
+});
