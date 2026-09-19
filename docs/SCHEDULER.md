@@ -26,7 +26,7 @@ On the **first startup**, `SchedulerState.activatedAt` records the rollout bound
 
 Discovery reads operation schedules and their attendance-job states in batches of 100, inserts unseen eligible jobs in batches, and updates only pending deadlines that actually changed. Completed and unchanged jobs incur no per-operation writes.
 
-Scheduled reminders process at most 100 attendees per transaction, retaining the unfinished job until a shorter batch completes. Sent markers, inbox messages, audit records, and bot events commit together; retries leave prior committed batches intact. Batches reuse the existing bot event for the same session version. The explicit reminder API retains its existing full-pass behavior.
+Scheduled reminders process at most 100 attendees per transaction, retaining the unfinished job until a shorter batch completes. Sent markers, inbox messages, audit records, and bot events commit together; retries leave prior committed batches intact. Batches reuse the existing bot event for the same session version and attendee roster (identified by its highest attendee ID). Adding an attendee creates a new reminder generation even if the session timestamp is unchanged. Event timestamp versions increase monotonically. The explicit reminder API retains its existing full-pass behavior.
 
 Attendance compilation queries only signed-up members’ events in the existing time window and groups events and notes by user once. `totalEventsProcessed` counts those matching events, excluding unrelated or unlinked events. Queue selection and pruning use an index on completion time, due time, and job key; attendance and reminder-event lookups have matching composite indexes.
 

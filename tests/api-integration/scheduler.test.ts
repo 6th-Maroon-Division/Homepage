@@ -253,11 +253,11 @@ test('promotion pages resume durably, yield to older work, and roll back cursor 
 test('reminders span committed batches with one inbox message per attendee and one session event', async () => {
   const training = await prisma.training.create({ data: { name: 'Batched scheduler reminders' } });
   const session = await prisma.trainingSession.create({ data: { trainingId: training.id, startsAt: new Date(start.getTime() + 7200000), status: 'scheduled' } });
-  const users = await prisma.user.createManyAndReturn({ data: Array.from({ length: 101 }, (_, i) => ({ username: `Batched reminder ${i}` })), select: { id: true } });
+  const users = await prisma.user.createManyAndReturn({ data: Array.from({ length: 102 }, (_, i) => ({ username: `Batched reminder ${i}` })), select: { id: true } });
   const ids = users.map(user => user.id);
   const key = 'batched-reminders';
   try {
-    await prisma.trainingSessionAttendee.createMany({ data: ids.map(userId => ({ userId, sessionId: session.id })) });
+    await prisma.trainingSessionAttendee.createMany({ data: ids.slice(0, 101).map(userId => ({ userId, sessionId: session.id })) });
     await prisma.schedulerState.create({ data: { id: 'scheduler', activatedAt: start } });
     await prisma.schedulerJob.create({ data: { key, kind: 'reminders', dueAt: start, nextAttemptAt: start } });
     await runNextJob(start);
@@ -280,6 +280,21 @@ test('reminders span committed batches with one inbox message per attendee and o
     expect(await prisma.messageRecipient.count({ where: { userId: { in: ids } } })).toBe(101);
     expect(await prisma.botEvent.count({ where: { type: 'training.reminder_due', aggregateId: String(session.id) } })).toBe(1);
     expect(await runNextJob(retry)).toBe(false);
+    const firstEvent = await prisma.botEvent.findFirstOrThrow({ where: { type: 'training.reminder_due', aggregateId: String(session.id) } });
+    // Late enrollment does not touch the session's timestamp, but must notify the bot.
+    await prisma.trainingSessionAttendee.create({ data: { userId: ids[101], sessionId: session.id } });
+    expect((await prisma.trainingSession.findUniqueOrThrow({ where: { id: session.id } })).updatedAt).toEqual(session.updatedAt);
+    await prisma.schedulerJob.create({ data: { key: 'late-attendee-reminder', kind: 'reminders', dueAt: retry, nextAttemptAt: retry } });
+    await runNextJob(retry);
+    expect(await prisma.messageRecipient.count({ where: { userId: { in: ids } } })).toBe(102);
+    const events = await prisma.botEvent.findMany({ where: { type: 'training.reminder_due', aggregateId: String(session.id) }, orderBy: { id: 'asc' } });
+    expect(events).toHaveLength(2);
+    expect(Date.parse((events[1].payload as { version: string }).version)).toBeGreaterThan(Date.parse((firstEvent.payload as { version: string }).version));
+    // A subsequent empty pass must not emit another event or duplicate inbox delivery.
+    await prisma.schedulerJob.create({ data: { key: 'repeat-reminder', kind: 'reminders', dueAt: retry, nextAttemptAt: retry } });
+    await runNextJob(retry);
+    expect(await prisma.botEvent.count({ where: { type: 'training.reminder_due', aggregateId: String(session.id) } })).toBe(2);
+    expect(await prisma.messageRecipient.count({ where: { userId: { in: ids } } })).toBe(102);
   } finally {
     await prisma.trainingSession.delete({ where: { id: session.id } });
     await prisma.user.deleteMany({ where: { id: { in: ids } } });
