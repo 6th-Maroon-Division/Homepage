@@ -33,18 +33,43 @@ export async function discoverJobs(now = new Date()) {
   await enqueue(prisma, `reminders:${reminderSlot.toISOString()}`, 'reminders', reminderSlot);
   let cursor = 0;
   for (;;) {
-    const orbats = await prisma.orbat.findMany({ where: { id: { gt: cursor }, isMainOp: true, isSideOp: false }, orderBy: { id: 'asc' }, take: 100 });
+    const orbats = await prisma.orbat.findMany({ where: { id: { gt: cursor }, isMainOp: true, isSideOp: false }, select: { id: true, startsAtUtc: true, endsAtUtc: true, eventDate: true, startTime: true, endTime: true }, orderBy: { id: 'asc' }, take: 100 });
     if (!orbats.length) break;
+    const existing = await prisma.schedulerJob.findMany({
+      where: { key: { in: orbats.map(orbat => attendanceJobKey(orbat.id)) } },
+      select: { key: true, dueAt: true, completedAt: true },
+    });
+    const byKey = new Map(existing.map(job => [job.key, job]));
+    const inserts: Prisma.SchedulerJobCreateManyInput[] = [];
     for (const orbat of orbats) {
+      const key = attendanceJobKey(orbat.id);
+      const job = byKey.get(key);
+      if (job?.completedAt) continue;
       const dueAt = attendanceDueAt(orbat);
       if (!dueAt) continue;
-      const key = attendanceJobKey(orbat.id);
-      if (dueAt >= state.activatedAt) await enqueue(prisma, key, 'attendance', dueAt, orbat.id);
-      // Preserve retry backoff and permanent completion, even after end-time edits.
-      await prisma.schedulerJob.updateMany({ where: { key, completedAt: null, NOT: { dueAt } }, data: { dueAt } });
+      if (!job) {
+        if (dueAt >= state.activatedAt) inserts.push({ key, kind: 'attendance', dueAt, orbatId: orbat.id, nextAttemptAt: new Date(0) });
+      } else if (dueAt.getTime() !== job.dueAt.getTime()) {
+        // Only changed pending deadlines write. Compare the observed value so
+        // stale discovery cannot overwrite a concurrent reschedule or completion.
+        await prisma.schedulerJob.updateMany({ where: { key, completedAt: null, dueAt: job.dueAt }, data: { dueAt } });
+      }
     }
+    if (inserts.length) await prisma.schedulerJob.createMany({ data: inserts, skipDuplicates: true });
     cursor = orbats.at(-1)!.id;
   }
+  await pruneCompletedJobs(now);
+}
+
+/** Bounded retention for repeatable work; attendance receipts must never expire. */
+export async function pruneCompletedJobs(now = new Date()) {
+  const cutoff = new Date(now.getTime() - 30 * 86400000);
+  const where: Prisma.SchedulerJobWhereInput = {
+    kind: { in: ['promotions', 'promotion-user', 'reminders'] },
+    completedAt: { lt: cutoff }, dueAt: { lt: cutoff },
+  };
+  const jobs = await prisma.schedulerJob.findMany({ where, select: { key: true }, orderBy: [{ completedAt: 'asc' }, { key: 'asc' }], take: 500 });
+  if (jobs.length) await prisma.schedulerJob.deleteMany({ where: { ...where, key: { in: jobs.map(job => job.key) } } });
 }
 
 /** A transaction-held database lock is the claim: crashes release it immediately.
@@ -104,10 +129,13 @@ export async function runNextJob(now = new Date()): Promise<boolean> {
     const code = error && typeof error === 'object' && 'code' in error && /^P\d{4}$/.test(String(error.code)) ? String(error.code) : 'job_failed';
     if (attemptedKey) {
       await prisma.$transaction(async tx => {
+        // Recovery participates in the same exclusion protocol as execution.
+        // Wait for a newer attempt, then re-read its committed state.
+        await tx.$queryRaw`SELECT id FROM "SchedulerState" WHERE id = ${STATE_ID} FOR UPDATE`;
         const job = await tx.schedulerJob.findUnique({ where: { key: attemptedKey! } });
         if (!job || job.completedAt) return;
         await tx.schedulerJob.updateMany({ where: { key: job.key, completedAt: null }, data: { attempts: { increment: 1 }, lastError: code, nextAttemptAt: retryAt(now, job.attempts + 1) } });
-      });
+      }, { timeout: 60000, maxWait: 5000 });
     }
     console.error(JSON.stringify({ event: 'scheduler.job_failed', key: attemptedKey, code }));
     throw new Error(`Scheduler job failed (${code})`);

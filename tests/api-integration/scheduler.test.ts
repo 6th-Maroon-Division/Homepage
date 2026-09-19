@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest';
 import { prisma } from '@/lib/prisma';
-import { discoverJobs, runNextJob, attendanceJobKey, attendanceDueAt, promotionSlot, retryAt } from '@/lib/scheduler/worker';
+import { discoverJobs, runNextJob, attendanceJobKey, attendanceDueAt, promotionSlot, retryAt, pruneCompletedJobs } from '@/lib/scheduler/worker';
 
 const start = new Date('2080-01-01T10:00:00Z');
 const end = new Date('2080-01-01T12:00:00Z');
@@ -168,4 +168,41 @@ test('standalone npm entrypoint runs against the isolated database without a web
   });
   expect(result.stdout).toContain('scheduler.job_committed');
   expect(await prisma.schedulerState.count()).toBe(1);
+});
+
+test('retention bounds periodic history without removing receipts, pending work or recent jobs', async () => {
+  const old = new Date('2079-01-01T00:00:00Z');
+  const data = Array.from({ length: 501 }, (_, i) => ({ key: `retention-old:${i}`, kind: ['promotions', 'promotion-user', 'reminders'][i % 3], dueAt: old, nextAttemptAt: old, completedAt: old }));
+  await prisma.schedulerJob.createMany({ data: [
+    ...data,
+    { key: 'retention-receipt', kind: 'attendance', dueAt: old, nextAttemptAt: old, completedAt: old },
+    { key: 'retention-pending', kind: 'reminders', dueAt: old, nextAttemptAt: old, completedAt: null },
+    { key: 'retention-recent', kind: 'reminders', dueAt: start, nextAttemptAt: start, completedAt: start },
+    { key: 'retention-future', kind: 'reminders', dueAt: new Date('2081-01-01'), nextAttemptAt: old, completedAt: old },
+  ] });
+  await pruneCompletedJobs(start);
+  expect(await prisma.schedulerJob.count({ where: { key: { startsWith: 'retention-old:' } } })).toBe(1);
+  await pruneCompletedJobs(start);
+  expect((await prisma.schedulerJob.findMany({ orderBy: { key: 'asc' }, select: { key: true } })).map(row => row.key)).toEqual(['retention-future', 'retention-pending', 'retention-receipt', 'retention-recent']);
+});
+
+test('discovery leaves unchanged and finalized operations unwritten and permanent receipts survive retention', async () => {
+  const main = await operation();
+  await discoverJobs(start);
+  const update = vi.spyOn(prisma.schedulerJob, 'updateMany');
+  const insert = vi.spyOn(prisma.schedulerJob, 'createMany');
+  try {
+    await discoverJobs(start);
+    expect(update).not.toHaveBeenCalled();
+    expect(insert).toHaveBeenCalledTimes(2); // Only the periodic slot upserts.
+    await drain(due);
+    update.mockClear(); insert.mockClear();
+    const later = new Date('2080-03-01T16:00:00Z');
+    await discoverJobs(later);
+    expect(update).not.toHaveBeenCalled();
+    expect(insert).toHaveBeenCalledTimes(2);
+    await drain(later);
+    expect((await prisma.schedulerJob.findUniqueOrThrow({ where: { key: attendanceJobKey(main.id) } })).completedAt).toEqual(due);
+    expect(await prisma.attendanceLog.count({ where: { attendance: { orbatId: main.id } } })).toBe(1);
+  } finally { update.mockRestore(); insert.mockRestore(); }
 });

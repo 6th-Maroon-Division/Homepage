@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 const m = vi.hoisted(() => {
-  const model = () => ({ upsert: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), findFirst: vi.fn(), createMany: vi.fn(), updateMany: vi.fn(), update: vi.fn(), delete: vi.fn() });
+  const model = () => ({ upsert: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), findFirst: vi.fn(), createMany: vi.fn(), updateMany: vi.fn(), update: vi.fn(), delete: vi.fn(), deleteMany: vi.fn() });
   return { compile: vi.fn(), promote: vi.fn(), remind: vi.fn(), event: vi.fn(), audit: vi.fn(), db: { schedulerState: model(), schedulerJob: model(), orbat: model(), userRank: model(), $queryRaw: vi.fn(), $transaction: vi.fn() } };
 });
 vi.mock('@/lib/prisma', () => ({ prisma: m.db }));
@@ -9,7 +9,7 @@ vi.mock('@/lib/jobs/promotions', () => ({ executeAutomaticPromotions: m.promote 
 vi.mock('@/lib/jobs/training-reminders', () => ({ executeTrainingReminders: m.remind }));
 vi.mock('@/lib/bot-events', () => ({ appendBotEvent: m.event }));
 vi.mock('@/lib/api/audit', () => ({ writeApiAudit: m.audit }));
-import { discoverJobs, runNextJob, attendanceDueAt } from '@/lib/scheduler/worker';
+import { discoverJobs, runNextJob, attendanceDueAt, pruneCompletedJobs } from '@/lib/scheduler/worker';
 const now = new Date('2091-01-01T16:00:00Z');
 const op = { id: 4, isMainOp: true, isSideOp: false, startsAtUtc: new Date('2091-01-01T10:00:00Z'), endsAtUtc: new Date('2091-01-01T12:00:00Z') };
 const job = { key: 'attendance:4', kind: 'attendance', orbatId: 4, userId: null, expectedRankId: null, completedAt: null, attempts: 0 };
@@ -21,6 +21,7 @@ beforeEach(() => {
   m.db.$transaction.mockImplementation(async cb => cb(m.db));
   m.db.$queryRaw.mockResolvedValue([{ id: 'scheduler' }]);
   m.db.schedulerState.upsert.mockResolvedValue({ activatedAt: now });
+  m.db.schedulerJob.findMany.mockResolvedValue([]);
   m.db.schedulerJob.findFirst.mockResolvedValue(job);
   m.db.schedulerJob.findUnique.mockResolvedValue(job);
   m.db.orbat.findUnique.mockResolvedValue(op);
@@ -35,7 +36,7 @@ test('discovery handles empty and incomplete schedules and preserves retry backo
   m.db.orbat.findMany.mockResolvedValueOnce([{ ...op, endsAtUtc: null }, op, { ...op, id: 5, endsAtUtc: new Date('2091-01-01T11:00:00Z') }]);
   await discoverJobs();
   expect(m.db.schedulerJob.createMany).toHaveBeenCalledTimes(3); // periodic promotions, reminders and the due operation
-  expect(m.db.schedulerJob.updateMany).toHaveBeenCalledTimes(2);
+  expect(m.db.schedulerJob.updateMany).not.toHaveBeenCalled();
   for (const [args] of m.db.schedulerJob.updateMany.mock.calls) expect(args.data).not.toHaveProperty('nextAttemptAt');
 });
 test('another worker owning the lock or an empty queue executes no work', async () => {
@@ -99,4 +100,53 @@ test('reminders use the job transaction and execution clock', async () => {
   m.db.schedulerJob.findFirst.mockResolvedValue({ ...job, kind: 'reminders' });
   await runNextJob();
   expect(m.remind).toHaveBeenCalledWith(m.db, expect.objectContaining({ actorType: 'scheduler' }), now);
+});
+
+test('discovery batches inserts and does not write unchanged or completed attendance jobs', async () => {
+  const other = { ...op, id: 5 };
+  m.db.orbat.findMany.mockResolvedValueOnce([op, other, { ...op, id: 6 }, { ...op, id: 7 }]);
+  m.db.schedulerJob.findMany.mockResolvedValueOnce([
+    { key: 'attendance:4', dueAt: now, completedAt: null },
+    { key: 'attendance:5', dueAt: new Date(0), completedAt: now },
+  ]);
+  await discoverJobs();
+  expect(m.db.schedulerJob.updateMany).not.toHaveBeenCalled();
+  expect(m.db.schedulerJob.createMany.mock.calls[2][0].data.map((row: { key: string }) => row.key)).toEqual(['attendance:6', 'attendance:7']);
+});
+test('discovery changes only a pending deadline and preserves newer concurrent state', async () => {
+  m.db.orbat.findMany.mockResolvedValueOnce([op]);
+  const previous = new Date(now.getTime() - 3600000);
+  m.db.schedulerJob.findMany.mockResolvedValueOnce([{ key: 'attendance:4', dueAt: previous, completedAt: null }]);
+  await discoverJobs();
+  expect(m.db.schedulerJob.updateMany).toHaveBeenCalledWith({ where: { key: 'attendance:4', completedAt: null, dueAt: previous }, data: { dueAt: now } });
+  expect(m.db.schedulerJob.createMany).toHaveBeenCalledTimes(2);
+});
+test('failed-job recovery waits for the scheduler lock before inspecting a newer attempt', async () => {
+  m.compile.mockRejectedValue(new Error('Failed'));
+  let release!: () => void;
+  let locked!: () => void;
+  const waiting = new Promise<void>(resolve => { locked = resolve; });
+  m.db.$queryRaw.mockResolvedValueOnce([{ id: 'scheduler' }]).mockResolvedValueOnce([{ id: 4 }]).mockImplementationOnce(async (sql: TemplateStringsArray) => {
+    expect(sql.join('')).toContain('FOR UPDATE');
+    expect(sql.join('')).not.toContain('SKIP LOCKED');
+    locked();
+    await new Promise<void>(resolve => { release = resolve; });
+    return [{ id: 'scheduler' }];
+  });
+  const result = expect(runNextJob()).rejects.toThrow('job_failed');
+  await waiting;
+  expect(m.db.schedulerJob.findUnique).not.toHaveBeenCalled();
+  expect(m.db.schedulerJob.updateMany).not.toHaveBeenCalled();
+  m.db.schedulerJob.findUnique.mockResolvedValue({ ...job, completedAt: now });
+  release();
+  await result;
+  expect(m.db.schedulerJob.updateMany).not.toHaveBeenCalled();
+});
+test('retention deletes a bounded page of old completed repeatable jobs only', async () => {
+  m.db.schedulerJob.findMany.mockResolvedValue([{ key: 'old-periodic' }]);
+  await pruneCompletedJobs();
+  const query = m.db.schedulerJob.findMany.mock.calls[0][0];
+  expect(query.take).toBe(500);
+  expect(query.where.kind.in).not.toContain('attendance');
+  expect(m.db.schedulerJob.deleteMany).toHaveBeenCalledWith({ where: { ...query.where, key: { in: ['old-periodic'] } } });
 });
