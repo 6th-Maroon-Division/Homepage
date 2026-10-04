@@ -61,3 +61,26 @@ test('deletion rejects self and preserves users with durable ORBAT references; b
   expect(await prisma.user.findUnique({ where: { id: target } })).toBeNull();
   expect(await prisma.authAccount.count({ where: { userId: target } })).toBe(0);
 });
+
+test('Discord-linked profile mutations and their invalidations commit or roll back together', async () => {
+  const discordUserId = '989898989123456789';
+  const linked = await prisma.user.create({ data: { username: 'Linked original', accounts: { create: { provider: 'discord', providerUserId: discordUserId } } } });
+  const eventWhere = { aggregate: 'member', aggregateId: String(linked.id) };
+  session.id = actor;
+  const transact = prisma.$transaction.bind(prisma);
+  const spy = vi.spyOn(prisma, '$transaction').mockImplementation(((operation: (tx: Prisma.TransactionClient) => Promise<unknown>, options?: { isolationLevel?: Prisma.TransactionIsolationLevel }) => transact(async tx => {
+    const failure = vi.spyOn(tx.botEvent, 'create').mockRejectedValue(new Error('Outbox unavailable'));
+    try { return await operation(tx); } finally { failure.mockRestore(); }
+  }, options)) as typeof prisma.$transaction);
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    expect((await PATCH(req('PATCH', { username: 'Must roll back' }), ctx(linked.id))).status).toBe(500);
+    expect((await DELETE(req('DELETE'), ctx(linked.id))).status).toBe(500);
+  } finally { spy.mockRestore(); log.mockRestore(); }
+  expect(await prisma.user.findUniqueOrThrow({ where: { id: linked.id } })).toMatchObject({ username: 'Linked original', nameRevision: 0 });
+  expect(await prisma.botEvent.count({ where: eventWhere })).toBe(0);
+  expect((await PATCH(req('PATCH', { username: 'Linked accepted' }), ctx(linked.id))).status).toBe(200);
+  expect(await prisma.botEvent.findFirst({ where: { ...eventWhere, type: 'member.name.changed' } })).toMatchObject({ payload: { userId: linked.id, discordUserId } });
+  expect((await DELETE(req('DELETE'), ctx(linked.id))).status).toBe(200);
+  expect(await prisma.botEvent.findFirst({ where: { ...eventWhere, type: 'member.deleted' } })).toMatchObject({ payload: { userId: linked.id, discordUserId } });
+});

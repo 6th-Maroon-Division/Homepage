@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => {
   const model = () => ({ findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() });
-  return { session: vi.fn(), db: { user: model(), botToken: model(), rank: model(), rankDiscordRole: model(), apiAuditLog: model(), $transaction: vi.fn() } };
+  return { session: vi.fn(), db: { user: model(), botToken: model(), rank: model(), rankDiscordRole: model(), discordIntegration: model(), apiAuditLog: model(), $transaction: vi.fn() } };
 });
 vi.mock('@/lib/prisma', () => ({ prisma: mocks.db }));
 vi.mock('next-auth', () => ({ getServerSession: mocks.session }));
@@ -117,4 +117,17 @@ describe('mapping mutations and audit', () => {
     expect(mocks.db.$transaction).toHaveBeenCalledTimes(2);
     spy.mockRestore();
   });
+});
+
+it('does not allow a self-service reaction role to become a managed rank role', async () => {
+  mocks.db.discordIntegration.findUnique.mockResolvedValue({ settings: { settings: { guildId, menus: [{ entries: [{ roleId: discordRoleId }] }] } } });
+  const response = await PATCH(req('PATCH', { discordRoleId, isActive: true }), ctx());
+  expect(response.status).toBe(422);
+  expect(mocks.db.rankDiscordRole.update).not.toHaveBeenCalled();
+  expect(mocks.db.apiAuditLog.create).not.toHaveBeenCalled();
+});
+
+it('allows rank mappings for a different role when a reaction menu exists', async () => {
+  mocks.db.discordIntegration.findUnique.mockResolvedValue({ settings: { settings: { guildId, menus: [{ entries: [{ roleId: '345678901234567890' }] }] } } });
+  expect((await PATCH(req('PATCH', { discordRoleId, isActive: true }), ctx())).status).toBe(200);
 });

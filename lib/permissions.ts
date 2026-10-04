@@ -144,6 +144,58 @@ export const PERMISSIONS = {
     maxValue: 255,
   },
 
+  // Discord bot administration permissions
+  "discord:view": {
+    description: "View Discord bot status and operational activity",
+    defaultValue: 0,
+    maxValue: 255,
+  },
+  "discord:configure": {
+    description: "Manage Discord bot configuration, role menus, and synchronization settings",
+    defaultValue: 0,
+    maxValue: 255,
+  },
+  "discord:announce": {
+    description: "Publish, refresh, and re-ping Discord ORBAT announcements",
+    defaultValue: 0,
+    maxValue: 255,
+  },
+  "discord:retry": {
+    description: "Retry failed Discord operations subject to their original action permissions",
+    defaultValue: 0,
+    maxValue: 255,
+  },
+  "discord:moderation_view": {
+    description: "View Discord moderation cases and punishment history without evidence content",
+    defaultValue: 0,
+    maxValue: 255,
+  },
+  "discord:timeout_release": {
+    description: "Release Discord member timeouts early",
+    defaultValue: 0,
+    maxValue: 255,
+  },
+  "discord:evidence_view": {
+    description: "View Discord moderation evidence, attachments, and recoverable evidence",
+    defaultValue: 0,
+    maxValue: 255,
+  },
+  "discord:evidence_delete": {
+    description: "Soft-delete Discord moderation evidence including indefinitely retained items",
+    defaultValue: 0,
+    maxValue: 255,
+  },
+  "discord:evidence_restore": {
+    description: "Restore Discord moderation evidence during its recovery window",
+    defaultValue: 0,
+    maxValue: 255,
+  },
+  "discord:evidence_retention": {
+    description: "Manage Discord evidence retention policy and per-item indefinite retention",
+    defaultValue: 0,
+    maxValue: 255,
+  },
+
   // Admin permissions
   "system:super_admin": {
     description: "Global super admin override across all admin features",

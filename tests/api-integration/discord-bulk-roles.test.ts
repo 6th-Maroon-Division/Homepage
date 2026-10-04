@@ -1,0 +1,74 @@
+import { afterAll, beforeAll, expect, test, vi } from 'vitest';
+const session = vi.hoisted(() => ({ id: null as number | null }));
+vi.mock('next-auth', () => ({ getServerSession: async () => session.id === null ? null : { user: { id: session.id } } }));
+vi.mock('@/app/api/auth/[...nextauth]/route', () => ({ authOptions: {} }));
+import { prisma } from '@/lib/prisma';
+import { Prisma } from '@/generated/prisma/client';
+import { defaultSettings } from '@/lib/discord/config';
+import { POST as preview } from '@/app/api/discord/bulk-roles/route';
+import { POST as snapshot } from '@/app/api/discord/bulk-roles/[id]/snapshot/route';
+import { POST as confirm } from '@/app/api/discord/bulk-roles/[id]/confirm/route';
+import { POST as targets } from '@/app/api/discord/bulk-roles/[id]/targets/route';
+import { POST as outcomes } from '@/app/api/discord/bulk-roles/[id]/outcomes/route';
+import { POST as complete } from '@/app/api/discord/commands/[id]/complete/route';
+import type { DiscordIntegration } from '@/generated/prisma/client';
+import { json } from '@/lib/api/discord/shared';
+const guild = '970000000000000001', role = '970000000000000002', member = '970000000000000003', banned = '970000000000000004', removedRole = '970000000000000005';
+const settings = { ...defaultSettings(), guildId: guild, defaultRoleIds: [role] };
+let original: DiscordIntegration | null, admin: number, tokenId: number;
+const req = (body: unknown, bot = false) => new Request('http://localhost/api/discord/bulk-roles', { method: 'POST', headers: bot ? { authorization: 'Bearer bulk-roles-integration' } : {}, body: JSON.stringify(body) });
+const ctx = (id: number) => ({ params: Promise.resolve({ id: String(id) }) });
+const credentials = { claimToken: 'bulk-integration-claim', generation: 1 };
+async function lease(commandId: number) { await prisma.discordCommand.update({ where: { id: commandId }, data: { status: 'running', claimToken: credentials.claimToken, claimedBy: tokenId, leaseUntil: new Date(Date.now() + 300000) } }); }
+beforeAll(async () => {
+  original = await prisma.discordIntegration.findUnique({ where: { id: 1 } });
+  const permission = await prisma.permission.upsert({ where: { key: 'discord:configure' }, create: { key: 'discord:configure' }, update: {} });
+  admin = (await prisma.user.create({ data: { username: 'Bulk roles integration admin', userPermissions: { create: { permissionId: permission.id, value: 1 } } } })).id;
+  tokenId = (await prisma.botToken.create({ data: { name: 'Bulk integration', token: 'bulk-roles-integration' } })).id;
+  session.id = admin;
+  await prisma.discordIntegration.upsert({ where: { id: 1 }, create: { id: 1, revision: 40000, settings: json({ settings }) }, update: { revision: 40000, settings: json({ settings }) } });
+});
+afterAll(async () => {
+  if (original) await prisma.discordIntegration.update({ where: { id: 1 }, data: { ...original, settings: json(original.settings), metadata: original.metadata === null ? Prisma.DbNull : json(original.metadata), diagnostics: original.diagnostics === null ? Prisma.DbNull : json(original.diagnostics) } });
+  else await prisma.discordIntegration.delete({ where: { id: 1 } });
+  await prisma.discordConfigurationRevision.deleteMany({ where: { revision: { in: [40000, 40001] } } });
+  await prisma.$disconnect();
+});
+test('bulk preview, exact review, ban filtering, member receipts and execution persist atomically', async () => {
+  const response = await preview(req({ requestKey: 'integration-bulk-one', action: 'apply_defaults' })); expect(response.status).toBe(202);
+  const plan = (await response.json()).data;
+  await lease(plan.previewCommandId);
+  const input = { ...credentials, page: 0, memberIds: [member, banned], final: true };
+  expect((await snapshot(req(input, true), ctx(plan.id))).status).toBe(200);
+  expect((await snapshot(req(input, true), ctx(plan.id))).status).toBe(200);
+  expect(await prisma.discordBulkRolePage.count({ where: { actionId: plan.id } })).toBe(1);
+  const ready = await prisma.discordBulkRoleAction.findUniqueOrThrow({ where: { id: plan.id } });
+  expect(ready.status).toBe('ready'); expect(ready.memberCount).toBe(2);
+  expect((await confirm(req({ requestKey: 'integration-bulk-execute', version: ready.version - 1 }), ctx(plan.id))).status).toBe(409);
+  const confirmation = await confirm(req({ requestKey: 'integration-bulk-execute', version: ready.version }), ctx(plan.id)); expect(confirmation.status).toBe(202);
+  const execution = (await confirmation.json()).data; await lease(execution.executeCommandId);
+  await prisma.discordModerationCase.create({ data: { triggerId: '970000000000000099', guildId: guild, memberId: banned, roleIds: [], configRevision: 40000, configSnapshot: json(settings), action: 'ban', status: 'pending', occurredAt: new Date() } });
+  const targetList = await targets(req({ ...credentials, page: 0 }, true), ctx(plan.id));
+  expect((await targetList.json()).data).toMatchObject({ memberIds: [member], skippedBanMemberIds: [banned] });
+  expect((await complete(req({ ...credentials, success: true, result: {} }, true), ctx(execution.executeCommandId))).status).toBe(409);
+  const result = [{ memberId: member, status: 'applied' }, { memberId: banned, status: 'skipped' }];
+  expect((await outcomes(req({ ...credentials, page: 0, outcomes: result }, true), ctx(plan.id))).status).toBe(200);
+  expect((await complete(req({ ...credentials, success: true, result: {} }, true), ctx(execution.executeCommandId))).status).toBe(200);
+  expect((await prisma.discordBulkRoleAction.findUniqueOrThrow({ where: { id: plan.id } })).status).toBe('succeeded');
+});
+test('historical menu-role provenance works with PostgreSQL JSON containment and current protection wins', async () => {
+  await prisma.discordConfigurationRevision.create({ data: { revision: 40000, settings: json({ ...settings, defaultRoleIds: [], menus: [{ id: 'old-games', title: 'Games', channelId: guild, entries: [{ roleId: removedRole, emoji: '🎲', label: 'Removed entry' }] }] }) } });
+  expect((await preview(req({ requestKey: 'integration-bulk-removal', action: 'remove_menu_role', roleId: removedRole }))).status).toBe(202);
+  await prisma.discordIntegration.update({ where: { id: 1 }, data: { settings: json({ settings: { ...settings, membershipRoleIds: [removedRole] } }) } });
+  expect((await preview(req({ requestKey: 'integration-protected-removal', action: 'remove_menu_role', roleId: removedRole }))).status).toBe(409);
+  await prisma.discordIntegration.update({ where: { id: 1 }, data: { settings: json({ settings }) } });
+});
+test('configuration changes invalidate previously frozen previews', async () => {
+  const response = await preview(req({ requestKey: 'integration-bulk-stale', action: 'apply_defaults' })); expect(response.status).toBe(202);
+  const plan = (await response.json()).data; await lease(plan.previewCommandId);
+  expect((await snapshot(req({ ...credentials, page: 0, memberIds: [member], final: true }, true), ctx(plan.id))).status).toBe(200);
+  const ready = await prisma.discordBulkRoleAction.findUniqueOrThrow({ where: { id: plan.id } });
+  await prisma.discordIntegration.update({ where: { id: 1 }, data: { revision: 40001 } });
+  expect((await confirm(req({ requestKey: 'integration-stale-execute', version: ready.version }), ctx(plan.id))).status).toBe(409);
+  expect((await prisma.discordBulkRoleAction.findUniqueOrThrow({ where: { id: plan.id } })).executeCommandId).toBeNull();
+});

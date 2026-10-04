@@ -79,6 +79,7 @@ export default async function AdminPage() {
     (userPermissions['rank:delete'] ?? 0) > 0;
   const canAccessPromotions = hasSuperAdmin || (userPermissions['rank:manage_promotions'] ?? 0) > 0;
   const canAccessMessaging = hasSuperAdmin;
+  const canAccessDiscord = hasSuperAdmin || Object.entries(userPermissions).some(([key, value]) => key.startsWith('discord:') && value > 0);
 
   return (
     <main className="min-h-screen">
@@ -203,6 +204,13 @@ export default async function AdminPage() {
             >
               <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>Messaging</h2>
               <p style={{ color: 'var(--muted-foreground)' }}>Send notifications to users</p>
+            </Link>
+          )}
+
+          {canAccessDiscord && (
+            <Link href="/admin/discord" className="border rounded-lg p-8 transition-colors" style={{ backgroundColor: 'var(--secondary)', borderColor: 'var(--border)' }}>
+              <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>Discord Bot</h2>
+              <p style={{ color: 'var(--muted-foreground)' }}>Configure Discord integration, review moderation, and manage evidence</p>
             </Link>
           )}
 

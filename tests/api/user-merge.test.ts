@@ -1,7 +1,7 @@
 import { beforeEach, expect, test, vi } from 'vitest';
 const mocks = vi.hoisted(() => {
   const model = () => ({ findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn(), delete: vi.fn(), deleteMany: vi.fn(), create: vi.fn() });
-  const models = ['user', 'userPermission', 'botToken', 'authAccount', 'signup', 'userTraining', 'promotionProposal', 'orbatAttendanceNote', 'messageRecipient', 'trainingSessionAttendee', 'trainingRequestReadState', 'trainingRequestSubscription', 'userRank', 'userNotificationPreference', 'orbat', 'orbatTemplate', 'userTrainingStatusHistory', 'trainingRequest', 'trainingSession', 'trainingRequestMessage', 'attendance', 'attendanceSession', 'attendanceLog', 'attendanceEvent', 'legacyAttendanceData', 'legacyUserData', 'message', 'rankHistory', 'permissionAuditLog', 'squadRoleAuditLog', 'leaveOfAbsence', 'apiAuditLog'];
+  const models = ['botEvent', 'user', 'userPermission', 'botToken', 'authAccount', 'signup', 'userTraining', 'promotionProposal', 'orbatAttendanceNote', 'messageRecipient', 'trainingSessionAttendee', 'trainingRequestReadState', 'trainingRequestSubscription', 'userRank', 'userNotificationPreference', 'orbat', 'orbatTemplate', 'userTrainingStatusHistory', 'trainingRequest', 'trainingSession', 'trainingRequestMessage', 'attendance', 'attendanceSession', 'attendanceLog', 'attendanceEvent', 'legacyAttendanceData', 'legacyUserData', 'message', 'rankHistory', 'permissionAuditLog', 'squadRoleAuditLog', 'leaveOfAbsence', 'apiAuditLog'];
   const db = Object.fromEntries(models.map(name => [name, model()])) as Record<string, ReturnType<typeof model>> & { $transaction: ReturnType<typeof vi.fn> };
   db.$transaction = vi.fn();
   return { session: vi.fn(), publish: vi.fn(), db };
@@ -167,4 +167,13 @@ test('training merges retain target timestamps and notes when superior source st
   mocks.db.userTraining.findMany.mockResolvedValueOnce([target]).mockResolvedValueOnce([source]);
   expect((await POST(req(undefined, true))).status).toBe(200);
   expect(mocks.db.userTraining.update.mock.lastCall![0].data).toMatchObject({ status: 'finished', notes: 'target', trainingSessionCompletedAt: date, orbatQualifiedAt: date, failedAt: date });
+});
+
+test.each([false, true])('merge emits reconciliation for moved/discarded Discord identity (target has Discord: %s)', async targetLinked => {
+  const sourceAccount = { id: 21, provider: 'discord', providerUserId: '123456789012345678' };
+  const targetAccount = { id: 22, provider: 'discord', providerUserId: '234567890123456789' };
+  mocks.db.authAccount.findMany.mockImplementation(async ({ where }) => where.userId === 5 ? [sourceAccount] : targetLinked ? [targetAccount] : []);
+  expect((await POST(req())).status).toBe(200);
+  expect(mocks.db.botEvent.create).toHaveBeenCalledWith({ data: { type: targetLinked ? 'member.unlinked' : 'member.linked', aggregate: 'member', aggregateId: targetLinked ? '5' : '6', payload: { userId: targetLinked ? 5 : 6, discordUserId: sourceAccount.providerUserId } } });
+  if (targetLinked) expect(mocks.db.botEvent.create).toHaveBeenCalledWith({ data: { type: 'member.updated', aggregate: 'member', aggregateId: '6', payload: { userId: 6, discordUserId: targetAccount.providerUserId } } });
 });

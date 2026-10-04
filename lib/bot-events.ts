@@ -6,7 +6,7 @@ type EventClient = Pick<typeof prisma, 'botEvent'> | Prisma.TransactionClient;
 export async function appendBotEvent(
   input: {
     type: string;
-    aggregate: 'rank' | 'orbat' | 'training';
+    aggregate: 'rank' | 'orbat' | 'training' | 'discord' | 'member';
     aggregateId?: string | number | null;
     payload: Prisma.InputJsonValue;
   },

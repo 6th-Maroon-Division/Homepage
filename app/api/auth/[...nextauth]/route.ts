@@ -1,3 +1,4 @@
+import { appendBotEvent } from '@/lib/bot-events';
 import NextAuth from 'next-auth';
 import type { AuthOptions, Session } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
@@ -71,13 +72,18 @@ export const authOptions: AuthOptions = {
           if (authAccount && authAccount.userId !== existingUserId) return null;
           if (!authAccount) {
             authAccount = await tx.authAccount.create({ data: { provider: 'discord', providerUserId, userId: existingUserId }, include: { user: true } });
+            await appendBotEvent({ type: 'member.linked', aggregate: 'member', aggregateId: existingUserId, payload: { userId: existingUserId, discordUserId: providerUserId } }, tx);
             if (!existing.avatarUrl && avatarUrl) await tx.user.update({ where: { id: existingUserId }, data: { avatarUrl } });
           }
         } else if (!authAccount) {
           await tx.user.create({ data: { username, email, avatarUrl, accounts: { create: { provider: 'discord', providerUserId } } } });
           authAccount = await tx.authAccount.findUniqueOrThrow({ where: { provider_providerUserId: { provider: 'discord', providerUserId } }, include: { user: true } });
+          await appendBotEvent({ type: 'member.linked', aggregate: 'member', aggregateId: authAccount.userId, payload: { userId: authAccount.userId, discordUserId: providerUserId } }, tx);
         }
-        if (refresh) await tx.user.update({ where: { id: authAccount.userId }, data: { username, email, avatarUrl } });
+        if (refresh) {
+          const updated = await tx.user.update({ where: { id: authAccount.userId }, data: { username, email, avatarUrl, nameRevision: { increment: 1 } } });
+          await appendBotEvent({ type: 'member.name.changed', aggregate: 'member', aggregateId: authAccount.userId, payload: { userId: authAccount.userId, discordUserId: providerUserId, nameRevision: updated.nameRevision } }, tx);
+        }
         await writeApiAudit(tx, { principal: { kind: 'user', userId: authAccount.userId, permissions: {} }, correlationId: randomUUID(), method: 'GET', path: '/api/auth/callback/discord' }, { action: existingUserId === null ? 'auth.discord.signed_in' : 'auth.discord.linked', resource: 'auth_account', resourceId: String(authAccount.id), targetUserIds: [authAccount.userId], outcome: 'success' });
         return authAccount.userId;
       });

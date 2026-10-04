@@ -34,9 +34,11 @@ test('live account linking rejects another owner and links a new verified accoun
   expect(await signin('76561400000000003')).toBe(true);
   expect((await prisma.authAccount.findUniqueOrThrow({ where: { provider_providerUserId: { provider: 'discord', providerUserId: '76561400000000003' } } })).userId).toBe(actor.id);
   expect(await prisma.apiAuditLog.findFirst({ where: { action: 'auth.discord.linked', actorUserId: actor.id } })).not.toBeNull();
+  expect(await prisma.botEvent.findFirst({where:{aggregate:'member',aggregateId:String(actor.id),type:'member.linked'}})).toMatchObject({payload:{userId:actor.id,discordUserId:'76561400000000003'}});
 });
 test('failed audit rolls back new Discord account and user atomically', async () => {
   const count = await prisma.user.count();
+  const events = await prisma.botEvent.count();
   const transaction = prisma.$transaction.bind(prisma);
   const spy = vi.spyOn(prisma, '$transaction').mockImplementation(((operation: (tx: Prisma.TransactionClient) => Promise<unknown>) => transaction(async tx => {
     const fail = vi.spyOn(tx.apiAuditLog, 'create').mockRejectedValue(new Error('Audit unavailable'));
@@ -44,5 +46,17 @@ test('failed audit rolls back new Discord account and user atomically', async ()
   })) as typeof prisma.$transaction);
   try { await expect(signin('76561400000000004')).rejects.toThrow('Audit unavailable'); } finally { spy.mockRestore(); }
   expect(await prisma.user.count()).toBe(count);
+  expect(await prisma.botEvent.count()).toBe(events);
   expect(await prisma.authAccount.count({ where: { provider: 'discord', providerUserId: '76561400000000004' } })).toBe(0);
+});
+
+test('first-time Discord registration and profile refresh publish accepted state with name revisions', async () => {
+  const discordUserId = '76561400000000005';
+  expect(await signin(discordUserId)).toBe(true);
+  const account = await prisma.authAccount.findUniqueOrThrow({where:{provider_providerUserId:{provider:'discord',providerUserId:discordUserId}}});
+  expect(await prisma.botEvent.findFirst({where:{aggregate:'member',aggregateId:String(account.userId),type:'member.linked'}})).toMatchObject({payload:{userId:account.userId,discordUserId}});
+  mocks.cookie.set('discord-avatar-refresh','1');
+  expect(await signin(discordUserId)).toBe(true);
+  expect(await prisma.user.findUniqueOrThrow({where:{id:account.userId}})).toMatchObject({nameRevision:1});
+  expect(await prisma.botEvent.findFirst({where:{aggregate:'member',aggregateId:String(account.userId),type:'member.name.changed'}})).toMatchObject({payload:{userId:account.userId,discordUserId,nameRevision:1}});
 });

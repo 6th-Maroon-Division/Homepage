@@ -1,4 +1,5 @@
 import { validateQueryParameters, parsePositiveId } from '@/lib/api/validation';
+import { decode } from '@/lib/api/discord/shared';
 import { prisma } from '@/lib/prisma';
 import { handleApiRequest } from '@/lib/api/handler';
 import { apiError, apiSuccess } from '@/lib/api/response';
@@ -27,12 +28,16 @@ export async function PATCH(request: Request, context: Context) {
         const where = { rankId_guildId: { rankId: ids.rankId, guildId: ids.guildId } };
         const before = await tx.rankDiscordRole.findUnique({ where });
         if (!before && !parsed.data.discordRoleId) return apiError(422, 'validation_failed', 'discordRoleId is required to create a mapping.');
+        const integration = await tx.discordIntegration.findUnique({ where: { id: 1 } });
+        const { settings } = decode(integration?.settings);
+        const desiredRole = parsed.data.discordRoleId ?? before?.discordRoleId;
+        if ((parsed.data.isActive ?? before?.isActive ?? true) && settings.guildId === ids.guildId && settings.menus.some(menu => menu.entries.some(entry => entry.roleId === desiredRole))) return apiError(422, 'validation_failed', 'Reaction-menu roles cannot become managed rank roles.');
         const after = before
           ? await tx.rankDiscordRole.update({ where, data: parsed.data, select: discordRankSelect })
           : await tx.rankDiscordRole.create({ data: { rankId: ids.rankId, guildId: ids.guildId, discordRoleId: parsed.data.discordRoleId!, ...(parsed.data.isActive !== undefined ? { isActive: parsed.data.isActive } : {}) }, select: discordRankSelect });
         await writeApiAudit(tx, audit, { action: before ? 'rank_discord_role.updated' : 'rank_discord_role.created', resource: 'rank_discord_role', resourceId: String(after.id), outcome: 'success', ...(before ? { before: discordRoleSnapshot(before) } : {}), after: discordRoleSnapshot(after) });
         return apiSuccess(after);
-      });
+      }, { isolationLevel: 'Serializable' });
     } catch (error) { return discordRoleDatabaseError(error); }
   });
 }

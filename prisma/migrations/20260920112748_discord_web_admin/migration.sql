@@ -1,0 +1,2 @@
+-- RenameIndex
+ALTER INDEX "TrainingSessionAttendee_reminder24hSentAt_status_sessionId_id_i" RENAME TO "TrainingSessionAttendee_reminder24hSentAt_status_sessionId__idx";

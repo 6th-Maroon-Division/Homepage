@@ -172,3 +172,20 @@ test('attendance finalization events expose the finalized operation window on th
   expect(response.status).toBe(200);
   expect((await response.json()).data).toEqual([{ id: '44', type: 'attendance.finalized', occurredAt: payload.version, payload }]);
 });
+
+test.each(['discord', 'member'])('durable %s invalidations use the same cursor and private-field allowlist in JSON and SSE', async aggregate => {
+  const payload = aggregate === 'discord' ? { revision: 12 } : { userId: 5, nameRevision: 3, discordUserId: '123456789012345678' };
+  mocks.db.botEvent.findMany.mockResolvedValue([{ ...row(23), aggregate, type: `${aggregate}.changed`, payload: { ...payload, username: 'Private name', settings: { secret: 'secret' }, reason: 'Private reason', token: 'secret' } }]);
+  const response = await GET(req(`?aggregate=${aggregate}&cursor=22`));
+  const result = await response.json();
+  expect(result.data[0].payload).toEqual(payload);
+  expect(result.meta.resumeCursor).toBe('23');
+  const stream = await GET(req(`?aggregate=${aggregate}`, { accept: 'text/event-stream', 'last-event-id': '22' }));
+  const reader = stream.body!.getReader();
+  try {
+    const chunk = new TextDecoder().decode((await reader.read()).value);
+    expect(chunk).toContain('id: 23');
+    expect(chunk).not.toContain('Private');
+    expect(chunk).not.toContain('secret');
+  } finally { await reader.cancel(); }
+});

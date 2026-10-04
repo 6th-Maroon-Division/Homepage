@@ -1,3 +1,4 @@
+import { appendBotEvent } from '@/lib/bot-events';
 import { prisma } from '@/lib/prisma';
 import { PERMISSIONS, type PermissionKey } from '@/lib/permissions';
 import { publishUserProfileEvent } from '@/lib/realtime/user-events';
@@ -382,6 +383,12 @@ export async function mergeUsers(request: Request) {
       result.movedReferenceRows = movedReferences.reduce((total, update) => total + update.count, 0);
 
       await tx.user.delete({ where: { id: sourceUserId } });
+      for (const account of sourceAccounts) if (account.provider === 'discord') {
+        const discarded = targetAccounts.some(target => target.provider === 'discord');
+        const userId = discarded ? sourceUserId : targetUserId;
+        await appendBotEvent({ type: discarded ? 'member.unlinked' : 'member.linked', aggregate: 'member', aggregateId: userId, payload: { userId, discordUserId: account.providerUserId } }, tx);
+      }
+      for (const account of targetAccounts) if (account.provider === 'discord') await appendBotEvent({ type: 'member.updated', aggregate: 'member', aggregateId: targetUserId, payload: { userId: targetUserId, discordUserId: account.providerUserId } }, tx);
 
       await writeApiAudit(tx, context, { action: 'user.merged', resource: 'user', resourceId: String(targetUserId), targetUserIds: [sourceUserId, targetUserId], outcome: 'success', before: { sourceUserId, targetUserId }, after: { removedUserId: sourceUserId, mergedIntoUserId: targetUserId, inheritedPermissions: inheritedGrants.map(grant => ({ permissionId: grant.permissionId, value: grant.value })), summary: result } });
       return { summary: result };

@@ -1,7 +1,7 @@
 import { beforeEach, expect, test, vi } from 'vitest';
 const mocks = vi.hoisted(() => {
   const model = () => ({ findUnique: vi.fn(), findUniqueOrThrow: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn() });
-  return { cookie: { get: vi.fn(), getAll: vi.fn(), set: vi.fn() }, decode: vi.fn(), pending: vi.fn(), db: { user: model(), authAccount: model(), userPermission: model(), apiAuditLog: model(), $transaction: vi.fn() } };
+  return { cookie: { get: vi.fn(), getAll: vi.fn(), set: vi.fn() }, decode: vi.fn(), pending: vi.fn(), db: { botEvent: { create: vi.fn(), deleteMany: vi.fn() }, user: model(), authAccount: model(), userPermission: model(), apiAuditLog: model(), $transaction: vi.fn() } };
 });
 vi.mock('next-auth', () => ({ default: () => () => new Response('NextAuth protocol') }));
 vi.mock('next-auth/jwt', () => ({ decode: mocks.decode }));
@@ -13,7 +13,7 @@ const signin = (profile: unknown = { id: '123456789012345678', username: 'Discor
 const jwt = (args: unknown) => authOptions.callbacks!.jwt!(args as never);
 const owner = { id: 10, username: 'Owner', email: null, createdAt: new Date() };
 beforeEach(() => {
-  vi.resetAllMocks(); mocks.cookie.getAll.mockReturnValue([]);
+  vi.resetAllMocks(); mocks.db.user.update.mockResolvedValue({ nameRevision: 1 }); mocks.cookie.getAll.mockReturnValue([]);
   mocks.db.authAccount.findUnique.mockResolvedValue({ id: 1, userId: 10, user: owner });
   mocks.db.user.findUnique.mockResolvedValue(owner);
   mocks.db.userPermission.findMany.mockResolvedValue([{ value: 1, permission: { key: 'user:edit' } }]);

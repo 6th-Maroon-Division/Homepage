@@ -16,6 +16,19 @@ const labels = {
 
 type Preferences = Record<keyof typeof labels, boolean>;
 
+const groups: { title: string; description: string; fields: (keyof Preferences)[] }[] = [
+  {
+    title: 'Delivery methods',
+    description: 'Choose how to receive the message types you enable below.',
+    fields: ['dmEnabled', 'channelMentionsEnabled'],
+  },
+  {
+    title: 'Message types',
+    description: 'Choose which notifications you want through your selected delivery methods.',
+    fields: ['orbatAnnouncements', 'trainingScheduled', 'trainingUpdated', 'trainingCancelled', 'trainingReminders', 'promotionAnnouncements'],
+  },
+];
+
 export default function NotificationPreferencesPanel() {
   const [preferences, setPreferences] = useState<Preferences | null>(null);
   const [saving, setSaving] = useState(false);
@@ -33,21 +46,33 @@ export default function NotificationPreferencesPanel() {
   if (!preferences) return <p style={{ color: 'var(--muted-foreground)' }}>Loading notification preferences…</p>;
 
   return (
-    <div className="rounded-lg border p-4" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--secondary)' }}>
+    <div className="space-y-5">
+      <header className="rounded-lg border p-5" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--secondary)' }}>
       <h3 className="font-semibold" style={{ color: 'var(--foreground)' }}>Notification preferences</h3>
-      <p className="mt-1 mb-4 text-sm" style={{ color: 'var(--muted-foreground)' }}>
-        These settings are shared with the Discord bot. Notifications are off until you enable them.
+      <p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>
+        These settings are shared with the Discord bot. Enable at least one delivery method and one message type to receive notifications.
       </p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {(Object.keys(labels) as Array<keyof Preferences>).map((field) => (
-          <label key={field} className="flex items-center gap-3 rounded border p-3" style={{ borderColor: 'var(--border)' }}>
-            <input type="checkbox" checked={preferences[field]} onChange={(event) => setPreferences({ ...preferences, [field]: event.target.checked })} />
-            <span className="text-sm" style={{ color: 'var(--foreground)' }}>{labels[field]}</span>
-          </label>
+      </header>
+      <div className="rounded-lg border" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--secondary)' }}>
+        {groups.map((group) => (
+          <section key={group.title} className="border-b p-5" style={{ borderColor: 'var(--border)' }}>
+            <h4 id={`notification-${group.fields[0]}`} className="mb-2 font-semibold" style={{ color: 'var(--foreground)' }}>{group.title}</h4>
+            <fieldset disabled={saving} aria-labelledby={`notification-${group.fields[0]}`}>
+            <p className="mb-3 text-sm" style={{ color: 'var(--muted-foreground)' }}>{group.description}</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {group.fields.map((field) => (
+                <label key={field} className="flex items-center gap-3 rounded border p-3" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)' }}>
+                  <input type="checkbox" checked={preferences[field]} onChange={(event) => setPreferences({ ...preferences, [field]: event.target.checked })} />
+                  <span className="text-sm" style={{ color: 'var(--foreground)' }}>{labels[field]}</span>
+                </label>
+              ))}
+            </div>
+            </fieldset>
+          </section>
         ))}
-      </div>
+        <div className="p-5">
       <button
-        className="mt-4 rounded px-4 py-2 text-sm font-medium disabled:opacity-50"
+        className="rounded px-4 py-2 text-sm font-medium disabled:opacity-50"
         style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
         disabled={saving}
         onClick={async () => {
@@ -64,6 +89,8 @@ export default function NotificationPreferencesPanel() {
           } finally { setSaving(false); }
         }}
       >{saving ? 'Saving…' : 'Save preferences'}</button>
+        </div>
+      </div>
     </div>
   );
 }

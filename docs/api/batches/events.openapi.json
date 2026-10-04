@@ -3,7 +3,7 @@
     "/events": {
       "get": {
         "summary": "Read or stream durable integration events",
-        "description": "Requires positive system:super_admin or active bot token. Audits only delivered other-user payload IDs without snapshots. Final nextCursor is null; resumeCursor remains the polling checkpoint.",
+        "description": "Requires positive system:super_admin or active bot token. Audits only delivered other-user payload IDs without snapshots. Final nextCursor is null; resumeCursor remains the polling checkpoint. Scheduled promotions emit user.rank_changed on rank; attendance.finalized on orbat carries orbatId, status (finalized), startsAt, endsAt and version (UTC finalization timestamp). Training reminders emit training.reminder_due on training. Events are retained for 30 days. discord.configuration.changed carries revision. member.linked, member.unlinked, member.deleted, member.updated and member.name.changed carry userId, discordUserId and optional nameRevision. These are invalidations: refetch authoritative state. Names, settings, reasons and credentials are not exposed. All source mutations and events commit atomically.",
         "security": [
           {
             "sessionCookie": []
@@ -25,7 +25,9 @@
               "enum": [
                 "rank",
                 "orbat",
-                "training"
+                "training",
+                "discord",
+                "member"
               ]
             }
           },
@@ -117,6 +119,14 @@
                   "type": "string"
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Correlation ID for this API request.",
+                "schema": {
+                  "type": "string"
+                }
+              }
             }
           },
           "400": {
@@ -125,6 +135,14 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiFailure"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Correlation ID for this API request.",
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -137,6 +155,14 @@
                   "$ref": "#/components/schemas/ApiFailure"
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Correlation ID for this API request.",
+                "schema": {
+                  "type": "string"
+                }
+              }
             }
           },
           "403": {
@@ -147,6 +173,14 @@
                   "$ref": "#/components/schemas/ApiFailure"
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Correlation ID for this API request.",
+                "schema": {
+                  "type": "string"
+                }
+              }
             }
           },
           "500": {
@@ -155,6 +189,14 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiFailure"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Correlation ID for this API request.",
+                "schema": {
+                  "type": "string"
                 }
               }
             }

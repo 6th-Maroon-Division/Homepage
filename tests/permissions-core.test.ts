@@ -8,10 +8,10 @@ import {
   isValidPermissionValue,
 } from '@/lib/permissions';
 
-test('registers exactly 26 permissions', () => {
+test('registers exactly 36 permissions', () => {
   const keys = getAllPermissionKeys();
-  assert.equal(keys.length, 26);
-  assert.equal(new Set(keys).size, 26);
+  assert.equal(keys.length, 36);
+  assert.equal(new Set(keys).size, 36);
 });
 
 test('includes all expected template permissions', () => {

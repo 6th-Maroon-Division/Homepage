@@ -1,3 +1,5 @@
+> **Deprecated — 2026-09-20.** Retained for historical reference only. Do not use this document for current product decisions, API readiness, or implementation contracts. See the [current documentation](./README.md), [feature specification](./feature-specification.md), and [web configuration and integration](./web-configuration-and-integration.md).
+
 # 6MD Discord Bot Design
 
 ## 1. Document purpose

@@ -1,3 +1,4 @@
+import { appendBotEvent } from '@/lib/bot-events';
 import { prisma } from '@/lib/prisma';
 import { handleApiRequest } from './handler';
 import { canAccessApiUser } from './auth';
@@ -7,7 +8,7 @@ import { readJsonBody } from './request';
 import { parsePositiveId } from './validation';
 import { writeApiAudit } from './audit';
 import { publishUserProfileEvent } from '@/lib/realtime/user-events';
-const select = { id: true, username: true, email: true, avatarUrl: true, createdAt: true, accounts: { orderBy: { id: 'asc' as const }, select: { provider: true } } } as const;
+const select = { id: true, username: true, email: true, avatarUrl: true, createdAt: true, accounts: { orderBy: { id: 'asc' as const }, select: { provider: true, providerUserId: true } } } as const;
 type ProfileUpdate = { username?: string; email?: string | null; avatarUrl?: string | null };
 export function parseProfileUpdate(body: unknown): ProfileUpdate | null {
   if (!body || typeof body !== 'object' || Array.isArray(body) || !Object.keys(body).length || Object.keys(body).some(key => !['username', 'email', 'avatarUrl'].includes(key))) return null;
@@ -55,10 +56,12 @@ export async function userProfile(request: Request, idValue: string, method: 'GE
           const messages = await tx.trainingRequestMessage.count({ where: { senderId: id } });
           if (references || messages) return { error: apiError(409, 'conflict', 'This user has training audit records. Merge the account instead.') };
           await tx.user.delete({ where: { id } });
+          for (const account of before.accounts) if (account.provider === 'discord') await appendBotEvent({ type: 'member.deleted', aggregate: 'member', aggregateId: id, payload: { userId: id, discordUserId: account.providerUserId } }, tx);
           await writeApiAudit(tx, context, { action: 'user.deleted', resource: 'user', resourceId: String(id), targetUserIds: [id], outcome: 'success', before: { id, username: before.username }, after: { deleted: true } });
           return { data: null };
         }
-        const after = await tx.user.update({ where: { id }, data: update!, select });
+        const after = await tx.user.update({ where: { id }, data: { ...update!, ...(update?.username !== undefined ? { nameRevision: { increment: 1 } } : {}) }, select });
+        if (update?.username !== undefined) for (const account of before.accounts) if (account.provider === 'discord') await appendBotEvent({ type: 'member.name.changed', aggregate: 'member', aggregateId: id, payload: { userId: id, discordUserId: account.providerUserId } }, tx);
         await writeApiAudit(tx, context, { action: 'user.updated', resource: 'user', resourceId: String(id), targetUserIds: [id], outcome: 'success', before: { username: before.username, email: before.email, avatarUrl: before.avatarUrl }, after: { username: after.username, email: after.email, avatarUrl: after.avatarUrl } });
         return { data: after };
       }, { isolationLevel: 'Serializable' });

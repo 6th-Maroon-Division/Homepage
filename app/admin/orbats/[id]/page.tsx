@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import DiscordAnnouncementPanel from '@/app/components/orbat/DiscordAnnouncementPanel';
 import AdminOrbatView from '@/app/components/orbat/AdminOrbatView';
 import { checkPermission } from '@/lib/auth-middleware';
 
@@ -90,6 +91,8 @@ export default async function AdminOrbatPage({ params }: AdminOrbatPageProps) {
     notFound();
   }
 
+  const canAnnounce = await checkPermission(session.user.id, 'discord:announce');
+
   const clientOrbat = {
     isSideOp: orbat.isSideOp,
     id: orbat.id,
@@ -148,6 +151,7 @@ export default async function AdminOrbatPage({ params }: AdminOrbatPageProps) {
     <main className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <AdminOrbatView orbat={clientOrbat} />
+        {canAnnounce && <DiscordAnnouncementPanel orbatId={orbat.id} name={orbat.name} />}
       </div>
     </main>
   );

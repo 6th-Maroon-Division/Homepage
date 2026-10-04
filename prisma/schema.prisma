@@ -20,6 +20,7 @@ enum FrequencyType {
 model User {
   id                           Int                           @id @default(autoincrement())
   username                     String?
+  nameRevision                 Int                           @default(0)
   email                        String?
   avatarUrl                    String?
   createdAt                    DateTime                      @default(now())
@@ -1088,4 +1089,168 @@ model SchedulerJob {
 
   @@index([completedAt, nextAttemptAt])
   @@index([completedAt, dueAt, key])
+}
+
+// Single-guild Discord integration. Secrets remain outside this configuration.
+model DiscordIntegration {
+  id              Int      @id @default(1)
+  revision        Int      @default(0)
+  settings        Json
+  appliedRevision Int      @default(0)
+  lastSeenAt      DateTime?
+  botVersion      String?
+  health          String   @default("not_connected")
+  metadata        Json?
+  metadataObservedAt DateTime?
+  diagnostics     Json?
+  diagnosticsReportedAt DateTime?
+  updatedAt       DateTime @updatedAt
+}
+
+model DiscordCommand {
+  id             Int       @id @default(autoincrement())
+  requestKey     String    @unique
+  kind           String
+  payload        Json
+  permission     String
+  requestedBy    Int?
+  status         String    @default("pending")
+  generation     Int       @default(1)
+  claimToken     String?
+  claimedBy      Int?
+  leaseUntil     DateTime?
+  result         Json?
+  errorCode      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status, id])
+}
+
+// Immutable bot outcomes, including automatic actions outside the command queue.
+model DiscordOperation {
+  id             Int      @id @default(autoincrement())
+  eventId        String   @unique
+  guildId        String
+  configRevision Int
+  kind           String
+  status         String
+  attempts       Int
+  memberId       String?
+  channelId      String?
+  roleId         String?
+  menuId         String?
+  errorCode      String?
+  occurredAt     DateTime
+  createdAt      DateTime @default(now())
+
+  @@index([status, id])
+  @@index([kind, id])
+}
+
+model DiscordAnnouncement {
+  id          Int      @id @default(autoincrement())
+  orbatId     Int      @unique
+  channelId   String
+  mention     String   @default("none")
+  missionText String
+  messageId   String?
+  renderedRevision String?
+  lastRenderedAt DateTime?
+  missingAt DateTime?
+  updatedAt   DateTime @updatedAt
+}
+
+model DiscordModerationCase {
+  id             Int       @id @default(autoincrement())
+  triggerId      String    @unique
+  guildId        String
+  memberId       String
+  roleIds        Json
+  configRevision Int
+  configSnapshot Json
+  action         String
+  status         String    @default("pending")
+  occurredAt     DateTime
+  timeoutUntil   DateTime?
+  releasedAt     DateTime?
+  cleanup        Json?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  evidence       DiscordEvidence[]
+}
+
+model DiscordEvidence {
+  id            Int      @id @default(autoincrement())
+  caseId        Int
+  moderationCase DiscordModerationCase @relation(fields: [caseId], references: [id], onDelete: Restrict)
+  messageId     String
+  channelId     String
+  authorId      String
+  sentAt        DateTime
+  content       String?
+  attachments   Json?
+  capturedAt    DateTime @default(now())
+  expiresAt     DateTime?
+  indefinite    Boolean  @default(false)
+  deletedAt     DateTime?
+  recoverUntil  DateTime?
+  purgedAt      DateTime?
+  version       Int      @default(1)
+
+  @@unique([caseId, messageId])
+  @@index([expiresAt, deletedAt])
+  @@index([recoverUntil, purgedAt])
+}
+
+// Published message references survive edits or removal of the configured menu.
+model DiscordRoleMenuMessage {
+  id            Int      @id @default(autoincrement())
+  menuId        String
+  channelId     String
+  messageId     String
+  lastCommandId Int
+  updatedAt     DateTime @updatedAt
+
+  @@unique([menuId, channelId])
+}
+
+// Frozen, explicitly reviewed bulk role changes. No changes occur during preview.
+model DiscordBulkRoleAction {
+  id             Int      @id @default(autoincrement())
+  requestKey     String   @unique
+  guildId        String
+  configRevision Int
+  action         String
+  roleIds        Json
+  requestedBy    Int
+  status         String   @default("preview_pending")
+  version        Int      @default(1)
+  nextPage       Int      @default(0)
+  memberCount    Int      @default(0)
+  previewCommandId Int    @unique
+  executeCommandId Int?   @unique
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  pages          DiscordBulkRolePage[]
+}
+
+model DiscordBulkRolePage {
+  id             Int      @id @default(autoincrement())
+  actionId       Int
+  action         DiscordBulkRoleAction @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  page           Int
+  memberIds      Json
+  outcomes       Json?
+  final          Boolean
+
+  @@unique([actionId, page])
+}
+
+model DiscordConfigurationRevision {
+  id        Int      @id @default(autoincrement())
+  revision  Int      @unique
+  settings  Json
+  createdAt DateTime @default(now())
 }

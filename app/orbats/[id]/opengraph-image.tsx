@@ -1,8 +1,10 @@
 import { ImageResponse } from 'next/og';
 import { readFile } from 'node:fs/promises';
 import { prisma } from '@/lib/prisma';
+import { defaultSettings, record } from '@/lib/discord/config';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 export const contentType = 'image/png';
 export const size = {
   width: 1200,
@@ -148,6 +150,7 @@ export default async function Image({ params }: OrbatImageProps) {
             orderBy: { orderIndex: 'asc' },
             select: {
               maxSignups: true,
+              _count: { select: { signups: true } },
               squadRole: {
                 select: {
                   name: true,
@@ -257,11 +260,22 @@ export default async function Image({ params }: OrbatImageProps) {
       : null,
   ].filter((row): row is { label: string; value: string; borderColor: string; valueColor: string } => Boolean(row));
 
+  const integration = await prisma.discordIntegration.findUnique({ where: { id: 1 }, select: { settings: true } });
+  const stored = record(integration?.settings) && record(integration.settings.settings) ? integration.settings.settings : {};
+  const imageSettings: Record<string, unknown> = { ...defaultSettings(), ...stored };
+  const slotColor = (key: string, fallback: string) => typeof imageSettings[key] === 'string' && /^#[0-9a-fA-F]{6}$/.test(imageSettings[key] as string) ? imageSettings[key] as string : fallback;
+
   const squadPanels = orbat.squads.map((squad) => {
     const roles = squad.slots.map((slot) => {
       const roleName = slot.squadRole?.name || 'Unassigned';
-      const slotAmount = slot.maxSignups ?? 1;
-      return slotAmount > 1 ? `${roleName} x${slotAmount}` : roleName;
+      const count = slot._count.signups;
+      const capacity = slot.maxSignups;
+      const full = capacity !== null && count >= capacity;
+      const state = full ? 'Full' : count > 0 ? 'Partial' : 'Open';
+      return {
+        label: `${roleName} ${count}/${capacity ?? '∞'} · ${state}`,
+        color: full ? slotColor('fullColor', '#166534') : count > 0 ? slotColor('partialColor', '#92400e') : slotColor('availableColor', '#334155'),
+      };
     });
 
     return {
@@ -381,12 +395,12 @@ export default async function Image({ params }: OrbatImageProps) {
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                       {panel.roles.map((role, index) => (
                         <div
-                          key={`${panel.squadName}-${index}-${role}`}
+                          key={`${panel.squadName}-${index}`}
                           style={{
                             display: 'flex',
                             fontSize: 11,
                             color: '#e2e8f0',
-                            background: 'rgba(30, 41, 59, 0.8)',
+                            background: role.color,
                             border: '1px solid rgba(148, 163, 184, 0.28)',
                             borderRadius: 999,
                             padding: '2px 6px',
@@ -396,7 +410,7 @@ export default async function Image({ params }: OrbatImageProps) {
                             maxWidth: '100%',
                           }}
                         >
-                          {role}
+                          {role.label}
                         </div>
                       ))}
                     </div>

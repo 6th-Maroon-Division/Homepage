@@ -26,7 +26,7 @@ function page(params: URLSearchParams) { const parsed = parseCursorPagination(pa
 export function signupRoute(request: Request, permission: PermissionKey | undefined, callback: (principal: ApiPrincipal, context: ApiAuditContext) => Promise<Response>) {
   return handleApiRequest(request, permission, async (principal, context) => { try { return await callback(principal, context); } catch (error) { return catchFailure(error); } });
 }
-function catchFailure(error: unknown): Response {
+export function catchFailure(error: unknown): Response {
   if (error instanceof Failure) return error.response;
   if (error && typeof error === 'object' && 'code' in error) {
     if (error.code === 'P2025') return apiError(404, 'not_found', 'Resource no longer exists.');
@@ -68,7 +68,7 @@ async function access(db: DB, userId: number, slot: Slot) {
 }
 function signupDto(row: { id: number; slotId: number; userId: number; createdAt: Date }, orbatId: number) { return { id: row.id, slotId: row.slotId, userId: row.userId, orbatId, createdAt: row.createdAt.toISOString() }; }
 function notify(principal: ApiPrincipal, audit: ApiAuditContext, orbatId: number, type: 'signup.created' | 'signup.moved' | 'signup.deleted', payload: Record<string, unknown>) { try { publishOrbatEvent({ type, orbatId, actorUserId: principal.kind === 'user' ? principal.userId : null, payload }); } catch { console.error('Signup notification failed', { correlationId: audit.correlationId, timestamp: new Date().toISOString() }); } }
-export async function mutateSignup(request: Request, principal: ApiPrincipal, audit: ApiAuditContext, method: 'POST' | 'PATCH' | 'DELETE', id?: number) {
+export async function mutateSignup(request: Request, principal: ApiPrincipal, audit: ApiAuditContext, method: 'POST' | 'PATCH' | 'DELETE', id?: number, allowMemberMove = false) {
   query(request, []);
   const body = method === 'DELETE' ? {} : object(await readJsonBody(request), method === 'POST' ? ['slotId', 'userId', 'qualificationTrainingId'] : ['slotId', 'overrideRequirements', 'qualificationTrainingId']);
   if (method !== 'DELETE' && !numeric(body.slotId)) fail(422, 'validation_failed', 'slotId must be a numeric positive 32-bit ID.');
@@ -76,7 +76,7 @@ export async function mutateSignup(request: Request, principal: ApiPrincipal, au
   if (body.overrideRequirements !== undefined && typeof body.overrideRequirements !== 'boolean') fail(422, 'validation_failed', 'overrideRequirements must be boolean.');
   if (body.qualificationTrainingId !== undefined && !numeric(body.qualificationTrainingId)) fail(422, 'validation_failed', 'qualificationTrainingId must be a numeric ID.');
   if (body.qualificationTrainingId !== undefined && body.overrideRequirements === true) fail(422, 'validation_failed', 'Qualification assignment cannot override requirements.');
-  if (method === 'PATCH' && body.qualificationTrainingId === undefined && !hasApiPermission(principal.permissions, 'orbat:edit')) fail(403, 'forbidden', 'Moving signups requires orbat:edit.');
+  if (method === 'PATCH' && !allowMemberMove && body.qualificationTrainingId === undefined && !hasApiPermission(principal.permissions, 'orbat:edit')) fail(403, 'forbidden', 'Moving signups requires orbat:edit.');
   const key = request.headers.get('idempotency-key');
   if (key !== null && (!key.trim() || key.length > 200)) fail(400, 'invalid_request', 'Idempotency-Key must contain 1–200 characters.');
   const receiptKey = key === null ? null : createHash('sha256').update(`${principal.kind}:${principal.kind === 'user' ? principal.userId : principal.tokenId}:${key}`).digest('hex');

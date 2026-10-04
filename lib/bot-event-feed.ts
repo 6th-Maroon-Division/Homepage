@@ -22,14 +22,14 @@ export function eventDto(event: BotEvent) {
   const raw = event.payload && typeof event.payload === 'object' && !Array.isArray(event.payload) ? event.payload : {};
   const payload: Record<string, string | number | null> = {};
   const numbers = event.aggregate === 'rank' ? ['rankHistoryId', 'userId', 'oldRankId', 'newRankId']
-    : event.aggregate === 'orbat' ? ['orbatId', 'signupId', 'userId', 'oldSlotId', 'slotId'] : ['trainingId', 'sessionId'];
+    : event.aggregate === 'orbat' ? ['orbatId', 'signupId', 'userId', 'oldSlotId', 'slotId'] : event.aggregate === 'discord' ? ['revision'] : event.aggregate === 'member' ? ['userId', 'nameRevision'] : ['trainingId', 'sessionId'];
   for (const key of numbers) {
     const value = raw[key];
     if (value === null || typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= 2147483647) payload[key] = value;
   }
-  const strings = event.aggregate === 'rank' ? ['changeType', 'source'] : event.aggregate === 'orbat' ? ['name', 'status'] : ['title', 'websiteUrl'];
+  const strings = event.aggregate === 'rank' ? ['changeType', 'source'] : event.aggregate === 'orbat' ? ['name', 'status'] : event.aggregate === 'training' ? ['title', 'websiteUrl'] : [];
   for (const key of strings) if (typeof raw[key] === 'string' || raw[key] === null) payload[key] = raw[key];
-  if (event.aggregate === 'rank' && (raw.discordUserId === null || typeof raw.discordUserId === 'string' && /^\d{17,20}$/.test(raw.discordUserId))) payload.discordUserId = raw.discordUserId;
+  if ((event.aggregate === 'rank' || event.aggregate === 'member') && (raw.discordUserId === null || typeof raw.discordUserId === 'string' && /^\d{17,20}$/.test(raw.discordUserId))) payload.discordUserId = raw.discordUserId;
   for (const key of ['version', 'startsAt', 'endsAt']) {
     if (raw[key] === null) payload[key] = null;
     else if (typeof raw[key] === 'string') { const date = parseUtcTimestamp(raw[key]); if (date) payload[key] = date.toISOString(); }
@@ -46,7 +46,7 @@ export async function getEventFeed(request: Request) {
     const params = new URL(request.url).searchParams;
     for (const key of params.keys()) if (!['aggregate', 'cursor', 'limit'].includes(key) || params.getAll(key).length !== 1) return apiError(400, 'invalid_request', 'Only aggregate, cursor and limit are supported once each.');
     const aggregate = params.get('aggregate');
-    if (aggregate !== 'rank' && aggregate !== 'orbat' && aggregate !== 'training') return apiError(400, 'invalid_request', 'aggregate must be rank, orbat or training.');
+    if (aggregate !== 'rank' && aggregate !== 'orbat' && aggregate !== 'training' && aggregate !== 'discord' && aggregate !== 'member') return apiError(400, 'invalid_request', 'aggregate must be rank, orbat, training, discord or member.');
     const limitValue = params.has('limit') ? parsePositiveId(params.get('limit')) : 50;
     if (limitValue === null) return apiError(400, 'invalid_request', 'limit must be a positive integer.');
     const limit = Math.min(limitValue, 100);

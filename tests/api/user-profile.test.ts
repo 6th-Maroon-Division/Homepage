@@ -1,5 +1,5 @@
 import { beforeEach, expect, test, vi } from 'vitest';
-const m = vi.hoisted(() => { const model = () => ({ findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), delete: vi.fn(), count: vi.fn(), create: vi.fn(), findFirst: vi.fn() }); return { session: vi.fn(), publish: vi.fn(), db: { user: model(), userPermission: model(), botToken: model(), apiAuditLog: model(), trainingRequest: model(), trainingRequestMessage: model(), $transaction: vi.fn() } }; });
+const m = vi.hoisted(() => { const model = () => ({ findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), delete: vi.fn(), count: vi.fn(), create: vi.fn(), findFirst: vi.fn() }); return { session: vi.fn(), publish: vi.fn(), db: { botEvent: { create: vi.fn(), deleteMany: vi.fn() }, user: model(), userPermission: model(), botToken: model(), apiAuditLog: model(), trainingRequest: model(), trainingRequestMessage: model(), $transaction: vi.fn() } }; });
 vi.mock('@/lib/prisma', () => ({ prisma: m.db })); vi.mock('next-auth', () => ({ getServerSession: m.session }));
 vi.mock('@/app/api/auth/[...nextauth]/route', () => ({ authOptions: {} }));
 vi.mock('@/lib/realtime/user-events', () => ({ publishUserProfileEvent: m.publish }));
@@ -78,4 +78,13 @@ test('avatar can be cleared explicitly with null',async()=>{
 test('unknown database code is not misreported as a known conflict',async()=>{
  m.db.$transaction.mockRejectedValue({code:'P9999'});const log=vi.spyOn(console,'error').mockImplementation(()=>{});
  try{expect((await PATCH(request('PATCH',{username:'Updated'}),context())).status).toBe(500)}finally{log.mockRestore()}
+});
+
+test('linked profile name changes and deletion append minimal durable invalidations inside the transaction', async () => {
+  const linked = { ...user, accounts: [{ provider: 'discord', providerUserId: '123456789012345678' }] };
+  m.db.user.findUnique.mockImplementation(async args => args.select.userPermissions ? { userPermissions: [{ permission: { key: 'user:manage' }, value: 10 }] } : linked);
+  expect((await PATCH(request('PATCH', { username: 'Accepted name' }), context('5'))).status).toBe(200);
+  expect(m.db.botEvent.create).toHaveBeenLastCalledWith({ data: { type: 'member.name.changed', aggregate: 'member', aggregateId: '5', payload: { userId: 5, discordUserId: '123456789012345678' } } });
+  expect((await DELETE(request('DELETE'), context('5'))).status).toBe(200);
+  expect(m.db.botEvent.create).toHaveBeenLastCalledWith({ data: { type: 'member.deleted', aggregate: 'member', aggregateId: '5', payload: { userId: 5, discordUserId: '123456789012345678' } } });
 });

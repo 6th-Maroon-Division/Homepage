@@ -11,6 +11,7 @@ async function main() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
   const { prisma } = await import('../lib/prisma');
   const { discoverJobs, runNextJob } = await import('../lib/scheduler/worker');
+  const { maintainDiscordEvidence } = await import('../lib/discord/evidence-maintenance');
   let stopping = false;
   let wake: (() => void) | undefined;
   const stop = () => { stopping = true; wake?.(); };
@@ -20,6 +21,7 @@ async function main() {
     do {
       try {
         await discoverJobs();
+        await maintainDiscordEvidence();
         for (let count = 0; count < 100 && !stopping; count++) if (!await runNextJob()) break;
       } catch {
         console.error(JSON.stringify({ event: 'scheduler.tick_failed', timestamp: new Date().toISOString() }));
