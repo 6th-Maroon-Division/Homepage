@@ -132,29 +132,46 @@ test('ORBAT announcement preview renders the roster image and explicit publicati
   expect(await db.discordCommand.count({ where: { kind: 'announcement.publish', status: 'pending', payload: { path: ['orbatId'], equals: seed.orbatId } } })).toBe(1);
 });
 
-test('Discord administration hydrates with Refresh disabled until configuration loads', async ({ page, login }) => {
-  await login();
-  const hydrationErrors: string[] = [];
-  page.on('console', message => {
-    if (/hydration|hydrated|server rendered HTML/i.test(message.text())) hydrationErrors.push(message.text());
+for (const initialFailure of [false, true]) {
+  test(`Discord administration hydrates before mounting Refresh (${initialFailure ? 'failed' : 'successful'} load)`, async ({ page, login }) => {
+    await login();
+    const hydrationErrors: string[] = [];
+    page.on('console', message => {
+      if (/hydration|hydrated|server rendered HTML/i.test(message.text())) hydrationErrors.push(message.text());
+    });
+    let releaseConfiguration!: () => void;
+    const configurationGate = new Promise<void>(resolve => { releaseConfiguration = resolve; });
+    let firstRequest = true;
+    await page.route('**/api/discord/config', async route => {
+      if (firstRequest) {
+        firstRequest = false;
+        await configurationGate;
+        if (initialFailure) {
+          await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({error: {code: 'unavailable', message: 'Temporary configuration failure'}}) });
+          return;
+        }
+      }
+      await route.continue();
+    });
+    try {
+      const response = await page.goto('/admin/discord');
+      const html = await response!.text();
+      expect(html).toMatch(/<span[^>]*aria-hidden="true"[^>]*>Refresh<\/span>/);
+      expect(html).not.toMatch(/<button[^>]*>Refresh<\/button>/);
+      await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toHaveCount(0);
+      await expect(page.getByText('Loading Discord settings…', {exact: true})).toBeVisible();
+    } finally {
+      releaseConfiguration();
+    }
+    const refresh = page.getByRole('button', {name: 'Refresh', exact: true});
+    await expect(refresh).toBeEnabled();
+    if (initialFailure) await expect(page.getByText('Configuration could not be loaded. Use Refresh to try again.')).toBeVisible();
+    await refresh.click();
+    await expect(page.getByText('No recent contact', {exact: true})).toBeVisible();
+    await expect(refresh).toBeEnabled();
+    expect(hydrationErrors).toEqual([]);
   });
-  let releaseConfiguration!: () => void;
-  const configurationGate = new Promise<void>(resolve => { releaseConfiguration = resolve; });
-  await page.route('**/api/discord/config', async route => {
-    await configurationGate;
-    await route.continue();
-  });
-  try {
-    const response = await page.goto('/admin/discord');
-    const html = await response!.text();
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Refresh<\/button>/);
-    await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeDisabled();
-  } finally {
-    releaseConfiguration();
-  }
-  await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
-  expect(hydrationErrors).toEqual([]);
-});
+}
 
 test('bot reports show exhausted join-role failures separately from queued actions', async ({ page, login, db }) => {
   const operation = await db.discordOperation.create({ data: {

@@ -103,7 +103,25 @@ export default function DiscordAdminClient({ permissions, defaultWebsiteUrl = ''
     const link = document.createElement('a'); link.href = url; link.download = attachment.name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   return <main className="mx-auto max-w-6xl px-4 py-8 space-y-6">
-    <header className={`${panel} flex flex-wrap items-start justify-between gap-4`}><div><Link href="/admin" className="text-sm underline">Administration</Link><h1 className="text-3xl font-bold mt-2">Discord bot</h1><p className="text-[var(--muted-foreground)] mt-2">Configure the server, manage delivery, and review moderation.</p></div><button className={button} disabled={busy || loading} onClick={() => { if (!dirty || window.confirm('Discard unsaved configuration changes and refresh?')) void run(async () => { await loadConfig(); if (tab !== 'configuration') await loadRows(tab); }); }}>Refresh</button></header>
+    <header className={`${panel} flex flex-wrap items-start justify-between gap-4`}>
+      <div>
+        <Link href="/admin" className="text-sm underline">Administration</Link>
+        <h1 className="text-3xl font-bold mt-2">Discord bot</h1>
+        <p className="text-[var(--muted-foreground)] mt-2">Configure the server, manage delivery, and review moderation.</p>
+      </div>
+      {/* Mount the interactive control after the initial client request settles.
+          The server and first client render share a noninteractive placeholder. */}
+      {loading ? <span className={`${button} opacity-50`} aria-hidden="true">Refresh</span> : <button
+        type="button"
+        className={button}
+        disabled={busy}
+        onClick={() => {
+          if (!dirty || window.confirm('Discard unsaved configuration changes and refresh?')) {
+            void run(async () => { await loadConfig(); if (tab !== 'configuration') await loadRows(tab); });
+          }
+        }}
+      >Refresh</button>}
+    </header>
     {error && <p role="alert" className="rounded border border-red-500 bg-[var(--secondary)] p-3 text-red-500">{error}</p>}{notice && <p role="status" className="rounded border border-emerald-500 bg-[var(--secondary)] p-3">{notice}</p>}
     {loading ? <p className={panel}>Loading Discord settings…</p> : !config ? <p className={panel}>Configuration could not be loaded. Use Refresh to try again.</p> : <>
       <section className={`${box} grid gap-4 sm:grid-cols-4`} aria-label="Bot status"><div><p className="text-sm opacity-70">Connection</p><strong>{config.lastSeenAt && now - Date.parse(config.lastSeenAt) < Number(settings.heartbeatSeconds) * 3000 ? 'Connected' : 'No recent contact'}</strong></div><div><p className="text-sm opacity-70">Configuration</p><strong>{config.appliedRevision === config.revision ? `Applied · revision ${config.revision}` : `Saved · revision ${config.revision}, waiting for bot`}</strong></div><div><p className="text-sm opacity-70">Last contact</p>{date(config.lastSeenAt)}</div><div><p className="text-sm opacity-70">Bot version</p>{config.botVersion ?? 'Not reported'}</div></section>

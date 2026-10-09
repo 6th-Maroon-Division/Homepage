@@ -20,6 +20,9 @@
 # production
 /build
 
+# generated handoff packets and other artifacts
+/artifacts/
+
 # misc
 .DS_Store
 *.pem
