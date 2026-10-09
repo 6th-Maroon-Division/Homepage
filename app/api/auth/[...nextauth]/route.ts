@@ -38,6 +38,8 @@ export const authOptions: AuthOptions = {
     DiscordProvider({
       clientId: process.env.DISCORD_CLIENT_ID!,
       clientSecret: process.env.DISCORD_CLIENT_SECRET!,
+      // Discord includes `iss` in callbacks; openid-client validates it against this value.
+      issuer: 'https://discord.com',
     }),
     // Steam uses OpenID 2.0 which doesn't work well with NextAuth's OAuth flow
     // We'll handle it with a custom page that redirects to Steam
