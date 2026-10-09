@@ -1,4 +1,6 @@
 import { beforeEach, expect, test, vi } from 'vitest';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 const mocks = vi.hoisted(() => {
   const model = () => ({ findUnique: vi.fn(), findUniqueOrThrow: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn() });
   return { cookie: { get: vi.fn(), getAll: vi.fn(), set: vi.fn() }, decode: vi.fn(), pending: vi.fn(), db: { user: model(), authAccount: model(), userPermission: model(), apiAuditLog: model(), $transaction: vi.fn() } };
@@ -12,6 +14,31 @@ import { authOptions, GET, POST } from '@/app/api/auth/[...nextauth]/route';
 const signin = (profile: unknown = { id: '123456789012345678', username: 'Discord user' }, provider = 'discord') => authOptions.callbacks!.signIn!({ account: { provider }, profile } as never);
 const jwt = (args: unknown) => authOptions.callbacks!.jwt!(args as never);
 const owner = { id: 10, username: 'Owner', email: null, createdAt: new Date() };
+// Exercise NextAuth's actual provider normalization and OAuth callback validation.
+// Only the outbound token exchange is mocked, so issuer/state checks stay real.
+const require = createRequire(import.meta.url);
+const nextAuthRoot = dirname(require.resolve('next-auth'));
+const { default: parseProviders } = require(join(nextAuthRoot, 'core/lib/providers.js'));
+const { openidClient } = require(join(nextAuthRoot, 'core/lib/oauth/client.js'));
+test('Discord callbacks accept the official issuer and reject incorrect issuer or state', async () => {
+  const { provider } = parseProviders({
+    providers: authOptions.providers,
+    providerId: 'discord',
+    url: 'https://example.test/api/auth',
+  });
+  const client = await openidClient({ provider: { ...provider, clientId: 'test-client', clientSecret: 'test-secret' } });
+  const grant = vi.spyOn(client, 'grant').mockResolvedValue({ access_token: 'test-access-token', token_type: 'Bearer' });
+  const params = { code: 'test-code', state: 'test-state', iss: 'https://discord.com' };
+  const checks = { state: 'test-state' };
+  try {
+    await expect(client.oauthCallback(provider.callbackUrl, params, checks)).resolves.toMatchObject({ access_token: 'test-access-token' });
+    expect(grant).toHaveBeenCalledTimes(1);
+    grant.mockClear();
+    await expect(client.oauthCallback(provider.callbackUrl, { ...params, iss: 'https://untrusted.example' }, checks)).rejects.toThrow('iss mismatch');
+    await expect(client.oauthCallback(provider.callbackUrl, { ...params, state: 'wrong-state' }, checks)).rejects.toThrow('state mismatch');
+    expect(grant).not.toHaveBeenCalled();
+  } finally { grant.mockRestore(); }
+});
 beforeEach(() => {
   vi.resetAllMocks(); mocks.cookie.getAll.mockReturnValue([]);
   mocks.db.authAccount.findUnique.mockResolvedValue({ id: 1, userId: 10, user: owner });
